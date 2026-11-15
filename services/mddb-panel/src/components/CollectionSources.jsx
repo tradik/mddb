@@ -59,36 +59,36 @@ export default function CollectionSources({ collection }) {
   return (
     <section aria-labelledby="collection-sources-title" className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 id="collection-sources-title" className="text-sm font-semibold text-gray-900">
+        <h3 id="collection-sources-title" className="text-sm font-semibold text-fg">
           Sources and triggers
         </h3>
         <button
           type="button"
           onClick={refresh}
           disabled={loading}
-          className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+          className="p-1 text-fg-subtle hover:bg-surface-subtle rounded"
           aria-label="Refresh sources and triggers"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
-      {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
+      {error && <p role="alert" className="text-xs text-danger">{error}</p>}
       {!error && !loading && rules.length === 0 && (
-        <p className="text-xs text-gray-600">No synced sources or triggers act on this collection.</p>
+        <p className="text-xs text-fg-subtle">No synced sources or triggers act on this collection.</p>
       )}
       {rules.length > 0 && (
-        <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
+        <ul className="divide-y divide-line border border-line rounded-lg">
           {rules.map((rule) => (
             <li key={rule.id} className="p-2 flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="text-sm text-gray-900">
+                <div className="text-sm text-fg">
                   <span className="font-medium">{rule.name || rule.id}</span>
-                  <span className="ml-2 text-xs uppercase text-gray-600">{rule.type}</span>
-                  <span className={`ml-2 text-xs ${rule.enabled ? 'text-green-800' : 'text-gray-600'}`}>
+                  <span className="ml-2 text-xs uppercase text-fg-subtle">{rule.type}</span>
+                  <span className={`ml-2 text-xs ${rule.enabled ? 'text-success-strong' : 'text-fg-subtle'}`}>
                     {rule.enabled ? 'enabled' : 'disabled'}
                   </span>
                 </div>
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-fg-subtle">
                   {rule.schedule && <span className="font-mono mr-1.5">{rule.schedule}</span>}
                   {describeRule(rule)}
                 </div>

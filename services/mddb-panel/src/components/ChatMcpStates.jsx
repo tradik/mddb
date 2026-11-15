@@ -7,17 +7,17 @@
 export default function ChatMcpStates({ servers }) {
   if (!servers?.length) return null;
   return (
-    <div className="mt-2 rounded border border-gray-200 p-2 text-xs">
-      <p className="font-medium text-gray-900">External MCP servers</p>
+    <div className="mt-2 rounded border border-line p-2 text-xs">
+      <p className="font-medium text-fg">External MCP servers</p>
       <ul className="mt-1 space-y-1">
         {servers.map((s) => (
-          <li key={s.name} className="text-gray-800">
+          <li key={s.name} className="text-fg-soft">
             <span className="font-medium">{s.name}</span>{' '}
-            {s.forwardIdentity && <span className="text-gray-700">(signed-in users only) </span>}
+            {s.forwardIdentity && <span className="text-fg-muted">(signed-in users only) </span>}
             {s.active ? (
-              <span className="text-green-800">active — tools: {s.tools.map((t) => t.name).join(', ') || 'none allowed'}</span>
+              <span className="text-success-strong">active — tools: {s.tools.map((t) => t.name).join(', ') || 'none allowed'}</span>
             ) : (
-              <span className="text-amber-900">inactive: {s.reason}</span>
+              <span className="text-warning-strong">inactive: {s.reason}</span>
             )}
           </li>
         ))}

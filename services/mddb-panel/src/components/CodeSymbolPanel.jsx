@@ -80,44 +80,44 @@ export default function CodeSymbolPanel() {
 
   return (
     <div className="h-full overflow-y-auto p-6">
-      <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-1">
+      <h2 className="text-xl font-bold text-fg flex items-center gap-2 mb-1">
         <Code2 className="w-5 h-5" aria-hidden="true" /> Code Symbols
       </h2>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-fg-subtle mb-4">
         Where a function, type or selector is defined, used, called and tested, as passages with line ranges.
         Collections indexed with <code>mddb-cli autoindex --semantic</code> answer from a language server&apos;s facts.
       </p>
       <form onSubmit={lookup} className="space-y-3 mb-6">
         <div className="flex flex-wrap gap-3 items-end">
-          <label className="text-sm text-gray-800">
+          <label className="text-sm text-fg-soft">
             <span className="block mb-1">Collection</span>
             <select
               value={collection}
               onChange={(e) => setCollection(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
+              className="px-3 py-2 border border-line-strong rounded-lg"
             >
               {collections.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </label>
-          <label className="text-sm text-gray-800 flex-1 min-w-[12rem]">
+          <label className="text-sm text-fg-soft flex-1 min-w-[12rem]">
             <span className="block mb-1">Symbol</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="SearchHybrid or Server.Close"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono"
+              className="w-full px-3 py-2 border border-line-strong rounded-lg font-mono"
             />
           </label>
-          <label className="text-sm text-gray-800 min-w-[10rem]">
+          <label className="text-sm text-fg-soft min-w-[10rem]">
             <span className="block mb-1">Definition file (optional)</span>
             <input
               value={path}
               onChange={(e) => setPath(e.target.value)}
               placeholder="internal/server/conn.go"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono"
+              className="w-full px-3 py-2 border border-line-strong rounded-lg font-mono"
             />
           </label>
-          <label className="text-sm text-gray-800">
+          <label className="text-sm text-fg-soft">
             <span className="block mb-1">Limit per relation</span>
             <input
               type="number"
@@ -125,11 +125,11 @@ export default function CodeSymbolPanel() {
               max={MAX_SYMBOL_LIMIT}
               value={limit}
               onChange={(e) => setLimit(e.target.value)}
-              className="w-24 px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-24 px-3 py-2 border border-line-strong rounded-lg"
             />
           </label>
         </div>
-        <fieldset className="flex flex-wrap gap-3 text-sm text-gray-800">
+        <fieldset className="flex flex-wrap gap-3 text-sm text-fg-soft">
           <legend className="sr-only">Relations</legend>
           {RELATIONS.map((r) => (
             <label key={r.id} className="inline-flex items-center gap-1">
@@ -151,19 +151,19 @@ export default function CodeSymbolPanel() {
             <Search className="w-4 h-4" aria-hidden="true" /> Look up
           </button>
           {loading && (
-            <button type="button" onClick={cancel} className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg inline-flex items-center gap-1">
+            <button type="button" onClick={cancel} className="px-4 py-2 bg-surface-subtle text-fg-soft rounded-lg inline-flex items-center gap-1">
               <X className="w-4 h-4" aria-hidden="true" /> Cancel
             </button>
           )}
         </div>
       </form>
-      {error && <p role="alert" className="text-sm text-red-700 mb-4">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger mb-4">{error}</p>}
       {result && (
         <div>
-          <p className="text-sm text-gray-700 mb-3">
+          <p className="text-sm text-fg-muted mb-3">
             <span className="font-mono">{result.symbol}</span> in {result.collection}
             <PrecisionBadge precision={result.precision} source={result.semanticSource} />
-            {result.truncated && <span className="ml-2 text-amber-800">Some relations were cut at the limit.</span>}
+            {result.truncated && <span className="ml-2 text-warning-strong">Some relations were cut at the limit.</span>}
           </p>
           {result.ambiguous && result.candidates?.length > 0 && (
             <CandidatePicker candidates={result.candidates} onPick={pick} />

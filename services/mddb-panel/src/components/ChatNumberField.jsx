@@ -7,7 +7,7 @@ export default function ChatNumberField({ id, label, value, onChange, hint, step
     <div>
       <label htmlFor={id} className={labelClass}>{label}</label>
       <input id={id} type="number" min="0" max={max} step={step} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
-      {hint && <p className="mt-1 text-xs text-gray-600">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-fg-subtle">{hint}</p>}
     </div>
   );
 }

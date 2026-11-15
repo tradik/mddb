@@ -106,7 +106,7 @@ describe('CommandModal', () => {
   test('curl is the default tab and shows a curl command', () => {
     const { container } = render(<CommandModal isOpen onClose={vi.fn()} type="search" params={{}} />);
     expect(codeText(container)).toMatch(/^curl -X POST/);
-    expect(screen.getByRole('button', { name: 'PHP' }).className).toContain('text-gray-600');
+    expect(screen.getByRole('button', { name: 'PHP' }).className).toContain('text-fg-subtle');
   });
 
   test('Copy writes the code to the clipboard and says Copied for 2 s', async () => {

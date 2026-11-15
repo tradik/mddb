@@ -11,11 +11,11 @@ import OneTimeSecret from './OneTimeSecret';
  */
 function KeyId({ apiKey }) {
   if (!apiKey.fingerprint) {
-    return <span className="ml-2 text-xs text-gray-600 font-mono">{apiKey.keyPrefix}</span>;
+    return <span className="ml-2 text-xs text-fg-subtle font-mono">{apiKey.keyPrefix}</span>;
   }
   return (
     <span
-      className="ml-2 text-xs text-gray-600 font-mono"
+      className="ml-2 text-xs text-fg-subtle font-mono"
       title="Fingerprint: four bytes of SHA-256 of the key, as the server log shows it. Not part of the key."
     >
       {apiKey.keyPrefix}… · {apiKey.fingerprint}
@@ -31,10 +31,10 @@ function KeyRow({ apiKey, onDisable, onDelete }) {
         <span className="font-medium text-sm">{apiKey.name}</span>
         <KeyId apiKey={apiKey} />
         {apiKey.disabled && (
-          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-700">DISABLED</span>
+          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-danger-muted text-danger">DISABLED</span>
         )}
         {apiKey.expiresAt > 0 && (
-          <span className="ml-2 text-xs text-gray-600">
+          <span className="ml-2 text-xs text-fg-subtle">
             expires {new Date(apiKey.expiresAt * 1000).toLocaleDateString()}
           </span>
         )}
@@ -45,7 +45,7 @@ function KeyRow({ apiKey, onDisable, onDelete }) {
             onClick={() => { void onDisable({ fingerprint: apiKey.fingerprint }); }}
             title="Disable key"
             aria-label={`Disable key ${apiKey.name}`}
-            className="p-1.5 text-gray-600 hover:text-yellow-700 rounded"
+            className="p-1.5 text-fg-subtle hover:text-warning rounded"
           >
             <Ban className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -54,7 +54,7 @@ function KeyRow({ apiKey, onDisable, onDelete }) {
           onClick={() => { void onDelete({ fingerprint: apiKey.fingerprint }); }}
           title="Delete key"
           aria-label={`Delete key ${apiKey.name}`}
-          className="p-1.5 text-gray-600 hover:text-red-700 rounded"
+          className="p-1.5 text-fg-subtle hover:text-danger rounded"
         >
           <Trash2 className="w-4 h-4" aria-hidden="true" />
         </button>
@@ -122,19 +122,19 @@ export default function MCPAPIKeysPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center space-x-2">
-        <Key className="w-5 h-5 text-gray-500" />
+        <Key className="w-5 h-5 text-fg-faint" />
         <h3 className="text-lg font-semibold">MCP API Keys</h3>
       </div>
 
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-fg-faint">
         Manage API keys for MCP endpoint access. Keys are stored in the database and persist across restarts.
       </p>
 
       {error && (
-        <div className="flex items-center space-x-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+        <div className="flex items-center space-x-2 p-3 bg-danger-soft text-danger rounded-lg text-sm">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">&times;</button>
+          <button onClick={() => setError(null)} className="ml-auto text-danger hover:text-danger">&times;</button>
         </div>
       )}
 
@@ -146,7 +146,7 @@ export default function MCPAPIKeysPanel() {
           onChange={(e) => setNewKeyName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
           placeholder="Key name (e.g. claude-prod)"
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-focus focus:border-transparent"
         />
         <button
           onClick={handleCreate}
@@ -162,9 +162,9 @@ export default function MCPAPIKeysPanel() {
       {createdKey && <OneTimeSecret secret={createdKey} onDismiss={() => setCreatedKey(null)} />}
 
       {/* Key list */}
-      {loading && <p className="text-sm text-gray-600">Loading keys...</p>}
+      {loading && <p className="text-sm text-fg-subtle">Loading keys...</p>}
       {!loading && keys.length === 0 && (
-        <p className="text-sm text-gray-600">No API keys configured. Create one above.</p>
+        <p className="text-sm text-fg-subtle">No API keys configured. Create one above.</p>
       )}
       {!loading && keys.length > 0 && (
         <div className="border rounded-lg divide-y">
@@ -174,10 +174,10 @@ export default function MCPAPIKeysPanel() {
         </div>
       )}
 
-      <p className="text-xs text-gray-600">
-        Use keys via <code className="bg-gray-100 px-1 rounded">X-API-Key</code> header
-        or <code className="bg-gray-100 px-1 rounded">Authorization: Bearer</code>.
-        Enable with <code className="bg-gray-100 px-1 rounded">MDDB_MCP_API_KEY_ENABLED=true</code>.
+      <p className="text-xs text-fg-subtle">
+        Use keys via <code className="bg-surface-subtle px-1 rounded">X-API-Key</code> header
+        or <code className="bg-surface-subtle px-1 rounded">Authorization: Bearer</code>.
+        Enable with <code className="bg-surface-subtle px-1 rounded">MDDB_MCP_API_KEY_ENABLED=true</code>.
       </p>
     </div>
   );

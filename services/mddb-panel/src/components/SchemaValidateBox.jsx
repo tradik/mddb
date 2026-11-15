@@ -23,8 +23,8 @@ export default function SchemaValidateBox({ collection }) {
   const validate = () => run(async () => setResult(await mddbClient.validateMeta(collection, parseJson(text).value || {})));
 
   return (
-    <section aria-labelledby="schema-validate-title" className="bg-white rounded-lg shadow p-4 space-y-3">
-      <h3 id="schema-validate-title" className="text-base font-semibold text-gray-900">Validate a document</h3>
+    <section aria-labelledby="schema-validate-title" className="bg-surface rounded-lg shadow p-4 space-y-3">
+      <h3 id="schema-validate-title" className="text-base font-semibold text-fg">Validate a document</h3>
       <JsonTextarea
         label={`Metadata to check against ${collection}`}
         value={text}
@@ -43,11 +43,11 @@ export default function SchemaValidateBox({ collection }) {
       <ApiErrorNotice error={error} collection={collection} />
       {result && (
         <div role="status" className="text-sm space-y-1">
-          <p className={result.valid ? 'text-green-800 font-medium' : 'text-red-800 font-medium'}>
+          <p className={result.valid ? 'text-success-strong font-medium' : 'text-danger-strong font-medium'}>
             {result.valid ? 'Valid: the server would accept this metadata.' : 'Invalid: the server would refuse this document.'}
           </p>
           {[...(result.errors || []).map((m) => ['error', m]), ...(result.warnings || []).map((m) => ['warning', m])].map(([kind, m]) => (
-            <p key={`${kind}-${m}`} className={kind === 'error' ? 'text-red-800' : 'text-amber-900'}>{kind === 'error' ? 'Error' : 'Warning'}: {m}</p>
+            <p key={`${kind}-${m}`} className={kind === 'error' ? 'text-danger-strong' : 'text-warning-strong'}>{kind === 'error' ? 'Error' : 'Warning'}: {m}</p>
           ))}
         </div>
       )}

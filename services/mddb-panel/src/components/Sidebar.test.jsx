@@ -140,7 +140,7 @@ describe('collections', () => {
     fireEvent.click(screen.getByRole('button', { name: 'site' }));
     expect(useStore.getState().currentCollection).toBe('site');
     expect(useStore.getState().viewMode).toBe('documents');
-    expect(row('site').className).toContain('bg-blue-100');
+    expect(row('site').className).toContain('bg-info-muted');
     fireEvent.click(screen.getByTitle('Upload documents to collection'));
     expect(screen.getByTestId('upload-modal').dataset.collection).toBe('site');
     fireEvent.click(screen.getByText('close upload'));
@@ -230,10 +230,10 @@ describe('administration menu', () => {
   test('Chat opens the chat scenarios page and is highlighted', async () => {
     await renderSidebar();
     const chat = screen.getByRole('button', { name: 'Chat' });
-    expect(chat.className).toContain('text-gray-700');
+    expect(chat.className).toContain('text-fg-muted');
     fireEvent.click(chat);
     expect(useStore.getState().viewMode).toBe('chat');
-    expect(screen.getByRole('button', { name: 'Chat' }).className).toContain('bg-blue-100');
+    expect(screen.getByRole('button', { name: 'Chat' }).className).toContain('bg-info-muted');
   });
 
   test('Users, Groups and Cluster appear only when the server has them; Automation unless disabled', async () => {

@@ -22,19 +22,19 @@ export default function ServerEdgeCard({ config: given }) {
   const config = given || loaded;
 
   return (
-    <section aria-labelledby="server-edge-title" className="bg-white rounded-lg shadow mb-6 p-6">
+    <section aria-labelledby="server-edge-title" className="bg-surface rounded-lg shadow mb-6 p-6">
       <div className="flex items-center mb-4">
-        <Shield className="w-5 h-5 text-primary-700 mr-2" aria-hidden="true" />
-        <h2 id="server-edge-title" className="text-lg font-semibold text-gray-900">Search surface, tracing &amp; proxies</h2>
+        <Shield className="w-5 h-5 text-accent mr-2" aria-hidden="true" />
+        <h2 id="server-edge-title" className="text-lg font-semibold text-fg">Search surface, tracing &amp; proxies</h2>
       </div>
-      {error && <p className="text-sm text-red-700">Could not load the server configuration: {error}</p>}
-      {!error && !config && <p className="text-sm text-gray-600">Loading…</p>}
+      {error && <p className="text-sm text-danger">Could not load the server configuration: {error}</p>}
+      {!error && !config && <p className="text-sm text-fg-subtle">Loading…</p>}
       {config && (
         <dl className="divide-y">
           {edgeRows(config).map(([label, value]) => (
             <div key={label} className="flex justify-between gap-4 py-2">
-              <dt className="text-sm text-gray-600">{label}</dt>
-              <dd className="text-sm font-medium text-gray-900 text-right break-all">{value}</dd>
+              <dt className="text-sm text-fg-subtle">{label}</dt>
+              <dd className="text-sm font-medium text-fg text-right break-all">{value}</dd>
             </div>
           ))}
         </dl>

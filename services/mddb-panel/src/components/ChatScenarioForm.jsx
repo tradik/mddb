@@ -18,23 +18,23 @@ function CollectionPicker({ collections, selected, onChange }) {
     <fieldset>
       <legend className={labelClass}>Allowed collections</legend>
       {names.length === 0 ? (
-        <p className="text-sm text-gray-600">This server has no collections yet.</p>
+        <p className="text-sm text-fg-subtle">This server has no collections yet.</p>
       ) : (
-        <div className="max-h-40 overflow-y-auto rounded border border-gray-300 p-2 grid gap-1 sm:grid-cols-2">
+        <div className="max-h-40 overflow-y-auto rounded border border-line-strong p-2 grid gap-1 sm:grid-cols-2">
           {names.map((name) => (
-            <label key={name} className="flex items-center gap-2 text-sm text-gray-800">
+            <label key={name} className="flex items-center gap-2 text-sm text-fg-soft">
               <input
                 type="checkbox"
                 checked={selected.includes(name)}
                 onChange={() => toggle(name)}
-                className="h-4 w-4 rounded border-gray-400 text-primary-700 focus:ring-primary-500"
+                className="h-4 w-4 rounded border-line-strong text-accent focus:ring-focus"
               />
               <span className="truncate">{name}</span>
             </label>
           ))}
         </div>
       )}
-      <p className="mt-1 text-xs text-gray-600">The assistant may search only these. With none selected it has no collection to search.</p>
+      <p className="mt-1 text-xs text-fg-subtle">The assistant may search only these. With none selected it has no collection to search.</p>
     </fieldset>
   );
 }
@@ -44,7 +44,7 @@ function TextArea({ id, label, value, onChange, rows, placeholder, hint }) {
     <div>
       <label htmlFor={id} className={labelClass}>{label}</label>
       <textarea id={id} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={inputClass} />
-      <p className="mt-1 text-xs text-gray-600">{hint}</p>
+      <p className="mt-1 text-xs text-fg-subtle">{hint}</p>
     </div>
   );
 }
@@ -61,7 +61,7 @@ export default function ChatScenarioForm({ form, set, collections, skills, secre
             onChange={(e) => set('name', e.target.value)}
             disabled={!isNew}
             placeholder="support"
-            className={`${inputClass} disabled:bg-gray-100 disabled:text-gray-700`}
+            className={`${inputClass} disabled:bg-surface-subtle disabled:text-fg-muted`}
           />
         </div>
         <div>
@@ -70,12 +70,12 @@ export default function ChatScenarioForm({ form, set, collections, skills, secre
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-800">
+      <label className="flex items-center gap-2 text-sm text-fg-soft">
         <input
           type="checkbox"
           checked={form.enabled}
           onChange={(e) => set('enabled', e.target.checked)}
-          className="h-4 w-4 rounded border-gray-400 text-primary-700 focus:ring-primary-500"
+          className="h-4 w-4 rounded border-line-strong text-accent focus:ring-focus"
         />
         Enabled — the chat service offers this scenario
       </label>

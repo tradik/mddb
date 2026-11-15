@@ -70,9 +70,9 @@ export default function AuditLogPanel() {
 
   if (forbidden) {
     return (
-      <div className="p-8 text-center text-gray-500">
-        <FileSearch className="w-10 h-10 mx-auto text-gray-300 mb-2" />
-        <p className="text-sm font-medium text-gray-700">Admin only</p>
+      <div className="p-8 text-center text-fg-faint">
+        <FileSearch className="w-10 h-10 mx-auto text-line-strong mb-2" />
+        <p className="text-sm font-medium text-fg-muted">Admin only</p>
         <p className="text-xs mt-1">Audit log access is restricted to administrator accounts.</p>
       </div>
     );
@@ -80,14 +80,14 @@ export default function AuditLogPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-line flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <FileSearch className="w-5 h-5 text-primary-600" />
+          <h3 className="text-lg font-semibold text-fg flex items-center gap-2">
+            <FileSearch className="w-5 h-5 text-accent" />
             Audit Log
             {dropped > 0 && (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-900 rounded text-xs font-semibold"
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-warning-muted text-warning-strong rounded text-xs font-semibold"
                 title="Events dropped because the audit buffer was full"
               >
                 <AlertTriangle className="w-3 h-3" />
@@ -95,7 +95,7 @@ export default function AuditLogPanel() {
               </span>
             )}
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-fg-faint mt-0.5">
             ISO 27001 A.8.15 / SOC 2 CC7.2 — access and administration events.
           </p>
         </div>
@@ -110,25 +110,25 @@ export default function AuditLogPanel() {
       </div>
 
       {/* Filter Bar */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 grid grid-cols-2 md:grid-cols-6 gap-2">
+      <div className="px-4 py-3 border-b border-line bg-surface-muted grid grid-cols-2 md:grid-cols-6 gap-2">
         <input
           type="text"
           value={actor}
           onChange={(e) => setActor(e.target.value)}
           placeholder="actor"
-          className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+          className="px-2 py-1.5 border border-line-strong rounded text-sm"
         />
         <input
           type="text"
           value={action}
           onChange={(e) => setAction(e.target.value)}
           placeholder="action"
-          className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+          className="px-2 py-1.5 border border-line-strong rounded text-sm"
         />
         <select
           value={result}
           onChange={(e) => setResult(e.target.value)}
-          className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+          className="px-2 py-1.5 border border-line-strong rounded text-sm"
         >
           <option value="">all results</option>
           <option value="ok">ok</option>
@@ -138,13 +138,13 @@ export default function AuditLogPanel() {
           type="datetime-local"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
-          className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+          className="px-2 py-1.5 border border-line-strong rounded text-sm"
         />
         <input
           type="datetime-local"
           value={to}
           onChange={(e) => setTo(e.target.value)}
-          className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+          className="px-2 py-1.5 border border-line-strong rounded text-sm"
         />
         <div className="flex items-center gap-2">
           <input
@@ -153,7 +153,7 @@ export default function AuditLogPanel() {
             max="10000"
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value) || 200)}
-            className="w-20 px-2 py-1.5 border border-gray-300 rounded text-sm"
+            className="w-20 px-2 py-1.5 border border-line-strong rounded text-sm"
             title="limit"
           />
           <button
@@ -166,21 +166,21 @@ export default function AuditLogPanel() {
       </div>
 
       {error && (
-        <div className="mx-4 mt-3 p-3 bg-red-100 border border-red-200 rounded-lg flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-red-900 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-900">{error}</p>
+        <div className="mx-4 mt-3 p-3 bg-danger-muted border border-danger-line rounded-lg flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-danger-strong flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-strong">{error}</p>
         </div>
       )}
 
       <div className="flex-1 overflow-auto p-4">
         {loading ? (
-          <p className="text-sm text-gray-500">Loading…</p>
+          <p className="text-sm text-fg-faint">Loading…</p>
         ) : events.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">No audit events match the current filter.</p>
+          <p className="text-sm text-fg-faint italic">No audit events match the current filter.</p>
         ) : (
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-600 border-b border-gray-200">
+              <tr className="text-left text-fg-subtle border-b border-line">
                 <th className="px-2 py-2 font-semibold">Timestamp</th>
                 <th className="px-2 py-2 font-semibold">Actor</th>
                 <th className="px-2 py-2 font-semibold">Action</th>
@@ -213,13 +213,13 @@ function auditEventKey(event) {
 
 function AuditRow({ event, formatTs }) {
   const resultClass = event.result === 'ok'
-    ? 'bg-green-100 text-green-900'
+    ? 'bg-success-muted text-success-strong'
     : event.result === 'fail'
-      ? 'bg-red-100 text-red-900'
-      : 'bg-gray-100 text-gray-800';
+      ? 'bg-danger-muted text-danger-strong'
+      : 'bg-surface-subtle text-fg-soft';
   return (
-    <tr className="border-b border-gray-100 hover:bg-gray-50">
-      <td className="px-2 py-1.5 font-mono whitespace-nowrap text-gray-700">{formatTs(event.ts)}</td>
+    <tr className="border-b border-line-soft hover:bg-surface-muted">
+      <td className="px-2 py-1.5 font-mono whitespace-nowrap text-fg-muted">{formatTs(event.ts)}</td>
       <td className="px-2 py-1.5 font-mono">{event.actor || '-'}</td>
       <td className="px-2 py-1.5 font-mono">{event.action || '-'}</td>
       <td className="px-2 py-1.5">

@@ -26,7 +26,7 @@ export default function FeatureBulkBar({ features, scope, busy, onApply }) {
       type="button"
       disabled={busy || plans[enabled].names.length === 0}
       onClick={() => setPending(enabled)}
-      className="rounded border border-gray-500 px-2.5 py-1 text-xs font-medium text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded border border-line-strong px-2.5 py-1 text-xs font-medium text-fg-soft hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
       aria-label={`Turn ${enabled ? 'on' : 'off'} all${scope ? ` in ${scope}` : ''}`}
     >
       Turn {enabled ? 'on' : 'off'} all

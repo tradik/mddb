@@ -6,9 +6,9 @@
 export default function PermissionScopeHint({ collection, admin }) {
   const global = collection.trim() === '*';
   return (
-    <p className="text-xs text-gray-700">
+    <p className="text-xs text-fg-muted">
       {admin && !global && (
-        <strong className="block text-amber-900">
+        <strong className="block text-warning-strong">
           Admin on &quot;{collection.trim() || '…'}&quot; covers that collection only — not server-wide.
         </strong>
       )}

@@ -10,7 +10,7 @@ import { saveBlob } from '../lib/download';
 // "*". A pack embedded by another model than the server's installs with
 // vectorsDisabled: its hybrid search falls back to full text.
 
-const inputClass = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+const inputClass = 'w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus';
 
 function PackRow({ pack, onRemove, removing }) {
   const info = pack.corpus;
@@ -18,20 +18,20 @@ function PackRow({ pack, onRemove, removing }) {
     <li className="py-3 flex items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-gray-900">{pack.collection}</span>
-          {info.version && <span className="text-xs text-gray-600">v{info.version}</span>}
+          <span className="font-medium text-fg">{pack.collection}</span>
+          {info.version && <span className="text-xs text-fg-subtle">v{info.version}</span>}
           {pack.readOnly && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
+            <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2 py-0.5 text-xs font-medium text-fg-soft">
               <Lock className="h-3 w-3" aria-hidden="true" /> read-only
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-xs text-gray-600">
+        <div className="mt-0.5 text-xs text-fg-subtle">
           {info.docCount} documents · licence {info.license} · built by MDDB {info.mddbVersion}
           {info.installedAt && ` · installed ${new Date(info.installedAt).toLocaleString()}`}
         </div>
         {info.vectorsDisabled && (
-          <div className="mt-1 flex items-center gap-1 text-xs text-amber-800">
+          <div className="mt-1 flex items-center gap-1 text-xs text-warning-strong">
             <AlertTriangle className="h-3 w-3" aria-hidden="true" />
             Embedded by another model than this server&apos;s: vector search finds nothing here, hybrid uses full text.
           </div>
@@ -42,7 +42,7 @@ function PackRow({ pack, onRemove, removing }) {
         onClick={() => onRemove(pack.collection)}
         disabled={removing}
         aria-label={`Remove pack ${pack.collection}`}
-        className="shrink-0 rounded p-1.5 text-red-700 hover:bg-red-50 disabled:opacity-50"
+        className="shrink-0 rounded p-1.5 text-danger hover:bg-danger-soft disabled:opacity-50"
       >
         <Trash2 className="h-4 w-4" />
       </button>
@@ -119,24 +119,24 @@ export default function CorpusPacksCard() {
   const collections = (stats?.collections || []).map((c) => c.name);
 
   return (
-    <div className="bg-white rounded-lg shadow mb-6 p-6">
+    <div className="bg-surface rounded-lg shadow mb-6 p-6">
       <div className="flex items-center mb-2">
-        <Package className="w-5 h-5 text-primary-600 mr-2" aria-hidden="true" />
-        <h2 className="text-lg font-semibold text-gray-900">Corpus packs</h2>
+        <Package className="w-5 h-5 text-accent mr-2" aria-hidden="true" />
+        <h2 className="text-lg font-semibold text-fg">Corpus packs</h2>
       </div>
-      <p className="text-sm text-gray-600 mb-3">
+      <p className="text-sm text-fg-subtle mb-3">
         Read-only collections installed from a <code>.mddbpack</code> — no re-embedding or reindexing.
         Every write to them is refused (403 READ_ONLY); remove the pack to use the name again.
         Installing, removing and building need admin on &quot;*&quot;.
       </p>
 
-      {error && <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
-      {message && <output className="mb-3 block rounded border border-green-200 bg-green-50 p-2 text-sm text-green-800">{message}</output>}
+      {error && <p role="alert" className="mb-3 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
+      {message && <output className="mb-3 block rounded border border-success-line bg-success-soft p-2 text-sm text-success-strong">{message}</output>}
 
       {packs.length === 0 ? (
-        <p className="text-sm text-gray-600">No packs installed.</p>
+        <p className="text-sm text-fg-subtle">No packs installed.</p>
       ) : (
-        <ul className="divide-y divide-gray-200">
+        <ul className="divide-y divide-line">
           {packs.map((pack) => (
             <PackRow key={pack.collection} pack={pack} onRemove={remove} removing={busy === 'remove'} />
           ))}
@@ -145,7 +145,7 @@ export default function CorpusPacksCard() {
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div>
-          <h3 className="text-sm font-medium text-gray-800 mb-1">Install a pack</h3>
+          <h3 className="text-sm font-medium text-fg-soft mb-1">Install a pack</h3>
           <label htmlFor="corpus-file" className="sr-only">Pack file</label>
           <input
             id="corpus-file"
@@ -153,7 +153,7 @@ export default function CorpusPacksCard() {
             type="file"
             accept=".mddbpack"
             onChange={(e) => setFile(e.target.files[0] || null)}
-            className="block w-full text-sm text-gray-700"
+            className="block w-full text-sm text-fg-muted"
           />
           <button
             type="button"
@@ -167,10 +167,10 @@ export default function CorpusPacksCard() {
         </div>
 
         <form onSubmit={buildPack}>
-          <h3 className="text-sm font-medium text-gray-800 mb-1">Build a pack</h3>
+          <h3 className="text-sm font-medium text-fg-soft mb-1">Build a pack</h3>
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label htmlFor="corpus-collection" className="block text-xs text-gray-600">Collection</label>
+              <label htmlFor="corpus-collection" className="block text-xs text-fg-subtle">Collection</label>
               <select
                 id="corpus-collection"
                 value={build.collection}
@@ -182,7 +182,7 @@ export default function CorpusPacksCard() {
               </select>
             </div>
             <div>
-              <label htmlFor="corpus-license" className="block text-xs text-gray-600">Licence</label>
+              <label htmlFor="corpus-license" className="block text-xs text-fg-subtle">Licence</label>
               <input
                 id="corpus-license"
                 value={build.license}
@@ -192,7 +192,7 @@ export default function CorpusPacksCard() {
               />
             </div>
             <div>
-              <label htmlFor="corpus-version" className="block text-xs text-gray-600">Version</label>
+              <label htmlFor="corpus-version" className="block text-xs text-fg-subtle">Version</label>
               <input
                 id="corpus-version"
                 value={build.version}
@@ -205,7 +205,7 @@ export default function CorpusPacksCard() {
           <button
             type="submit"
             disabled={!build.collection || !build.license.trim() || busy !== null}
-            className="mt-2 flex items-center px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded hover:bg-gray-200 disabled:opacity-50"
+            className="mt-2 flex items-center px-3 py-1.5 bg-surface-subtle text-fg-soft text-sm rounded hover:bg-surface-strong disabled:opacity-50"
           >
             <Download className="w-4 h-4 mr-1.5" aria-hidden="true" />
             {busy === 'build' ? 'Building…' : 'Build and download'}

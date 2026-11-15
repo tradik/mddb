@@ -36,7 +36,7 @@ export default function NavMenu({ authEnabled = false, clusterEnabled = false, a
   return (
     <nav aria-label="Panel menu">
       <div className="relative mb-3">
-        <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+        <Search className="w-3.5 h-3.5 text-fg-faint absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
         <input
           type="search"
           value={query}
@@ -46,11 +46,11 @@ export default function NavMenu({ authEnabled = false, clusterEnabled = false, a
           aria-label="Search the menu"
           aria-keyshortcuts="/"
           data-shortcut="search"
-          className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-500 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          className="w-full pl-8 pr-2 py-1.5 text-sm border border-line-strong rounded-lg text-fg placeholder-fg-faint focus:outline-none focus:ring-2 focus:ring-focus"
         />
       </div>
       {groups.length === 0 && (
-        <p role="status" className="text-sm text-gray-600 px-3">No menu entries match “{query.trim()}”.</p>
+        <p role="status" className="text-sm text-fg-subtle px-3">No menu entries match “{query.trim()}”.</p>
       )}
       <div className="space-y-2">
         {groups.map((group) => {

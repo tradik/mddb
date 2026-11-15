@@ -25,22 +25,22 @@ export default function MemoryMessageForm({ sessionId, onAdded }) {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-2 border-t border-gray-200 pt-3">
-      <h4 className="text-sm font-semibold text-gray-900">Add a message</h4>
+    <form onSubmit={submit} className="space-y-2 border-t border-line pt-3">
+      <h4 className="text-sm font-semibold text-fg">Add a message</h4>
       <div className="flex gap-2 items-start">
-        <label className="text-sm text-gray-800">
+        <label className="text-sm text-fg-soft">
           <span className="block mb-1">Role</span>
-          <select value={role} onChange={(e) => setRole(e.target.value)} className="px-2 py-2 border border-gray-300 rounded-lg">
+          <select value={role} onChange={(e) => setRole(e.target.value)} className="px-2 py-2 border border-line-strong rounded-lg">
             {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </label>
-        <label className="flex-1 text-sm text-gray-800">
+        <label className="flex-1 text-sm text-fg-soft">
           <span className="block mb-1">Content</span>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            className="w-full px-3 py-2 border border-line-strong rounded-lg"
           />
         </label>
       </div>

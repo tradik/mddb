@@ -38,28 +38,28 @@ export default function DocumentCompare({ document, onClose }) {
 
   const ready = collection.trim() && key.trim() && lang.trim();
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col">
-      <div className="border-b border-gray-200 p-4 flex items-center justify-between">
+    <div className="fixed inset-0 bg-surface z-50 flex flex-col">
+      <div className="border-b border-line p-4 flex items-center justify-between">
         <div className="min-w-0">
-          <h2 className="text-xl font-semibold text-gray-900">Compare with…</h2>
-          <p className="text-sm text-gray-700 mt-1 break-words">
+          <h2 className="text-xl font-semibold text-fg">Compare with…</h2>
+          <p className="text-sm text-fg-muted mt-1 break-words">
             {document.collection} / {document.key} ({document.lang})
           </p>
         </div>
-        <button onClick={onClose} aria-label="Close comparison" className="p-2 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
+        <button onClick={onClose} aria-label="Close comparison" className="p-2 text-fg-subtle hover:text-fg-soft rounded-lg hover:bg-surface-subtle">
           <X className="w-5 h-5" />
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         <form onSubmit={compare} className="grid gap-3 sm:grid-cols-[1fr_1fr_8rem_auto] sm:items-end">
           <CollectionNameInput value={collection} onChange={setCollection} />
-          <label className="block text-sm text-gray-800">
+          <label className="block text-sm text-fg-soft">
             <span className="block mb-1">Key</span>
-            <input value={key} onChange={(e) => setKey(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+            <input value={key} onChange={(e) => setKey(e.target.value)} className="w-full px-3 py-2 border border-line-strong rounded-lg" />
           </label>
-          <label className="block text-sm text-gray-800">
+          <label className="block text-sm text-fg-soft">
             <span className="block mb-1">Language</span>
-            <input value={lang} onChange={(e) => setLang(e.target.value)} placeholder="e.g. pl_PL" className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+            <input value={lang} onChange={(e) => setLang(e.target.value)} placeholder="e.g. pl_PL" className="w-full px-3 py-2 border border-line-strong rounded-lg" />
           </label>
           <button
             type="submit"
@@ -73,7 +73,7 @@ export default function DocumentCompare({ document, onClose }) {
         <ApiErrorNotice error={error} collection={collection} />
         {other && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-800">
+            <p className="text-sm text-fg-soft">
               From <strong>{document.key} ({document.lang})</strong> to <strong>{other.collection} / {other.key} ({other.lang})</strong>:
             </p>
             <MetaDiff before={document.meta} after={other.meta} label="Metadata" />

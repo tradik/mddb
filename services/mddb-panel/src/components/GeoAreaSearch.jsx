@@ -41,7 +41,7 @@ export default function GeoAreaSearch({ collection, onResults }) {
 
   return (
     <div className="space-y-2 text-sm">
-      <fieldset className="flex gap-3 text-gray-800">
+      <fieldset className="flex gap-3 text-fg-soft">
         <legend className="sr-only">Area shape</legend>
         <label className="inline-flex items-center gap-1"><input type="radio" name="geo-shape" checked={shape === 'box'} onChange={() => setShape('box')} /> Bounding box</label>
         <label className="inline-flex items-center gap-1"><input type="radio" name="geo-shape" checked={shape === 'polygon'} onChange={() => setShape('polygon')} /> Polygon</label>
@@ -49,9 +49,9 @@ export default function GeoAreaSearch({ collection, onResults }) {
       {shape === 'box' ? (
         <div className="grid grid-cols-2 gap-2">
           {BOX.map(([name, label]) => (
-            <label key={name} className="text-xs text-gray-800">
+            <label key={name} className="text-xs text-fg-soft">
               <span className="block mb-0.5">{label}</span>
-              <input type="number" step="0.000001" value={box[name]} onChange={(e) => setBox({ ...box, [name]: e.target.value })} className="w-full border border-gray-300 rounded px-2 py-1" />
+              <input type="number" step="0.000001" value={box[name]} onChange={(e) => setBox({ ...box, [name]: e.target.value })} className="w-full border border-line-strong rounded px-2 py-1" />
             </label>
           ))}
         </div>
@@ -62,7 +62,7 @@ export default function GeoAreaSearch({ collection, onResults }) {
         Search area
       </button>
       <ApiErrorNotice error={error} collection={collection || '*'} />
-      {total !== null && <p role="status" className="text-xs text-gray-800">{total} documents inside the area.</p>}
+      {total !== null && <p role="status" className="text-xs text-fg-soft">{total} documents inside the area.</p>}
     </div>
   );
 }

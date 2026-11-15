@@ -19,7 +19,7 @@ export default function NavGroup({ group, open, pinned = false, onToggle }) {
         aria-disabled={pinned || undefined}
         title={pinned ? 'Kept open while the menu is searched' : undefined}
         onClick={() => !pinned && onToggle(group.id)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded text-left text-xs font-semibold text-gray-600 uppercase tracking-wide hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+        className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         {/* One line, left-aligned like every group; a sidebar too narrow for
             the label cuts it with an ellipsis rather than wrapping it. */}

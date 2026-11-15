@@ -5,9 +5,9 @@ import { lineDiff, diffStats } from '../lib/line-diff';
 // rest on colour alone (WCAG 2.2 SC 1.4.1); the colours keep 4.5:1 text contrast.
 
 const styles = {
-  same: { sign: ' ', word: '', className: 'text-gray-800' },
-  added: { sign: '+', word: 'added: ', className: 'bg-green-50 text-green-900' },
-  removed: { sign: '-', word: 'removed: ', className: 'bg-red-50 text-red-900' },
+  same: { sign: ' ', word: '', className: 'text-fg-soft' },
+  added: { sign: '+', word: 'added: ', className: 'bg-success-soft text-success-strong' },
+  removed: { sign: '-', word: 'removed: ', className: 'bg-danger-soft text-danger-strong' },
 };
 
 export default function LineDiff({ before, after, label }) {
@@ -15,13 +15,13 @@ export default function LineDiff({ before, after, label }) {
   const { added, removed } = diffStats(diff);
   return (
     <figure className="mt-2">
-      <figcaption className="text-xs text-gray-700">
+      <figcaption className="text-xs text-fg-muted">
         {label}: {added} line{added === 1 ? '' : 's'} added, {removed} removed
       </figcaption>
       {added + removed === 0 ? (
-        <p className="mt-1 text-sm text-gray-700">No change.</p>
+        <p className="mt-1 text-sm text-fg-muted">No change.</p>
       ) : (
-        <pre className="mt-1 max-h-96 overflow-auto rounded border border-gray-200 bg-white p-2 text-xs">
+        <pre className="mt-1 max-h-96 overflow-auto rounded border border-line bg-surface p-2 text-xs">
           {diff.map((d, i) => {
             const s = styles[d.type];
             return (

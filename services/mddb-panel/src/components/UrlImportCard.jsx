@@ -35,15 +35,15 @@ export default function UrlImportCard() {
   };
 
   const input = (label, value, setValue, props = {}) => (
-    <label className="block text-sm text-gray-800">
+    <label className="block text-sm text-fg-soft">
       <span className="block mb-1">{label}</span>
-      <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" {...props} />
+      <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full px-3 py-2 border border-line-strong rounded-lg" {...props} />
     </label>
   );
 
   return (
-    <section aria-labelledby="url-import-title" className="bg-white rounded-lg shadow p-4">
-      <h3 id="url-import-title" className="text-base font-semibold text-gray-900 flex items-center gap-2 mb-3">
+    <section aria-labelledby="url-import-title" className="bg-surface rounded-lg shadow p-4">
+      <h3 id="url-import-title" className="text-base font-semibold text-fg flex items-center gap-2 mb-3">
         <Link2 className="w-4 h-4" aria-hidden="true" /> Import from a URL
       </h3>
       <form onSubmit={submit} className="space-y-3">
@@ -55,7 +55,7 @@ export default function UrlImportCard() {
           {input('Expires after (seconds, optional)', ttl, setTtl, { type: 'number', min: 0 })}
         </div>
         <ApiErrorNotice error={error} collection={collection.trim() || '*'} />
-        {saved && <p role="status" className="text-sm text-green-800">Imported {saved.key} ({saved.lang}) into {collection.trim()}.</p>}
+        {saved && <p role="status" className="text-sm text-success-strong">Imported {saved.key} ({saved.lang}) into {collection.trim()}.</p>}
         <button
           type="submit"
           disabled={busy || !url.trim() || !collection.trim()}

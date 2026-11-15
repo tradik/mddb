@@ -186,7 +186,7 @@ describe('VectorPanel', () => {
     });
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     const note = await within(row('notes')).findByText('Reindexed: 3 embedded, 1 unchanged of 4');
-    expect(note.className).toContain('text-green-700');
+    expect(note.className).toContain('text-success');
     expect(within(row('notes')).queryByRole('status')).toBeNull();
     expect(await screen.findByText('(force)')).toBeTruthy();
     await waitFor(() => expect(valueOf('Coverage', row('notes'))).toBe('100.0%'));
@@ -209,7 +209,7 @@ describe('VectorPanel', () => {
     vi.mocked(mddbClient.getVectorReindexJob).mockResolvedValue({ jobId: 'j0', status: 'failed', error: 'provider unreachable' });
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     const note = await within(row('blog')).findByText('Reindex failed: provider unreachable');
-    expect(note.className).toContain('text-red-700');
+    expect(note.className).toContain('text-danger');
   });
 
   test('a 409 without a job body and other refusals only show the message', async () => {

@@ -75,8 +75,8 @@ describe('CrossSearchPanel', () => {
     fireEvent.change(queryBox(), { target: { value: '  red apple  ' } });
     fireEvent.click(screen.getByLabelText('blog'));
     expect(screen.queryByText('All collections will be searched if none selected')).toBeNull();
-    expect(screen.getByText('blog').className).toContain('bg-primary-100');
-    expect(screen.getByText('docs').className).toContain('bg-gray-50');
+    expect(screen.getByText('blog').className).toContain('bg-accent-muted');
+    expect(screen.getByText('docs').className).toContain('bg-surface-muted');
     const [topK, threshold] = screen.getAllByRole('slider');
     fireEvent.change(topK, { target: { value: '30' } });
     fireEvent.change(threshold, { target: { value: '25' } });
@@ -159,7 +159,7 @@ describe('CrossSearchPanel', () => {
     renderPanel();
     fireEvent.click(screen.getByRole('button', { name: 'Document' }));
     expect(screen.queryByPlaceholderText(/across collections/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Document' }).className).toContain('bg-primary-100');
+    expect(screen.getByRole('button', { name: 'Document' }).className).toContain('bg-accent-muted');
     const select = screen.getByDisplayValue('Select...');
     expect([...select.options].map((o) => o.value)).toEqual(['', 'docs', 'blog']);
     expect(searchButton().disabled).toBe(true);

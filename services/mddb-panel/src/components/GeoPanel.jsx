@@ -137,12 +137,12 @@ export default function GeoPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
-        <MapPin className="w-5 h-5 text-blue-600" />
+    <div className="flex flex-col h-full bg-surface">
+      <div className="px-4 py-3 border-b border-line flex items-center gap-2">
+        <MapPin className="w-5 h-5 text-info" />
         <h2 className="text-lg font-semibold">Geo Search</h2>
         {geoStats && (
-          <span className="ml-auto text-xs text-gray-500">
+          <span className="ml-auto text-xs text-fg-faint">
             {Object.keys(geoStats.collections || {}).length} geo-enabled collections
           </span>
         )}
@@ -150,23 +150,23 @@ export default function GeoPanel() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left: map */}
-        <div className="flex-1 flex flex-col border-r border-gray-200">
+        <div className="flex-1 flex flex-col border-r border-line">
           <div ref={mapEl} className="flex-1" style={{ minHeight: 400 }} />
-          <div className="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
+          <div className="px-4 py-3 border-t border-line text-xs text-fg-faint">
             Click the map to set the query center. Drag sliders to change the radius.
           </div>
         </div>
 
         {/* Right: form + results */}
         <div className="w-96 flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-gray-200 space-y-3">
+          <div className="p-4 border-b border-line space-y-3">
             <div>
-              <label htmlFor={`${fieldId}-collection`} className="block text-xs font-medium text-gray-600 mb-1">Collection</label>
+              <label htmlFor={`${fieldId}-collection`} className="block text-xs font-medium text-fg-subtle mb-1">Collection</label>
               <select
                 id={`${fieldId}-collection`}
                 value={collection}
                 onChange={(e) => setCollection(e.target.value)}
-                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                className="w-full border border-line-strong rounded px-2 py-1.5 text-sm"
               >
                 <option value="">— pick one —</option>
                 {collections.map((c) => (
@@ -179,31 +179,31 @@ export default function GeoPanel() {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label htmlFor={`${fieldId}-lat`} className="block text-xs font-medium text-gray-600 mb-1">Lat</label>
+                <label htmlFor={`${fieldId}-lat`} className="block text-xs font-medium text-fg-subtle mb-1">Lat</label>
                 <input
                   id={`${fieldId}-lat`}
                   type="number"
                   step="0.000001"
                   value={lat}
                   onChange={(e) => setLat(parseFloat(e.target.value))}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  className="w-full border border-line-strong rounded px-2 py-1.5 text-sm"
                 />
               </div>
               <div>
-                <label htmlFor={`${fieldId}-lng`} className="block text-xs font-medium text-gray-600 mb-1">Lng</label>
+                <label htmlFor={`${fieldId}-lng`} className="block text-xs font-medium text-fg-subtle mb-1">Lng</label>
                 <input
                   id={`${fieldId}-lng`}
                   type="number"
                   step="0.000001"
                   value={lng}
                   onChange={(e) => setLng(parseFloat(e.target.value))}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  className="w-full border border-line-strong rounded px-2 py-1.5 text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor={`${fieldId}-radius`} className="block text-xs font-medium text-gray-600 mb-1">
+              <label htmlFor={`${fieldId}-radius`} className="block text-xs font-medium text-fg-subtle mb-1">
                 Radius: {radiusMeters >= 1000 ? `${(radiusMeters / 1000).toFixed(1)} km` : `${radiusMeters} m`}
               </label>
               <input
@@ -220,19 +220,19 @@ export default function GeoPanel() {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label htmlFor={`${fieldId}-algorithm`} className="block text-xs font-medium text-gray-600 mb-1">Algorithm</label>
+                <label htmlFor={`${fieldId}-algorithm`} className="block text-xs font-medium text-fg-subtle mb-1">Algorithm</label>
                 <select
                   id={`${fieldId}-algorithm`}
                   value={algorithm}
                   onChange={(e) => setAlgorithm(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  className="w-full border border-line-strong rounded px-2 py-1.5 text-sm"
                 >
                   <option value="rtree">R-tree (default)</option>
                   <option value="geohash">Geohash</option>
                 </select>
               </div>
               <div>
-                <label htmlFor={`${fieldId}-topk`} className="block text-xs font-medium text-gray-600 mb-1">Top K</label>
+                <label htmlFor={`${fieldId}-topk`} className="block text-xs font-medium text-fg-subtle mb-1">Top K</label>
                 <input
                   id={`${fieldId}-topk`}
                   type="number"
@@ -240,7 +240,7 @@ export default function GeoPanel() {
                   max={500}
                   value={topK}
                   onChange={(e) => setTopK(parseInt(e.target.value, 10))}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  className="w-full border border-line-strong rounded px-2 py-1.5 text-sm"
                 />
               </div>
             </div>
@@ -255,7 +255,7 @@ export default function GeoPanel() {
             </button>
 
             {error && (
-              <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+              <div className="text-xs text-danger bg-danger-soft border border-danger-line rounded px-2 py-1.5">
                 {error}
               </div>
             )}
@@ -272,7 +272,7 @@ export default function GeoPanel() {
 
           <div className="flex-1 overflow-y-auto">
             {results.length === 0 && !loading && (
-              <div className="p-4 text-sm text-gray-500 text-center">
+              <div className="p-4 text-sm text-fg-faint text-center">
                 No results yet. Click the map to set a center and hit Search.
               </div>
             )}
@@ -280,12 +280,12 @@ export default function GeoPanel() {
               <button
                 key={item.document?.id || item.rank}
                 onClick={() => setCurrentDocument(item.document)}
-                className="w-full text-left px-4 py-2 border-b border-gray-100 hover:bg-gray-50"
+                className="w-full text-left px-4 py-2 border-b border-line-soft hover:bg-surface-muted"
               >
-                <div className="text-sm font-medium text-gray-900 truncate">
+                <div className="text-sm font-medium text-fg truncate">
                   {item.document?.key || item.document?.id}
                 </div>
-                <div className="text-xs text-gray-500 flex items-center justify-between">
+                <div className="text-xs text-fg-faint flex items-center justify-between">
                   <span>#{item.rank}</span>
                   {item.distanceMeters != null && (
                     <span>{formatDistance(item.distanceMeters)}</span>
@@ -295,15 +295,15 @@ export default function GeoPanel() {
             ))}
           </div>
 
-          <div className="px-4 py-2 border-t border-gray-200 flex items-center gap-2">
+          <div className="px-4 py-2 border-t border-line flex items-center gap-2">
             <button
               onClick={loadGeoStats}
-              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+              className="text-xs text-fg-faint hover:text-fg-muted flex items-center gap-1"
             >
               <RefreshCw className="w-3 h-3" /> Refresh stats
             </button>
             {geoStats?.ready === false && (
-              <span className="text-xs text-orange-600">Index loading…</span>
+              <span className="text-xs text-warning">Index loading…</span>
             )}
           </div>
         </div>

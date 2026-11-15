@@ -97,12 +97,12 @@ export default function EmbeddingModelsPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
+    <div className="h-full flex flex-col bg-surface-muted">
+      <div className="bg-surface border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Embedding Models</h1>
-            <p className="text-gray-600">Configure embedding providers for vector search</p>
+            <h1 className="text-2xl font-bold text-fg mb-1">Embedding Models</h1>
+            <p className="text-fg-subtle">Configure embedding providers for vector search</p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
@@ -116,25 +116,25 @@ export default function EmbeddingModelsPanel() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800">{error}</p>
+          <div className="mb-4 p-4 bg-danger-soft border border-danger-line rounded-lg">
+            <p className="text-danger-strong">{error}</p>
           </div>
         )}
 
         {configs.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <Brain className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+          <div className="bg-surface rounded-lg shadow p-12 text-center">
+            <Brain className="w-16 h-16 mx-auto mb-4 text-fg-faint" />
             {vectorStats && vectorStats.enabled ? (
               <>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Import Current Configuration</h3>
-                <p className="text-gray-600 mb-2">
+                <h3 className="text-lg font-medium text-fg mb-2">Import Current Configuration</h3>
+                <p className="text-fg-subtle mb-2">
                   You're currently using environment variables for embedding configuration:
                 </p>
-                <div className="inline-block bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-6">
-                  <div className="text-sm text-gray-700">
+                <div className="inline-block bg-info-soft border border-info-line rounded-lg px-4 py-2 mb-6">
+                  <div className="text-sm text-fg-muted">
                     <span className="font-medium capitalize">{vectorStats.provider}</span> - {vectorStats.model}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-fg-faint">
                     {vectorStats.dimensions} dimensions
                   </div>
                 </div>
@@ -155,8 +155,8 @@ export default function EmbeddingModelsPanel() {
               </>
             ) : (
               <>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No embedding models configured</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-lg font-medium text-fg mb-2">No embedding models configured</h3>
+                <p className="text-fg-subtle mb-6">
                   Add an embedding provider to enable vector search features
                 </p>
                 <button
@@ -171,13 +171,13 @@ export default function EmbeddingModelsPanel() {
         ) : (
           <div className="grid gap-4">
             {configs.map((config) => (
-              <div key={config.id} className="bg-white rounded-lg shadow p-6">
+              <div key={config.id} className="bg-surface rounded-lg shadow p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{config.name}</h3>
+                      <h3 className="text-lg font-semibold text-fg">{config.name}</h3>
                       {config.isDefault && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded flex items-center gap-1">
+                        <span className="px-2 py-0.5 bg-success-muted text-success-strong text-xs font-medium rounded flex items-center gap-1">
                           <Star className="w-3 h-3" />
                           Default
                         </span>
@@ -186,20 +186,20 @@ export default function EmbeddingModelsPanel() {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
                       <div>
-                        <div className="text-xs text-gray-500">Provider</div>
-                        <div className="text-sm font-medium text-gray-900 capitalize">{config.provider}</div>
+                        <div className="text-xs text-fg-faint">Provider</div>
+                        <div className="text-sm font-medium text-fg capitalize">{config.provider}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Model</div>
-                        <div className="text-sm font-medium text-gray-900">{config.model}</div>
+                        <div className="text-xs text-fg-faint">Model</div>
+                        <div className="text-sm font-medium text-fg">{config.model}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Dimensions</div>
-                        <div className="text-sm font-medium text-gray-900">{config.dimensions}</div>
+                        <div className="text-xs text-fg-faint">Dimensions</div>
+                        <div className="text-sm font-medium text-fg">{config.dimensions}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">API URL</div>
-                        <div className="text-sm font-medium text-gray-900 truncate" title={config.apiUrl}>
+                        <div className="text-xs text-fg-faint">API URL</div>
+                        <div className="text-sm font-medium text-fg truncate" title={config.apiUrl}>
                           {config.apiUrl || 'Default'}
                         </div>
                       </div>
@@ -210,7 +210,7 @@ export default function EmbeddingModelsPanel() {
                     {!config.isDefault && (
                       <button
                         onClick={() => handleSetDefault(config.id)}
-                        className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded"
+                        className="p-2 text-fg-subtle hover:text-success hover:bg-success-soft rounded"
                         title="Set as default"
                       >
                         <Star className="w-4 h-4" />
@@ -221,7 +221,7 @@ export default function EmbeddingModelsPanel() {
                         setSelectedConfig(config);
                         setShowEditModal(true);
                       }}
-                      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      className="p-2 text-fg-subtle hover:text-info hover:bg-info-soft rounded"
                       title="Edit"
                     >
                       <Edit className="w-4 h-4" />
@@ -229,7 +229,7 @@ export default function EmbeddingModelsPanel() {
                     <button
                       onClick={() => handleDelete(config)}
                       disabled={config.isDefault}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />

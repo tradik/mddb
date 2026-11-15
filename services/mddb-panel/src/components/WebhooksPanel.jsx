@@ -53,13 +53,13 @@ export default function WebhooksPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-line flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <Webhook className="w-5 h-5 text-primary-600" />
+          <h3 className="text-lg font-semibold text-fg flex items-center gap-2">
+            <Webhook className="w-5 h-5 text-accent" />
             Webhooks
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-fg-faint mt-0.5">
             Outbound HTTP notifications for document and security/ops incident events.
           </p>
         </div>
@@ -73,17 +73,17 @@ export default function WebhooksPanel() {
       </div>
 
       {error && (
-        <div className="mx-4 mt-3 p-3 bg-red-100 border border-red-200 rounded-lg flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-red-900 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-900">{error}</p>
+        <div className="mx-4 mt-3 p-3 bg-danger-muted border border-danger-line rounded-lg flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-danger-strong flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-strong">{error}</p>
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
-          <p className="text-sm text-gray-500">Loading…</p>
+          <p className="text-sm text-fg-faint">Loading…</p>
         ) : webhooks.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">No webhooks registered yet.</p>
+          <p className="text-sm text-fg-faint italic">No webhooks registered yet.</p>
         ) : (
           <div className="space-y-3">
             {webhooks.map((w) => (
@@ -109,20 +109,20 @@ export default function WebhooksPanel() {
 
 function WebhookRow({ webhook, onDelete }) {
   return (
-    <div className="border border-gray-200 rounded-lg p-3 bg-white hover:border-gray-300 transition">
+    <div className="border border-line rounded-lg p-3 bg-surface hover:border-line-strong transition">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="font-mono text-sm text-gray-900 truncate" title={webhook.url}>
+          <p className="font-mono text-sm text-fg truncate" title={webhook.url}>
             {webhook.url}
           </p>
           <div className="flex flex-wrap gap-1 mt-1">
             {(webhook.events || []).map((ev) => (
-              <span key={ev} className="inline-flex px-1.5 py-0.5 bg-primary-100 text-primary-800 rounded text-[10px] font-mono">
+              <span key={ev} className="inline-flex px-1.5 py-0.5 bg-accent-muted text-accent-strong rounded text-[10px] font-mono">
                 {ev}
               </span>
             ))}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-fg-faint mt-1">
             Collection: <span className="font-mono">{webhook.collection || 'all'}</span>
             {webhook.createdAt && (
               <> · Created {new Date(webhook.createdAt).toLocaleString()}</>
@@ -131,7 +131,7 @@ function WebhookRow({ webhook, onDelete }) {
         </div>
         <button
           onClick={onDelete}
-          className="p-1 text-gray-400 hover:text-red-600"
+          className="p-1 text-fg-faint hover:text-danger"
           title="Delete"
         >
           <Trash2 className="w-4 h-4" />
@@ -179,28 +179,28 @@ function WebhookForm({ collectionNames, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Webhook className="w-5 h-5 text-primary-600" />
+            <h2 className="text-xl font-bold text-fg flex items-center gap-2">
+              <Webhook className="w-5 h-5 text-accent" />
               New Webhook
             </h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-fg-faint hover:text-fg-subtle">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="webhook-url" className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+              <label htmlFor="webhook-url" className="block text-sm font-medium text-fg-muted mb-1">URL</label>
               <input
                 id="webhook-url"
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com/hook"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-mono"
+                className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm font-mono"
               />
             </div>
 
@@ -219,12 +219,12 @@ function WebhookForm({ collectionNames, onClose, onSaved }) {
             />
 
             <div>
-              <label htmlFor="webhook-collection" className="block text-sm font-medium text-gray-700 mb-1">Collection filter</label>
+              <label htmlFor="webhook-collection" className="block text-sm font-medium text-fg-muted mb-1">Collection filter</label>
               <select
                 id="webhook-collection"
                 value={collection}
                 onChange={(e) => setCollection(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
               >
                 <option value="">All collections</option>
                 {collectionNames.map((c) => (
@@ -236,15 +236,15 @@ function WebhookForm({ collectionNames, onClose, onSaved }) {
             </div>
 
             {error && (
-              <div className="p-3 bg-red-100 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-900">{error}</p>
+              <div className="p-3 bg-danger-muted border border-danger-line rounded-lg">
+                <p className="text-sm text-danger-strong">{error}</p>
               </div>
             )}
 
             <div className="flex gap-3 pt-2">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="flex-1 px-4 py-2 bg-surface-subtle text-fg-muted rounded-lg hover:bg-surface-strong"
               >
                 Cancel
               </button>
@@ -267,15 +267,15 @@ function WebhookForm({ collectionNames, onClose, onSaved }) {
 function EventPickerSection({ title, options, selected, onToggle }) {
   return (
     <div>
-      <p className="text-sm font-medium text-gray-700 mb-1">{title}</p>
-      <div className="space-y-1 border border-gray-200 rounded-lg p-2 bg-gray-50">
+      <p className="text-sm font-medium text-fg-muted mb-1">{title}</p>
+      <div className="space-y-1 border border-line rounded-lg p-2 bg-surface-muted">
         {options.map((ev) => (
-          <label key={ev} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <label key={ev} className="flex items-center gap-2 text-sm text-fg-muted cursor-pointer">
             <input
               type="checkbox"
               checked={selected.includes(ev)}
               onChange={() => onToggle(ev)}
-              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              className="rounded border-line-strong text-accent focus:ring-focus"
             />
             <span className="font-mono text-xs">{ev}</span>
           </label>

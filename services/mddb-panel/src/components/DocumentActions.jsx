@@ -57,19 +57,19 @@ export default function DocumentActions({ document }) {
         aria-expanded={open}
         aria-controls={`${id}-menu`}
         onClick={() => { setError(null); setOpen(!open); }}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-800 bg-gray-100 rounded-lg hover:bg-gray-200"
+        className="flex items-center gap-2 px-3 py-1.5 text-sm text-fg-soft bg-surface-subtle rounded-lg hover:bg-surface-strong"
       >
         <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
         <span>More</span>
       </button>
       {open && (
-        <ul id={`${id}-menu`} className="absolute right-0 top-full mt-1 z-20 min-w-[12rem] py-1 bg-white border border-gray-200 rounded-lg shadow-lg">
+        <ul id={`${id}-menu`} className="absolute right-0 top-full mt-1 z-20 min-w-[12rem] py-1 bg-surface border border-line rounded-lg shadow-lg">
           {items.map(({ name, label, icon: Icon, run }) => (
             <li key={name}>
               <button
                 type="button"
                 onClick={() => { setOpen(false); run(); }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100"
+                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-fg-soft hover:bg-surface-subtle"
               >
                 <Icon className="w-4 h-4" aria-hidden="true" />
                 {label}
@@ -78,7 +78,7 @@ export default function DocumentActions({ document }) {
           ))}
         </ul>
       )}
-      {error && <p role="alert" className="absolute right-0 top-full mt-1 w-64 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-800">{error}</p>}
+      {error && <p role="alert" className="absolute right-0 top-full mt-1 w-64 rounded-lg border border-danger-line bg-danger-soft p-2 text-xs text-danger-strong">{error}</p>}
       {active === 'compare' && <DocumentCompare document={document} onClose={done} />}
       {active === 'print' && <DocumentPrint document={document} onDone={done} />}
       {active === 'template' && <SaveTemplateDialog document={document} onClose={done} />}

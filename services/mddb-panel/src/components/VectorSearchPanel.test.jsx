@@ -196,7 +196,7 @@ describe('VectorSearchPanel', () => {
     await screen.findByText('3 results found');
     fireEvent.click(searchButton());
     const message = await screen.findByText('API Error (500): boom');
-    expect(message.className).toContain('text-red-700');
+    expect(message.className).toContain('text-danger');
     expect(screen.queryByText('3 results found')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Search plan' })).toBeNull();
     expect(screen.queryByText('No results found')).toBeNull();
@@ -212,7 +212,7 @@ describe('VectorSearchPanel', () => {
     fireEvent.click(searchButton());
     await act(async () => {});
     const message = screen.getByText('ivf index is training; flat or hnsw answer now');
-    expect(message.className).toContain('text-amber-800');
+    expect(message.className).toContain('text-warning-strong');
     await act(async () => vi.advanceTimersByTimeAsync(10000));
     expect(mddbClient.vectorSearch).toHaveBeenCalledTimes(1);
     expect(useStore.getState().vectorLoading).toBe(false);
@@ -227,7 +227,7 @@ describe('VectorSearchPanel', () => {
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       const status = screen.getByText(`Vector index is loading... retrying (${attempt}/3)`);
-      expect(status.className).toContain('text-amber-800');
+      expect(status.className).toContain('text-warning-strong');
       expect(useStore.getState().vectorLoading).toBe(true);
       expect(mddbClient.vectorSearch).toHaveBeenCalledTimes(attempt);
       await act(async () => vi.advanceTimersByTimeAsync(1999));
@@ -237,7 +237,7 @@ describe('VectorSearchPanel', () => {
 
     expect(mddbClient.vectorSearch).toHaveBeenCalledTimes(4);
     // "loading" in the server's text keeps the amber style.
-    expect(screen.getByText('vector index loading').className).toContain('text-amber-800');
+    expect(screen.getByText('vector index loading').className).toContain('text-warning-strong');
     expect(useStore.getState().vectorLoading).toBe(false);
     await act(async () => vi.advanceTimersByTimeAsync(10000));
     expect(mddbClient.vectorSearch).toHaveBeenCalledTimes(4);
@@ -390,8 +390,8 @@ describe('VectorSearchPanel', () => {
   });
 
   test.each([
-    ['counts', { embedded: 4, skipped: 2, failed: 1 }, 'Embedded: 4, Skipped: 2, Failed: 1', 'text-green-700'],
-    ['an empty answer', {}, 'Embedded: 0, Skipped: 0, Failed: 0', 'text-green-700'],
+    ['counts', { embedded: 4, skipped: 2, failed: 1 }, 'Embedded: 4, Skipped: 2, Failed: 1', 'text-success'],
+    ['an empty answer', {}, 'Embedded: 0, Skipped: 0, Failed: 0', 'text-success'],
   ])('Reindex reports %s', async (_label, answer, text, cls) => {
     let resolve;
     vi.mocked(mddbClient.vectorReindex).mockReturnValue(new Promise((r) => { resolve = r; }));
@@ -411,7 +411,7 @@ describe('VectorSearchPanel', () => {
     renderPanel();
     fireEvent.click(screen.getByRole('button', { name: 'Reindex Embeddings' }));
     const report = await screen.findByText('no embedder');
-    expect(report.className).toContain('text-red-700');
+    expect(report.className).toContain('text-danger');
     fireEvent.click(searchButton());
     await screen.findByText('No results found');
     expect(screen.queryByText('no embedder')).toBeNull();

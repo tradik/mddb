@@ -47,19 +47,19 @@ export default function ConfirmDialog({ title, message, confirmLabel = 'Delete',
         aria-labelledby={titleId}
         aria-describedby={messageId}
         onKeyDown={onKeyDown}
-        className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full"
+        className="bg-surface rounded-lg shadow-xl p-6 max-w-md w-full"
       >
-        <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-3">
-          <AlertTriangle className="w-5 h-5 text-red-700" aria-hidden="true" />
+        <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold text-fg mb-3">
+          <AlertTriangle className="w-5 h-5 text-danger" aria-hidden="true" />
           {title}
         </h2>
-        <div id={messageId} className="text-sm text-gray-800 mb-6">{message}</div>
+        <div id={messageId} className="text-sm text-fg-soft mb-6">{message}</div>
         <div className="flex justify-end gap-3">
           <button
             ref={cancelRef}
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            className="px-4 py-2 text-fg-soft bg-surface-subtle hover:bg-surface-strong rounded-lg"
           >
             Cancel
           </button>

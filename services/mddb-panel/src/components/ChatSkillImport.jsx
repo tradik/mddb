@@ -34,7 +34,7 @@ export default function ChatSkillImport({ busy, onSave, onError }) {
   const save = () => onSave({ name, description: preview.description || '', content: preview.content, source: preview.source });
 
   return (
-    <div className="space-y-3 rounded-lg bg-white p-4 shadow">
+    <div className="space-y-3 rounded-lg bg-surface p-4 shadow">
       <form onSubmit={fetchPreview} className="flex items-end gap-2">
         <div className="flex-1">
           <label htmlFor="skill-import-url" className={labelClass}>SKILL.md URL (https)</label>
@@ -48,25 +48,25 @@ export default function ChatSkillImport({ busy, onSave, onError }) {
             className={inputClass}
           />
         </div>
-        <button type="submit" disabled={fetching} className="flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-100 disabled:opacity-50">
+        <button type="submit" disabled={fetching} className="flex items-center gap-1.5 rounded border border-line-strong px-3 py-1.5 text-sm text-fg-soft hover:bg-surface-subtle disabled:opacity-50">
           <Download className="h-4 w-4" aria-hidden="true" /> {fetching ? 'Fetching…' : 'Fetch preview'}
         </button>
       </form>
-      <p className="text-xs text-gray-600">Nothing is saved until you read the text below and press Save.</p>
+      <p className="text-xs text-fg-subtle">Nothing is saved until you read the text below and press Save.</p>
 
       {preview && (
         <section aria-labelledby="skill-import-heading" className="space-y-2">
-          <h3 id="skill-import-heading" className="text-sm font-semibold text-gray-900">Preview</h3>
-          <p className="text-xs text-gray-700">
+          <h3 id="skill-import-heading" className="text-sm font-semibold text-fg">Preview</h3>
+          <p className="text-xs text-fg-muted">
             {sourceLabel(preview.source)} · instructions {formatBytes(preview.bytes)}
             {preview.description && ` · ${preview.description}`}
           </p>
           {preview.exists && (
-            <p role="status" className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            <p role="status" className="rounded border border-warning-line bg-warning-soft p-2 text-xs text-warning-strong">
               A skill named {preview.name} exists: saving under that name stores a new version of it.
             </p>
           )}
-          <pre aria-label="The whole fetched text" tabIndex={0} className="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-3 text-xs text-gray-900">{preview.raw}</pre>
+          <pre aria-label="The whole fetched text" tabIndex={0} className="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-surface-muted p-3 text-xs text-fg">{preview.raw}</pre>
           <div className="flex items-end gap-2">
             <div className="flex-1">
               <label htmlFor="skill-import-name" className={labelClass}>Save as</label>

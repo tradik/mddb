@@ -8,17 +8,17 @@ import ServerEdgeCard from './ServerEdgeCard';
 function FeatureToggle({ label, enabled }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-sm text-gray-700">{label}</span>
+      <span className="text-sm text-fg-muted">{label}</span>
       <div className="flex items-center">
         {enabled ? (
           <>
-            <ToggleRight className="w-5 h-5 text-green-600" />
-            <span className="ml-2 text-xs font-medium text-green-700">Enabled</span>
+            <ToggleRight className="w-5 h-5 text-success" />
+            <span className="ml-2 text-xs font-medium text-success">Enabled</span>
           </>
         ) : (
           <>
-            <ToggleLeft className="w-5 h-5 text-gray-400" />
-            <span className="ml-2 text-xs font-medium text-gray-500">Disabled</span>
+            <ToggleLeft className="w-5 h-5 text-fg-faint" />
+            <span className="ml-2 text-xs font-medium text-fg-faint">Disabled</span>
           </>
         )}
       </div>
@@ -66,8 +66,8 @@ export default function ConfigPanel() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="text-red-600 font-medium mb-2">Failed to load configuration</div>
-          <div className="text-sm text-gray-500">{configError}</div>
+          <div className="text-danger font-medium mb-2">Failed to load configuration</div>
+          <div className="text-sm text-fg-faint">{configError}</div>
           <button
             onClick={loadConfig}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
@@ -82,27 +82,27 @@ export default function ConfigPanel() {
   if (!config) return null;
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6">
+    <div className="h-full overflow-y-auto bg-surface-muted p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Server Configuration</h1>
-          <p className="text-gray-600">Current server settings and features</p>
+          <h1 className="text-2xl font-bold text-fg mb-2">Server Configuration</h1>
+          <p className="text-fg-subtle">Current server settings and features</p>
         </div>
 
         {/* Database Settings */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
+        <div className="bg-surface rounded-lg shadow mb-6 p-6">
           <div className="flex items-center mb-4">
-            <Database className="w-5 h-5 text-primary-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Database</h2>
+            <Database className="w-5 h-5 text-accent mr-2" />
+            <h2 className="text-lg font-semibold text-fg">Database</h2>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
-              <span className="text-sm text-gray-600">Path</span>
-              <span className="text-sm font-medium text-gray-900 font-mono">{config.databasePath}</span>
+              <span className="text-sm text-fg-subtle">Path</span>
+              <span className="text-sm font-medium text-fg font-mono">{config.databasePath}</span>
             </div>
             <div className="flex justify-between py-2">
-              <span className="text-sm text-gray-600">Mode</span>
-              <span className="text-sm font-medium text-gray-900 uppercase">
+              <span className="text-sm text-fg-subtle">Mode</span>
+              <span className="text-sm font-medium text-fg uppercase">
                 {config.mode === 'wr' ? 'Read/Write' : config.mode === 'read' ? 'Read Only' : 'Write Only'}
               </span>
             </div>
@@ -110,34 +110,34 @@ export default function ConfigPanel() {
         </div>
 
         {/* Network Settings */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
+        <div className="bg-surface rounded-lg shadow mb-6 p-6">
           <div className="flex items-center mb-4">
-            <Network className="w-5 h-5 text-primary-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Network</h2>
+            <Network className="w-5 h-5 text-accent mr-2" />
+            <h2 className="text-lg font-semibold text-fg">Network</h2>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
-              <span className="text-sm text-gray-600">HTTP Address</span>
-              <span className="text-sm font-medium text-gray-900 font-mono">{config.protocols?.http?.addr}</span>
+              <span className="text-sm text-fg-subtle">HTTP Address</span>
+              <span className="text-sm font-medium text-fg font-mono">{config.protocols?.http?.addr}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-sm text-gray-600">gRPC Address</span>
-              <span className="text-sm font-medium text-gray-900 font-mono">{config.protocols?.grpc?.addr}</span>
+              <span className="text-sm text-fg-subtle">gRPC Address</span>
+              <span className="text-sm font-medium text-fg font-mono">{config.protocols?.grpc?.addr}</span>
             </div>
             {config.protocols?.http3?.enabled && (
               <div className="flex justify-between py-2">
-                <span className="text-sm text-gray-600">HTTP/3 Address</span>
-                <span className="text-sm font-medium text-gray-900 font-mono">{config.protocols.http3.addr}</span>
+                <span className="text-sm text-fg-subtle">HTTP/3 Address</span>
+                <span className="text-sm font-medium text-fg font-mono">{config.protocols.http3.addr}</span>
               </div>
             )}
           </div>
         </div>
 
         {/* Features */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
+        <div className="bg-surface rounded-lg shadow mb-6 p-6">
           <div className="flex items-center mb-4">
-            <Settings className="w-5 h-5 text-primary-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Features</h2>
+            <Settings className="w-5 h-5 text-accent mr-2" />
+            <h2 className="text-lg font-semibold text-fg">Features</h2>
           </div>
           <div className="space-y-1 divide-y">
             <FeatureToggle label="Authentication & RBAC" enabled={config.authEnabled} />
@@ -152,35 +152,35 @@ export default function ConfigPanel() {
 
         {/* Vector Configuration */}
         {config.vectorConfig && config.vectorConfig.enabled && (
-          <div className="bg-white rounded-lg shadow mb-6 p-6">
+          <div className="bg-surface rounded-lg shadow mb-6 p-6">
             <div className="flex items-center mb-4">
-              <Brain className="w-5 h-5 text-primary-600 mr-2" />
-              <h2 className="text-lg font-semibold text-gray-900">Vector Search Configuration</h2>
+              <Brain className="w-5 h-5 text-accent mr-2" />
+              <h2 className="text-lg font-semibold text-fg">Vector Search Configuration</h2>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between py-2 border-b">
-                <span className="text-sm text-gray-600">Provider</span>
-                <span className="text-sm font-medium text-gray-900 capitalize">{config.vectorConfig.provider}</span>
+                <span className="text-sm text-fg-subtle">Provider</span>
+                <span className="text-sm font-medium text-fg capitalize">{config.vectorConfig.provider}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
-                <span className="text-sm text-gray-600">Model</span>
-                <span className="text-sm font-medium text-gray-900">{config.vectorConfig.model}</span>
+                <span className="text-sm text-fg-subtle">Model</span>
+                <span className="text-sm font-medium text-fg">{config.vectorConfig.model}</span>
               </div>
               {config.vectorConfig.semantic !== undefined && (
                 <div className="flex justify-between py-2 border-b">
-                  <span className="text-sm text-gray-600">Matches by meaning</span>
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm text-fg-subtle">Matches by meaning</span>
+                  <span className="text-sm font-medium text-fg">
                     {config.vectorConfig.semantic ? 'Yes' : 'No — shared spelling only (semantic: false)'}
                   </span>
                 </div>
               )}
               <div className="flex justify-between py-2 border-b">
-                <span className="text-sm text-gray-600">Dimensions</span>
-                <span className="text-sm font-medium text-gray-900">{config.vectorConfig.dimensions}</span>
+                <span className="text-sm text-fg-subtle">Dimensions</span>
+                <span className="text-sm font-medium text-fg">{config.vectorConfig.dimensions}</span>
               </div>
               <div className="flex justify-between py-2">
-                <span className="text-sm text-gray-600">API URL</span>
-                <span className="text-sm font-medium text-gray-900 font-mono text-right break-all">
+                <span className="text-sm text-fg-subtle">API URL</span>
+                <span className="text-sm font-medium text-fg font-mono text-right break-all">
                   {config.vectorConfig.apiUrl}
                 </span>
               </div>
@@ -189,8 +189,8 @@ export default function ConfigPanel() {
         )}
 
         {/* Refresh Note */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
+        <div className="bg-info-soft border border-info-line rounded-lg p-4">
+          <p className="text-sm text-info-strong">
             <strong>Note:</strong> Configuration changes require server restart to take effect.
             These settings are read from environment variables at startup.
           </p>

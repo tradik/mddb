@@ -53,13 +53,13 @@ export default function DocumentsJsonForm({ onQueued }) {
   const ready = parsed && !parsed.error && !busy;
 
   return (
-    <section aria-labelledby="documents-json-title" className="bg-white rounded-lg shadow p-4 space-y-3">
-      <h3 id="documents-json-title" className="text-base font-semibold text-gray-900">Add documents from JSON</h3>
+    <section aria-labelledby="documents-json-title" className="bg-surface rounded-lg shadow p-4 space-y-3">
+      <h3 id="documents-json-title" className="text-base font-semibold text-fg">Add documents from JSON</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <CollectionNameInput value={collection} onChange={setCollection} />
-        <label className="text-sm text-gray-800">
+        <label className="text-sm text-fg-soft">
           <span className="block mb-1">Language of documents that name none</span>
-          <input value={lang} onChange={(e) => setLang(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+          <input value={lang} onChange={(e) => setLang(e.target.value)} className="w-full px-3 py-2 border border-line-strong rounded-lg" />
         </label>
       </div>
       <JsonTextarea
@@ -71,23 +71,23 @@ export default function DocumentsJsonForm({ onQueued }) {
         placeholder={EXAMPLE}
         rows={10}
       />
-      <label className="block text-sm text-gray-800">
+      <label className="block text-sm text-fg-soft">
         <span className="block mb-1">Or load a .json or .ndjson file</span>
         <input type="file" accept=".json,.ndjson,.jsonl,application/json" onChange={(e) => loadFile(e.target.files[0])} className="text-sm" />
       </label>
-      {parsed?.documents && <p className="text-sm text-gray-800">{parsed.documents.length} documents ready.</p>}
+      {parsed?.documents && <p className="text-sm text-fg-soft">{parsed.documents.length} documents ready.</p>}
       <ApiErrorNotice error={error} collection={collection.trim() || '*'} />
       {result && (
-        <div role="status" className="text-sm text-gray-900">
+        <div role="status" className="text-sm text-fg">
           <p>{result.text}</p>
-          {result.errors?.length > 0 && <ul className="list-disc pl-5 text-red-800">{result.errors.map((e) => <li key={e}>{e}</li>)}</ul>}
+          {result.errors?.length > 0 && <ul className="list-disc pl-5 text-danger-strong">{result.errors.map((e) => <li key={e}>{e}</li>)}</ul>}
         </div>
       )}
       <div className="flex gap-2">
         <button type="button" onClick={() => send(false)} disabled={!ready} className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 text-sm">
           Add now
         </button>
-        <button type="button" onClick={() => send(true)} disabled={!ready} className="px-4 py-2 bg-gray-100 text-gray-900 rounded-lg hover:bg-gray-200 disabled:opacity-50 text-sm">
+        <button type="button" onClick={() => send(true)} disabled={!ready} className="px-4 py-2 bg-surface-subtle text-fg rounded-lg hover:bg-surface-strong disabled:opacity-50 text-sm">
           Queue as a job
         </button>
       </div>

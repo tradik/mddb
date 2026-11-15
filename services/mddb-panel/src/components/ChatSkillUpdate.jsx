@@ -31,22 +31,22 @@ export default function ChatSkillUpdate({ skill, onSaved, onError }) {
   };
 
   return (
-    <section aria-labelledby="skill-update-heading" className="rounded-lg bg-white p-4 shadow">
+    <section aria-labelledby="skill-update-heading" className="rounded-lg bg-surface p-4 shadow">
       <div className="flex items-center justify-between gap-2">
-        <h3 id="skill-update-heading" className="text-sm font-semibold text-gray-900">Source</h3>
-        <button type="button" onClick={() => call({})} disabled={busy} className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-800 hover:bg-gray-100 disabled:opacity-50">
+        <h3 id="skill-update-heading" className="text-sm font-semibold text-fg">Source</h3>
+        <button type="button" onClick={() => call({})} disabled={busy} className="flex items-center gap-1 rounded border border-line-strong px-2 py-1 text-xs font-medium text-fg-soft hover:bg-surface-subtle disabled:opacity-50">
           <RefreshCw className="h-3 w-3" aria-hidden="true" /> {busy ? 'Fetching…' : 'Update from source'}
         </button>
       </div>
-      <p className="mt-1 text-xs text-gray-700">
+      <p className="mt-1 text-xs text-fg-muted">
         {sourceLabel(skill.source)}, fetched {skill.source.fetchedAt}. It is fetched again only when you ask.
       </p>
       {result && !result.changed && (
-        <p role="status" className="mt-2 text-sm text-gray-800">The source holds the stored text: nothing to update.</p>
+        <p role="status" className="mt-2 text-sm text-fg-soft">The source holds the stored text: nothing to update.</p>
       )}
       {result && result.changed && (
         <div className="mt-2">
-          <p className="text-xs text-gray-700">Now at {sourceLabel(result.preview.source)}.</p>
+          <p className="text-xs text-fg-muted">Now at {sourceLabel(result.preview.source)}.</p>
           {result.preview.description !== skill.description && (
             <LineDiff label="Description" before={skill.description} after={result.preview.description} />
           )}

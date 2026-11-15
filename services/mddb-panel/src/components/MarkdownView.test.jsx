@@ -2,16 +2,24 @@
 // MarkdownView (2.19.6): the one Markdown renderer of the editor preview and
 // the document viewer — styled headings and blocks, GFM tables, the three
 // shapes of code, and raw HTML through the sanitizer.
-import { describe, test, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, cleanup, act } from '@testing-library/react';
 
 vi.mock('react-syntax-highlighter', () => ({
-  Prism: ({ children, language, className }) => <pre data-language={language} className={className}>{children}</pre>,
+  Prism: ({ children, language, className, style }) => (
+    <pre data-language={language} data-theme={style.name} className={className}>{children}</pre>
+  ),
 }));
-vi.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({ vscDarkPlus: {} }));
+vi.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({ vscDarkPlus: { name: 'vscDarkPlus' } }));
+vi.mock('react-syntax-highlighter/dist/esm/styles/prism/a11y-one-light', () => ({ default: { name: 'a11yOneLight' } }));
 
 const { default: MarkdownView } = await import('./MarkdownView');
+const { setTheme, resetThemeState } = await import('../lib/theme');
 
+beforeEach(() => {
+  localStorage.clear();
+  resetThemeState();
+});
 afterEach(cleanup);
 
 const markdown = [
@@ -39,11 +47,11 @@ describe('MarkdownView', () => {
     expect(screen.getByRole('link', { name: 'link' }).className).toContain('underline');
     expect(container.querySelector('ul').className).toContain('list-disc');
     expect(container.querySelector('ol').className).toContain('list-decimal');
-    expect(container.querySelector('li').className).toContain('text-gray-700');
+    expect(container.querySelector('li').className).toContain('text-fg-muted');
     expect(container.querySelector('blockquote').className).toContain('border-l-4');
     expect(container.querySelector('hr').className).toContain('my-6');
     expect(container.querySelector('table').parentElement.className).toContain('overflow-x-auto');
-    expect(container.querySelector('thead').className).toContain('bg-gray-50');
+    expect(container.querySelector('thead').className).toContain('bg-surface-muted');
     expect(container.querySelector('th').className).toContain('uppercase');
     expect(container.querySelector('td').className).toContain('border-t');
     expect(screen.getByAltText('alt text').className).toContain('max-w-full');
@@ -57,12 +65,27 @@ describe('MarkdownView', () => {
     expect(block.tagName).toBe('CODE');
     expect(block.className).toContain('block');
     const inline = screen.getByText('inline code');
-    expect(inline.className).toContain('bg-gray-100');
+    expect(inline.className).toContain('bg-surface-subtle');
     expect(inline.className).not.toContain('block');
   });
 
   test('raw HTML is sanitized', () => {
     render(<MarkdownView>{markdown}</MarkdownView>);
     expect(screen.getByText('raw html').getAttribute('onclick')).toBeNull();
+  });
+
+  test('code follows the theme: the light theme on light pages, vscDarkPlus on dark (FE-015)', () => {
+    const { container } = render(<MarkdownView>{markdown}</MarkdownView>);
+    expect(container.querySelector('pre[data-language="js"]').dataset.theme).toBe('a11yOneLight');
+    act(() => setTheme('dark'));
+    expect(container.querySelector('pre[data-language="js"]').dataset.theme).toBe('vscDarkPlus');
+    setTheme('light');
+  });
+
+  test('scheme="light" keeps code light on a dark panel (print, HTML export)', () => {
+    setTheme('dark');
+    const { container } = render(<MarkdownView scheme="light">{markdown}</MarkdownView>);
+    expect(container.querySelector('pre[data-language="js"]').dataset.theme).toBe('a11yOneLight');
+    setTheme('light');
   });
 });

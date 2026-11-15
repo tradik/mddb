@@ -9,9 +9,9 @@ import { loopGuardModes, loopGuardUnits } from '../lib/chat-loop-guard';
 
 export default function ChatScenarioLoopGuardFields({ form, set }) {
   return (
-    <div className="mt-3 rounded border border-gray-200 p-3">
-      <h4 className="text-xs font-semibold text-gray-900">Repetition-loop guard</h4>
-      <p className="mt-1 text-xs text-gray-600">
+    <div className="mt-3 rounded border border-line p-3">
+      <h4 className="text-xs font-semibold text-fg">Repetition-loop guard</h4>
+      <p className="mt-1 text-xs text-fg-subtle">
         Stops an answer that keeps repeating itself and ends it with “[Response stopped: repetition detected]”.
         Code blocks and tables are never counted.
       </p>

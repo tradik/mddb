@@ -13,7 +13,7 @@ export default function ChatMcpServers({ rows, onChange, secrets, scenarioEnable
   return (
     <fieldset>
       <legend className={labelClass}>External knowledge (MCP)</legend>
-      <p className="mb-2 text-xs text-gray-600">
+      <p className="mb-2 text-xs text-fg-subtle">
         Live data or knowledge someone else keeps behind an MCP server. Only read-only tools can be allowed, and mddbd checks
         them against the server on save. A tool reaches the model only while the {mcpFeature} feature, the scenario, the server
         and the tool are all on. For static knowledge a collection is faster and cites by key.
@@ -33,11 +33,11 @@ export default function ChatMcpServers({ rows, onChange, secrets, scenarioEnable
           ))}
         </ul>
       )}
-      {secrets === null && <p className="mt-1 text-xs text-gray-600">The secret list needs admin on &quot;*&quot;; stored references are kept.</p>}
+      {secrets === null && <p className="mt-1 text-xs text-fg-subtle">The secret list needs admin on &quot;*&quot;; stored references are kept.</p>}
       <button
         type="button"
         onClick={() => onChange([...rows, newMcpServer()])}
-        className="mt-2 flex items-center gap-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-800 hover:bg-gray-100"
+        className="mt-2 flex items-center gap-1 rounded border border-line-strong px-2 py-1.5 text-sm text-fg-soft hover:bg-surface-subtle"
       >
         <Plus className="h-4 w-4" aria-hidden="true" /> Add an MCP server
       </button>

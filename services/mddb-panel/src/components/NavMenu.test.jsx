@@ -93,10 +93,10 @@ describe('groups', () => {
   test('an entry switches the page and is highlighted', async () => {
     await renderMenu();
     const geo = screen.getByRole('button', { name: 'Geo Search' });
-    expect(geo.className).toContain('text-gray-700');
+    expect(geo.className).toContain('text-fg-muted');
     fireEvent.click(geo);
     expect(useStore.getState().viewMode).toBe('geo');
-    expect(screen.getByRole('button', { name: 'Geo Search' }).className).toContain('bg-blue-100');
+    expect(screen.getByRole('button', { name: 'Geo Search' }).className).toContain('bg-info-muted');
   });
 
   test('entries follow auth, replication, automations and the module switches; an empty group goes', async () => {

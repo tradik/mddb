@@ -9,9 +9,9 @@ import { AlertTriangle } from 'lucide-react';
  */
 export default function RevisionConflictNotice({ expected, current, busy, onOverwrite }) {
   return (
-    <div role="alert" className="flex items-start space-x-3 rounded-lg border border-amber-300 bg-amber-50 p-4">
-      <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-800" aria-hidden="true" />
-      <div className="text-sm text-amber-900">
+    <div role="alert" className="flex items-start space-x-3 rounded-lg border border-warning-line bg-warning-soft p-4">
+      <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning-strong" aria-hidden="true" />
+      <div className="text-sm text-warning-strong">
         <h4 className="font-medium">Not saved: the document changed on the server</h4>
         <p className="mt-1">
           {current

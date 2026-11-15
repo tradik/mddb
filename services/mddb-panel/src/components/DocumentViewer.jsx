@@ -31,22 +31,22 @@ class ErrorBoundary extends Component {
         return (
           <div style={{
             padding: '16px',
-            backgroundColor: '#f8fafc',
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--color-surface-muted)',
+            border: '1px solid var(--color-line)',
             borderRadius: '8px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <FileText style={{ width: '20px', height: '20px', marginRight: '8px', color: '#64748b' }} />
-                <strong style={{ color: '#475569' }}>Raw Content</strong>
+                <FileText style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--color-fg-faint)' }} />
+                <strong style={{ color: 'var(--color-fg-subtle)' }}>Raw Content</strong>
               </div>
               <button
                 onClick={() => this.setState({ showRaw: false })}
                 style={{
                   padding: '4px 8px',
                   fontSize: '12px',
-                  backgroundColor: '#e2e8f0',
-                  color: '#475569',
+                  backgroundColor: 'var(--color-surface-strong)',
+                  color: 'var(--color-fg-subtle)',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer'
@@ -59,8 +59,8 @@ class ErrorBoundary extends Component {
               fontSize: '14px',
               margin: 0,
               padding: '12px',
-              backgroundColor: '#fff',
-              border: '1px solid #e2e8f0',
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-line)',
               borderRadius: '4px',
               overflow: 'auto',
               maxHeight: '400px',
@@ -76,10 +76,10 @@ class ErrorBoundary extends Component {
       return (
         <div style={{
           padding: '16px',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
+          backgroundColor: 'var(--color-danger-soft)',
+          border: '1px solid var(--color-danger-line)',
           borderRadius: '8px',
-          color: '#dc2626'
+          color: 'var(--color-danger)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
             <AlertTriangle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
@@ -109,8 +109,8 @@ class ErrorBoundary extends Component {
                 fontSize: '11px',
                 marginTop: '8px',
                 padding: '8px',
-                backgroundColor: '#fff',
-                border: '1px solid #e5e7eb',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-line)',
                 borderRadius: '4px',
                 overflow: 'auto',
                 maxHeight: '100px'
@@ -139,12 +139,12 @@ export default function DocumentViewer() {
   // Show loading state if document doesn't have content yet
   if (!currentDocument.contentMd) {
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-surface)' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center' }}>
-            <Loader2 style={{ width: '48px', height: '48px', color: '#2563eb', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
-            <p style={{ color: '#6b7280', fontSize: '16px' }}>Loading document content...</p>
-            <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '8px' }}>Document: {currentDocument.key} ({currentDocument.lang})</p>
+            <Loader2 style={{ width: '48px', height: '48px', color: 'var(--color-info)', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+            <p style={{ color: 'var(--color-fg-faint)', fontSize: '16px' }}>Loading document content...</p>
+            <p style={{ color: 'var(--color-fg-faint)', fontSize: '12px', marginTop: '8px' }}>Document: {currentDocument.key} ({currentDocument.lang})</p>
           </div>
         </div>
       </div>
@@ -176,17 +176,17 @@ export default function DocumentViewer() {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-surface)' }}>
       {/* Header */}
-      <div style={{ borderBottom: '1px solid #e5e7eb', padding: '16px' }}>
+      <div style={{ borderBottom: '1px solid var(--color-line)', padding: '16px' }}>
         {/* 2.19.6: the title side may shrink (minWidth 0) and long keys wrap,
             so the buttons stay on screen next to an open sidebar. */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ flex: '1 1 12rem', minWidth: 0 }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '4px', overflowWrap: 'anywhere' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-fg)', marginBottom: '4px', overflowWrap: 'anywhere' }}>
               {currentDocument.key}
             </h3>
-            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '16px', rowGap: '4px', fontSize: '14px', color: '#4b5563' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '16px', rowGap: '4px', fontSize: '14px', color: 'var(--color-fg-subtle)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <FileText style={{ width: '16px', height: '16px' }} />
                 <span>{currentDocument.lang}</span>
@@ -217,7 +217,7 @@ export default function DocumentViewer() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '6px 12px', fontSize: '14px',
-                backgroundColor: '#f3f4f6', color: '#374151',
+                backgroundColor: 'var(--color-surface-subtle)', color: 'var(--color-fg-muted)',
                 borderRadius: '8px', border: 'none', cursor: 'pointer'
               }}
             >
@@ -237,9 +237,9 @@ export default function DocumentViewer() {
             <DocumentActions document={currentDocument} />
             <button
               onClick={handleDelete}
-              style={{ padding: '8px', color: '#9ca3af', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
-              onMouseOver={(e) => { e.target.style.color = '#dc2626'; e.target.style.backgroundColor = '#fef2f2'; }}
-              onMouseOut={(e) => { e.target.style.color = '#9ca3af'; e.target.style.backgroundColor = 'transparent'; }}
+              style={{ padding: '8px', color: 'var(--color-fg-faint)', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
+              onMouseOver={(e) => { e.target.style.color = 'var(--color-danger)'; e.target.style.backgroundColor = 'var(--color-danger-soft)'; }}
+              onMouseOut={(e) => { e.target.style.color = 'var(--color-fg-faint)'; e.target.style.backgroundColor = 'transparent'; }}
               title="Delete document"
               aria-label="Delete document"
             >
@@ -247,9 +247,9 @@ export default function DocumentViewer() {
             </button>
             <button
               onClick={clearCurrentDocument}
-              style={{ padding: '8px', color: '#9ca3af', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
-              onMouseOver={(e) => { e.target.style.color = '#4b5563'; e.target.style.backgroundColor = '#f3f4f6'; }}
-              onMouseOut={(e) => { e.target.style.color = '#9ca3af'; e.target.style.backgroundColor = 'transparent'; }}
+              style={{ padding: '8px', color: 'var(--color-fg-faint)', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
+              onMouseOver={(e) => { e.target.style.color = 'var(--color-fg-subtle)'; e.target.style.backgroundColor = 'var(--color-surface-subtle)'; }}
+              onMouseOut={(e) => { e.target.style.color = 'var(--color-fg-faint)'; e.target.style.backgroundColor = 'transparent'; }}
               title="Close document"
               aria-label="Close document"
             >
@@ -264,19 +264,19 @@ export default function DocumentViewer() {
 
       {/* Metadata */}
       {currentDocument.meta && Object.keys(currentDocument.meta).length > 0 && (
-        <div style={{ borderBottom: '1px solid #e5e7eb', padding: '16px', backgroundColor: '#f9fafb' }}>
-          <h4 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ borderBottom: '1px solid var(--color-line)', padding: '16px', backgroundColor: 'var(--color-surface-muted)' }}>
+          <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-fg-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Tag style={{ width: '16px', height: '16px' }} />
             <span>Metadata</span>
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {Object.entries(currentDocument.meta).map(([key, values]) => (
               <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', minWidth: 0 }}>
-                <span style={{ fontSize: '12px', fontWeight: '500', color: '#374151', minWidth: '80px', maxWidth: '40%', overflowWrap: 'anywhere' }}>
+                <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-fg-muted)', minWidth: '80px', maxWidth: '40%', overflowWrap: 'anywhere' }}>
                   {key}:
                 </span>
                 {/* A long value (a URL, a list) wraps instead of widening the pane. */}
-                <div style={{ fontSize: '14px', color: '#111827', minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>
+                <div style={{ fontSize: '14px', color: 'var(--color-fg)', minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>
                   {Array.isArray(values) ? values.join(', ') : values}
                 </div>
               </div>
@@ -290,14 +290,14 @@ export default function DocumentViewer() {
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minWidth: 0 }}>
-        <h4 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
+        <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-fg-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
           Content
         </h4>
 
         {/* 2.18.9: an image document shows its picture above its alt text */}
         <ImagePreview collection={currentDocument.collection} docKey={currentDocument.key} lang={currentDocument.lang} meta={currentDocument.meta} />
 
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e5e7eb', margin: '0', maxWidth: '100%', overflow: 'hidden' }}>
+        <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: '8px', padding: '16px', border: '1px solid var(--color-line)', margin: '0', maxWidth: '100%', overflow: 'hidden' }}>
           <ErrorBoundary>
             <MarkdownView>{currentDocument.contentMd}</MarkdownView>
           </ErrorBoundary>
@@ -305,17 +305,17 @@ export default function DocumentViewer() {
       </div>
 
       {/* Footer Info */}
-      <div style={{ borderTop: '1px solid #e5e7eb', padding: '16px', backgroundColor: '#f9fafb' }}>
+      <div style={{ borderTop: '1px solid var(--color-line)', padding: '16px', backgroundColor: 'var(--color-surface-muted)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', fontSize: '12px' }}>
           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={currentDocument.collection || undefined}>
-            <span style={{ color: '#4b5563' }}>Collection:</span>
-            <span style={{ marginLeft: '8px', fontWeight: '500', color: '#111827' }}>
+            <span style={{ color: 'var(--color-fg-subtle)' }}>Collection:</span>
+            <span style={{ marginLeft: '8px', fontWeight: '500', color: 'var(--color-fg)' }}>
               {currentDocument.collection || 'N/A'}
             </span>
           </div>
           <div>
-            <span style={{ color: '#6b7280' }}>Added:</span>
-            <span style={{ marginLeft: '8px', fontWeight: '500', color: '#111827' }}>
+            <span style={{ color: 'var(--color-fg-faint)' }}>Added:</span>
+            <span style={{ marginLeft: '8px', fontWeight: '500', color: 'var(--color-fg)' }}>
               {currentDocument.addedAt
                 ? format(new Date(currentDocument.addedAt * 1000), 'PP')
                 : 'N/A'}
@@ -326,12 +326,12 @@ export default function DocumentViewer() {
               onClick={() => setShowRevisions(true)}
               style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              <History style={{ width: '14px', height: '14px', color: '#6b7280' }} />
-              <span style={{ color: '#6b7280' }}>Revision:</span>
-              <span style={{ marginLeft: '4px', fontWeight: '500', color: '#2563eb' }}>
+              <History style={{ width: '14px', height: '14px', color: 'var(--color-fg-faint)' }} />
+              <span style={{ color: 'var(--color-fg-faint)' }}>Revision:</span>
+              <span style={{ marginLeft: '4px', fontWeight: '500', color: 'var(--color-info)' }}>
                 {currentDocument.revision || 0}
               </span>
-              <span style={{ color: '#2563eb', fontSize: '11px', marginLeft: '4px' }}>(History)</span>
+              <span style={{ color: 'var(--color-info)', fontSize: '11px', marginLeft: '4px' }}>(History)</span>
             </button>
           </div>
         </div>
@@ -362,23 +362,23 @@ export default function DocumentViewer() {
           alignItems: 'center', justifyContent: 'center', zIndex: 50
         }}>
           <div style={{
-            backgroundColor: 'white', borderRadius: '8px', padding: '24px',
+            backgroundColor: 'var(--color-surface)', borderRadius: '8px', padding: '24px',
             maxWidth: '400px', width: '90%', margin: '0 16px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-              <Trash2 style={{ width: '24px', height: '24px', color: '#dc2626', marginRight: '12px' }} />
-              <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0 }}>
+              <Trash2 style={{ width: '24px', height: '24px', color: 'var(--color-danger)', marginRight: '12px' }} />
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-fg)', margin: 0 }}>
                 Delete Document
               </h3>
             </div>
-            <p style={{ color: '#6b7280', marginBottom: '24px', lineHeight: '1.5' }}>
+            <p style={{ color: 'var(--color-fg-faint)', marginBottom: '24px', lineHeight: '1.5' }}>
               Are you sure you want to delete "{currentDocument.key}" ({currentDocument.lang})? This action cannot be undone.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button
                 onClick={() => setDeleteConfirm(false)}
                 style={{
-                  padding: '8px 16px', color: '#374151', backgroundColor: '#f3f4f6',
+                  padding: '8px 16px', color: 'var(--color-fg-muted)', backgroundColor: 'var(--color-surface-subtle)',
                   borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '14px'
                 }}
               >

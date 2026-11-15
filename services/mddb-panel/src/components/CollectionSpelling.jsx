@@ -14,9 +14,9 @@ export default function CollectionSpelling({ collection, lang, text, onChange })
   const { suggestions, checking, error } = useCollectionSpelling({ enabled, collection, lang, text });
 
   return (
-    <div className="border-t border-gray-200 bg-white px-4 py-2 text-sm">
+    <div className="border-t border-line bg-surface px-4 py-2 text-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <label htmlFor={toggleId} className="flex items-center gap-2 text-gray-800">
+        <label htmlFor={toggleId} className="flex items-center gap-2 text-fg-soft">
           <input
             id={toggleId}
             type="checkbox"
@@ -26,18 +26,18 @@ export default function CollectionSpelling({ collection, lang, text, onChange })
           Check spelling against the collection dictionary
         </label>
         {enabled && (
-          <span role="status" className="text-xs text-gray-700">
+          <span role="status" className="text-xs text-fg-muted">
             {checking ? 'Checking…' : `${suggestions.length} suggestion${suggestions.length === 1 ? '' : 's'}`}
           </span>
         )}
       </div>
       {enabled && error && (
-        <p role="alert" className="mt-1 text-xs text-red-700">Spelling check failed: {error}</p>
+        <p role="alert" className="mt-1 text-xs text-danger">Spelling check failed: {error}</p>
       )}
       {enabled && suggestions.length > 0 && (
         <ul aria-label="Spelling suggestions" className="mt-2 flex flex-wrap gap-2">
           {suggestions.map(({ word, corrected }) => (
-            <li key={word} className="flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-amber-900">
+            <li key={word} className="flex items-center gap-1 rounded border border-warning-line bg-warning-soft px-2 py-0.5 text-warning-strong">
               <span className="line-through">{word}</span>
               <span aria-hidden="true">→</span>
               <span className="sr-only">suggested:</span>
@@ -46,7 +46,7 @@ export default function CollectionSpelling({ collection, lang, text, onChange })
                 type="button"
                 onClick={() => onChange?.(replaceWord(text, word, corrected))}
                 aria-label={`Replace ${word} with ${corrected}`}
-                className="ml-1 rounded px-1 text-xs underline hover:bg-amber-100"
+                className="ml-1 rounded px-1 text-xs underline hover:bg-warning-muted"
               >
                 Replace
               </button>

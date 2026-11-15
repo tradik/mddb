@@ -574,24 +574,83 @@ open, so a first visit shows the same pages as before.
 - The placement lives in one data file, `src/lib/nav-groups.js`; the sidebar
   renders from it.
 
+### Dark mode (2.19.7)
+
+The header has a three-way switch — **light**, **dark** and **system** (the
+operating system's setting, the default). The choice is kept in the
+browser's `localStorage` (`mddb.theme`); where storage is blocked the panel
+follows the system and forgets the choice on reload. A small script in
+`index.html` sets the theme before the first paint, so a dark panel never
+flashes white, and on "system" the panel follows the OS setting as it
+changes.
+
+![Document viewer in dark mode: the document list, the metadata and a bash code block highlighted with the dark code theme](panel-dark-document-viewer.png)
+
+![Edit Document dialog in dark mode: metadata rows, the toolbar and the split Markdown editor with its preview](panel-dark-editor.png)
+
+- **Code blocks follow the mode**: an accessible light code theme on light
+  pages, `vscDarkPlus` on dark ones (`MarkdownView.jsx`, one place).
+- **Print and Download HTML stay light** whatever the panel shows; dark
+  colours apply on screen only.
+- **The vector-space plot keeps a white canvas** in both modes: its point
+  colours are chosen against white.
+
 ### Colours and contrast
 
-The panel's palette is Tailwind's gray, red, amber and green plus the
-`primary` scale in `tailwind.config.js`. Text meets WCAG 2.2 SC 1.4.3 (4.5:1)
-and bars and other meaningful graphics meet SC 1.4.11 (3:1):
+Components do not name palette steps; they use colour tokens defined once in
+`src/index.css` — `bg-surface`, `text-fg-muted`, `border-line`,
+`bg-warning-soft`, `text-danger`… The `:root.dark` block there gives every
+token its dark value, so a component needs no `dark:` pair of its own (the
+storage bars are the one exception). `src/theme-contrast.test.js` measures
+every pair below from the CSS and fails the build when one drops under WCAG
+2.2 AA: 4.5:1 for text (SC 1.4.3), 3:1 for input borders, focus rings and
+meaningful graphics (SC 1.4.11).
 
-| Use | Token | Contrast |
-|-----|-------|----------|
-| Body and secondary text on white | `gray-900`, `gray-700`, `gray-600` | 17.7:1, 10.3:1, 7.6:1 |
-| Quota bar track | `gray-200` | — |
-| Quota bar fill: under 80% / 80–99% / at the limit | `primary-700`, `amber-700`, `red-700` | 4.8:1, 4.1:1, 5.2:1 against the track |
-| Warning / error notes on white | `amber-800`, `red-700` | 7.1:1, 6.5:1 |
-| *Enabled* label on the Config page | `green-700` | 5.0:1 |
-| Draft, conflict and spelling notes (2.19.7) | `amber-900` on `amber-50`, white on `amber-800` buttons | 9.6:1, 7.1:1 |
-| Diff lines added / removed, chat notes (#404) | `green-900` on `green-50`, `red-900` on `red-50`, `amber-900` on `amber-50` | 9.9:1, 9.3:1, 9.6:1 |
+| Token | Use | Light | Dark |
+|-------|-----|-------|------|
+| `surface` | Cards, dialogs, the header | `#ffffff` | `#141a24` |
+| `surface-muted` | Page background, table heads, footers | `#f9fafb` | `#0d1119` |
+| `surface-subtle` | Hover, chips, inline code | `#f3f4f6` | `#1f2733` |
+| `surface-strong` | Bar tracks, pressed buttons | `#e5e7eb` | `#2a3341` |
+| `fg` / `fg-soft` | Headings, body text | `#101828` / `#1e2939` | `#f3f4f6` / `#e5e7eb` |
+| `fg-muted` / `fg-subtle` | Secondary text, labels | `#364153` / `#4a5565` | `#d1d5dc` / `#b8bfca` |
+| `fg-faint` | Hints, timestamps, placeholders | `#5d6574` | `#99a1af` |
+| `line-soft` / `line` | Dividers, card borders | `#f3f4f6` / `#e5e7eb` | `#1f2733` / `#2a3341` |
+| `line-strong` | Input, button and checkbox borders | `#868e9c` | `#6a7282` |
+| `focus` | Focus rings | `#0369a1` | `#38bdf8` |
+| `danger` (`-soft`, `-muted`, `-line`, `-strong`) | Errors, delete | `#c10007` on `#fef2f2` | `#ffa2a2` on `#2a1214` |
+| `success` (…) | Enabled, added lines | `#007a33` on `#f0fdf4` | `#7bf1a8` on `#0c2216` |
+| `warning` (…) | Notices, drafts, conflicts | `#973c00` on `#fffbeb` | `#ffd230` on `#281c08` |
+| `info` (…) | Links, selection | `#1447e6` on `#eff6ff` | `#8ec5ff` on `#0f1a33` |
+| `accent` (…) | The `primary` brand colour | `#0369a1` on `#f0f9ff` | `#7dd3fc` on `#0a1e2e` |
+| `note` (…) | Purple badges | `#8200db` on `#faf5ff` | `#dab2ff` on `#211232` |
 
-Colour never carries a state alone: every bar has its numbers as text, and
-near or over a limit a sentence says so.
+Measured contrast (lowest pair of each group):
+
+| Pair | Light | Dark |
+|------|-------|------|
+| `fg` on any surface | 14.3:1 | 11.6:1 |
+| `fg-subtle` on any surface | 6.1:1 | 6.9:1 |
+| `fg-faint` on any surface | 4.7:1 | 4.9:1 |
+| `danger` / `danger-strong` on surface, `-soft` or `-muted` | 5.3:1 / 8.2:1 | 7.8:1 / 10.3:1 |
+| `success` / `success-strong` | 5.0:1 / 8.2:1 | 9.9:1 / 11.5:1 |
+| `warning` / `warning-strong` (draft, conflict and spelling notes) | 6.4:1 / 8.1:1 | 9.5:1 / 11.0:1 |
+| `info` / `info-strong` | 5.6:1 / 8.5:1 | 8.2:1 / 10.4:1 |
+| `accent` / `accent-strong` | 5.2:1 / 8.2:1 | 8.2:1 / 10.3:1 |
+| `note` / `note-strong` | 6.0:1 / 9.3:1 | 8.4:1 / 11.0:1 |
+| `line-strong` (input borders) on `surface` / `surface-muted` | 3.3:1 / 3.2:1 | 3.6:1 / 3.9:1 |
+| `focus` ring on any surface | 5.4:1 | 7.0:1 |
+| Quota bar fill on the `surface-strong` track: `accent`, `warning`, `danger` | 4.8:1, 5.7:1, 5.2:1 | 7.6:1, 8.8:1, 6.6:1 |
+| White on solid buttons (`primary-600`, `primary-700`) | 5.2:1, 5.9:1 | same |
+
+Solid buttons (`bg-primary-700`, `bg-red-700`, `bg-amber-800`…) keep their
+palette colour and white text in both modes. `primary-600` is darker than
+Tailwind's sky-600 so white text on it reaches 4.5:1. Run
+`PRINT_CONTRAST=1 npx vitest run src/theme-contrast.test.js --silent=false`
+to print every pair.
+
+Colour never carries a state alone: every bar has its numbers as text, near
+or over a limit a sentence says so, and diff lines carry `+`/`-` signs.
 
 ### 🎨 Modern UI
 - Clean, responsive design
@@ -936,6 +995,7 @@ services/mddb-panel/
 ├── src/
 │   ├── components/
 │   │   ├── Header.jsx           # Top navigation bar
+│   │   ├── ThemeSwitch.jsx      # Light / dark / system switch (2.19.7)
 │   │   ├── Sidebar.jsx          # Collections, stats and the menu (NavMenu)
 │   │   ├── DocumentList.jsx     # Document browser
 │   │   ├── DocumentViewer.jsx   # Document details view
@@ -1003,14 +1063,14 @@ services/mddb-panel/
 │   │   ├── use-draft.js         # Draft autosave and the leave-page warning (2.19.7)
 │   │   ├── spell-words.js       # The word list sent for spelling, Replace (2.19.7)
 │   │   ├── use-collection-spelling.js # Debounced, cached spelling requests (2.19.7)
+│   │   ├── theme.js             # Theme choice, `dark` class, useTheme (2.19.7)
 │   │   └── store.js             # Zustand store
 │   ├── App.jsx                  # Main application
 │   ├── main.jsx                 # Entry point
-│   └── index.css                # Global styles
+│   └── index.css                # Global styles, colour tokens (light and dark)
 ├── public/                      # Static assets
 ├── index.html                   # HTML template
 ├── vite.config.js               # Vite configuration
-├── tailwind.config.js           # Tailwind configuration
 ├── postcss.config.js            # PostCSS configuration
 ├── package.json                 # Dependencies
 ├── Dockerfile                   # Docker build
@@ -1087,20 +1147,11 @@ Get a specific document:
 
 ### Styling
 
-The panel uses TailwindCSS for styling. Customize colors in `tailwind.config.js`:
-
-```javascript
-theme: {
-  extend: {
-    colors: {
-      primary: {
-        50: '#f0f9ff',
-        // ... customize colors
-      },
-    },
-  },
-}
-```
+The panel uses Tailwind CSS 4, configured in `src/index.css` (there is no
+`tailwind.config.js`). Colours are tokens in its `@theme` block, with their
+dark values in the `:root.dark` block below it; change both, then run the
+tests — `src/theme-contrast.test.js` checks every pair against WCAG 2.2 AA.
+See [Colours and contrast](#colours-and-contrast).
 
 ### Components
 

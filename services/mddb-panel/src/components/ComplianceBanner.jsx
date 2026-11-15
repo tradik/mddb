@@ -46,22 +46,22 @@ export default function ComplianceBanner() {
   if (status.production && status.compliant) return null;
 
   return (
-    <div className="bg-amber-100 border-b border-amber-300 text-amber-900">
+    <div className="bg-warning-muted border-b border-warning-line text-warning-strong">
       <div className="px-4 py-2 flex items-start gap-3">
-        <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-700" />
+        <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-warning" />
         <div className="flex-1 text-sm">
           <p className="font-semibold">
             Running with insecure defaults. Set <span className="font-mono">MDDB_PRODUCTION=true</span> for ISO 27001 / SOC 2 compliance.
           </p>
           {status.missing && status.missing.length > 0 && (
-            <p className="text-xs mt-1 text-amber-800">
+            <p className="text-xs mt-1 text-warning-strong">
               Missing: {status.missing.map((m) => m.envVar).join(', ')}. See docs/config.md.
             </p>
           )}
         </div>
         <button
           onClick={handleDismiss}
-          className="flex-shrink-0 p-1 text-amber-800 hover:text-amber-900 hover:bg-amber-200 rounded transition-colors"
+          className="flex-shrink-0 p-1 text-warning-strong hover:text-warning-strong hover:bg-warning-muted rounded transition-colors"
           title="Dismiss"
         >
           <X className="w-4 h-4" />

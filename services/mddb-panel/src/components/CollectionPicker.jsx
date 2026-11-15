@@ -13,13 +13,13 @@ export default function CollectionPicker({ value, onChange, label = 'Collection'
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-800 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-fg-soft mb-1">{label}</label>
       <select
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+        className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm bg-surface"
       >
         {placeholder !== undefined && <option value="">{placeholder}</option>}
         {names.map((name) => <option key={name} value={name}>{name}</option>)}

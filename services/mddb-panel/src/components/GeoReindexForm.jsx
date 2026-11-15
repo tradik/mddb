@@ -23,15 +23,15 @@ export default function GeoReindexForm({ collection, onDone }) {
 
   return (
     <div className="space-y-2 text-sm">
-      <label className="block text-xs text-gray-800">
+      <label className="block text-xs text-fg-soft">
         <span className="block mb-0.5">Postcode files to load first (optional, one &quot;country, path on the server&quot; per line)</span>
-        <textarea value={postcodes} onChange={(e) => setPostcodes(e.target.value)} rows={2} placeholder="PL, /var/lib/mddb/postcodes/pl.csv" className="w-full border border-gray-300 rounded px-2 py-1 font-mono text-xs" />
+        <textarea value={postcodes} onChange={(e) => setPostcodes(e.target.value)} rows={2} placeholder="PL, /var/lib/mddb/postcodes/pl.csv" className="w-full border border-line-strong rounded px-2 py-1 font-mono text-xs" />
       </label>
-      <button type="button" onClick={reindex} disabled={busy} className="w-full bg-gray-100 text-gray-900 rounded px-3 py-1.5 hover:bg-gray-200 disabled:opacity-50">
+      <button type="button" onClick={reindex} disabled={busy} className="w-full bg-surface-subtle text-fg rounded px-3 py-1.5 hover:bg-surface-strong disabled:opacity-50">
         Rebuild geo index of {collection || 'all collections'}
       </button>
       <ApiErrorNotice error={error} collection={collection || '*'} />
-      {answer && <p role="status" className="text-xs text-gray-900">{answer}</p>}
+      {answer && <p role="status" className="text-xs text-fg">{answer}</p>}
     </div>
   );
 }

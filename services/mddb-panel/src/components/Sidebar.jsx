@@ -101,12 +101,12 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
   };
 
   return (
-    <div className="h-full bg-white border-r border-gray-200 overflow-y-auto flex flex-col">
+    <div className="h-full bg-surface border-r border-line overflow-y-auto flex flex-col">
       {/* Collapse button */}
-      <div className="p-2 border-b border-gray-200 flex justify-end">
+      <div className="p-2 border-b border-line flex justify-end">
         <button
           onClick={onCollapse}
-          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 text-fg-faint hover:text-fg-subtle hover:bg-surface-subtle rounded transition-colors"
           title="Hide sidebar"
         >
           <PanelLeftClose className="w-4 h-4" />
@@ -114,26 +114,26 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
       </div>
 
       {/* Stats Summary */}
-      <div className="p-4 border-b border-gray-200">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+      <div className="p-4 border-b border-line">
+        <h3 className="text-xs font-semibold text-fg-faint uppercase tracking-wider mb-3">
           Server Stats
         </h3>
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Documents</span>
-            <span className="font-medium text-gray-900">
+            <span className="text-fg-subtle">Documents</span>
+            <span className="font-medium text-fg">
               {stats?.totalDocuments?.toLocaleString() || 0}
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Revisions</span>
-            <span className="font-medium text-gray-900">
+            <span className="text-fg-subtle">Revisions</span>
+            <span className="font-medium text-fg">
               {stats?.totalRevisions?.toLocaleString() || 0}
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">DB Size</span>
-            <span className="font-medium text-gray-900">
+            <span className="text-fg-subtle">DB Size</span>
+            <span className="font-medium text-fg">
               {formatBytes(stats?.databaseSize || 0)}
             </span>
           </div>
@@ -142,8 +142,8 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
 
       {/* Embeddings */}
       {vectorStats && (
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <div className="p-4 border-b border-line">
+          <h3 className="text-xs font-semibold text-fg-faint uppercase tracking-wider mb-3">
             <span className="flex items-center space-x-2">
               <Brain className="w-3 h-3" />
               <span>Embeddings</span>
@@ -157,24 +157,24 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
           {vectorStats.enabled ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Provider</span>
-                <span className="font-medium text-gray-900 text-xs capitalize">
+                <span className="text-fg-subtle">Provider</span>
+                <span className="font-medium text-fg text-xs capitalize">
                   {vectorStats.provider || 'Unknown'}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Model</span>
-                <span className="font-medium text-gray-900 text-xs truncate max-w-[120px]" title={vectorStats.model}>
+                <span className="text-fg-subtle">Model</span>
+                <span className="font-medium text-fg text-xs truncate max-w-[120px]" title={vectorStats.model}>
                   {vectorStats.model}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Dimensions</span>
-                <span className="font-medium text-gray-900">{vectorStats.dimensions}</span>
+                <span className="text-fg-subtle">Dimensions</span>
+                <span className="font-medium text-fg">{vectorStats.dimensions}</span>
               </div>
             </div>
           ) : (
-            <p className="text-xs text-gray-400">Disabled</p>
+            <p className="text-xs text-fg-faint">Disabled</p>
           )}
         </div>
       )}
@@ -182,7 +182,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
       {/* Collections List */}
       <div className="p-4 flex-1">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <h3 className="text-xs font-semibold text-fg-faint uppercase tracking-wider">
             Collections ({collections.length})
           </h3>
           {currentCollection ? (
@@ -205,18 +205,18 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
         </div>
         <div className="space-y-1">
           {statsError ? (
-            <div className="text-sm text-red-600 text-center py-8 px-4">
+            <div className="text-sm text-danger text-center py-8 px-4">
               <div className="flex items-center justify-center mb-2">
-                <Database className="w-8 h-8 text-red-400" />
+                <Database className="w-8 h-8 text-danger" />
               </div>
               <div className="font-medium">Connection Error</div>
               <div className="text-xs mt-1">{statsError}</div>
-              <div className="text-xs mt-2 text-gray-500">
+              <div className="text-xs mt-2 text-fg-faint">
                 Make sure MDDB server is running and accessible
               </div>
             </div>
           ) : collections.length === 0 ? (
-            <div className="text-sm text-gray-500 text-center py-8">
+            <div className="text-sm text-fg-faint text-center py-8">
               No collections found
             </div>
           ) : (
@@ -224,8 +224,8 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
               <div
                 key={collection.name}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors group ${currentCollection === collection.name
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-info-muted text-info'
+                  : 'text-fg-muted hover:bg-surface-subtle'
                   }`}
               >
                 <button
@@ -243,7 +243,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
                   </span>
                 </button>
                 <div className="flex-shrink-0 ml-2 flex items-center space-x-2">
-                  <span className="text-xs text-gray-600">
+                  <span className="text-xs text-fg-subtle">
                     {collection.documentCount}
                   </span>
                   <button
@@ -251,7 +251,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
                       e.stopPropagation();
                       setConfigCollection(collection.name);
                     }}
-                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-fg-faint hover:text-fg-subtle hover:bg-surface-subtle rounded transition-opacity"
                     title="Collection settings"
                   >
                     <Settings2 className="w-3 h-3" />
@@ -259,7 +259,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
                   <button
                     onClick={(e) => handleDeleteCollection(collection.name, e)}
                     disabled={deletingCollection === collection.name}
-                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-red-500 hover:bg-red-50 rounded transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-danger hover:bg-danger-soft rounded transition-opacity"
                     title="Delete collection"
                   >
                     {deletingCollection === collection.name ? (
@@ -276,7 +276,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
       </div>
 
       {/* Menu: grouped, searchable, built from nav-groups.js */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-line">
         <NavMenu
           authEnabled={authEnabled}
           clusterEnabled={clusterEnabled}
@@ -285,8 +285,8 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
       </div>
 
       {/* Version Footer */}
-      <div className="px-4 py-2 border-t border-gray-200 text-center">
-        <span className="text-[10px] text-gray-600">
+      <div className="px-4 py-2 border-t border-line text-center">
+        <span className="text-[10px] text-fg-subtle">
           Server v{config?.version || '...'} · Panel v{panelVersion}
         </span>
       </div>

@@ -27,11 +27,11 @@ export default function AdminToolViews({ viewMode, currentDocument }) {
   if (!Page) return null;
   return (
     <>
-      <div className="flex-1 border-l border-gray-200">
+      <div className="flex-1 border-l border-line">
         <Page />
       </div>
       {WITH_VIEWER.has(viewMode) && currentDocument && (
-        <div className="flex-1 border-l border-gray-200">
+        <div className="flex-1 border-l border-line">
           <DocumentViewer />
         </div>
       )}

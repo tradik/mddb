@@ -12,9 +12,9 @@ export default function CollectionNameInput({ value, onChange, label = 'Collecti
   const names = (stats?.collections || []).map((c) => c.name);
 
   return (
-    <label className="block text-sm text-gray-800">
+    <label className="block text-sm text-fg-soft">
       <span className="block mb-1">{label}</span>
-      <input list={`${id}-names`} value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+      <input list={`${id}-names`} value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 border border-line-strong rounded-lg" />
       <datalist id={`${id}-names`}>{names.map((n) => <option key={n} value={n} />)}</datalist>
     </label>
   );

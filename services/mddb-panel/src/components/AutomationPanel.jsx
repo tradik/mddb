@@ -20,9 +20,9 @@ import { EMPTY_RULE, buildPayload, ruleToForm, describeCronAction, isRunnable } 
 import { LastRunResult, RunNowButton } from './CronRunNow';
 
 const TYPE_CONFIG = {
-  webhook: { icon: Webhook, label: 'Webhook', badgeClass: 'bg-blue-100 text-blue-800' },
-  trigger: { icon: Zap, label: 'Trigger', badgeClass: 'bg-amber-100 text-amber-800' },
-  cron: { icon: Clock, label: 'Cron', badgeClass: 'bg-purple-100 text-purple-800' },
+  webhook: { icon: Webhook, label: 'Webhook', badgeClass: 'bg-info-muted text-info-strong' },
+  trigger: { icon: Zap, label: 'Trigger', badgeClass: 'bg-warning-muted text-warning-strong' },
+  cron: { icon: Clock, label: 'Cron', badgeClass: 'bg-note-muted text-note-strong' },
 };
 
 const EVENT_OPTIONS = [
@@ -198,8 +198,8 @@ export default function AutomationPanel() {
       onClick={() => setFilterType(type)}
       className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
         filterType === type
-          ? 'bg-blue-100 text-blue-700'
-          : 'text-gray-600 hover:bg-gray-100'
+          ? 'bg-info-muted text-info'
+          : 'text-fg-subtle hover:bg-surface-subtle'
       }`}
     >
       {label} ({count})
@@ -220,7 +220,7 @@ export default function AutomationPanel() {
     const cfg = TYPE_CONFIG[type];
     if (!cfg) return null;
     const Icon = cfg.icon;
-    return <Icon className="w-4 h-4 text-gray-500" />;
+    return <Icon className="w-4 h-4 text-fg-faint" />;
   };
 
   // ---- Dynamic type-specific fields ----
@@ -229,21 +229,21 @@ export default function AutomationPanel() {
       return (
         <>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">URL</label>
+            <label className="block text-xs text-fg-faint mb-1">URL</label>
             <input
               type="url"
               value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })}
               placeholder="https://example.com/hook"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Method</label>
+            <label className="block text-xs text-fg-faint mb-1">Method</label>
             <select
               value={form.method}
               onChange={(e) => setForm({ ...form, method: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
             >
               <option value="POST">POST</option>
               <option value="GET">GET</option>
@@ -251,46 +251,46 @@ export default function AutomationPanel() {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Headers (JSON)</label>
+            <label className="block text-xs text-fg-faint mb-1">Headers (JSON)</label>
             <textarea
               value={form.headers}
               onChange={(e) => setForm({ ...form, headers: e.target.value })}
               placeholder={'{"Content-Type": "application/json"}'}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+              className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm font-mono"
             />
           </div>
           <div className="md:col-span-2">
-            <details className="text-xs text-gray-500">
-              <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium select-none">
+            <details className="text-xs text-fg-faint">
+              <summary className="cursor-pointer text-info hover:text-info-strong font-medium select-none">
                 Template Variables
               </summary>
-              <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+              <div className="mt-2 bg-surface-muted border border-line rounded-lg p-3 space-y-2">
                 <p>
-                  Use <code className="bg-gray-200 px-1 rounded text-gray-700">{'{{variable}}'}</code> in URL or header values. Variables are replaced when the webhook fires.
+                  Use <code className="bg-surface-strong px-1 rounded text-fg-muted">{'{{variable}}'}</code> in URL or header values. Variables are replaced when the webhook fires.
                 </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                  <div className="font-semibold mt-1 col-span-2 text-gray-700">Trigger Variables</div>
-                  <code className="text-gray-600">{'{{doc.id}}'}</code><span>Document ID</span>
-                  <code className="text-gray-600">{'{{doc.key}}'}</code><span>Document key</span>
-                  <code className="text-gray-600">{'{{doc.lang}}'}</code><span>Document language</span>
-                  <code className="text-gray-600">{'{{doc.addedAt}}'}</code><span>Added timestamp</span>
-                  <code className="text-gray-600">{'{{doc.updatedAt}}'}</code><span>Updated timestamp</span>
-                  <code className="text-gray-600">{'{{doc.meta.FIELD}}'}</code><span>Meta field value</span>
-                  <code className="text-gray-600">{'{{collection}}'}</code><span>Collection name</span>
-                  <code className="text-gray-600">{'{{trigger.id}}'}</code><span>Trigger ID</span>
-                  <code className="text-gray-600">{'{{trigger.name}}'}</code><span>Trigger name</span>
-                  <code className="text-gray-600">{'{{score}}'}</code><span>Search score</span>
-                  <code className="text-gray-600">{'{{sentiment}}'}</code><span>Sentiment score</span>
-                  <code className="text-gray-600">{'{{timestamp}}'}</code><span>Unix timestamp</span>
-                  <code className="text-gray-600">{'{{webhook.id}}'}</code><span>Webhook ID</span>
-                  <code className="text-gray-600">{'{{event}}'}</code><span>Event type</span>
-                  <div className="font-semibold mt-1 col-span-2 text-gray-700">Cron Variables</div>
-                  <code className="text-gray-600">{'{{cron.id}}'}</code><span>Cron ID</span>
-                  <code className="text-gray-600">{'{{cron.name}}'}</code><span>Cron name</span>
-                  <code className="text-gray-600">{'{{timestamp}}'}</code><span>Unix timestamp</span>
-                  <code className="text-gray-600">{'{{webhook.id}}'}</code><span>Webhook ID</span>
-                  <code className="text-gray-600">{'{{event}}'}</code><span>Event type</span>
+                  <div className="font-semibold mt-1 col-span-2 text-fg-muted">Trigger Variables</div>
+                  <code className="text-fg-subtle">{'{{doc.id}}'}</code><span>Document ID</span>
+                  <code className="text-fg-subtle">{'{{doc.key}}'}</code><span>Document key</span>
+                  <code className="text-fg-subtle">{'{{doc.lang}}'}</code><span>Document language</span>
+                  <code className="text-fg-subtle">{'{{doc.addedAt}}'}</code><span>Added timestamp</span>
+                  <code className="text-fg-subtle">{'{{doc.updatedAt}}'}</code><span>Updated timestamp</span>
+                  <code className="text-fg-subtle">{'{{doc.meta.FIELD}}'}</code><span>Meta field value</span>
+                  <code className="text-fg-subtle">{'{{collection}}'}</code><span>Collection name</span>
+                  <code className="text-fg-subtle">{'{{trigger.id}}'}</code><span>Trigger ID</span>
+                  <code className="text-fg-subtle">{'{{trigger.name}}'}</code><span>Trigger name</span>
+                  <code className="text-fg-subtle">{'{{score}}'}</code><span>Search score</span>
+                  <code className="text-fg-subtle">{'{{sentiment}}'}</code><span>Sentiment score</span>
+                  <code className="text-fg-subtle">{'{{timestamp}}'}</code><span>Unix timestamp</span>
+                  <code className="text-fg-subtle">{'{{webhook.id}}'}</code><span>Webhook ID</span>
+                  <code className="text-fg-subtle">{'{{event}}'}</code><span>Event type</span>
+                  <div className="font-semibold mt-1 col-span-2 text-fg-muted">Cron Variables</div>
+                  <code className="text-fg-subtle">{'{{cron.id}}'}</code><span>Cron ID</span>
+                  <code className="text-fg-subtle">{'{{cron.name}}'}</code><span>Cron name</span>
+                  <code className="text-fg-subtle">{'{{timestamp}}'}</code><span>Unix timestamp</span>
+                  <code className="text-fg-subtle">{'{{webhook.id}}'}</code><span>Webhook ID</span>
+                  <code className="text-fg-subtle">{'{{event}}'}</code><span>Event type</span>
                 </div>
               </div>
             </details>
@@ -303,8 +303,8 @@ export default function AutomationPanel() {
       return (
         <>
           {/* ── WHEN ── */}
-          <div className="md:col-span-2 bg-gray-50 rounded-lg p-4 space-y-3">
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">When</div>
+          <div className="md:col-span-2 bg-surface-muted rounded-lg p-4 space-y-3">
+            <div className="text-xs font-semibold text-fg-faint uppercase tracking-wider">When</div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex flex-wrap gap-3">
                 {EVENT_OPTIONS.map((ev) => (
@@ -319,18 +319,18 @@ export default function AutomationPanel() {
                           : [...current, ev.value];
                         setForm({ ...form, events: next });
                       }}
-                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      className="w-4 h-4 text-info rounded border-line-strong focus:ring-focus"
                     />
                     {ev.label}
                   </label>
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">in</span>
+                <span className="text-sm text-fg-faint">in</span>
                 <select
                   value={form.collection}
                   onChange={(e) => setForm({ ...form, collection: e.target.value })}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="px-3 py-1.5 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 >
                   <option value="">Select collection</option>
                   {collections.map((c) => (
@@ -344,17 +344,17 @@ export default function AutomationPanel() {
           </div>
 
           {/* ── IF (optional condition) ── */}
-          <div className="md:col-span-2 bg-amber-50 rounded-lg p-4 space-y-3">
-            <div className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
+          <div className="md:col-span-2 bg-warning-soft rounded-lg p-4 space-y-3">
+            <div className="text-xs font-semibold text-warning uppercase tracking-wider">
               If matches (optional)
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Search method</label>
+                <label className="block text-xs text-fg-faint mb-1">Search method</label>
                 <select
                   value={form.searchType}
                   onChange={(e) => setForm({ ...form, searchType: e.target.value })}
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-1.5 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 >
                   <option value="fts">Full-Text Search</option>
                   <option value="vector">Vector Search</option>
@@ -362,17 +362,17 @@ export default function AutomationPanel() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Query</label>
+                <label className="block text-xs text-fg-faint mb-1">Query</label>
                 <input
                   type="text"
                   value={form.query}
                   onChange={(e) => setForm({ ...form, query: e.target.value })}
                   placeholder="e.g. breaking news"
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-1.5 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
+                <label className="block text-xs text-fg-faint mb-1">
                   Score &ge; {form.threshold}%
                 </label>
                 <input
@@ -386,54 +386,54 @@ export default function AutomationPanel() {
               </div>
             </div>
             {/* Sentiment condition */}
-            <div className="border-t border-amber-200 pt-3 mt-3">
+            <div className="border-t border-warning-line pt-3 mt-3">
               <label className="flex items-center gap-2 cursor-pointer mb-2">
                 <input
                   type="checkbox"
                   checked={form.sentimentEnabled}
                   onChange={(e) => setForm({ ...form, sentimentEnabled: e.target.checked })}
-                  className="w-4 h-4 text-amber-600 rounded border-gray-300 focus:ring-amber-500"
+                  className="w-4 h-4 text-warning rounded border-line-strong focus:ring-amber-500"
                 />
-                <span className="text-sm text-gray-700 font-medium">Sentiment condition</span>
+                <span className="text-sm text-fg-muted font-medium">Sentiment condition</span>
               </label>
               {form.sentimentEnabled && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-6">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Min score: {form.sentimentMin.toFixed(1)} <span className="text-gray-400">(Negative &minus;1.0)</span></label>
+                    <label className="block text-xs text-fg-faint mb-1">Min score: {form.sentimentMin.toFixed(1)} <span className="text-fg-faint">(Negative &minus;1.0)</span></label>
                     <input type="range" min={-100} max={100} value={Math.round(form.sentimentMin * 100)} onChange={(e) => setForm({ ...form, sentimentMin: parseInt(e.target.value, 10) / 100 })} className="w-full" />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Max score: {form.sentimentMax.toFixed(1)} <span className="text-gray-400">(Positive 1.0)</span></label>
+                    <label className="block text-xs text-fg-faint mb-1">Max score: {form.sentimentMax.toFixed(1)} <span className="text-fg-faint">(Positive 1.0)</span></label>
                     <input type="range" min={-100} max={100} value={Math.round(form.sentimentMax * 100)} onChange={(e) => setForm({ ...form, sentimentMax: parseInt(e.target.value, 10) / 100 })} className="w-full" />
                   </div>
                 </div>
               )}
             </div>
             {form.query && form.sentimentEnabled && (
-              <div className="border-t border-amber-200 pt-3 mt-3">
-                <span className="text-xs text-gray-500 mr-3">Combine conditions:</span>
+              <div className="border-t border-warning-line pt-3 mt-3">
+                <span className="text-xs text-fg-faint mr-3">Combine conditions:</span>
                 <label className="inline-flex items-center gap-1.5 mr-4 text-sm">
-                  <input type="radio" value="and" checked={form.conditionLogic === 'and'} onChange={() => setForm({ ...form, conditionLogic: 'and' })} className="w-4 h-4 text-amber-600" />
+                  <input type="radio" value="and" checked={form.conditionLogic === 'and'} onChange={() => setForm({ ...form, conditionLogic: 'and' })} className="w-4 h-4 text-warning" />
                   AND (both must match)
                 </label>
                 <label className="inline-flex items-center gap-1.5 text-sm">
-                  <input type="radio" value="or" checked={form.conditionLogic === 'or'} onChange={() => setForm({ ...form, conditionLogic: 'or' })} className="w-4 h-4 text-amber-600" />
+                  <input type="radio" value="or" checked={form.conditionLogic === 'or'} onChange={() => setForm({ ...form, conditionLogic: 'or' })} className="w-4 h-4 text-warning" />
                   OR (either must match)
                 </label>
               </div>
             )}
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-fg-faint">
               Leave query empty and sentiment unchecked to fire on every matching event.
             </p>
           </div>
 
           {/* ── THEN ── */}
-          <div className="md:col-span-2 bg-blue-50 rounded-lg p-4 space-y-3">
-            <div className="text-xs font-semibold text-blue-500 uppercase tracking-wider">Then call</div>
+          <div className="md:col-span-2 bg-info-soft rounded-lg p-4 space-y-3">
+            <div className="text-xs font-semibold text-info uppercase tracking-wider">Then call</div>
             <select
               value={form.webhookId}
               onChange={(e) => setForm({ ...form, webhookId: e.target.value })}
-              className="w-full md:w-64 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full md:w-64 px-3 py-1.5 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
             >
               <option value="">Select webhook</option>
               {allWebhooks.map((w) => (
@@ -454,13 +454,13 @@ export default function AutomationPanel() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-surface-muted">
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
+      <div className="bg-surface border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Automation</h1>
-            <p className="text-gray-600">Manage webhooks, triggers, and cron schedules that call a webhook, take a backup or sync a source</p>
+            <h1 className="text-2xl font-bold text-fg mb-1">Automation</h1>
+            <p className="text-fg-subtle">Manage webhooks, triggers, and cron schedules that call a webhook, take a backup or sync a source</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -477,7 +477,7 @@ export default function AutomationPanel() {
             <button
               onClick={loadRules}
               disabled={loading}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 bg-surface-subtle text-fg-muted rounded hover:bg-surface-strong flex items-center gap-2 disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -487,9 +487,9 @@ export default function AutomationPanel() {
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b px-6 flex items-center gap-4">
-        <button onClick={() => setActiveTab('rules')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rules' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Rules</button>
-        {logsEnabled && <button onClick={() => setActiveTab('logs')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Logs</button>}
+      <div className="bg-surface border-b px-6 flex items-center gap-4">
+        <button onClick={() => setActiveTab('rules')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rules' ? 'border-blue-600 text-info' : 'border-transparent text-fg-faint hover:text-fg-muted'}`}>Rules</button>
+        {logsEnabled && <button onClick={() => setActiveTab('logs')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'logs' ? 'border-blue-600 text-info' : 'border-transparent text-fg-faint hover:text-fg-muted'}`}>Logs</button>}
       </div>
 
       {/* Main content */}
@@ -505,28 +505,28 @@ export default function AutomationPanel() {
 
           {/* Error alert */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+            <div className="bg-danger-soft border border-danger-line rounded-lg p-4 text-danger text-sm">
               {error}
             </div>
           )}
 
           {/* Add form (expandable) */}
           {showAddForm && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Plus className="w-5 h-5 text-blue-600" />
+            <div className="bg-surface rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-fg mb-4 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-info" />
                 Add Automation Rule
               </h2>
               <form onSubmit={handleCreate} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Type</label>
+                    <label className="block text-xs text-fg-faint mb-1">Type</label>
                     <select
                       value={newRule.type}
                       onChange={(e) =>
                         setNewRule({ ...EMPTY_RULE, type: e.target.value, name: newRule.name, enabled: newRule.enabled })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                     >
                       <option value="webhook">Webhook</option>
                       <option value="trigger">Trigger</option>
@@ -534,13 +534,13 @@ export default function AutomationPanel() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Name</label>
+                    <label className="block text-xs text-fg-faint mb-1">Name</label>
                     <input
                       type="text"
                       value={newRule.name}
                       onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
                       placeholder="My automation rule"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                     />
                   </div>
                   <div className="flex items-end">
@@ -549,9 +549,9 @@ export default function AutomationPanel() {
                         type="checkbox"
                         checked={newRule.enabled}
                         onChange={(e) => setNewRule({ ...newRule, enabled: e.target.checked })}
-                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        className="w-4 h-4 text-info rounded border-line-strong focus:ring-focus"
                       />
-                      <span className="text-sm text-gray-700">Enabled</span>
+                      <span className="text-sm text-fg-muted">Enabled</span>
                     </label>
                   </div>
                 </div>
@@ -580,7 +580,7 @@ export default function AutomationPanel() {
                       setShowAddForm(false);
                       setNewRule({ ...EMPTY_RULE });
                     }}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                    className="px-4 py-2 bg-surface-subtle text-fg-muted rounded-lg hover:bg-surface-strong text-sm"
                   >
                     Cancel
                   </button>
@@ -590,9 +590,9 @@ export default function AutomationPanel() {
           )}
 
           {/* Rules table */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+          <div className="bg-surface rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-line">
+              <h2 className="text-lg font-semibold text-fg">
                 Rules ({rules.length})
               </h2>
             </div>
@@ -601,45 +601,45 @@ export default function AutomationPanel() {
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                  <p className="text-gray-500 text-sm">Loading automation rules...</p>
+                  <p className="text-fg-faint text-sm">Loading automation rules...</p>
                 </div>
               </div>
             ) : rules.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
+              <div className="p-12 text-center text-fg-faint">
                 <p>No automation rules found.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
+                    <tr className="bg-surface-muted border-b border-line">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider w-10">
                         {/* Icon */}
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">
                         Name
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">
                         Type
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                      <th className="text-right px-6 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider w-48">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-line">
                     {rules.map((rule) => (
-                      <tr key={rule.id} className="hover:bg-gray-50">
+                      <tr key={rule.id} className="hover:bg-surface-muted">
                         {editingId === rule.id ? (
                           /* ---- Inline edit row ---- */
                           <td colSpan={5} className="px-6 py-4">
                             <div className="space-y-4">
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                  <label className="block text-xs text-gray-500 mb-1">Type</label>
+                                  <label className="block text-xs text-fg-faint mb-1">Type</label>
                                   <select
                                     value={editRule.type}
                                     onChange={(e) =>
@@ -650,7 +650,7 @@ export default function AutomationPanel() {
                                         enabled: editRule.enabled,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                                   >
                                     <option value="webhook">Webhook</option>
                                     <option value="trigger">Trigger</option>
@@ -658,12 +658,12 @@ export default function AutomationPanel() {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="block text-xs text-gray-500 mb-1">Name</label>
+                                  <label className="block text-xs text-fg-faint mb-1">Name</label>
                                   <input
                                     type="text"
                                     value={editRule.name}
                                     onChange={(e) => setEditRule({ ...editRule, name: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                                   />
                                 </div>
                                 <div className="flex items-end">
@@ -672,9 +672,9 @@ export default function AutomationPanel() {
                                       type="checkbox"
                                       checked={editRule.enabled}
                                       onChange={(e) => setEditRule({ ...editRule, enabled: e.target.checked })}
-                                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                      className="w-4 h-4 text-info rounded border-line-strong focus:ring-focus"
                                     />
-                                    <span className="text-sm text-gray-700">Enabled</span>
+                                    <span className="text-sm text-fg-muted">Enabled</span>
                                   </label>
                                 </div>
                               </div>
@@ -696,7 +696,7 @@ export default function AutomationPanel() {
                                 </button>
                                 <button
                                   onClick={handleCancelEdit}
-                                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                                  className="px-4 py-2 bg-surface-subtle text-fg-muted rounded-lg hover:bg-surface-strong text-sm"
                                 >
                                   Cancel
                                 </button>
@@ -710,23 +710,23 @@ export default function AutomationPanel() {
                               <TypeIcon type={rule.type} />
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{rule.name}</div>
+                              <div className="text-sm font-medium text-fg">{rule.name}</div>
                               {rule.type === 'webhook' && rule.url && (
-                                <div className="text-xs text-gray-500 font-mono mt-0.5 truncate max-w-xs">
+                                <div className="text-xs text-fg-faint font-mono mt-0.5 truncate max-w-xs">
                                   {rule.method || 'POST'} {rule.url}
                                 </div>
                               )}
                               {rule.type === 'trigger' && (
-                                <div className="text-xs text-gray-500 mt-0.5">
+                                <div className="text-xs text-fg-faint mt-0.5">
                                   {rule.collection && <span>{rule.collection}</span>}
                                   {rule.query && <span className="ml-1 font-mono">"{rule.query}"</span>}
                                   {rule.sentimentEnabled && (
-                                    <span className="ml-1.5 text-amber-600">
+                                    <span className="ml-1.5 text-warning">
                                       sentiment [{rule.sentimentMin?.toFixed(1)}, {rule.sentimentMax?.toFixed(1)}]
                                     </span>
                                   )}
                                   {rule.query && rule.sentimentEnabled && (
-                                    <span className="ml-1 text-gray-400 uppercase text-[10px]">{rule.conditionLogic || 'and'}</span>
+                                    <span className="ml-1 text-fg-faint uppercase text-[10px]">{rule.conditionLogic || 'and'}</span>
                                   )}
                                   {rule.events && rule.events.length > 0 && (
                                     <span className="ml-1.5">
@@ -736,7 +736,7 @@ export default function AutomationPanel() {
                                 </div>
                               )}
                               {rule.type === 'cron' && (
-                                <div className="text-xs text-gray-600 mt-0.5">
+                                <div className="text-xs text-fg-subtle mt-0.5">
                                   <span className="font-mono">{rule.schedule}</span>
                                   <span className="ml-1.5">{describeCronAction(rule)}</span>
                                   <LastRunResult rule={rule} />
@@ -754,13 +754,13 @@ export default function AutomationPanel() {
                                 title={rule.enabled ? 'Click to disable' : 'Click to enable'}
                               >
                                 {toggling === rule.id ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent"></div>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-line-strong border-t-transparent"></div>
                                 ) : rule.enabled ? (
-                                  <ToggleRight className="w-5 h-5 text-green-600" />
+                                  <ToggleRight className="w-5 h-5 text-success" />
                                 ) : (
-                                  <ToggleLeft className="w-5 h-5 text-gray-400" />
+                                  <ToggleLeft className="w-5 h-5 text-fg-faint" />
                                 )}
-                                <span className={rule.enabled ? 'text-green-700' : 'text-gray-500'}>
+                                <span className={rule.enabled ? 'text-success' : 'text-fg-faint'}>
                                   {rule.enabled ? 'Enabled' : 'Disabled'}
                                 </span>
                               </button>
@@ -772,7 +772,7 @@ export default function AutomationPanel() {
                                   <button
                                     onClick={() => handleTest(rule.id)}
                                     disabled={testing === rule.id}
-                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                    className="p-1.5 text-success hover:bg-success-soft rounded transition-colors"
                                     title="Test trigger"
                                   >
                                     {testing === rule.id ? (
@@ -784,7 +784,7 @@ export default function AutomationPanel() {
                                 )}
                                 <button
                                   onClick={() => handleStartEdit(rule)}
-                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  className="p-1.5 text-info hover:bg-info-soft rounded transition-colors"
                                   title="Edit"
                                 >
                                   <Edit3 className="w-4 h-4" />
@@ -792,7 +792,7 @@ export default function AutomationPanel() {
                                 <button
                                   onClick={() => handleDelete(rule.id, rule.name)}
                                   disabled={deleting === rule.id}
-                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                  className="p-1.5 text-danger hover:bg-danger-soft rounded transition-colors"
                                   title="Delete"
                                 >
                                   {deleting === rule.id ? (
@@ -815,20 +815,20 @@ export default function AutomationPanel() {
 
           {/* Test results */}
           {testResults && (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-surface rounded-lg shadow p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Play className="w-5 h-5 text-green-600" />
+                <h2 className="text-lg font-semibold text-fg flex items-center gap-2">
+                  <Play className="w-5 h-5 text-success" />
                   Test Results
                 </h2>
                 <button
                   onClick={() => setTestResults(null)}
-                  className="text-sm text-gray-500 hover:text-gray-700"
+                  className="text-sm text-fg-faint hover:text-fg-muted"
                 >
                   Dismiss
                 </button>
               </div>
-              <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-800 overflow-x-auto font-mono">
+              <pre className="bg-surface-muted border border-line rounded-lg p-4 text-sm text-fg-soft overflow-x-auto font-mono">
                 {JSON.stringify(testResults.result, null, 2)}
               </pre>
             </div>

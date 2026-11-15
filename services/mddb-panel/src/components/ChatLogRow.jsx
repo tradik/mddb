@@ -11,22 +11,22 @@ import { outcomeLabels, ratingText, scoreText, whoOf } from '../lib/chat-log';
 function Detail({ label, children }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-gray-700">{label}</dt>
-      <dd className="whitespace-pre-wrap break-words text-sm text-gray-900">{children}</dd>
+      <dt className="text-xs font-medium text-fg-muted">{label}</dt>
+      <dd className="whitespace-pre-wrap break-words text-sm text-fg">{children}</dd>
     </div>
   );
 }
 
 function ToolCalls({ calls }) {
-  if (!calls?.length) return <p className="text-sm text-gray-700">No tools were called.</p>;
+  if (!calls?.length) return <p className="text-sm text-fg-muted">No tools were called.</p>;
   return (
     <table className="w-full text-left text-xs">
-      <thead className="text-gray-700">
+      <thead className="text-fg-muted">
         <tr><th scope="col">Tool (server/tool when external)</th><th scope="col">Collection</th><th scope="col">Query</th><th scope="col">Result keys</th><th scope="col">Top score</th><th scope="col">ms</th></tr>
       </thead>
-      <tbody className="text-gray-900">
+      <tbody className="text-fg">
         {calls.map((c, i) => (
-          <tr key={i} className="border-t border-gray-200 align-top">
+          <tr key={i} className="border-t border-line align-top">
             <td className="py-1 pr-2 font-mono">{c.server ? `${c.server}/${c.name}` : c.name}</td>
             <td className="py-1 pr-2">{c.collection || '—'}</td>
             <td className="py-1 pr-2">{c.query || '—'}</td>
@@ -46,7 +46,7 @@ export default function ChatLogRow({ turn }) {
   const tokens = turn.tokens ? `${turn.tokens.prompt} in / ${turn.tokens.completion} out` : '—';
   return (
     <>
-      <tr className="border-t border-gray-200 align-top">
+      <tr className="border-t border-line align-top">
         <td className="p-2">
           <button
             type="button"
@@ -54,7 +54,7 @@ export default function ChatLogRow({ turn }) {
             aria-controls={detailId}
             aria-label={`${open ? 'Hide' : 'Show'} the turn of ${formatUnix(turn.at)}`}
             onClick={() => setOpen(!open)}
-            className="rounded p-1 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="rounded p-1 text-fg-muted hover:bg-surface-subtle focus:outline-none focus:ring-2 focus:ring-focus"
           >
             {open ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
           </button>
@@ -63,15 +63,15 @@ export default function ChatLogRow({ turn }) {
         <td className="p-2">{turn.scenario}</td>
         <td className="p-2">{whoOf(turn)}</td>
         <td className="p-2">{turn.question || '—'}</td>
-        <td className="p-2 text-gray-800">{turn.answerExcerpt}</td>
+        <td className="p-2 text-fg-soft">{turn.answerExcerpt}</td>
         <td className="p-2">
           {outcomeLabels[turn.outcome] || turn.outcome}
-          {turn.loopStopped && <span className="ml-1 whitespace-nowrap rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">loop stopped</span>}
+          {turn.loopStopped && <span className="ml-1 whitespace-nowrap rounded bg-warning-muted px-1.5 py-0.5 text-xs font-medium text-warning-strong">loop stopped</span>}
         </td>
         <td className="whitespace-nowrap p-2">{ratingText(turn.rating)}</td>
       </tr>
       {open && (
-        <tr id={detailId} className="bg-gray-50">
+        <tr id={detailId} className="bg-surface-muted">
           <td />
           <td colSpan={7} className="p-3">
             <dl className="grid gap-3 md:grid-cols-2">
@@ -83,7 +83,7 @@ export default function ChatLogRow({ turn }) {
               <Detail label="Conversation">{`${turn.conversationId} / ${turn.messageId}`}</Detail>
               {turn.loopStopped && <Detail label="Loop guard">The answer repeated itself and was stopped where the repetition began (#413).</Detail>}
             </dl>
-            <h4 className="mb-1 mt-3 text-xs font-semibold text-gray-900">Tools</h4>
+            <h4 className="mb-1 mt-3 text-xs font-semibold text-fg">Tools</h4>
             <ToolCalls calls={turn.toolCalls} />
           </td>
         </tr>

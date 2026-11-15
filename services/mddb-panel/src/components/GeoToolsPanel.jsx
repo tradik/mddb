@@ -18,7 +18,7 @@ export default function GeoToolsPanel({ collection, lat, lng, onResults, onReind
   const [tool, setTool] = useState('area');
 
   return (
-    <div className="p-4 border-b border-gray-200 space-y-2">
+    <div className="p-4 border-b border-line space-y-2">
       <div role="group" aria-label="Geo tools" className="flex gap-1">
         {TOOLS.map((t) => (
           <button
@@ -26,7 +26,7 @@ export default function GeoToolsPanel({ collection, lat, lng, onResults, onReind
             type="button"
             aria-pressed={tool === t.id}
             onClick={() => setTool(t.id)}
-            className={`px-2 py-1 text-xs rounded ${tool === t.id ? 'bg-blue-100 text-blue-900' : 'text-gray-800 hover:bg-gray-100'}`}
+            className={`px-2 py-1 text-xs rounded ${tool === t.id ? 'bg-info-muted text-info-strong' : 'text-fg-soft hover:bg-surface-subtle'}`}
           >
             {t.label}
           </button>

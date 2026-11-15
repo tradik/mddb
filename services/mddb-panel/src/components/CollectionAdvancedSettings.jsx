@@ -6,8 +6,8 @@ import { QUOTA_FIELDS } from '../lib/collection-config';
 // mode and weight (RAG-009) and result cap (#368), meta keys kept out of
 // full-text search (#367), and the collection's quota (GO-043).
 
-const input = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
-const small = 'block text-xs text-gray-600 mb-0.5';
+const input = 'w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus';
+const small = 'block text-xs text-fg-subtle mb-0.5';
 
 export default function CollectionAdvancedSettings({ value, onChange }) {
   const set = (key) => (e) => onChange({ ...value, [key]: e.target.value });
@@ -26,7 +26,7 @@ export default function CollectionAdvancedSettings({ value, onChange }) {
         <div>
           <label htmlFor="cc-max-top-k" className={small}>Result cap (maxTopK)</label>
           <input id="cc-max-top-k" type="number" min="0" value={value.maxTopK} onChange={set('maxTopK')} placeholder="server cap" className={input} />
-          <p className="text-xs text-gray-600 mt-0.5">Lowers MDDB_SEARCH_MAX_LIMIT for this collection; never raises it.</p>
+          <p className="text-xs text-fg-subtle mt-0.5">Lowers MDDB_SEARCH_MAX_LIMIT for this collection; never raises it.</p>
         </div>
         <div>
           <label htmlFor="cc-summary-mode" className={small}>Document summaries</label>
@@ -36,7 +36,7 @@ export default function CollectionAdvancedSettings({ value, onChange }) {
             <option value="blend">Blend: best of chunk and summary</option>
             <option value="expand">Expand: also return the summary&apos;s best chunks</option>
           </select>
-          <p className="text-xs text-gray-600 mt-0.5">Uses each document&apos;s meta.summary, written by its client.</p>
+          <p className="text-xs text-fg-subtle mt-0.5">Uses each document&apos;s meta.summary, written by its client.</p>
         </div>
         <div>
           <label htmlFor="cc-summary-weight" className={small}>Summary weight</label>
@@ -45,7 +45,7 @@ export default function CollectionAdvancedSettings({ value, onChange }) {
       </div>
 
       <div>
-        <label htmlFor="cc-exclude-meta" className="block text-sm font-medium text-gray-700 mb-1">Meta keys kept out of full-text search</label>
+        <label htmlFor="cc-exclude-meta" className="block text-sm font-medium text-fg-muted mb-1">Meta keys kept out of full-text search</label>
         <input
           id="cc-exclude-meta"
           value={value.excludeMetaKeys}
@@ -53,15 +53,15 @@ export default function CollectionAdvancedSettings({ value, onChange }) {
           placeholder="e.g. url, license, sha"
           className={input}
         />
-        <p className="text-xs text-gray-600 mt-1">
+        <p className="text-xs text-fg-subtle mt-1">
           Comma-separated. Keys used only as filters: they get no postings, and filters and facets still work on them.
           Run an FTS reindex after changing the list.
         </p>
       </div>
 
       <fieldset>
-        <legend className="block text-sm font-medium text-gray-700 mb-1">Quota</legend>
-        <p className="text-xs text-gray-600 mb-2">
+        <legend className="block text-sm font-medium text-fg-muted mb-1">Quota</legend>
+        <p className="text-xs text-fg-subtle mb-2">
           Writes past a storage limit are refused (507); embeddings past a daily budget wait until midnight UTC.
           Leave empty for no limit. Only an admin on &quot;*&quot; can change a quota.
         </p>

@@ -52,21 +52,21 @@ export default function MyApiKeysPanel() {
   });
 
   return (
-    <section aria-labelledby="my-keys-title" className="bg-white rounded-lg shadow p-4 space-y-3">
-      <h3 id="my-keys-title" className="text-base font-semibold text-gray-900 flex items-center gap-2">
+    <section aria-labelledby="my-keys-title" className="bg-surface rounded-lg shadow p-4 space-y-3">
+      <h3 id="my-keys-title" className="text-base font-semibold text-fg flex items-center gap-2">
         <KeyRound className="w-4 h-4" aria-hidden="true" /> My API keys
       </h3>
-      <p className="text-sm text-gray-700">
+      <p className="text-sm text-fg-muted">
         Keys for scripts and integrations, sent as the X-API-Key header. A key has your permissions; revoke it when it is no longer used.
       </p>
       <form onSubmit={create} className="flex flex-wrap gap-2 items-end">
-        <label className="flex-1 min-w-[12rem] text-sm text-gray-800">
+        <label className="flex-1 min-w-[12rem] text-sm text-fg-soft">
           <span className="block mb-1">Description</span>
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="CI pipeline" className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="CI pipeline" className="w-full px-3 py-2 border border-line-strong rounded-lg" />
         </label>
-        <label className="text-sm text-gray-800">
+        <label className="text-sm text-fg-soft">
           <span className="block mb-1">Expires on (optional)</span>
-          <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg" />
+          <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="px-3 py-2 border border-line-strong rounded-lg" />
         </label>
         <button type="submit" disabled={busy || !description.trim()} className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 text-sm">
           Create key
@@ -74,11 +74,11 @@ export default function MyApiKeysPanel() {
       </form>
       {secret && <OneTimeSecret secret={secret} onDismiss={() => setSecret(null)} />}
       <ApiErrorNotice error={error || loadError} />
-      {keys?.length === 0 && <p className="text-sm text-gray-700">You have no API keys.</p>}
+      {keys?.length === 0 && <p className="text-sm text-fg-muted">You have no API keys.</p>}
       {keys?.length > 0 && (
         <table className="min-w-full text-sm" aria-label="My API keys">
           <thead>
-            <tr className="text-left text-gray-800">
+            <tr className="text-left text-fg-soft">
               <th scope="col" className="py-2 pr-3">Description</th>
               <th scope="col" className="py-2 pr-3">Key hash</th>
               <th scope="col" className="py-2 pr-3">Created</th>
@@ -86,15 +86,15 @@ export default function MyApiKeysPanel() {
               <th scope="col" className="py-2"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line-soft">
             {keys.map((k) => (
               <tr key={k.keyHash}>
-                <td className="py-2 pr-3 text-gray-900">{k.description || '—'}</td>
-                <td className="py-2 pr-3 font-mono text-xs text-gray-800" title={k.keyHash}>{k.keyHash.slice(0, 12)}…</td>
-                <td className="py-2 pr-3 text-gray-800">{formatUnix(k.createdAt)}</td>
-                <td className="py-2 pr-3 text-gray-800">{k.expiresAt ? formatUnix(k.expiresAt) : 'Never'}</td>
+                <td className="py-2 pr-3 text-fg">{k.description || '—'}</td>
+                <td className="py-2 pr-3 font-mono text-xs text-fg-soft" title={k.keyHash}>{k.keyHash.slice(0, 12)}…</td>
+                <td className="py-2 pr-3 text-fg-soft">{formatUnix(k.createdAt)}</td>
+                <td className="py-2 pr-3 text-fg-soft">{k.expiresAt ? formatUnix(k.expiresAt) : 'Never'}</td>
                 <td className="py-2">
-                  <button type="button" onClick={() => setRevoking(k)} className="text-red-800 underline">
+                  <button type="button" onClick={() => setRevoking(k)} className="text-danger-strong underline">
                     Revoke <span className="sr-only">{k.description || k.keyHash.slice(0, 12)}</span>
                   </button>
                 </td>

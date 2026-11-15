@@ -39,19 +39,19 @@ export default function SettingsPanel() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+        <h2 className="text-2xl font-bold text-fg flex items-center">
           <Settings className="w-6 h-6 mr-2" />
           Client Settings
         </h2>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-fg-subtle mt-1">
           Configure how the panel communicates with the MDDB server
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">API Mode</h3>
-          <p className="text-sm text-gray-600 mt-1">
+      <div className="bg-surface rounded-lg shadow-sm border border-line">
+        <div className="p-4 border-b border-line">
+          <h3 className="text-lg font-semibold text-fg">API Mode</h3>
+          <p className="text-sm text-fg-subtle mt-1">
             Choose which API protocol to use for communication
           </p>
         </div>
@@ -68,8 +68,8 @@ export default function SettingsPanel() {
                 className={`
                   relative p-4 rounded-lg border-2 cursor-pointer transition-all
                   ${isSelected
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                    ? 'border-blue-500 bg-info-soft'
+                    : 'border-line hover:border-line-strong bg-surface'
                   }
                 `}
               >
@@ -77,38 +77,38 @@ export default function SettingsPanel() {
                   <div
                     className={`
                     flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center
-                    ${isSelected ? 'bg-blue-100' : 'bg-gray-100'}
+                    ${isSelected ? 'bg-info-muted' : 'bg-surface-subtle'}
                   `}
                   >
                     <Icon
-                      className={`w-5 h-5 ${isSelected ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`w-5 h-5 ${isSelected ? 'text-info' : 'text-fg-subtle'}`}
                     />
                   </div>
 
                   <div className="ml-4 flex-1">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-base font-semibold text-gray-900">{mode.name}</h4>
+                      <h4 className="text-base font-semibold text-fg">{mode.name}</h4>
                       {isSelected && (
-                        <CheckCircle className="w-5 h-5 text-blue-600" />
+                        <CheckCircle className="w-5 h-5 text-info" />
                       )}
                     </div>
 
-                    <p className="text-sm text-gray-600 mt-1">{mode.description}</p>
+                    <p className="text-sm text-fg-subtle mt-1">{mode.description}</p>
 
                     <ul className="mt-3 space-y-1">
                       {mode.features.map((feature, idx) => (
                         <li
                           key={idx}
-                          className="text-xs text-gray-600 flex items-center"
+                          className="text-xs text-fg-subtle flex items-center"
                         >
-                          <span className="w-1 h-1 bg-gray-400 rounded-full mr-2"></span>
+                          <span className="w-1 h-1 bg-line-strong rounded-full mr-2"></span>
                           {feature}
                         </li>
                       ))}
                     </ul>
 
                     {mode.note && (
-                      <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                      <div className="mt-3 p-2 bg-warning-soft border border-warning-line rounded text-xs text-warning-strong">
                         <strong>Note:</strong> {mode.note}
                       </div>
                     )}
@@ -119,18 +119,18 @@ export default function SettingsPanel() {
           })}
         </div>
 
-        <div className="p-4 bg-gray-50 border-t border-gray-200">
+        <div className="p-4 bg-surface-muted border-t border-line">
           <div className="flex items-start">
             <div className="flex-shrink-0">
-              <Settings className="w-5 h-5 text-blue-600" />
+              <Settings className="w-5 h-5 text-info" />
             </div>
             <div className="ml-3">
-              <h4 className="text-sm font-semibold text-gray-900">Current Mode</h4>
-              <p className="text-xs text-gray-600 mt-1">
-                Selected: <strong className="text-gray-900">{apiMode.toUpperCase()}</strong>.
+              <h4 className="text-sm font-semibold text-fg">Current Mode</h4>
+              <p className="text-xs text-fg-subtle mt-1">
+                Selected: <strong className="text-fg">{apiMode.toUpperCase()}</strong>.
               </p>
               {apiMode === 'graphql' && (
-                <p className="text-xs text-orange-600 mt-2">
+                <p className="text-xs text-warning mt-2">
                   ⚠️ The MDDB server now serves a fully-functional GraphQL endpoint at
                   <code> /graphql</code> (and Playground at <code>/playground</code>) — enabled by
                   default in MDDB 2.9.14+. The panel UI itself, however, still issues every
@@ -145,9 +145,9 @@ export default function SettingsPanel() {
         </div>
       </div>
 
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-blue-900 mb-2">💡 Tips</h4>
-        <ul className="space-y-1 text-xs text-blue-800">
+      <div className="mt-6 bg-info-soft border border-info-line rounded-lg p-4">
+        <h4 className="text-sm font-semibold text-info-strong mb-2">💡 Tips</h4>
+        <ul className="space-y-1 text-xs text-info-strong">
           <li className="flex items-start">
             <span className="mr-2">•</span>
             <span>
@@ -164,7 +164,7 @@ export default function SettingsPanel() {
             <span className="mr-2">•</span>
             <span>
               Test GraphQL queries at{' '}
-              <code className="bg-blue-100 px-1 rounded">/playground</code>
+              <code className="bg-info-muted px-1 rounded">/playground</code>
             </span>
           </li>
           <li className="flex items-start">

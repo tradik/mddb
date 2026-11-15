@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Radio, X } from 'lucide-react';
 
 const EVENT_ICONS = {
-  'doc.added': { icon: '+', color: 'bg-green-500', label: 'Added' },
-  'doc.updated': { icon: '~', color: 'bg-blue-500', label: 'Updated' },
-  'doc.deleted': { icon: '-', color: 'bg-red-500', label: 'Deleted' },
+  'doc.added': { icon: '+', color: 'bg-green-700', label: 'Added' },
+  'doc.updated': { icon: '~', color: 'bg-blue-700', label: 'Updated' },
+  'doc.deleted': { icon: '-', color: 'bg-red-700', label: 'Deleted' },
 };
 
 const MAX_TOASTS = 5;
@@ -42,7 +42,7 @@ export default function SSEToast({ connected, lastEvent }) {
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
       {/* Connection indicator */}
       <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full self-end ${
-        connected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+        connected ? 'bg-success-muted text-success' : 'bg-surface-subtle text-fg-faint'
       }`}>
         <Radio className="w-3 h-3" />
         <span>{connected ? 'Live' : 'Offline'}</span>
@@ -54,25 +54,25 @@ export default function SSEToast({ connected, lastEvent }) {
         return (
           <div
             key={toast.id}
-            className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 flex items-start gap-3 animate-slide-in"
+            className="bg-surface border border-line rounded-lg shadow-lg p-3 flex items-start gap-3 animate-slide-in"
           >
             <div className={`${meta.color} text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0`}>
               {meta.icon}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-fg truncate">
                 {meta.label}: {toast.key}
               </p>
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-fg-faint truncate">
                 {toast.collection}
                 {toast.readOnly === false && (
-                  <span className="ml-1 text-blue-500">(writable)</span>
+                  <span className="ml-1 text-info">(writable)</span>
                 )}
               </p>
             </div>
             <button
               onClick={() => dismiss(toast.id)}
-              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              className="text-fg-faint hover:text-fg-subtle flex-shrink-0"
             >
               <X className="w-3.5 h-3.5" />
             </button>

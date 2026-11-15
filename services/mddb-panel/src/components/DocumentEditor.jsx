@@ -133,22 +133,22 @@ export default function DocumentEditor({ document, onClose, onSave }) {
   if (!document) return null;
 
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col">
+    <div className="fixed inset-0 bg-surface z-50 flex flex-col">
       {/* Header */}
-      <div className="border-b border-gray-200 p-4 flex-shrink-0">
+      <div className="border-b border-line p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-fg">
               Edit Document
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-fg-faint mt-1">
               {document.collection} / {document.key} ({document.lang})
             </p>
           </div>
           <button
             onClick={onClose}
             aria-label="Close editor"
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+            className="p-2 text-fg-faint hover:text-fg-subtle rounded-lg hover:bg-surface-subtle"
           >
             <X className="w-5 h-5" />
           </button>
@@ -172,26 +172,26 @@ export default function DocumentEditor({ document, onClose, onSave }) {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-danger-soft border border-danger-line rounded-lg p-4 flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-medium text-red-900">Error saving document</h4>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <h4 className="text-sm font-medium text-danger-strong">Error saving document</h4>
+              <p className="text-sm text-danger mt-1">{error}</p>
             </div>
           </div>
         )}
 
         {/* Success Message */}
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-3">
-            <Check className="w-5 h-5 text-green-600" />
-            <p className="text-sm font-medium text-green-900">Document saved successfully!</p>
+          <div className="bg-success-soft border border-success-line rounded-lg p-4 flex items-center space-x-3">
+            <Check className="w-5 h-5 text-success" />
+            <p className="text-sm font-medium text-success-strong">Document saved successfully!</p>
           </div>
         )}
 
         {/* Metadata Section */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Metadata</h3>
+          <h3 className="text-sm font-semibold text-fg-muted mb-3">Metadata</h3>
 
           {/* Existing Metadata */}
           <div className="space-y-2 mb-4">
@@ -201,17 +201,17 @@ export default function DocumentEditor({ document, onClose, onSave }) {
                   type="text"
                   value={key}
                   disabled
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50"
+                  className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm bg-surface-muted"
                 />
                 <input
                   type="text"
                   value={Array.isArray(values) ? values.join(', ') : values}
                   onChange={(e) => handleUpdateMetadata(key, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                 />
                 <button
                   onClick={() => handleRemoveMetadata(key)}
-                  className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="px-3 py-2 text-danger hover:bg-danger-soft rounded-lg transition-colors"
                 >
                   Remove
                 </button>
@@ -226,7 +226,7 @@ export default function DocumentEditor({ document, onClose, onSave }) {
               placeholder="Key (e.g., author)"
               value={newMetaKey}
               onChange={(e) => setNewMetaKey(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
             />
             <input
               type="text"
@@ -234,7 +234,7 @@ export default function DocumentEditor({ document, onClose, onSave }) {
               value={newMetaValue}
               onChange={(e) => setNewMetaValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleAddMetadata()}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
             />
             <button
               onClick={handleAddMetadata}
@@ -247,8 +247,8 @@ export default function DocumentEditor({ document, onClose, onSave }) {
 
         {/* Content Section */}
         <div className="flex-1 flex flex-col">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Content (Markdown)</h3>
-          <div className="border border-gray-300 rounded-lg overflow-hidden flex-1">
+          <h3 className="text-sm font-semibold text-fg-muted mb-3">Content (Markdown)</h3>
+          <div className="border border-line-strong rounded-lg overflow-hidden flex-1">
             <MarkdownEditor
               value={contentMd}
               onChange={setContentMd}
@@ -261,10 +261,10 @@ export default function DocumentEditor({ document, onClose, onSave }) {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-gray-200 p-4 flex items-center justify-end space-x-3 flex-shrink-0">
+      <div className="border-t border-line p-4 flex items-center justify-end space-x-3 flex-shrink-0">
         <button
           onClick={onClose}
-          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          className="px-4 py-2 text-fg-muted bg-surface-subtle rounded-lg hover:bg-surface-strong transition-colors"
         >
           Cancel
         </button>

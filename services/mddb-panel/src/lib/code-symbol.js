@@ -36,9 +36,9 @@ export function passageLocation(p) {
  * pair keeps text contrast above 7:1 (WCAG 2.2 AAA).
  */
 const PRECISION_STYLES = {
-  semantic: { label: 'semantic', className: 'bg-green-100 text-green-900 border-green-700' },
-  mixed: { label: 'mixed', className: 'bg-amber-100 text-amber-900 border-amber-700' },
-  heuristic: { label: 'heuristic', className: 'bg-gray-100 text-gray-900 border-gray-600' },
+  semantic: { label: 'semantic', className: 'bg-success-muted text-success-strong border-success' },
+  mixed: { label: 'mixed', className: 'bg-warning-muted text-warning-strong border-warning' },
+  heuristic: { label: 'heuristic', className: 'bg-surface-subtle text-fg border-line-strong' },
 };
 
 export function precisionStyle(precision) {

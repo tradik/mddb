@@ -38,7 +38,7 @@ export default function VectorPanel() {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading vector search stats...</p>
+          <p className="text-fg-faint">Loading vector search stats...</p>
         </div>
       </div>
     );
@@ -48,9 +48,9 @@ export default function VectorPanel() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-          <p className="text-red-600 mb-2">Error loading vector stats</p>
-          <p className="text-sm text-gray-500 mb-4">{error}</p>
+          <AlertCircle className="w-12 h-12 text-danger mx-auto mb-4" />
+          <p className="text-danger mb-2">Error loading vector stats</p>
+          <p className="text-sm text-fg-faint mb-4">{error}</p>
           <button
             onClick={() => loadStats()}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -64,49 +64,49 @@ export default function VectorPanel() {
 
   if (!stats || !stats.enabled) {
     return (
-      <div className="h-full flex flex-col bg-gray-50">
-        <div className="bg-white border-b px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Vector Search</h1>
-          <p className="text-gray-600">Manage vector embeddings and search</p>
+      <div className="h-full flex flex-col bg-surface-muted">
+        <div className="bg-surface border-b px-6 py-4">
+          <h1 className="text-2xl font-bold text-fg mb-1">Vector Search</h1>
+          <p className="text-fg-subtle">Manage vector embeddings and search</p>
         </div>
 
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="max-w-lg text-center">
-            <Database className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <Database className="w-16 h-16 text-fg-faint mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-fg mb-2">
               Vector Search Disabled
             </h2>
-            <p className="text-gray-600 mb-4">
+            <p className="text-fg-subtle mb-4">
               Vector search is not enabled on this server. To enable it, configure an embedding
               provider (OpenAI or Ollama) in your server environment variables.
             </p>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-left text-sm">
-              <p className="font-medium text-gray-900 mb-2">Required environment variables:</p>
-              <ul className="space-y-1 text-gray-700">
+            <div className="bg-surface-muted border border-line rounded-lg p-4 text-left text-sm">
+              <p className="font-medium text-fg mb-2">Required environment variables:</p>
+              <ul className="space-y-1 text-fg-muted">
                 <li>
-                  <code className="bg-gray-200 px-1 py-0.5 rounded">
+                  <code className="bg-surface-strong px-1 py-0.5 rounded">
                     MDDB_EMBEDDING_PROVIDER
                   </code>{' '}
                   - "openai" or "ollama"
                 </li>
                 <li>
-                  <code className="bg-gray-200 px-1 py-0.5 rounded">MDDB_EMBEDDING_MODEL</code> -
+                  <code className="bg-surface-strong px-1 py-0.5 rounded">MDDB_EMBEDDING_MODEL</code> -
                   Model name
                 </li>
                 <li>
-                  <code className="bg-gray-200 px-1 py-0.5 rounded">
+                  <code className="bg-surface-strong px-1 py-0.5 rounded">
                     MDDB_EMBEDDING_DIMENSIONS
                   </code>{' '}
                   - Embedding dimensions
                 </li>
                 <li>
-                  <code className="bg-gray-200 px-1 py-0.5 rounded">
+                  <code className="bg-surface-strong px-1 py-0.5 rounded">
                     MDDB_EMBEDDING_API_KEY
                   </code>{' '}
                   - API key (OpenAI only)
                 </li>
                 <li>
-                  <code className="bg-gray-200 px-1 py-0.5 rounded">
+                  <code className="bg-surface-strong px-1 py-0.5 rounded">
                     MDDB_EMBEDDING_API_URL
                   </code>{' '}
                   - API URL (Ollama only)
@@ -127,16 +127,16 @@ export default function VectorPanel() {
   const trainingSet = new Set(stats.indexTraining?.pending || []);
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
+    <div className="h-full flex flex-col bg-surface-muted">
+      <div className="bg-surface border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Vector Search</h1>
-            <p className="text-gray-600">Manage vector embeddings and search</p>
+            <h1 className="text-2xl font-bold text-fg mb-1">Vector Search</h1>
+            <p className="text-fg-subtle">Manage vector embeddings and search</p>
           </div>
           <button
             onClick={() => loadStats()}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-2"
+            className="px-4 py-2 bg-surface-subtle text-fg-muted rounded hover:bg-surface-strong flex items-center gap-2"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -149,25 +149,25 @@ export default function VectorPanel() {
           <IndexTrainingNotice training={stats.indexTraining} />
 
           {/* Provider Info */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-blue-600" />
+          <div className="bg-surface rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-fg mb-4 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-info" />
               Embedding Provider
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <div className="text-sm text-gray-500 mb-1">Provider</div>
-                <div className="text-lg font-medium text-gray-900">
+                <div className="text-sm text-fg-faint mb-1">Provider</div>
+                <div className="text-lg font-medium text-fg">
                   {stats.provider || 'Unknown'}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-500 mb-1">Model</div>
-                <div className="text-lg font-medium text-gray-900">{stats.model || 'N/A'}</div>
+                <div className="text-sm text-fg-faint mb-1">Model</div>
+                <div className="text-lg font-medium text-fg">{stats.model || 'N/A'}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-500 mb-1">Dimensions</div>
-                <div className="text-lg font-medium text-gray-900">
+                <div className="text-sm text-fg-faint mb-1">Dimensions</div>
+                <div className="text-lg font-medium text-fg">
                   {stats.dimensions || 'N/A'}
                 </div>
               </div>
@@ -176,40 +176,40 @@ export default function VectorPanel() {
 
           {/* Overview Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-500 mb-1">Total Collections</div>
-              <div className="text-3xl font-bold text-gray-900">{collections.length}</div>
+            <div className="bg-surface rounded-lg shadow p-6">
+              <div className="text-sm text-fg-faint mb-1">Total Collections</div>
+              <div className="text-3xl font-bold text-fg">{collections.length}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-500 mb-1">Total Documents</div>
-              <div className="text-3xl font-bold text-gray-900">{totalDocs}</div>
+            <div className="bg-surface rounded-lg shadow p-6">
+              <div className="text-sm text-fg-faint mb-1">Total Documents</div>
+              <div className="text-3xl font-bold text-fg">{totalDocs}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-500 mb-1">Indexed Vectors</div>
-              <div className="text-3xl font-bold text-blue-600">{totalVectors}</div>
+            <div className="bg-surface rounded-lg shadow p-6">
+              <div className="text-sm text-fg-faint mb-1">Indexed Vectors</div>
+              <div className="text-3xl font-bold text-info">{totalVectors}</div>
             </div>
           </div>
 
           {/* Collections */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Collections</h2>
-              <p className="text-sm text-gray-600 mt-1">
+          <div className="bg-surface rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-line">
+              <h2 className="text-lg font-semibold text-fg">Collections</h2>
+              <p className="text-sm text-fg-subtle mt-1">
                 Manage vector embeddings for each collection
               </p>
-              <label className="mt-2 flex items-center gap-2 text-sm text-gray-800">
+              <label className="mt-2 flex items-center gap-2 text-sm text-fg-soft">
                 <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
                 Force re-embed (also documents whose content has not changed)
               </label>
             </div>
 
             {collections.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
-                <Database className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+              <div className="p-12 text-center text-fg-faint">
+                <Database className="w-12 h-12 mx-auto mb-2 text-fg-faint" />
                 <p>No collections found</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-line">
                 {collections.map((collection) => {
                   const docCount = collectionsMap[collection]?.total_documents || 0;
                   const vectorCount = collectionsMap[collection]?.embedded_documents || 0;
@@ -222,10 +222,10 @@ export default function VectorPanel() {
                     <div key={collection} className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
+                          <h3 className="text-lg font-medium text-fg mb-2 flex items-center gap-2">
                             {collection}
                             {trainingSet.has(collection) && (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                              <span className="rounded-full bg-warning-muted px-2 py-0.5 text-xs font-medium text-warning-strong">
                                 {stats.indexTraining.current === collection ? 'training now' : 'waiting to train'}
                               </span>
                             )}
@@ -233,23 +233,23 @@ export default function VectorPanel() {
 
                           <div className="grid grid-cols-3 gap-4 mb-3">
                             <div>
-                              <div className="text-xs text-gray-500">Documents</div>
-                              <div className="text-sm font-medium text-gray-900">{docCount}</div>
+                              <div className="text-xs text-fg-faint">Documents</div>
+                              <div className="text-sm font-medium text-fg">{docCount}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-500">Indexed</div>
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-xs text-fg-faint">Indexed</div>
+                              <div className="text-sm font-medium text-fg">
                                 {vectorCount}
                               </div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-500">Coverage</div>
-                              <div className="text-sm font-medium text-gray-900">{coverage}%</div>
+                              <div className="text-xs text-fg-faint">Coverage</div>
+                              <div className="text-sm font-medium text-fg">{coverage}%</div>
                             </div>
                           </div>
 
                           {/* Progress bar */}
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-surface-strong rounded-full h-2">
                             <div
                               className={`h-2 rounded-full transition-all ${
                                 coverage >= 100
@@ -263,14 +263,14 @@ export default function VectorPanel() {
                           </div>
 
                           {job && (
-                            <p className="mt-3 text-sm text-blue-800" role="status">{describeJob(job)}</p>
+                            <p className="mt-3 text-sm text-info-strong" role="status">{describeJob(job)}</p>
                           )}
 
                           {/* Status message */}
                           {status && (
                             <div
                               className={`mt-3 text-sm flex items-center gap-2 ${
-                                status.success ? 'text-green-700' : 'text-red-700'
+                                status.success ? 'text-success' : 'text-danger'
                               }`}
                             >
                               {status.success ? (

@@ -13,9 +13,9 @@ function packSource(pack) {
 export default function ReadOnlyNotice({ config, compact = false }) {
   if (!config?.readOnly) return null;
   return (
-    <div role="note" className={`flex items-start gap-2 rounded-lg border border-gray-300 bg-gray-50 ${compact ? 'p-2' : 'p-3'}`}>
-      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-gray-700" aria-hidden="true" />
-      <p className="text-sm text-gray-800">
+    <div role="note" className={`flex items-start gap-2 rounded-lg border border-line-strong bg-surface-muted ${compact ? 'p-2' : 'p-3'}`}>
+      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" aria-hidden="true" />
+      <p className="text-sm text-fg-soft">
         <strong>Read-only</strong>
         {packSource(config.corpus)}
         Writes to its documents are refused; remove the pack on the System page to write to this name.

@@ -44,12 +44,12 @@ export default function ImagePreview({ collection, docKey, lang, meta }) {
   const parent = firstMeta(meta, 'parent');
 
   return (
-    <figure className="mb-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      {!error && !url && <p className="text-sm text-gray-600">Loading image…</p>}
+    <figure className="mb-4 border border-line rounded-lg p-3 bg-surface-muted">
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      {!error && !url && <p className="text-sm text-fg-subtle">Loading image…</p>}
       {url && <img src={url} alt={firstMeta(meta, 'altText') || ''} className="max-w-full max-h-96 mx-auto" />}
       {(caption || page || parent) && (
-        <figcaption className="mt-2 text-xs text-gray-700 space-y-0.5">
+        <figcaption className="mt-2 text-xs text-fg-muted space-y-0.5">
           {caption && <div>{caption}</div>}
           {page && <div>Page {page}</div>}
           {parent && <div>From document <span className="font-mono">{parent}</span></div>}

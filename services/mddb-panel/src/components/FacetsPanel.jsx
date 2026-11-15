@@ -27,13 +27,13 @@ export default function FacetsPanel({ collection, filters }) {
   const count = () => run(async () => setResult(await mddbClient.aggregate({ collection, fields: chosen, filterMeta: filters, orderBy })));
 
   return (
-    <section aria-label="Facets" className="border border-gray-200 rounded-lg p-3 mt-2 space-y-2 bg-gray-50">
+    <section aria-label="Facets" className="border border-line rounded-lg p-3 mt-2 space-y-2 bg-surface-muted">
       <ApiErrorNotice error={keysError || error} collection={collection} />
-      {!keysError && keys.length === 0 && <p className="text-xs text-gray-700">This collection has no metadata keys to count.</p>}
+      {!keysError && keys.length === 0 && <p className="text-xs text-fg-muted">This collection has no metadata keys to count.</p>}
       {keys.length > 0 && (
         <>
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-900 max-h-24 overflow-y-auto">
-            <legend className="text-xs font-semibold text-gray-800 mb-1">Metadata keys to count</legend>
+          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-fg max-h-24 overflow-y-auto">
+            <legend className="text-xs font-semibold text-fg-soft mb-1">Metadata keys to count</legend>
             {keys.map((key) => (
               <label key={key} className="inline-flex items-center gap-1">
                 <input type="checkbox" checked={chosen.includes(key)} onChange={() => toggle(key)} /> {key}
@@ -41,9 +41,9 @@ export default function FacetsPanel({ collection, filters }) {
             ))}
           </fieldset>
           <div className="flex items-end gap-2">
-            <label className="text-xs text-gray-800">
+            <label className="text-xs text-fg-soft">
               <span className="block mb-0.5">Order</span>
-              <select value={orderBy} onChange={(e) => setOrderBy(e.target.value)} className="px-2 py-1 border border-gray-300 rounded text-xs">
+              <select value={orderBy} onChange={(e) => setOrderBy(e.target.value)} className="px-2 py-1 border border-line-strong rounded text-xs">
                 <option value="count">Most documents first</option>
                 <option value="value">By value</option>
               </select>
@@ -56,21 +56,21 @@ export default function FacetsPanel({ collection, filters }) {
       )}
       {result && (
         <div role="status" className="space-y-2">
-          <p className="text-xs text-gray-800">{result.totalDocs} documents match the filters.</p>
+          <p className="text-xs text-fg-soft">{result.totalDocs} documents match the filters.</p>
           {Object.entries(result.facets || {}).map(([field, buckets]) => (
-            <table key={field} className="w-full text-xs bg-white">
-              <caption className="text-left font-semibold text-gray-900">{field}</caption>
+            <table key={field} className="w-full text-xs bg-surface">
+              <caption className="text-left font-semibold text-fg">{field}</caption>
               <thead>
-                <tr className="text-left text-gray-800">
+                <tr className="text-left text-fg-soft">
                   <th scope="col" className="px-2 py-1">Value</th>
                   <th scope="col" className="px-2 py-1 text-right">Documents</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line-soft">
                 {buckets.map((b) => (
                   <tr key={b.value}>
-                    <td className="px-2 py-1 text-gray-900 break-all">{b.value}</td>
-                    <td className="px-2 py-1 text-right text-gray-900">{b.count}</td>
+                    <td className="px-2 py-1 text-fg break-all">{b.value}</td>
+                    <td className="px-2 py-1 text-right text-fg">{b.count}</td>
                   </tr>
                 ))}
               </tbody>

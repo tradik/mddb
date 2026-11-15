@@ -95,7 +95,7 @@ describe('AutomationPanel: rules table', () => {
     for (const tab of ['All (7)', 'Webhooks (2)', 'Triggers (2)', 'Crons (2)']) {
       expect(screen.getByRole('button', { name: tab })).toBeTruthy();
     }
-    expect(screen.getByRole('button', { name: 'All (7)' }).className).toContain('bg-blue-100');
+    expect(screen.getByRole('button', { name: 'All (7)' }).className).toContain('bg-info-muted');
 
     expect(rowOf('Slack').textContent).toContain('POST https://hooks/slack');
     expect(rowOf('Ping').textContent).toContain('GET https://ping');
@@ -111,9 +111,9 @@ describe('AutomationPanel: rules table', () => {
     expect(within(rowOf('Nightly')).getByText('backup → MDDB_BACKUP_DIR, keep 7')).toBeTruthy();
     expect(within(rowOf('Mirror')).getByText('sync s3 s3://bk/docs/ → docs')).toBeTruthy();
 
-    expect(within(rowOf('Slack')).getByText('Webhook').className).toContain('bg-blue-100');
-    expect(within(rowOf('News')).getByText('Trigger').className).toContain('bg-amber-100');
-    expect(within(rowOf('Nightly')).getByText('Cron').className).toContain('bg-purple-100');
+    expect(within(rowOf('Slack')).getByText('Webhook').className).toContain('bg-info-muted');
+    expect(within(rowOf('News')).getByText('Trigger').className).toContain('bg-warning-muted');
+    expect(within(rowOf('Nightly')).getByText('Cron').className).toContain('bg-note-muted');
     // An unknown type gets neither icon nor badge.
     expect(rowOf('Odd').querySelector('td').innerHTML).toBe('');
     expect(rowOf('Odd').querySelectorAll('td')[2].innerHTML).toBe('');
@@ -136,8 +136,8 @@ describe('AutomationPanel: rules table', () => {
     expect(client.listAutomation).toHaveBeenLastCalledWith(type);
     const shown = [...container.querySelectorAll('tbody tr td:nth-child(2) > div:first-child')].map((d) => d.textContent);
     expect(shown).toEqual(names);
-    expect(screen.getByRole('button', { name: tab }).className).toContain('bg-blue-100');
-    expect(screen.getByRole('button', { name: 'All (7)' }).className).not.toContain('bg-blue-100');
+    expect(screen.getByRole('button', { name: tab }).className).toContain('bg-info-muted');
+    expect(screen.getByRole('button', { name: 'All (7)' }).className).not.toContain('bg-info-muted');
   });
 
   test.each([

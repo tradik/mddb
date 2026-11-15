@@ -488,16 +488,16 @@ export default function MCPConfigPanel() {
   const currentTabInfo = TABS.find(t => t.id === activeTab);
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6">
+    <div className="h-full overflow-y-auto bg-surface-muted p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">LLM Connections</h1>
-          <p className="text-gray-600">Configuration for connecting MDDB to AI agents and LLM tools</p>
+          <h1 className="text-2xl font-bold text-fg mb-2">LLM Connections</h1>
+          <p className="text-fg-subtle">Configuration for connecting MDDB to AI agents and LLM tools</p>
         </div>
 
         {/* Domain Input */}
-        <div className="bg-white rounded-lg shadow mb-6 p-4">
-          <label htmlFor="mcp-server-domain" className="block text-sm font-medium text-gray-700 mb-1">Server Domain</label>
+        <div className="bg-surface rounded-lg shadow mb-6 p-4">
+          <label htmlFor="mcp-server-domain" className="block text-sm font-medium text-fg-muted mb-1">Server Domain</label>
           <div className="flex items-center gap-3">
             <input
               id="mcp-server-domain"
@@ -505,24 +505,24 @@ export default function MCPConfigPanel() {
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
               placeholder="e.g. myserver.com"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500"
+              className="flex-1 px-3 py-2 border border-line-strong rounded-md text-sm focus:ring-focus focus:border-primary-500"
             />
-            <span className="text-xs text-gray-600 whitespace-nowrap">All examples below use this domain</span>
+            <span className="text-xs text-fg-subtle whitespace-nowrap">All examples below use this domain</span>
           </div>
-          <p className="text-xs text-gray-500 mt-1">Set <code className="bg-gray-100 px-1 rounded">MDDB_MCP_DOMAIN</code> env var to persist this value.</p>
+          <p className="text-xs text-fg-faint mt-1">Set <code className="bg-surface-subtle px-1 rounded">MDDB_MCP_DOMAIN</code> env var to persist this value.</p>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="border-b border-gray-200 overflow-x-auto">
+        <div className="bg-surface rounded-lg shadow mb-6">
+          <div className="border-b border-line overflow-x-auto">
             <div className="flex min-w-max">
               {TABS.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => { setActiveTab(tab.id); setShowAlt(false); setCopied(false); }}
                   className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === tab.id
-                    ? 'border-primary-600 text-primary-700 bg-primary-50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary-600 text-accent bg-accent-soft'
+                    : 'border-transparent text-fg-faint hover:text-fg-muted hover:border-line-strong'
                     }`}
                 >
                   {tab.label}
@@ -538,28 +538,28 @@ export default function MCPConfigPanel() {
           ) : (
             <>
               {/* Tab Description */}
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center text-sm text-gray-600">
-                  <Brain className="w-4 h-4 mr-2 text-primary-600" />
+              <div className="px-4 py-3 border-b border-line-soft flex items-center justify-between">
+                <div className="flex items-center text-sm text-fg-subtle">
+                  <Brain className="w-4 h-4 mr-2 text-accent" />
                   <span>{currentTabInfo?.desc}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   {tabConfig.alt && (
                     <button
                       onClick={() => setShowAlt(!showAlt)}
-                      className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      className="text-xs px-2 py-1 bg-surface-subtle hover:bg-surface-strong rounded transition-colors"
                     >
                       {showAlt ? 'Docker' : tabConfig.alt.label}
                     </button>
                   )}
                   <button
                     onClick={handleCopy}
-                    className="flex items-center px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                    className="flex items-center px-3 py-1.5 text-sm bg-surface-subtle hover:bg-surface-strong rounded transition-colors"
                   >
                     {copied ? (
                       <>
-                        <Check className="w-3.5 h-3.5 mr-1 text-green-600" />
-                        <span className="text-green-600">Copied!</span>
+                        <Check className="w-3.5 h-3.5 mr-1 text-success" />
+                        <span className="text-success">Copied!</span>
                       </>
                     ) : (
                       <>
@@ -581,13 +581,13 @@ export default function MCPConfigPanel() {
               {/* Code Block */}
               <div className="bg-gray-900">
                 <div className="px-4 py-2 border-b border-gray-700 flex items-center">
-                  <Code className="w-3.5 h-3.5 text-gray-400 mr-2" />
-                  <span className="text-xs text-gray-400 font-mono">{displayFilename}</span>
+                  <Code className="w-3.5 h-3.5 text-fg-faint mr-2" />
+                  <span className="text-xs text-fg-faint font-mono">{displayFilename}</span>
                 </div>
                 <div className="p-4 overflow-x-auto">
                   {activeTab === 'mcp' && mcpLoading ? (
                     <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-line-strong"></div>
                     </div>
                   ) : (
                     <pre className="text-sm text-gray-100 font-mono whitespace-pre">
@@ -601,9 +601,9 @@ export default function MCPConfigPanel() {
         </div>
 
         {activeTab !== 'api-keys' && tabConfig.instructions.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 className="text-sm font-semibold text-blue-900 mb-2">Setup Instructions:</h3>
-            <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+          <div className="bg-info-soft border border-info-line rounded-lg p-4 mb-6">
+            <h3 className="text-sm font-semibold text-info-strong mb-2">Setup Instructions:</h3>
+            <ol className="text-sm text-info-strong space-y-1 list-decimal list-inside">
               {tabConfig.instructions.map((step, i) => (
                 <li key={i}>{step}</li>
               ))}
@@ -612,14 +612,14 @@ export default function MCPConfigPanel() {
         )}
 
         {/* Documentation Link */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <p className="text-sm text-gray-700">
+        <div className="bg-surface-muted border border-line rounded-lg p-4">
+          <p className="text-sm text-fg-muted">
             For detailed setup guides, see the{' '}
             <a
               href="https://github.com/tradik/mddb/blob/main/docs/LLM_CONNECTIONS.md"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary-600 hover:text-primary-700 underline"
+              className="text-accent hover:text-accent underline"
             >
               LLM Connections documentation
             </a>.

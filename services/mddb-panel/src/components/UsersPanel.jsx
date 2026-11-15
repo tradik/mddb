@@ -69,8 +69,8 @@ export default function UsersPanel() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="text-red-600 font-medium mb-2">Failed to load users</div>
-          <div className="text-sm text-gray-500">{usersError}</div>
+          <div className="text-danger font-medium mb-2">Failed to load users</div>
+          <div className="text-sm text-fg-faint">{usersError}</div>
           <button
             onClick={loadUsers}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -83,17 +83,17 @@ export default function UsersPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
+    <div className="h-full flex flex-col bg-surface-muted">
+      <div className="bg-surface border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">User Management</h1>
-            <p className="text-gray-600">Manage users and their permissions</p>
+            <h1 className="text-2xl font-bold text-fg mb-1">User Management</h1>
+            <p className="text-fg-subtle">Manage users and their permissions</p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={loadUsers}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              className="px-4 py-2 bg-surface-subtle text-fg-muted rounded hover:bg-surface-strong"
             >
               Refresh
             </button>
@@ -110,67 +110,67 @@ export default function UsersPanel() {
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="bg-surface rounded-lg shadow overflow-hidden">
+            <table className="min-w-full divide-y divide-line">
+              <thead className="bg-surface-muted">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-fg-faint uppercase tracking-wider">
                     Username
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-fg-faint uppercase tracking-wider">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-fg-faint uppercase tracking-wider">
                     Role
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-fg-faint uppercase tracking-wider">
                     Groups
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-fg-faint uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-fg-faint uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-surface divide-y divide-line">
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                      <Users className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                    <td colSpan="6" className="px-6 py-12 text-center text-fg-faint">
+                      <Users className="w-12 h-12 mx-auto mb-2 text-fg-faint" />
                       <div>No users found</div>
                     </td>
                   </tr>
                 ) : (
                   users.map((user) => (
-                    <tr key={user.username} className="hover:bg-gray-50">
+                    <tr key={user.username} className="hover:bg-surface-muted">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <span className="text-blue-600 font-medium text-sm">
+                          <div className="flex-shrink-0 h-8 w-8 bg-info-muted rounded-full flex items-center justify-center">
+                            <span className="text-info font-medium text-sm">
                               {user.username.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div className="ml-3">
-                            <div className="text-sm font-medium text-gray-900">{user.username}</div>
+                            <div className="text-sm font-medium text-fg">{user.username}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-600">
+                        <div className="flex items-center text-sm text-fg-subtle">
                           <Clock className="w-4 h-4 mr-1" />
                           {formatDate(user.createdAt)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {user.admin ? (
-                          <span className="flex items-center px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 w-fit">
+                          <span className="flex items-center px-2 py-1 text-xs font-medium rounded-full bg-note-muted text-note-strong w-fit">
                             <Shield className="w-3 h-3 mr-1" />
                             Admin
                           </span>
                         ) : (
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-surface-subtle text-fg-soft">
                             User
                           </span>
                         )}
@@ -181,23 +181,23 @@ export default function UsersPanel() {
                             user.groups.map((group) => (
                               <span
                                 key={group}
-                                className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800"
+                                className="px-2 py-1 text-xs rounded-full bg-info-muted text-info-strong"
                               >
                                 {group}
                               </span>
                             ))
                           ) : (
-                            <span className="text-sm text-gray-400">No groups</span>
+                            <span className="text-sm text-fg-faint">No groups</span>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {user.disabled ? (
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-danger-muted text-danger-strong">
                             Disabled
                           </span>
                         ) : (
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-success-muted text-success-strong">
                             Active
                           </span>
                         )}
@@ -208,7 +208,7 @@ export default function UsersPanel() {
                             setSelectedUser(user);
                             setShowPermissionsModal(true);
                           }}
-                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          className="text-info hover:text-info-strong mr-3"
                           title="Manage Permissions"
                         >
                           <Key className="w-4 h-4" />
@@ -218,7 +218,7 @@ export default function UsersPanel() {
                             setSelectedUser(user);
                             setShowDeleteModal(true);
                           }}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-danger hover:text-danger-strong"
                           title="Delete User"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -296,10 +296,10 @@ function CreateUserModal({ onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-xl font-bold text-fg">Create New User</h2>
+          <button onClick={onClose} className="text-fg-faint hover:text-fg-subtle">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -307,7 +307,7 @@ function CreateUserModal({ onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="create-user-username" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-user-username" className="block text-sm font-medium text-fg-muted mb-1">
                 Username
               </label>
               <input
@@ -315,13 +315,13 @@ function CreateUserModal({ onClose, onSuccess }) {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-md focus:outline-none focus:ring-2 focus:ring-focus"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="create-user-password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-user-password" className="block text-sm font-medium text-fg-muted mb-1">
                 Password
               </label>
               <input
@@ -329,7 +329,7 @@ function CreateUserModal({ onClose, onSuccess }) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-md focus:outline-none focus:ring-2 focus:ring-focus"
                 required
                 minLength={6}
               />
@@ -341,15 +341,15 @@ function CreateUserModal({ onClose, onSuccess }) {
                 id="isAdmin"
                 checked={isAdmin}
                 onChange={(e) => setIsAdmin(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded"
               />
-              <label htmlFor="isAdmin" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="isAdmin" className="ml-2 block text-sm text-fg-muted">
                 Administrator privileges (admin on &quot;*&quot;, server-wide)
               </label>
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">
+              <div className="bg-danger-soft border border-danger-line text-danger px-4 py-2 rounded text-sm">
                 {error}
               </div>
             )}
@@ -359,7 +359,7 @@ function CreateUserModal({ onClose, onSuccess }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              className="flex-1 px-4 py-2 border border-line-strong text-fg-muted rounded-md hover:bg-surface-muted"
             >
               Cancel
             </button>
@@ -381,13 +381,13 @@ function CreateUserModal({ onClose, onSuccess }) {
 function DeleteConfirmModal({ title, message, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">{title}</h2>
-        <p className="text-gray-600 mb-6">{message}</p>
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-md p-6">
+        <h2 className="text-xl font-bold text-fg mb-4">{title}</h2>
+        <p className="text-fg-subtle mb-6">{message}</p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            className="flex-1 px-4 py-2 border border-line-strong text-fg-muted rounded-md hover:bg-surface-muted"
           >
             Cancel
           </button>
@@ -472,44 +472,44 @@ function PermissionsModal({ user, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">
+          <h2 className="text-xl font-bold text-fg">
             Manage Permissions: {user.username}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-fg-faint hover:text-fg-subtle">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Existing Permissions */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Current Permissions</h3>
+          <h3 className="text-sm font-medium text-fg-muted mb-2">Current Permissions</h3>
           {loading ? (
             <div className="text-center py-4">Loading...</div>
           ) : permissions.length === 0 ? (
-            <div className="text-sm text-gray-500 bg-gray-50 rounded p-4">
+            <div className="text-sm text-fg-faint bg-surface-muted rounded p-4">
               No permissions set
             </div>
           ) : (
             <div className="space-y-2">
               {permissions.map((perm, idx) => (
-                <div key={idx} className="bg-gray-50 rounded p-3 flex items-center justify-between">
+                <div key={idx} className="bg-surface-muted rounded p-3 flex items-center justify-between">
                   <div>
-                    <span className="font-medium text-gray-900">{perm.collection}</span>
+                    <span className="font-medium text-fg">{perm.collection}</span>
                     <div className="flex gap-2 mt-1">
                       {perm.read && (
-                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">
+                        <span className="px-2 py-0.5 text-xs bg-success-muted text-success-strong rounded">
                           Read
                         </span>
                       )}
                       {perm.write && (
-                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                        <span className="px-2 py-0.5 text-xs bg-info-muted text-info-strong rounded">
                           Write
                         </span>
                       )}
                       {perm.admin && (
-                        <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                        <span className="px-2 py-0.5 text-xs bg-note-muted text-note-strong rounded">
                           {adminScopeLabel(perm.collection)}
                         </span>
                       )}
@@ -523,10 +523,10 @@ function PermissionsModal({ user, onClose }) {
 
         {/* Add New Permission */}
         <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Add New Permission</h3>
+          <h3 className="text-sm font-medium text-fg-muted mb-2">Add New Permission</h3>
           <form onSubmit={handleAddPermission} className="space-y-4">
             <div>
-              <label htmlFor="user-permission-collection" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="user-permission-collection" className="block text-sm font-medium text-fg-muted mb-1">
                 Collection (* for all)
               </label>
               <input
@@ -534,22 +534,22 @@ function PermissionsModal({ user, onClose }) {
                 type="text"
                 value={collection}
                 onChange={(e) => setCollection(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-md focus:outline-none focus:ring-2 focus:ring-focus"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Permissions</label>
+              <label className="block text-sm font-medium text-fg-muted">Permissions</label>
               <div className="flex items-center">
                 <input
                   type="checkbox"
                   id="read"
                   checked={read}
                   onChange={(e) => setRead(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded"
                 />
-                <label htmlFor="read" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="read" className="ml-2 block text-sm text-fg-muted">
                   Read
                 </label>
               </div>
@@ -559,9 +559,9 @@ function PermissionsModal({ user, onClose }) {
                   id="write"
                   checked={write}
                   onChange={(e) => setWrite(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded"
                 />
-                <label htmlFor="write" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="write" className="ml-2 block text-sm text-fg-muted">
                   Write
                 </label>
               </div>
@@ -571,9 +571,9 @@ function PermissionsModal({ user, onClose }) {
                   id="admin"
                   checked={admin}
                   onChange={(e) => setAdmin(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded"
                 />
-                <label htmlFor="admin" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="admin" className="ml-2 block text-sm text-fg-muted">
                   Admin
                 </label>
               </div>
@@ -581,13 +581,13 @@ function PermissionsModal({ user, onClose }) {
             </div>
 
             {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded text-sm">
+              <div className="bg-success-soft border border-success-line text-success px-4 py-2 rounded text-sm">
                 ✓ Permission added successfully!
               </div>
             )}
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">
+              <div className="bg-danger-soft border border-danger-line text-danger px-4 py-2 rounded text-sm">
                 {error}
               </div>
             )}
@@ -605,7 +605,7 @@ function PermissionsModal({ user, onClose }) {
         <div className="mt-6">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            className="w-full px-4 py-2 border border-line-strong text-fg-muted rounded-md hover:bg-surface-muted"
           >
             Close
           </button>

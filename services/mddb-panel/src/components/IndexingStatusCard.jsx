@@ -16,8 +16,8 @@ export const REFRESH_MS = 5000;
 function Figure({ label, value }) {
   return (
     <div>
-      <dt className="text-xs text-gray-600">{label}</dt>
-      <dd className="text-sm font-medium text-gray-900">{value}</dd>
+      <dt className="text-xs text-fg-subtle">{label}</dt>
+      <dd className="text-sm font-medium text-fg">{value}</dd>
     </div>
   );
 }
@@ -52,10 +52,10 @@ export default function IndexingStatusCard() {
   const percent = progressPercent(status?.progress);
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-surface rounded-lg shadow p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-blue-700" aria-hidden="true" />
+        <h2 className="text-lg font-semibold text-fg flex items-center gap-2">
+          <Activity className="w-5 h-5 text-info" aria-hidden="true" />
           Indexing status
         </h2>
         <div className="flex items-end gap-2">
@@ -64,7 +64,7 @@ export default function IndexingStatusCard() {
             id="indexing-collection"
             value={collection}
             onChange={(e) => setCollection(e.target.value)}
-            className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+            className="px-2 py-1.5 border border-line-strong rounded text-sm"
           >
             <option value="">Whole server</option>
             {collections.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -72,25 +72,25 @@ export default function IndexingStatusCard() {
           <button
             type="button"
             onClick={load}
-            className="px-3 py-1.5 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 text-sm flex items-center gap-1"
+            className="px-3 py-1.5 bg-surface-subtle text-fg-soft rounded hover:bg-surface-strong text-sm flex items-center gap-1"
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" /> Refresh
           </button>
         </div>
       </div>
 
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
 
       {status && (
         <div>
-          <p className="text-sm text-gray-800 mb-2">
+          <p className="text-sm text-fg-soft mb-2">
             {status.indexed
               ? 'Everything written is searchable.'
               : 'Embeddings are still queued: semantic search sees new documents once the queue drains.'}
-            {status.provider && <span className="text-gray-600"> Provider: {status.provider}.</span>}
+            {status.provider && <span className="text-fg-subtle"> Provider: {status.provider}.</span>}
           </p>
           <div
-            className="w-full bg-gray-200 rounded-full h-2"
+            className="w-full bg-surface-strong rounded-full h-2"
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
@@ -99,7 +99,7 @@ export default function IndexingStatusCard() {
           >
             <div className={`h-2 rounded-full ${status.indexed ? 'bg-green-700' : 'bg-blue-700'}`} style={{ width: `${percent}%` }} />
           </div>
-          <p className="mt-1 text-xs text-gray-700">{percent}% embedded</p>
+          <p className="mt-1 text-xs text-fg-muted">{percent}% embedded</p>
 
           <dl className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
             <Figure label="Pending embeddings" value={status.pendingEmbeddings ?? 0} />
@@ -113,15 +113,15 @@ export default function IndexingStatusCard() {
           </dl>
 
           {status.images && (
-            <p className="mt-3 text-sm text-gray-800">
+            <p className="mt-3 text-sm text-fg-soft">
               Images: {status.images.embedded ?? 0} of {status.images.documents ?? 0} embedded
               {status.images.model && ` with ${status.images.model}`}
-              {status.images.note && <span className="block text-xs text-amber-800">{status.images.note}</span>}
+              {status.images.note && <span className="block text-xs text-warning-strong">{status.images.note}</span>}
             </p>
           )}
 
           {status.trainingCollections?.length > 0 && (
-            <p className="mt-3 text-sm text-amber-800">
+            <p className="mt-3 text-sm text-warning-strong">
               Vector indexes still training: {status.trainingCollections.join(', ')} (flat and HNSW already answer).
             </p>
           )}

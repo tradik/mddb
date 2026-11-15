@@ -2,12 +2,12 @@
 // GitSyncFields). Each control sits inside its label (no ids), because the
 // add form and an inline edit row can be open at once.
 
-export const field = 'mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900';
-export const labelClass = 'block text-xs text-gray-600';
+export const field = 'mt-1 w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm text-fg';
+export const labelClass = 'block text-xs text-fg-subtle';
 
 /** A hint under a control, in a colour that keeps WCAG AA contrast. */
 export function Hint({ children }) {
-  return <span className="mt-0.5 block text-[11px] text-gray-600">{children}</span>;
+  return <span className="mt-0.5 block text-[11px] text-fg-subtle">{children}</span>;
 }
 
 export function Text({ name, value, onChange, placeholder, type = 'text', mono = false, hint }) {
@@ -50,8 +50,8 @@ export function TextArea({ name, value, onChange, placeholder, hint, wide = fals
 
 export function Check({ checked, onChange, children, wide = false }) {
   return (
-    <label className={`${wide ? 'md:col-span-2 ' : ''}flex items-center gap-2 text-sm text-gray-700`}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 rounded border-gray-300" />
+    <label className={`${wide ? 'md:col-span-2 ' : ''}flex items-center gap-2 text-sm text-fg-muted`}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 rounded border-line-strong" />
       {children}
     </label>
   );

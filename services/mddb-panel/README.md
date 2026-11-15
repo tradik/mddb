@@ -48,6 +48,7 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - 🕸️ **Code graph, geo tools, temporal events, spell cleanup** (2.19.0) - `/v1/code-graph`; bounding box, polygon, geohash and geo reindex; one document's events; `/v1/spell-cleanup`
 - ⌨️ **Editor shortcuts** (2.19.7) - `Ctrl/Cmd+B`, `I`, `K`, `S`, `Tab` for list indent, `Esc` leaves fullscreen; `/` focuses the menu search, `?` lists every shortcut
 - 💾 **Drafts** (2.19.7) - Unsaved edits are kept in `localStorage` and offered for restore; saves send `expectedRevision`, so a newer server version is reported (409), not overwritten
+- 🌗 **Dark mode** (2.19.7) - Light / dark / system switch in the header, remembered in `localStorage` (`mddb.theme`) and applied before the first paint; code blocks switch theme with the page, print and HTML export stay light. Colours are tokens in `src/index.css`, checked against WCAG 2.2 AA in both modes (see [docs/PANEL.md](../../docs/PANEL.md#colours-and-contrast))
 - 🔤 **Collection spelling** (2.19.7) - Opt-in check of the editor text against the collection's spelling dictionary (`/v1/spell-suggest`), with *Replace*
 
 ## Screenshots
@@ -67,6 +68,8 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - Custom document templates shared through the `_templates` collection
   (see [docs/PANEL.md](../../docs/PANEL.md#document-viewer-compare-export-templates-2197))
 - Hybrid search mode (BM25 + vector with alpha blending / RRF)
+- Dark mode, with the document viewer and editor shown in
+  [docs/PANEL.md](../../docs/PANEL.md#dark-mode-2197)
 - Command modal with copy-ready API examples (curl, PHP, Python, JavaScript)
 
 ## Quick Start
@@ -150,7 +153,7 @@ The development server is configured to proxy API requests to MDDB server. See `
 
 - **React 19.1** - UI framework
 - **Vite 6** - Build tool and dev server
-- **TailwindCSS 4** - Styling
+- **TailwindCSS 4** - Styling, configured in `src/index.css` (colour tokens, class-based `dark:` variant)
 - **Zustand 5** - State management
 - **Lucide React** - Icons
 - **date-fns 4** - Date formatting
@@ -171,13 +174,12 @@ services/mddb-panel/
 │   │   └── store.js         # Global state
 │   ├── App.jsx              # Main app component
 │   ├── main.jsx             # Entry point
-│   └── index.css            # Global styles
+│   └── index.css            # Global styles, colour tokens (light and dark)
 ├── public/                  # Static assets
 ├── index.html               # HTML template
 ├── test/                    # Shared test helpers (fetch stub, node:test shim)
 ├── vite.config.js           # Vite configuration
 ├── vitest.config.js         # Test runner and coverage thresholds
-├── tailwind.config.js       # Tailwind configuration
 └── package.json             # Dependencies
 ```
 

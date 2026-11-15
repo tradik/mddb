@@ -9,8 +9,8 @@
 import { toMcpRows, fromMcpRows, mcpServerProblem } from './chat-mcp';
 import { toLoopGuardForm, fromLoopGuardForm, loopGuardProblem } from './chat-loop-guard';
 
-export const inputClass = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500';
-export const labelClass = 'block text-xs font-medium text-gray-700 mb-1';
+export const inputClass = 'w-full px-2 py-1.5 border border-line-strong rounded text-sm text-fg focus:outline-none focus:ring-2 focus:ring-focus';
+export const labelClass = 'block text-xs font-medium text-fg-muted mb-1';
 
 export const offTopicModes = [
   { value: 'refuse', label: 'Refuse politely' },

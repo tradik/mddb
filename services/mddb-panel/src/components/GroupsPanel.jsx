@@ -83,8 +83,8 @@ export default function GroupsPanel() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="text-red-600 font-medium mb-2">Failed to load groups</div>
-          <div className="text-sm text-gray-500">{groupsError}</div>
+          <div className="text-danger font-medium mb-2">Failed to load groups</div>
+          <div className="text-sm text-fg-faint">{groupsError}</div>
           <button
             onClick={loadGroups}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -97,17 +97,17 @@ export default function GroupsPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
+    <div className="h-full flex flex-col bg-surface-muted">
+      <div className="bg-surface border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Group Management</h1>
-            <p className="text-gray-600">Manage user groups and group permissions</p>
+            <h1 className="text-2xl font-bold text-fg mb-1">Group Management</h1>
+            <p className="text-fg-subtle">Manage user groups and group permissions</p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={loadGroups}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              className="px-4 py-2 bg-surface-subtle text-fg-muted rounded hover:bg-surface-strong"
             >
               Refresh
             </button>
@@ -125,10 +125,10 @@ export default function GroupsPanel() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
           {groups.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-12 text-center">
-              <Users className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No groups yet</h3>
-              <p className="text-gray-600 mb-6">
+            <div className="bg-surface rounded-lg shadow p-12 text-center">
+              <Users className="w-16 h-16 mx-auto mb-4 text-fg-faint" />
+              <h3 className="text-lg font-medium text-fg mb-2">No groups yet</h3>
+              <p className="text-fg-subtle mb-6">
                 Create groups to organize users and manage permissions efficiently.
               </p>
               <button
@@ -141,16 +141,16 @@ export default function GroupsPanel() {
           ) : (
             <div className="grid gap-4">
               {groups.map((group) => (
-                <div key={group.name} className="bg-white rounded-lg shadow p-6">
+                <div key={group.name} className="bg-surface rounded-lg shadow p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">{group.name}</h3>
+                      <h3 className="text-lg font-semibold text-fg mb-1">{group.name}</h3>
                       {group.description && (
-                        <p className="text-sm text-gray-600">{group.description}</p>
+                        <p className="text-sm text-fg-subtle">{group.description}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center text-sm text-gray-500 mr-3">
+                      <div className="flex items-center text-sm text-fg-faint mr-3">
                         <Clock className="w-4 h-4 mr-1" />
                         {formatDate(group.createdAt)}
                       </div>
@@ -159,7 +159,7 @@ export default function GroupsPanel() {
                           setSelectedGroup(group);
                           setShowPermissionsModal(true);
                         }}
-                        className="text-primary-600 hover:text-primary-900 p-1"
+                        className="text-accent hover:text-accent-strong p-1"
                         title="Manage Permissions"
                       >
                         <Key className="w-4 h-4" />
@@ -169,7 +169,7 @@ export default function GroupsPanel() {
                           setSelectedGroup(group);
                           setShowEditModal(true);
                         }}
-                        className="text-blue-600 hover:text-blue-900 p-1"
+                        className="text-info hover:text-info-strong p-1"
                         title="Edit Group"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -179,7 +179,7 @@ export default function GroupsPanel() {
                           setSelectedGroup(group);
                           setShowDeleteModal(true);
                         }}
-                        className="text-red-600 hover:text-red-900 p-1"
+                        className="text-danger hover:text-danger-strong p-1"
                         title="Delete Group"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -190,8 +190,8 @@ export default function GroupsPanel() {
                   <div className="border-t pt-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-sm text-gray-600">Members:</span>
-                        <span className="ml-2 text-sm font-medium text-gray-900">
+                        <span className="text-sm text-fg-subtle">Members:</span>
+                        <span className="ml-2 text-sm font-medium text-fg">
                           {group.members?.length || 0}
                         </span>
                       </div>
@@ -200,16 +200,16 @@ export default function GroupsPanel() {
                           group.members.slice(0, 5).map((member) => (
                             <span
                               key={member}
-                              className="px-2 py-1 text-xs rounded-full bg-primary-100 text-primary-800"
+                              className="px-2 py-1 text-xs rounded-full bg-accent-muted text-accent-strong"
                             >
                               {member}
                             </span>
                           ))
                         ) : (
-                          <span className="text-sm text-gray-400">No members</span>
+                          <span className="text-sm text-fg-faint">No members</span>
                         )}
                         {group.members && group.members.length > 5 && (
-                          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+                          <span className="px-2 py-1 text-xs rounded-full bg-surface-subtle text-fg-subtle">
                             +{group.members.length - 5} more
                           </span>
                         )}
@@ -288,27 +288,27 @@ export default function GroupsPanel() {
 function MemberPicker({ users, selected, onToggle }) {
   return (
     <fieldset className="m-0 min-w-0 border-0 p-0">
-      <legend className="block text-sm font-medium text-gray-700 mb-2">
+      <legend className="block text-sm font-medium text-fg-muted mb-2">
         Members ({selected.length})
       </legend>
-      <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
+      <div className="border border-line-strong rounded-md max-h-48 overflow-y-auto">
         {users.length === 0 ? (
-          <div className="text-sm text-gray-500 p-3">No users available</div>
+          <div className="text-sm text-fg-faint p-3">No users available</div>
         ) : (
           users.map((user) => (
             <label
               key={user.username}
-              className="flex items-center p-2 hover:bg-gray-50 cursor-pointer"
+              className="flex items-center p-2 hover:bg-surface-muted cursor-pointer"
             >
               <input
                 type="checkbox"
                 checked={selected.includes(user.username)}
                 onChange={() => onToggle(user.username)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded"
               />
-              <span className="ml-2 text-sm text-gray-700">{user.username}</span>
+              <span className="ml-2 text-sm text-fg-muted">{user.username}</span>
               {user.admin && (
-                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-note-muted text-note-strong">
                   Admin
                 </span>
               )}
@@ -356,10 +356,10 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Create New Group</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-xl font-bold text-fg">Create New Group</h2>
+          <button onClick={onClose} className="text-fg-faint hover:text-fg-subtle">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -367,7 +367,7 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="create-group-name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-group-name" className="block text-sm font-medium text-fg-muted mb-1">
                 Group Name
               </label>
               <input
@@ -375,13 +375,13 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-md focus:outline-none focus:ring-2 focus:ring-focus"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="create-group-description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-group-description" className="block text-sm font-medium text-fg-muted mb-1">
                 Description
               </label>
               <textarea
@@ -389,14 +389,14 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows="3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-md focus:outline-none focus:ring-2 focus:ring-focus"
               />
             </div>
 
             <MemberPicker users={users} selected={selectedMembers} onToggle={toggleMember} />
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">
+              <div className="bg-danger-soft border border-danger-line text-danger px-4 py-2 rounded text-sm">
                 {error}
               </div>
             )}
@@ -406,7 +406,7 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              className="flex-1 px-4 py-2 border border-line-strong text-fg-muted rounded-md hover:bg-surface-muted"
             >
               Cancel
             </button>
@@ -459,10 +459,10 @@ function EditGroupModal({ group, users, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Edit Group: {group.name}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-xl font-bold text-fg">Edit Group: {group.name}</h2>
+          <button onClick={onClose} className="text-fg-faint hover:text-fg-subtle">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -470,7 +470,7 @@ function EditGroupModal({ group, users, onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="edit-group-description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="edit-group-description" className="block text-sm font-medium text-fg-muted mb-1">
                 Description
               </label>
               <textarea
@@ -478,14 +478,14 @@ function EditGroupModal({ group, users, onClose, onSuccess }) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows="3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-md focus:outline-none focus:ring-2 focus:ring-focus"
               />
             </div>
 
             <MemberPicker users={users} selected={selectedMembers} onToggle={toggleMember} />
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">
+              <div className="bg-danger-soft border border-danger-line text-danger px-4 py-2 rounded text-sm">
                 {error}
               </div>
             )}
@@ -495,7 +495,7 @@ function EditGroupModal({ group, users, onClose, onSuccess }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              className="flex-1 px-4 py-2 border border-line-strong text-fg-muted rounded-md hover:bg-surface-muted"
             >
               Cancel
             </button>
@@ -517,13 +517,13 @@ function EditGroupModal({ group, users, onClose, onSuccess }) {
 function DeleteConfirmModal({ title, message, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">{title}</h2>
-        <p className="text-gray-600 mb-6">{message}</p>
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-md p-6">
+        <h2 className="text-xl font-bold text-fg mb-4">{title}</h2>
+        <p className="text-fg-subtle mb-6">{message}</p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            className="flex-1 px-4 py-2 border border-line-strong text-fg-muted rounded-md hover:bg-surface-muted"
           >
             Cancel
           </button>
@@ -607,44 +607,44 @@ function GroupPermissionsModal({ group, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">
+          <h2 className="text-xl font-bold text-fg">
             Group Permissions: {group.name}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-fg-faint hover:text-fg-subtle">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Existing Permissions */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Current Permissions</h3>
+          <h3 className="text-sm font-medium text-fg-muted mb-2">Current Permissions</h3>
           {loading ? (
             <div className="text-center py-4">Loading...</div>
           ) : permissions.length === 0 ? (
-            <div className="text-sm text-gray-500 bg-gray-50 rounded p-4">
+            <div className="text-sm text-fg-faint bg-surface-muted rounded p-4">
               No permissions set
             </div>
           ) : (
             <div className="space-y-2">
               {permissions.map((perm, idx) => (
-                <div key={idx} className="bg-gray-50 rounded p-3">
+                <div key={idx} className="bg-surface-muted rounded p-3">
                   <div>
-                    <span className="font-medium text-gray-900">{perm.collection}</span>
+                    <span className="font-medium text-fg">{perm.collection}</span>
                     <div className="flex gap-2 mt-1">
                       {perm.read && (
-                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">
+                        <span className="px-2 py-0.5 text-xs bg-success-muted text-success-strong rounded">
                           Read
                         </span>
                       )}
                       {perm.write && (
-                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                        <span className="px-2 py-0.5 text-xs bg-info-muted text-info-strong rounded">
                           Write
                         </span>
                       )}
                       {perm.admin && (
-                        <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                        <span className="px-2 py-0.5 text-xs bg-note-muted text-note-strong rounded">
                           {adminScopeLabel(perm.collection)}
                         </span>
                       )}
@@ -658,10 +658,10 @@ function GroupPermissionsModal({ group, onClose }) {
 
         {/* Add New Permission */}
         <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Add New Permission</h3>
+          <h3 className="text-sm font-medium text-fg-muted mb-2">Add New Permission</h3>
           <form onSubmit={handleAddPermission} className="space-y-4">
             <div>
-              <label htmlFor="group-permission-collection" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="group-permission-collection" className="block text-sm font-medium text-fg-muted mb-1">
                 Collection (* for all)
               </label>
               <input
@@ -669,22 +669,22 @@ function GroupPermissionsModal({ group, onClose }) {
                 type="text"
                 value={collection}
                 onChange={(e) => setCollection(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-md focus:outline-none focus:ring-2 focus:ring-focus"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Permissions</label>
+              <label className="block text-sm font-medium text-fg-muted">Permissions</label>
               <div className="flex items-center">
                 <input
                   type="checkbox"
                   id="groupRead"
                   checked={read}
                   onChange={(e) => setRead(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded"
                 />
-                <label htmlFor="groupRead" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="groupRead" className="ml-2 block text-sm text-fg-muted">
                   Read
                 </label>
               </div>
@@ -694,9 +694,9 @@ function GroupPermissionsModal({ group, onClose }) {
                   id="groupWrite"
                   checked={write}
                   onChange={(e) => setWrite(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded"
                 />
-                <label htmlFor="groupWrite" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="groupWrite" className="ml-2 block text-sm text-fg-muted">
                   Write
                 </label>
               </div>
@@ -706,9 +706,9 @@ function GroupPermissionsModal({ group, onClose }) {
                   id="groupAdmin"
                   checked={admin}
                   onChange={(e) => setAdmin(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded"
                 />
-                <label htmlFor="groupAdmin" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="groupAdmin" className="ml-2 block text-sm text-fg-muted">
                   Admin
                 </label>
               </div>
@@ -716,13 +716,13 @@ function GroupPermissionsModal({ group, onClose }) {
             </div>
 
             {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded text-sm">
+              <div className="bg-success-soft border border-success-line text-success px-4 py-2 rounded text-sm">
                 ✓ Permission added successfully!
               </div>
             )}
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">
+              <div className="bg-danger-soft border border-danger-line text-danger px-4 py-2 rounded text-sm">
                 {error}
               </div>
             )}
@@ -740,7 +740,7 @@ function GroupPermissionsModal({ group, onClose }) {
         <div className="mt-6">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            className="w-full px-4 py-2 border border-line-strong text-fg-muted rounded-md hover:bg-surface-muted"
           >
             Close
           </button>

@@ -71,12 +71,12 @@ export default function FeaturesPanel() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6">
+    <div className="h-full overflow-y-auto bg-surface-muted p-6">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ToggleRight className="h-6 w-6 text-primary-700" aria-hidden="true" />
-          <h2 className="text-xl font-bold text-gray-900">Features</h2>
-          <span className="text-xs text-gray-600">version {version}</span>
+          <ToggleRight className="h-6 w-6 text-accent" aria-hidden="true" />
+          <h2 className="text-xl font-bold text-fg">Features</h2>
+          <span className="text-xs text-fg-subtle">version {version}</span>
         </div>
         <div className="flex items-center gap-3">
           <FeatureBulkBar features={list} busy={busy !== null || loading} onApply={applyAll} />
@@ -84,31 +84,31 @@ export default function FeaturesPanel() {
             type="button"
             onClick={() => reload()}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-100 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-fg-soft hover:bg-surface-subtle disabled:opacity-50"
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" /> Reload
           </button>
         </div>
       </div>
-      <p className="mb-4 max-w-3xl text-sm text-gray-700">
+      <p className="mb-4 max-w-3xl text-sm text-fg-muted">
         Each optional module of the server can be switched off. A module that is off answers its API routes with
         404 &quot;feature disabled&quot; and its pages leave this menu. Documents, collections, full-text and vector
         search, auth and backups are always on. A module forced off with MDDB_FEATURES_FORCE_OFF stays off until the
         operator changes the environment. Switching needs admin on &quot;*&quot;.
       </p>
 
-      {error && <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
-      {message && <output className="mb-3 block rounded border border-green-200 bg-green-50 p-2 text-sm text-green-800">{message}</output>}
-      {listError && <p role="alert" className="mb-3 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">{loadError(listError)}</p>}
+      {error && <p role="alert" className="mb-3 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
+      {message && <output className="mb-3 block rounded border border-success-line bg-success-soft p-2 text-sm text-success-strong">{message}</output>}
+      {listError && <p role="alert" className="mb-3 rounded border border-warning-line bg-warning-soft p-2 text-sm text-warning-strong">{loadError(listError)}</p>}
 
       {loading && list.length === 0 ? (
-        <p className="text-sm text-gray-700">Loading modules…</p>
+        <p className="text-sm text-fg-muted">Loading modules…</p>
       ) : (
         <div aria-label="Modules" role="region" className="max-w-5xl space-y-6">
           {groupFeatures(list).map((group) => (
             <section key={group.id} aria-labelledby={`features-${group.id}`}>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h3 id={`features-${group.id}`} className="text-sm font-semibold uppercase tracking-wide text-gray-700">
+                <h3 id={`features-${group.id}`} className="text-sm font-semibold uppercase tracking-wide text-fg-muted">
                   {group.label}
                 </h3>
                 <FeatureBulkBar features={group.features} scope={group.label} busy={busy !== null} onApply={applyAll} />

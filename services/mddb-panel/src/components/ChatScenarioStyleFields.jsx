@@ -17,8 +17,8 @@ function Choice({ id, label, value, options, onChange }) {
 
 export default function ChatScenarioStyleFields({ form, set }) {
   return (
-    <fieldset className="rounded-lg border border-gray-200 p-4">
-      <legend className="px-1 text-sm font-semibold text-gray-900">Behaviour and style</legend>
+    <fieldset className="rounded-lg border border-line p-4">
+      <legend className="px-1 text-sm font-semibold text-fg">Behaviour and style</legend>
       <div className="grid gap-3 md:grid-cols-3">
         <Choice id="chat-off-topic" label="Off-topic questions" value={form.offTopicMode} options={offTopicModes} onChange={(v) => set('offTopicMode', v)} />
         <Choice id="chat-emoji" label="Emoji" value={form.emoji} options={emojiPolicies} onChange={(v) => set('emoji', v)} />
@@ -35,7 +35,7 @@ export default function ChatScenarioStyleFields({ form, set }) {
             placeholder="I can only help with questions about our products."
             className={inputClass}
           />
-          <p className="mt-1 text-xs text-gray-600">Sent instead of an answer. Left empty, a built-in sentence is used.</p>
+          <p className="mt-1 text-xs text-fg-subtle">Sent instead of an answer. Left empty, a built-in sentence is used.</p>
         </div>
       )}
 
@@ -48,15 +48,15 @@ export default function ChatScenarioStyleFields({ form, set }) {
           placeholder="https://example.org/blob/main/{{key}}"
           className={`${inputClass} font-mono`}
         />
-        <p className="mt-1 text-xs text-gray-600">How a source is cited, for example a link template with the document key.</p>
+        <p className="mt-1 text-xs text-fg-subtle">How a source is cited, for example a link template with the document key.</p>
       </div>
 
-      <label className="mt-3 flex items-center gap-2 text-sm text-gray-800">
+      <label className="mt-3 flex items-center gap-2 text-sm text-fg-soft">
         <input
           type="checkbox"
           checked={form.markdown}
           onChange={(e) => set('markdown', e.target.checked)}
-          className="h-4 w-4 rounded border-gray-400 text-primary-700 focus:ring-primary-500"
+          className="h-4 w-4 rounded border-line-strong text-accent focus:ring-focus"
         />
         Format answers in Markdown
       </label>

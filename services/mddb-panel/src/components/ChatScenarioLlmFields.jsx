@@ -17,12 +17,12 @@ function ExtraBodyEditor({ entries, onChange }) {
         <button
           type="button"
           onClick={() => onChange([...entries, { key: '', value: '' }])}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50"
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft"
         >
           <Plus className="h-3 w-3" aria-hidden="true" /> Add field
         </button>
       </div>
-      {entries.length === 0 && <p className="text-xs text-gray-600">Nothing extra is sent to the model API.</p>}
+      {entries.length === 0 && <p className="text-xs text-fg-subtle">Nothing extra is sent to the model API.</p>}
       {entries.map((entry, index) => (
         <div key={index} className="mt-1 flex items-center gap-2">
           <input
@@ -43,21 +43,21 @@ function ExtraBodyEditor({ entries, onChange }) {
             type="button"
             onClick={() => onChange(entries.filter((_, i) => i !== index))}
             aria-label={`Remove extra field ${index + 1}`}
-            className="shrink-0 rounded p-1.5 text-red-700 hover:bg-red-50"
+            className="shrink-0 rounded p-1.5 text-danger hover:bg-danger-soft"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       ))}
-      <p className="mt-1 text-xs text-gray-600">Values that read as JSON (numbers, true, objects) are sent as such; anything else as text.</p>
+      <p className="mt-1 text-xs text-fg-subtle">Values that read as JSON (numbers, true, objects) are sent as such; anything else as text.</p>
     </div>
   );
 }
 
 export default function ChatScenarioLlmFields({ form, set }) {
   return (
-    <fieldset className="rounded-lg border border-gray-200 p-4">
-      <legend className="px-1 text-sm font-semibold text-gray-900">Model and limits</legend>
+    <fieldset className="rounded-lg border border-line p-4">
+      <legend className="px-1 text-sm font-semibold text-fg">Model and limits</legend>
       <div className="grid gap-3 md:grid-cols-3">
         <div>
           <label htmlFor="chat-model" className={labelClass}>Model</label>

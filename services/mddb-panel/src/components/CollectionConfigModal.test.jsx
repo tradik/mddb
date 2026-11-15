@@ -413,11 +413,11 @@ describe('CollectionConfigModal editing', () => {
     fireEvent.change(prompt, { target: { value: 'x'.repeat(3801) } });
     const counter = screen.getByText(/3801 \/ 4096 characters/);
     expect(counter.textContent).toContain('competes with the answer for context');
-    expect(counter.className).toContain('text-amber-600');
+    expect(counter.className).toContain('text-warning');
     fireEvent.change(prompt, { target: { value: 'y'.repeat(5000) } });
     expect(prompt.value).toHaveLength(4096);
     fireEvent.change(prompt, { target: { value: 'short' } });
-    expect(screen.getByText('5 / 4096 characters').className).toContain('text-gray-400');
+    expect(screen.getByText('5 / 4096 characters').className).toContain('text-fg-faint');
   });
 });
 

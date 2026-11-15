@@ -106,17 +106,17 @@ export default function SynonymsPanel() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
+    <div className="h-full flex flex-col bg-surface-muted">
+      <div className="bg-surface border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Synonyms</h1>
-            <p className="text-gray-600">Manage FTS synonym groups per collection</p>
+            <h1 className="text-2xl font-bold text-fg mb-1">Synonyms</h1>
+            <p className="text-fg-subtle">Manage FTS synonym groups per collection</p>
           </div>
           <button
             onClick={loadSynonyms}
             disabled={!collection || loading}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 bg-surface-subtle text-fg-muted rounded hover:bg-surface-strong flex items-center gap-2 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -127,12 +127,12 @@ export default function SynonymsPanel() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Collection Selector */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Collection</label>
+          <div className="bg-surface rounded-lg shadow p-6">
+            <label className="block text-sm font-medium text-fg-muted mb-2">Collection</label>
             <select
               value={collection}
               onChange={(e) => setCollection(e.target.value)}
-              className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full md:w-64 px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus"
             >
               {collections.length === 0 && (
                 <option value="">No collections available</option>
@@ -147,36 +147,36 @@ export default function SynonymsPanel() {
 
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+            <div className="bg-danger-soft border border-danger-line rounded-lg p-4 text-danger text-sm">
               {error}
             </div>
           )}
 
           {/* Add Form */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-blue-600" />
+          <div className="bg-surface rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-fg mb-4 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-info" />
               Add Synonym Group
             </h2>
             <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-3">
               <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">Term</label>
+                <label className="block text-xs text-fg-faint mb-1">Term</label>
                 <input
                   type="text"
                   value={newTerm}
                   onChange={(e) => setNewTerm(e.target.value)}
                   placeholder="e.g. car"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 />
               </div>
               <div className="flex-[2]">
-                <label className="block text-xs text-gray-500 mb-1">Synonyms (comma-separated)</label>
+                <label className="block text-xs text-fg-faint mb-1">Synonyms (comma-separated)</label>
                 <input
                   type="text"
                   value={newSynonyms}
                   onChange={(e) => setNewSynonyms(e.target.value)}
                   placeholder="e.g. automobile, vehicle, auto"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 />
               </div>
               <div className="flex items-end">
@@ -197,9 +197,9 @@ export default function SynonymsPanel() {
           </div>
 
           {/* Synonyms Table */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+          <div className="bg-surface rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-line">
+              <h2 className="text-lg font-semibold text-fg">
                 Synonym Groups ({entries.length})
               </h2>
             </div>
@@ -208,42 +208,42 @@ export default function SynonymsPanel() {
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                  <p className="text-gray-500 text-sm">Loading synonyms...</p>
+                  <p className="text-fg-faint text-sm">Loading synonyms...</p>
                 </div>
               </div>
             ) : entries.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
+              <div className="p-12 text-center text-fg-faint">
                 <p>No synonym groups found for this collection.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <tr className="bg-surface-muted border-b border-line">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">
                         Term
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">
                         Synonyms
                       </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                      <th className="text-right px-6 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider w-32">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-line">
                     {entries.map((entry) => (
-                      <tr key={entry.term} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                      <tr key={entry.term} className="hover:bg-surface-muted">
+                        <td className="px-6 py-4 text-sm font-medium text-fg whitespace-nowrap">
                           {entry.term}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-700">
+                        <td className="px-6 py-4 text-sm text-fg-muted">
                           {editingTerm === entry.term ? (
                             <input
                               type="text"
                               value={editSynonyms}
                               onChange={(e) => setEditSynonyms(e.target.value)}
-                              className="w-full px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              className="w-full px-2 py-1 border border-info-line rounded focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                               autoFocus
                             />
                           ) : (
@@ -256,7 +256,7 @@ export default function SynonymsPanel() {
                               <button
                                 onClick={() => handleSaveEdit(entry.term)}
                                 disabled={saving}
-                                className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                className="p-1.5 text-success hover:bg-success-soft rounded transition-colors"
                                 title="Save"
                               >
                                 {saving ? (
@@ -267,7 +267,7 @@ export default function SynonymsPanel() {
                               </button>
                               <button
                                 onClick={handleCancelEdit}
-                                className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                                className="p-1.5 text-fg-faint hover:bg-surface-subtle rounded transition-colors"
                                 title="Cancel"
                               >
                                 <X className="w-4 h-4" />
@@ -277,7 +277,7 @@ export default function SynonymsPanel() {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleEdit(entry)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                className="p-1.5 text-info hover:bg-info-soft rounded transition-colors"
                                 title="Edit"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -285,7 +285,7 @@ export default function SynonymsPanel() {
                               <button
                                 onClick={() => handleDelete(entry.term)}
                                 disabled={deleting === entry.term}
-                                className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                className="p-1.5 text-danger hover:bg-danger-soft rounded transition-colors"
                                 title="Delete"
                               >
                                 {deleting === entry.term ? (

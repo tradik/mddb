@@ -54,7 +54,7 @@ export default function SelectionActionBar({ collection, documents, readOnly = f
   return (
     <div className="mt-2 space-y-1">
       {count > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded bg-blue-50 px-2 py-1.5 text-sm text-blue-950">
+        <div className="flex flex-wrap items-center gap-2 rounded bg-info-soft px-2 py-1.5 text-sm text-info-strong">
           <span>{count} selected</span>
           {EXPORT_FORMATS.map((format) => (
             <button
@@ -62,7 +62,7 @@ export default function SelectionActionBar({ collection, documents, readOnly = f
               type="button"
               onClick={() => exportAs(format)}
               disabled={busy}
-              className={`${ACTION} text-gray-900 bg-white border border-gray-400 hover:bg-gray-100`}
+              className={`${ACTION} text-fg bg-surface border border-line-strong hover:bg-surface-subtle`}
             >
               <Download className="w-3.5 h-3.5" aria-hidden="true" /> Export {format.toUpperCase()}
             </button>

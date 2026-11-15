@@ -20,24 +20,24 @@ export default function ChatSkillHistory({ skill, onError }) {
   };
 
   return (
-    <section aria-labelledby="skill-history-heading" className="rounded-lg bg-white p-4 shadow">
-      <h3 className="text-sm font-semibold text-gray-900">Used by</h3>
+    <section aria-labelledby="skill-history-heading" className="rounded-lg bg-surface p-4 shadow">
+      <h3 className="text-sm font-semibold text-fg">Used by</h3>
       {used.length === 0 ? (
-        <p className="text-sm text-gray-700">No scenario attaches this skill.</p>
+        <p className="text-sm text-fg-muted">No scenario attaches this skill.</p>
       ) : (
-        <ul className="list-inside list-disc text-sm text-gray-800">
+        <ul className="list-inside list-disc text-sm text-fg-soft">
           {used.map((name) => <li key={name}>{name}</li>)}
         </ul>
       )}
-      <h3 id="skill-history-heading" className="mt-3 text-sm font-semibold text-gray-900">Earlier versions</h3>
+      <h3 id="skill-history-heading" className="mt-3 text-sm font-semibold text-fg">Earlier versions</h3>
       {history.length === 0 ? (
-        <p className="text-sm text-gray-700">This is the first version.</p>
+        <p className="text-sm text-fg-muted">This is the first version.</p>
       ) : (
-        <ul className="space-y-1 text-sm text-gray-800">
+        <ul className="space-y-1 text-sm text-fg-soft">
           {history.map((r) => (
             <li key={r.version} className="flex items-center justify-between gap-2">
               <span>v{r.version} · {formatBytes(r.bytes)} · {sourceLabel(r.source)}</span>
-              <button type="button" onClick={() => compare(r.version)} className="rounded px-2 py-0.5 text-xs font-medium text-primary-800 hover:bg-primary-50">
+              <button type="button" onClick={() => compare(r.version)} className="rounded px-2 py-0.5 text-xs font-medium text-accent-strong hover:bg-accent-soft">
                 Compare v{r.version} with v{skill.version}
               </button>
             </li>

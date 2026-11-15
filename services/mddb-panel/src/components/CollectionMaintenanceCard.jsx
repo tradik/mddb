@@ -43,28 +43,28 @@ export default function CollectionMaintenanceCard() {
   const button = 'px-3 py-2 text-sm rounded-lg disabled:opacity-50';
 
   return (
-    <div className="bg-white rounded-lg shadow mb-6 p-6 space-y-3">
-      <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-        <Wrench className="w-5 h-5 text-primary-600" aria-hidden="true" /> Collection maintenance
+    <div className="bg-surface rounded-lg shadow mb-6 p-6 space-y-3">
+      <h2 className="text-lg font-semibold text-fg flex items-center gap-2">
+        <Wrench className="w-5 h-5 text-accent" aria-hidden="true" /> Collection maintenance
       </h2>
       <div className="flex flex-wrap gap-3 items-end">
         <div className="min-w-[10rem]"><CollectionPicker value={collection} onChange={(v) => { setPicked(v); setMessage(null); }} /></div>
-        <button type="button" onClick={checksum} disabled={busy || !collection} className={`${button} bg-gray-100 text-gray-900 hover:bg-gray-200`}>Checksum</button>
-        <label className="text-sm text-gray-800">
+        <button type="button" onClick={checksum} disabled={busy || !collection} className={`${button} bg-surface-subtle text-fg hover:bg-surface-strong`}>Checksum</button>
+        <label className="text-sm text-fg-soft">
           <span className="block mb-1">Export format</span>
-          <select value={format} onChange={(e) => setFormat(e.target.value)} className="px-2 py-2 border border-gray-300 rounded-lg">
+          <select value={format} onChange={(e) => setFormat(e.target.value)} className="px-2 py-2 border border-line-strong rounded-lg">
             <option value="ndjson">NDJSON</option>
             <option value="zip">ZIP of Markdown files</option>
           </select>
         </label>
-        <button type="button" onClick={exportFile} disabled={busy || !collection} className={`${button} bg-gray-100 text-gray-900 hover:bg-gray-200`}>Export</button>
-        <label className="text-sm text-gray-800">
+        <button type="button" onClick={exportFile} disabled={busy || !collection} className={`${button} bg-surface-subtle text-fg hover:bg-surface-strong`}>Export</button>
+        <label className="text-sm text-fg-soft">
           <span className="block mb-1">Revisions to keep</span>
-          <input type="number" min="0" value={keepRevs} onChange={(e) => setKeepRevs(e.target.value)} className="w-24 px-3 py-2 border border-gray-300 rounded-lg" />
+          <input type="number" min="0" value={keepRevs} onChange={(e) => setKeepRevs(e.target.value)} className="w-24 px-3 py-2 border border-line-strong rounded-lg" />
         </label>
-        <button type="button" onClick={() => setConfirming(true)} disabled={busy || !collection} className={`${button} text-red-800 border border-red-300 hover:bg-red-50`}>Truncate revisions</button>
+        <button type="button" onClick={() => setConfirming(true)} disabled={busy || !collection} className={`${button} text-danger-strong border border-danger-line hover:bg-danger-soft`}>Truncate revisions</button>
       </div>
-      {message && <p role="status" className="text-sm text-gray-900">{message}</p>}
+      {message && <p role="status" className="text-sm text-fg">{message}</p>}
       <ApiErrorNotice error={error} collection={collection} />
       {confirming && (
         <ConfirmDialog

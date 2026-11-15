@@ -95,8 +95,8 @@ describe('CurationPanel list', () => {
     client.listCurationRules.mockResolvedValue({ rules: [ruleA, ruleB, ruleC] });
     await renderPanel();
     expect(screen.getAllByText('ENABLED')).toHaveLength(2);
-    expect(screen.getByText('DISABLED').className).toContain('bg-gray-200');
-    expect(screen.getAllByText('ENABLED')[0].className).toContain('bg-green-100');
+    expect(screen.getByText('DISABLED').className).toContain('bg-surface-strong');
+    expect(screen.getAllByText('ENABLED')[0].className).toContain('bg-success-muted');
     expect(screen.getByText('rust tutorial')).toBeTruthy();
     expect(screen.getByText('(contains)')).toBeTruthy();
     expect(screen.getAllByText('(exact)')).toHaveLength(2);

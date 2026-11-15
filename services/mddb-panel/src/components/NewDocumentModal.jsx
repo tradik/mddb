@@ -56,21 +56,21 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="border-b border-gray-200 p-4">
+        <div className="border-b border-line p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-fg">
                 New Document
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-fg-faint mt-1">
                 Create a new document in {collection}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+              className="p-2 text-fg-faint hover:text-fg-subtle rounded-lg hover:bg-surface-subtle"
             >
               <X className="w-5 h-5" />
             </button>
@@ -81,11 +81,11 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="bg-danger-soft border border-danger-line rounded-lg p-4 flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-sm font-medium text-red-900">Error creating document</h4>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
+                <h4 className="text-sm font-medium text-danger-strong">Error creating document</h4>
+                <p className="text-sm text-danger mt-1">{error}</p>
               </div>
             </div>
           )}
@@ -93,7 +93,7 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-fg-muted mb-2">
                 Document Key *
               </label>
               <input
@@ -101,21 +101,21 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 placeholder="e.g., hello-world"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-fg-faint mt-1">
                 Unique identifier for this document
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-fg-muted mb-2">
                 Language *
               </label>
               <select
                 value={lang}
                 onChange={(e) => setLang(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
               >
                 <option value="en_US">English (US)</option>
                 <option value="en_GB">English (GB)</option>
@@ -138,7 +138,7 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
 
           {/* Metadata Section */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Metadata (Optional)</h3>
+            <h3 className="text-sm font-semibold text-fg-muted mb-3">Metadata (Optional)</h3>
             
             {/* Existing Metadata */}
             {Object.keys(metadata).length > 0 && (
@@ -149,17 +149,17 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
                       type="text"
                       value={key}
                       disabled
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50"
+                      className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm bg-surface-muted"
                     />
                     <input
                       type="text"
                       value={values.join(', ')}
                       disabled
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50"
+                      className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm bg-surface-muted"
                     />
                     <button
                       onClick={() => handleRemoveMetadata(key)}
-                      className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm"
+                      className="px-3 py-2 text-danger hover:bg-danger-soft rounded-lg transition-colors text-sm"
                     >
                       Remove
                     </button>
@@ -175,7 +175,7 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
                 placeholder="Key (e.g., author)"
                 value={newMetaKey}
                 onChange={(e) => setNewMetaKey(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
               />
               <input
                 type="text"
@@ -183,11 +183,11 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
                 value={newMetaValue}
                 onChange={(e) => setNewMetaValue(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddMetadata()}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
               />
               <button
                 onClick={handleAddMetadata}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                className="px-4 py-2 bg-surface-subtle text-fg-muted rounded-lg hover:bg-surface-strong transition-colors text-sm font-medium"
               >
                 Add
               </button>
@@ -196,10 +196,10 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
 
           {/* Content Section */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-fg-muted mb-2">
               Content (Markdown)
             </label>
-            <div className="border border-gray-300 rounded-lg overflow-hidden">
+            <div className="border border-line-strong rounded-lg overflow-hidden">
               <MarkdownEditor
                 value={contentMd}
                 onChange={setContentMd}
@@ -211,10 +211,10 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 p-4 flex items-center justify-end space-x-3">
+        <div className="border-t border-line p-4 flex items-center justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            className="px-4 py-2 text-fg-muted bg-surface-subtle rounded-lg hover:bg-surface-strong transition-colors"
           >
             Cancel
           </button>

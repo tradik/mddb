@@ -74,8 +74,8 @@ export default function SystemInfo() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="text-red-600 font-medium mb-2">Failed to load system info</div>
-          <div className="text-sm text-gray-500">{systemInfoError}</div>
+          <div className="text-danger font-medium mb-2">Failed to load system info</div>
+          <div className="text-sm text-fg-faint">{systemInfoError}</div>
           <button
             onClick={loadSystemInfo}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
@@ -90,44 +90,44 @@ export default function SystemInfo() {
   if (!systemInfo) return null;
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6">
+    <div className="h-full overflow-y-auto bg-surface-muted p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">System Information</h1>
-          <p className="text-gray-600">Server hardware and runtime details</p>
+          <h1 className="text-2xl font-bold text-fg mb-2">System Information</h1>
+          <p className="text-fg-subtle">Server hardware and runtime details</p>
         </div>
 
         {/* Server Info Card */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
+        <div className="bg-surface rounded-lg shadow mb-6 p-6">
           <div className="flex items-center mb-4">
-            <Server className="w-5 h-5 text-primary-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Server</h2>
+            <Server className="w-5 h-5 text-accent mr-2" />
+            <h2 className="text-lg font-semibold text-fg">Server</h2>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="text-sm text-gray-600">Hostname</div>
-              <div className="font-medium text-gray-900">{systemInfo.hostname}</div>
+              <div className="text-sm text-fg-subtle">Hostname</div>
+              <div className="font-medium text-fg">{systemInfo.hostname}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Uptime</div>
-              <div className="font-medium text-gray-900">{formatUptime(systemInfo.uptimeSeconds)}</div>
+              <div className="text-sm text-fg-subtle">Uptime</div>
+              <div className="font-medium text-fg">{formatUptime(systemInfo.uptimeSeconds)}</div>
             </div>
           </div>
         </div>
 
         {/* Hardware Card */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
+        <div className="bg-surface rounded-lg shadow mb-6 p-6">
           <div className="flex items-center mb-4">
-            <Cpu className="w-5 h-5 text-primary-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Hardware</h2>
+            <Cpu className="w-5 h-5 text-accent mr-2" />
+            <h2 className="text-lg font-semibold text-fg">Hardware</h2>
           </div>
           <div className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">CPU Usage ({systemInfo.numCPU} cores)</span>
-                <span className="font-medium text-gray-900">{Math.round(systemInfo.cpuUsagePercent || 0)}%</span>
+                <span className="text-fg-subtle">CPU Usage ({systemInfo.numCPU} cores)</span>
+                <span className="font-medium text-fg">{Math.round(systemInfo.cpuUsagePercent || 0)}%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-surface-strong rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all ${
                     (systemInfo.cpuUsagePercent || 0) > 80 ? 'bg-red-500' :
@@ -139,56 +139,56 @@ export default function SystemInfo() {
             </div>
             <div className="grid grid-cols-3 gap-4 pt-2 border-t">
               <div>
-                <div className="text-sm text-gray-600">Operating System</div>
-                <div className="font-medium text-gray-900">{systemInfo.os} ({systemInfo.arch})</div>
+                <div className="text-sm text-fg-subtle">Operating System</div>
+                <div className="font-medium text-fg">{systemInfo.os} ({systemInfo.arch})</div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">CPU Cores</div>
-                <div className="font-medium text-gray-900">{systemInfo.numCPU}</div>
+                <div className="text-sm text-fg-subtle">CPU Cores</div>
+                <div className="font-medium text-fg">{systemInfo.numCPU}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">Goroutines</div>
-                <div className="font-medium text-gray-900">{systemInfo.numGoroutines.toLocaleString()}</div>
+                <div className="text-sm text-fg-subtle">Goroutines</div>
+                <div className="font-medium text-fg">{systemInfo.numGoroutines.toLocaleString()}</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Memory Card */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
+        <div className="bg-surface rounded-lg shadow mb-6 p-6">
           <div className="flex items-center mb-4">
-            <HardDrive className="w-5 h-5 text-primary-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Memory</h2>
+            <HardDrive className="w-5 h-5 text-accent mr-2" />
+            <h2 className="text-lg font-semibold text-fg">Memory</h2>
           </div>
           <div className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">Heap Memory Usage</span>
-                <span className="font-medium text-gray-900">{getMemoryPercentage()}%</span>
+                <span className="text-fg-subtle">Heap Memory Usage</span>
+                <span className="font-medium text-fg">{getMemoryPercentage()}%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-surface-strong rounded-full h-2">
                 <div
                   className="bg-primary-600 h-2 rounded-full transition-all"
                   style={{ width: `${getMemoryPercentage()}%` }}
                 ></div>
               </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-fg-faint mt-1">
                 <span>{formatBytes(systemInfo.memoryUsed)} used</span>
                 <span>{formatBytes(systemInfo.memorySystem)} system</span>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4 pt-2 border-t">
               <div>
-                <div className="text-sm text-gray-600">Total Allocated</div>
-                <div className="font-medium text-gray-900">{formatBytes(systemInfo.memoryTotal)}</div>
+                <div className="text-sm text-fg-subtle">Total Allocated</div>
+                <div className="font-medium text-fg">{formatBytes(systemInfo.memoryTotal)}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">In Use</div>
-                <div className="font-medium text-gray-900">{formatBytes(systemInfo.memoryUsed)}</div>
+                <div className="text-sm text-fg-subtle">In Use</div>
+                <div className="font-medium text-fg">{formatBytes(systemInfo.memoryUsed)}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">Heap In Use</div>
-                <div className="font-medium text-gray-900">{formatBytes(systemInfo.memoryHeap)}</div>
+                <div className="text-sm text-fg-subtle">Heap In Use</div>
+                <div className="font-medium text-fg">{formatBytes(systemInfo.memoryHeap)}</div>
               </div>
             </div>
           </div>
@@ -196,21 +196,21 @@ export default function SystemInfo() {
 
         {/* Network Card */}
         {systemInfo.network && systemInfo.network.length > 0 && (
-          <div className="bg-white rounded-lg shadow mb-6 p-6">
+          <div className="bg-surface rounded-lg shadow mb-6 p-6">
             <div className="flex items-center mb-4">
-              <Network className="w-5 h-5 text-primary-600 mr-2" />
-              <h2 className="text-lg font-semibold text-gray-900">Network</h2>
+              <Network className="w-5 h-5 text-accent mr-2" />
+              <h2 className="text-lg font-semibold text-fg">Network</h2>
             </div>
             <div className="space-y-3">
               {systemInfo.network.map((iface, idx) => (
                 <div key={idx} className={idx > 0 ? 'pt-3 border-t' : ''}>
                   <div className="flex items-center justify-between mb-1">
-                    <div className="font-medium text-gray-900">{iface.name}</div>
-                    <div className="text-xs text-gray-500">{iface.flags}</div>
+                    <div className="font-medium text-fg">{iface.name}</div>
+                    <div className="text-xs text-fg-faint">{iface.flags}</div>
                   </div>
                   <div className="space-y-0.5">
                     {iface.addresses.map((addr, i) => (
-                      <div key={i} className="text-sm text-gray-600 font-mono">{addr}</div>
+                      <div key={i} className="text-sm text-fg-subtle font-mono">{addr}</div>
                     ))}
                   </div>
                 </div>
@@ -220,19 +220,19 @@ export default function SystemInfo() {
         )}
 
         {/* Software Card */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-surface rounded-lg shadow p-6">
           <div className="flex items-center mb-4">
-            <Package className="w-5 h-5 text-primary-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Software</h2>
+            <Package className="w-5 h-5 text-accent mr-2" />
+            <h2 className="text-lg font-semibold text-fg">Software</h2>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="text-sm text-gray-600">Go Version</div>
-              <div className="font-medium text-gray-900">{systemInfo.goVersion}</div>
+              <div className="text-sm text-fg-subtle">Go Version</div>
+              <div className="font-medium text-fg">{systemInfo.goVersion}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">MDDB Version</div>
-              <div className="font-medium text-gray-900">{systemInfo.version}</div>
+              <div className="text-sm text-fg-subtle">MDDB Version</div>
+              <div className="font-medium text-fg">{systemInfo.version}</div>
             </div>
           </div>
         </div>

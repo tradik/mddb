@@ -100,12 +100,12 @@ export default function ChatSkillsPanel() {
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-primary-700" aria-hidden="true" />
-          <h2 className="text-xl font-bold text-gray-900">Chat skills</h2>
-          <span className="text-xs text-gray-600">version {version}</span>
+          <Sparkles className="h-6 w-6 text-accent" aria-hidden="true" />
+          <h2 className="text-xl font-bold text-fg">Chat skills</h2>
+          <span className="text-xs text-fg-subtle">version {version}</span>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={() => show('import')} className="flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-100">
+          <button type="button" onClick={() => show('import')} className="flex items-center gap-1.5 rounded border border-line-strong bg-surface px-3 py-1.5 text-sm text-fg-soft hover:bg-surface-subtle">
             <Download className="h-4 w-4" aria-hidden="true" /> Import from URL
           </button>
           <button type="button" onClick={() => show('new')} className="flex items-center gap-1.5 rounded bg-primary-700 px-3 py-1.5 text-sm text-white hover:bg-primary-800">
@@ -113,19 +113,19 @@ export default function ChatSkillsPanel() {
           </button>
         </div>
       </div>
-      <p className="mb-4 max-w-3xl text-sm text-gray-700">
+      <p className="mb-4 max-w-3xl text-sm text-fg-muted">
         A skill is a block of instructions in the SKILL.md format that scenarios attach. It is added to the prompt after the
         guardrails, which take precedence. Skills are part of system prompts, so every action here needs admin on &quot;*&quot;.
       </p>
 
-      {error && <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
-      {message && <output className="mb-3 block rounded border border-green-200 bg-green-50 p-2 text-sm text-green-800">{message}</output>}
+      {error && <p role="alert" className="mb-3 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
+      {message && <output className="mb-3 block rounded border border-success-line bg-success-soft p-2 text-sm text-success-strong">{message}</output>}
 
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <nav aria-label="Skills" className="rounded-lg bg-white p-3 shadow">
+        <nav aria-label="Skills" className="rounded-lg bg-surface p-3 shadow">
           <ChatSkillList skills={skills} selected={current?.name} onSelect={open} />
         </nav>
-        {mode === null && <p className="rounded-lg bg-white p-6 text-sm text-gray-700 shadow">Pick a skill to edit it, write a new one, or import one.</p>}
+        {mode === null && <p className="rounded-lg bg-surface p-6 text-sm text-fg-muted shadow">Pick a skill to edit it, write a new one, or import one.</p>}
         {mode === 'import' && <ChatSkillImport busy={busy} onSave={save} onError={fail} />}
         {mode === 'new' && <ChatSkillEditor key="new" isNew busy={busy} onSave={save} onError={fail} />}
         {mode === 'edit' && (

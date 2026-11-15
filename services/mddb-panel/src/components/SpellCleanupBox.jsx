@@ -20,17 +20,17 @@ export default function SpellCleanupBox({ collection, text, lang }) {
         type="button"
         onClick={cleanup}
         disabled={busy || !text.trim()}
-        className="px-4 py-2 bg-gray-100 text-gray-900 rounded-lg hover:bg-gray-200 disabled:opacity-50 text-sm font-medium"
+        className="px-4 py-2 bg-surface-subtle text-fg rounded-lg hover:bg-surface-strong disabled:opacity-50 text-sm font-medium"
       >
         {busy ? 'Cleaning…' : 'Clean up text'}
       </button>
       {error?.status === 404
-        ? <p role="alert" className="text-sm text-amber-950">Spell correction is off on this server: start it with MDDB_SPELL=true.</p>
+        ? <p role="alert" className="text-sm text-warning-strong">Spell correction is off on this server: start it with MDDB_SPELL=true.</p>
         : <ApiErrorNotice error={error} collection={collection || '*'} />}
       {result && (
-        <div role="status" className="p-3 bg-green-50 rounded-lg border border-green-300 text-sm">
-          <p className="text-xs text-green-900 mb-1">Cleaned text ({result.correctionsApplied} corrections)</p>
-          <p className="font-mono text-gray-900">{result.cleaned}</p>
+        <div role="status" className="p-3 bg-success-soft rounded-lg border border-success-line text-sm">
+          <p className="text-xs text-success-strong mb-1">Cleaned text ({result.correctionsApplied} corrections)</p>
+          <p className="font-mono text-fg">{result.cleaned}</p>
         </div>
       )}
     </div>

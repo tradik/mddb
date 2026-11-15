@@ -12,9 +12,9 @@ function relativeTime(ts) {
 
 const StatusBadge = ({ status }) => {
   const cfg = {
-    success: { icon: CheckCircle2, cls: 'bg-green-100 text-green-800' },
-    error: { icon: AlertCircle, cls: 'bg-red-100 text-red-800' },
-    skipped: { icon: MinusCircle, cls: 'bg-gray-100 text-gray-600' },
+    success: { icon: CheckCircle2, cls: 'bg-success-muted text-success-strong' },
+    error: { icon: AlertCircle, cls: 'bg-danger-muted text-danger-strong' },
+    skipped: { icon: MinusCircle, cls: 'bg-surface-subtle text-fg-subtle' },
   };
   const c = cfg[status] || cfg.skipped;
   const Icon = c.icon;
@@ -28,11 +28,11 @@ const StatusBadge = ({ status }) => {
 
 const TypeBadge = ({ type }) => {
   const cfg = {
-    trigger: { label: 'Trigger', cls: 'bg-amber-100 text-amber-800' },
-    cron: { label: 'Cron', cls: 'bg-purple-100 text-purple-800' },
+    trigger: { label: 'Trigger', cls: 'bg-warning-muted text-warning-strong' },
+    cron: { label: 'Cron', cls: 'bg-note-muted text-note-strong' },
   };
   const c = cfg[type];
-  if (!c) return <span className="text-xs text-gray-500">{type}</span>;
+  if (!c) return <span className="text-xs text-fg-faint">{type}</span>;
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${c.cls}`}>
       {c.label}
@@ -47,16 +47,16 @@ const ActionCell = ({ log }) => {
     const s = log.sync || {};
     return (
       <span>
-        <span className="font-medium text-gray-900">sync</span>{' '}
+        <span className="font-medium text-fg">sync</span>{' '}
         +{s.added ?? 0} added, {s.updated ?? 0} updated, {s.unchanged ?? 0} unchanged, {s.deleted ?? 0} deleted
-        {s.failed > 0 && <span className="text-red-700">, {s.failed} failed</span>}
+        {s.failed > 0 && <span className="text-danger">, {s.failed} failed</span>}
       </span>
     );
   }
   if (log.action === 'backup') {
     return (
       <span>
-        <span className="font-medium text-gray-900">backup</span>{' '}
+        <span className="font-medium text-fg">backup</span>{' '}
         <span className="font-mono">{log.target || '-'}</span>
         {log.removed?.length > 0 && `, ${log.removed.length} old removed`}
       </span>
@@ -136,11 +136,11 @@ export default function AutomationLogsTab() {
         {/* Filter row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-600">Status:</label>
+            <label className="text-sm text-fg-subtle">Status:</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="px-3 py-1.5 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
             >
               <option value="">All</option>
               <option value="success">Success</option>
@@ -149,19 +149,19 @@ export default function AutomationLogsTab() {
             </select>
           </div>
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-fg-subtle cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoRefresh}
                 onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                className="w-4 h-4 text-info rounded border-line-strong focus:ring-focus"
               />
               Auto-refresh
             </label>
             <button
               onClick={() => fetchLogs(false)}
               disabled={loading}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm disabled:opacity-50"
+              className="px-3 py-1.5 bg-surface-subtle text-fg-muted rounded-lg hover:bg-surface-strong flex items-center gap-2 text-sm disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -171,67 +171,67 @@ export default function AutomationLogsTab() {
 
         {/* Error */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+          <div className="bg-danger-soft border border-danger-line rounded-lg p-4 text-danger text-sm">
             {error}
           </div>
         )}
 
         {/* Table */}
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
+        <div className="bg-surface rounded-lg shadow overflow-x-auto">
           {loading && logs.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                <p className="text-gray-500 text-sm">Loading automation logs...</p>
+                <p className="text-fg-faint text-sm">Loading automation logs...</p>
               </div>
             </div>
           ) : logs.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">
+            <div className="p-12 text-center text-fg-faint">
               <p>No automation logs found.</p>
             </div>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Rule Name</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">HTTP Code</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Attempt</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Error</th>
+                <tr className="bg-surface-muted border-b border-line">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">Time</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">Rule Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">Type</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">Action</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">HTTP Code</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">Duration</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">Attempt</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-fg-faint uppercase tracking-wider">Error</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-line">
                 {logs.map((log, idx) => (
-                  <tr key={log.id || idx} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                  <tr key={log.id || idx} className="hover:bg-surface-muted">
+                    <td className="px-4 py-3 text-sm text-fg-subtle whitespace-nowrap">
                       {log.timestamp ? relativeTime(log.timestamp) : '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm font-medium text-fg whitespace-nowrap">
                       {log.ruleName || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <TypeBadge type={log.ruleType} />
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-700 max-w-[320px]" title={log.target || log.webhookUrl}>
+                    <td className="px-4 py-3 text-xs text-fg-muted max-w-[320px]" title={log.target || log.webhookUrl}>
                       <ActionCell log={log} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <StatusBadge status={log.status} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm text-fg-subtle whitespace-nowrap">
                       {log.httpStatus || '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm text-fg-subtle whitespace-nowrap">
                       {log.durationMs != null ? `${log.durationMs}ms` : '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm text-fg-subtle whitespace-nowrap">
                       {log.attempt || '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-red-600 max-w-[250px] truncate" title={log.error}>
+                    <td className="px-4 py-3 text-sm text-danger max-w-[250px] truncate" title={log.error}>
                       {log.error || ''}
                     </td>
                   </tr>
@@ -247,10 +247,10 @@ export default function AutomationLogsTab() {
             <button
               onClick={handleLoadMore}
               disabled={loadingMore}
-              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm disabled:opacity-50 flex items-center gap-2 mx-auto"
+              className="px-6 py-2 bg-surface-subtle text-fg-muted rounded-lg hover:bg-surface-strong text-sm disabled:opacity-50 flex items-center gap-2 mx-auto"
             >
               {loadingMore ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-line-strong border-t-transparent"></div>
               ) : null}
               Load more
             </button>

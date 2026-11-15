@@ -17,7 +17,7 @@ export function LastRunResult({ rule }) {
   const failed = r.status === 'error';
   return (
     <div
-      className={`text-xs mt-0.5 ${failed ? 'text-red-700' : 'text-gray-600'}`}
+      className={`text-xs mt-0.5 ${failed ? 'text-danger' : 'text-fg-subtle'}`}
       title="Last run: status, added +, updated ~, unchanged =, deleted −, failed ✕"
     >
       Last run: {text}
@@ -39,7 +39,7 @@ function GitRunAt({ result }) {
           href={result.commitUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-mono text-blue-800 underline hover:text-blue-900"
+          className="font-mono text-info-strong underline hover:text-info-strong"
           aria-label={`Commit ${result.commit} on the forge`}
         >
           {short}
@@ -89,14 +89,14 @@ export function RunNowButton({ rule }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       {message && (
-        <output className={`text-xs ${message.ok ? 'text-green-800' : 'text-red-700'}`}>
+        <output className={`text-xs ${message.ok ? 'text-success-strong' : 'text-danger'}`}>
           {message.text}
         </output>
       )}
       <button
         onClick={run}
         disabled={running}
-        className="p-1.5 text-green-700 hover:bg-green-50 rounded transition-colors"
+        className="p-1.5 text-success hover:bg-success-soft rounded transition-colors"
         title="Run now"
         aria-label={`Run ${rule.name} now`}
       >

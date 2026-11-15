@@ -8,13 +8,13 @@ import TtlControl from './TtlControl';
  */
 export default function DocumentTools({ document: doc }) {
   return (
-    <div className="border-b border-gray-200 px-4 py-2 space-y-1">
+    <div className="border-b border-line px-4 py-2 space-y-1">
       <details>
-        <summary className="cursor-pointer text-sm font-medium text-gray-900">Expiry (TTL)</summary>
+        <summary className="cursor-pointer text-sm font-medium text-fg">Expiry (TTL)</summary>
         <div className="pt-2"><TtlControl document={doc} /></div>
       </details>
       <details>
-        <summary className="cursor-pointer text-sm font-medium text-gray-900">Classify</summary>
+        <summary className="cursor-pointer text-sm font-medium text-fg">Classify</summary>
         <div className="pt-2"><ClassifyBox document={doc} /></div>
       </details>
     </div>

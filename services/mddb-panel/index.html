@@ -6,6 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MDDB Panel - Admin Interface</title>
 
+    <!-- FE-015: the colour theme before the first paint, so a dark panel
+         never flashes white. Same key and rules as src/lib/theme.js, which
+         takes over once the app runs; storage or matchMedia that throws
+         leaves the page light. -->
+    <script>
+      (function (w, d) {
+        var theme = 'system';
+        try { theme = w.localStorage.getItem('mddb.theme') || 'system'; } catch (e) { /* no storage */ }
+        var dark = theme === 'dark';
+        if (theme !== 'dark' && theme !== 'light') {
+          try { dark = w.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { /* no matchMedia */ }
+        }
+        d.documentElement.classList.toggle('dark', dark);
+      })(window, document);
+    </script>
+
     <meta
       name="description"
       content="Admin interface for MDDB: browse collections, edit markdown documents, run full-text and vector search, and watch replication."

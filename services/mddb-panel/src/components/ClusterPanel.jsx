@@ -69,20 +69,20 @@ export default function ClusterPanel() {
 
   const getStatusBadge = (nodeStatus) => {
     const colors = {
-      healthy: 'bg-green-100 text-green-800',
-      warning: 'bg-yellow-100 text-yellow-800',
-      unhealthy: 'bg-red-100 text-red-800',
+      healthy: 'bg-success-muted text-success-strong',
+      warning: 'bg-warning-muted text-warning-strong',
+      unhealthy: 'bg-danger-muted text-danger-strong',
     };
-    return colors[nodeStatus] || 'bg-gray-100 text-gray-800';
+    return colors[nodeStatus] || 'bg-surface-subtle text-fg-soft';
   };
 
   const getRoleBadge = (role) => {
     const colors = {
-      leader: 'bg-blue-100 text-blue-800',
-      follower: 'bg-purple-100 text-purple-800',
-      standalone: 'bg-gray-100 text-gray-800',
+      leader: 'bg-info-muted text-info-strong',
+      follower: 'bg-note-muted text-note-strong',
+      standalone: 'bg-surface-subtle text-fg-soft',
     };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+    return colors[role] || 'bg-surface-subtle text-fg-soft';
   };
 
   const getNodeStatus = () => {
@@ -107,9 +107,9 @@ export default function ClusterPanel() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <Network className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <div className="text-red-600 font-medium mb-2">Failed to load cluster status</div>
-          <div className="text-sm text-gray-500 mb-4">{error}</div>
+          <Network className="w-12 h-12 text-line-strong mx-auto mb-4" />
+          <div className="text-danger font-medium mb-2">Failed to load cluster status</div>
+          <div className="text-sm text-fg-faint mb-4">{error}</div>
           <button
             onClick={handleRefresh}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -128,13 +128,13 @@ export default function ClusterPanel() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-          <Network className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-bold text-gray-900">Cluster</h2>
+          <Network className="w-6 h-6 text-info" />
+          <h2 className="text-xl font-bold text-fg">Cluster</h2>
         </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          className="flex items-center space-x-2 px-3 py-2 text-sm bg-surface-subtle hover:bg-surface-strong rounded-lg transition-colors"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           <span>Refresh</span>
@@ -142,17 +142,17 @@ export default function ClusterPanel() {
       </div>
 
       {/* This Node Overview */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">This Node</h3>
+      <div className="bg-surface rounded-xl border border-line p-5 mb-6">
+        <h3 className="text-sm font-semibold text-fg-faint uppercase tracking-wider mb-4">This Node</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <div className="text-xs text-gray-500 mb-1">Role</div>
+            <div className="text-xs text-fg-faint mb-1">Role</div>
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadge(status?.role)}`}>
               {status?.role || 'unknown'}
             </span>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Status</div>
+            <div className="text-xs text-fg-faint mb-1">Status</div>
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(nodeStatus)}`}>
               <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
                 nodeStatus === 'healthy' ? 'bg-green-500' :
@@ -162,45 +162,45 @@ export default function ClusterPanel() {
             </span>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Node ID</div>
-            <div className="text-sm font-mono text-gray-900">{status?.node_id || '-'}</div>
+            <div className="text-xs text-fg-faint mb-1">Node ID</div>
+            <div className="text-sm font-mono text-fg">{status?.node_id || '-'}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Uptime</div>
-            <div className="text-sm text-gray-900">{formatUptime(status?.uptime_seconds)}</div>
+            <div className="text-xs text-fg-faint mb-1">Uptime</div>
+            <div className="text-sm text-fg">{formatUptime(status?.uptime_seconds)}</div>
           </div>
         </div>
       </div>
 
       {/* LSN & Binlog Info */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-surface rounded-xl border border-line p-5">
           <div className="flex items-center space-x-2 mb-2">
-            <Activity className="w-4 h-4 text-blue-500" />
-            <div className="text-xs text-gray-500 uppercase font-semibold">Current LSN</div>
+            <Activity className="w-4 h-4 text-info" />
+            <div className="text-xs text-fg-faint uppercase font-semibold">Current LSN</div>
           </div>
-          <div className="text-2xl font-bold text-gray-900 font-mono">
+          <div className="text-2xl font-bold text-fg font-mono">
             {(status?.current_lsn || 0).toLocaleString()}
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-surface rounded-xl border border-line p-5">
           <div className="flex items-center space-x-2 mb-2">
-            <Database className="w-4 h-4 text-purple-500" />
-            <div className="text-xs text-gray-500 uppercase font-semibold">Binlog Size</div>
+            <Database className="w-4 h-4 text-note" />
+            <div className="text-xs text-fg-faint uppercase font-semibold">Binlog Size</div>
           </div>
-          <div className="text-2xl font-bold text-gray-900">
+          <div className="text-2xl font-bold text-fg">
             {formatBytes(status?.binlog_size_bytes)}
           </div>
           {status?.binlog_oldest_lsn > 0 && (
-            <div className="text-xs text-gray-400 mt-1">Oldest LSN: {status.binlog_oldest_lsn.toLocaleString()}</div>
+            <div className="text-xs text-fg-faint mt-1">Oldest LSN: {status.binlog_oldest_lsn.toLocaleString()}</div>
           )}
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-surface rounded-xl border border-line p-5">
           <div className="flex items-center space-x-2 mb-2">
-            <Clock className="w-4 h-4 text-green-500" />
-            <div className="text-xs text-gray-500 uppercase font-semibold">Replication Lag</div>
+            <Clock className="w-4 h-4 text-success" />
+            <div className="text-xs text-fg-faint uppercase font-semibold">Replication Lag</div>
           </div>
-          <div className="text-2xl font-bold text-gray-900">
+          <div className="text-2xl font-bold text-fg">
             {formatLag(status?.replication_lag_ms)}
           </div>
         </div>
@@ -208,29 +208,29 @@ export default function ClusterPanel() {
 
       {/* Followers Table (Leader only) */}
       {status?.followers && status.followers.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+        <div className="bg-surface rounded-xl border border-line p-5 mb-6">
+          <h3 className="text-sm font-semibold text-fg-faint uppercase tracking-wider mb-4">
             Connected Followers ({status.followers.length})
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Node ID</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Address</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase">LSN</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Lag</th>
-                  <th className="text-center py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Last Seen</th>
+                <tr className="border-b border-line-soft">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-fg-faint uppercase">Node ID</th>
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-fg-faint uppercase">Address</th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-fg-faint uppercase">LSN</th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-fg-faint uppercase">Lag</th>
+                  <th className="text-center py-2 px-3 text-xs font-semibold text-fg-faint uppercase">Status</th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-fg-faint uppercase">Last Seen</th>
                 </tr>
               </thead>
               <tbody>
                 {status.followers.map((f) => (
-                  <tr key={f.follower_id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-2.5 px-3 font-mono text-gray-900">{f.follower_id}</td>
-                    <td className="py-2.5 px-3 text-gray-600">{f.address || '-'}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-gray-900">{(f.confirmed_lsn || 0).toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-gray-900">{formatLag(f.lag_ms)}</td>
+                  <tr key={f.follower_id} className="border-b border-line-soft hover:bg-surface-muted">
+                    <td className="py-2.5 px-3 font-mono text-fg">{f.follower_id}</td>
+                    <td className="py-2.5 px-3 text-fg-subtle">{f.address || '-'}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-fg">{(f.confirmed_lsn || 0).toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-fg">{formatLag(f.lag_ms)}</td>
                     <td className="py-2.5 px-3 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(f.status)}`}>
                         <span className={`w-1.5 h-1.5 rounded-full mr-1 ${
@@ -240,7 +240,7 @@ export default function ClusterPanel() {
                         {f.status}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right text-gray-500">
+                    <td className="py-2.5 px-3 text-right text-fg-faint">
                       {f.last_seen_at ? new Date(f.last_seen_at * 1000).toLocaleTimeString() : '-'}
                     </td>
                   </tr>
@@ -253,8 +253,8 @@ export default function ClusterPanel() {
 
       {/* Lag History Chart (simple ASCII-style bar chart) */}
       {lagHistory.length > 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+        <div className="bg-surface rounded-xl border border-line p-5 mb-6">
+          <h3 className="text-sm font-semibold text-fg-faint uppercase tracking-wider mb-4">
             Lag History (last {Math.round(lagHistory.length * POLL_INTERVAL / 1000)}s)
           </h3>
           <div className="flex items-end space-x-0.5 h-24">
@@ -272,7 +272,7 @@ export default function ClusterPanel() {
               );
             })}
           </div>
-          <div className="flex justify-between mt-1 text-xs text-gray-400">
+          <div className="flex justify-between mt-1 text-xs text-fg-faint">
             <span>{lagHistory.length > 0 ? new Date(lagHistory[0].time).toLocaleTimeString() : ''}</span>
             <span>now</span>
           </div>
@@ -281,17 +281,17 @@ export default function ClusterPanel() {
 
       {/* Standalone Info */}
       {status?.role === 'standalone' && (
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 text-center">
-          <WifiOff className="w-8 h-8 text-gray-400 mx-auto mb-3" />
-          <div className="text-sm font-medium text-gray-600 mb-1">Standalone Mode</div>
-          <div className="text-xs text-gray-400">
-            Replication is not configured. Set <code className="bg-gray-200 px-1 rounded">MDDB_REPLICATION_ROLE</code> to enable clustering.
+        <div className="bg-surface-muted rounded-xl border border-line p-5 text-center">
+          <WifiOff className="w-8 h-8 text-fg-faint mx-auto mb-3" />
+          <div className="text-sm font-medium text-fg-subtle mb-1">Standalone Mode</div>
+          <div className="text-xs text-fg-faint">
+            Replication is not configured. Set <code className="bg-surface-strong px-1 rounded">MDDB_REPLICATION_ROLE</code> to enable clustering.
           </div>
         </div>
       )}
 
       {/* Auto-refresh indicator */}
-      <div className="text-center text-xs text-gray-400 mt-4">
+      <div className="text-center text-xs text-fg-faint mt-4">
         <Wifi className="w-3 h-3 inline mr-1" />
         Auto-refreshing every {POLL_INTERVAL / 1000}s
       </div>

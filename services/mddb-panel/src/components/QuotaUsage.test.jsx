@@ -31,19 +31,19 @@ describe('QuotaUsage', () => {
     expect(docs.max).toBe(100);
     expect(docs.getAttribute('aria-valuetext')).toBe('1,234 / 5,000 documents (25%)');
     expect(docs.textContent).toBe('1,234 / 5,000 documents (25%)');
-    expect(docs.className).toContain('[&::-webkit-progress-value]:bg-primary-700');
-    expect(docs.className).toContain('[&::-moz-progress-bar]:bg-primary-700');
+    expect(docs.className).toContain('[&::-webkit-progress-value]:bg-accent');
+    expect(docs.className).toContain('[&::-moz-progress-bar]:bg-accent');
 
     const vectors = screen.getByRole('progressbar', { name: 'Vectors' });
-    expect(vectors.className).toContain('[&::-webkit-progress-value]:bg-amber-700');
+    expect(vectors.className).toContain('[&::-webkit-progress-value]:bg-warning');
     expect(screen.getByText('Close to the limit.')).toBeTruthy();
 
     // Over the limit: the bar stops at 100%, the text keeps the real share.
     const calls = screen.getByRole('progressbar', { name: 'Embedding calls today' });
     expect(calls.value).toBe(100);
     expect(calls.getAttribute('aria-valuetext')).toBe('12 / 10 embedding calls today (120%)');
-    expect(calls.className).toContain('[&::-moz-progress-bar]:bg-red-700');
+    expect(calls.className).toContain('[&::-moz-progress-bar]:bg-danger');
     expect(screen.getByText('120%')).toBeTruthy();
-    expect(screen.getByText(/At or over the limit/).className).toContain('text-red-700');
+    expect(screen.getByText(/At or over the limit/).className).toContain('text-danger');
   });
 });

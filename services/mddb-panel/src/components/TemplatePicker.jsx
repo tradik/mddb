@@ -34,14 +34,14 @@ export default function TemplatePicker({ onPick }) {
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">
+      <label htmlFor={id} className="block text-sm font-medium text-fg-muted mb-2">
         Start from template
       </label>
       <select
         id={id}
         value={value}
         onChange={choose}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-focus"
       >
         <option value="">Blank document</option>
         <optgroup label="Built-in">
@@ -54,11 +54,11 @@ export default function TemplatePicker({ onPick }) {
           </optgroup>
         )}
       </select>
-      <p className="text-xs text-gray-600 mt-1">
+      <p className="text-xs text-fg-subtle mt-1">
         A template replaces the content and the metadata below.
       </p>
       {error && (
-        <p role="status" className="text-xs text-amber-900 mt-1">
+        <p role="status" className="text-xs text-warning-strong mt-1">
           {error.status === 403
             ? `Custom templates are not shown: you have no read permission on ${templateCollection}.`
             : `Custom templates could not be loaded: ${error.message}`}

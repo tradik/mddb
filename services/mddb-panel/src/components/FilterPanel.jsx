@@ -13,8 +13,8 @@ const MIN_LIMIT = 1;
 const MAX_LIMIT = 1000;
 const DEFAULT_LIMIT = 100;
 
-const INPUT = 'w-full px-3 py-2 border border-gray-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600';
-const HEADING = 'text-sm font-semibold text-gray-800 mb-2';
+const INPUT = 'w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus';
+const HEADING = 'text-sm font-semibold text-fg-soft mb-2';
 
 /** clampLimit reads the page-size field: a whole number in 1..1000, else 100. */
 function clampLimit(raw) {
@@ -31,7 +31,7 @@ function OrderButton({ pressed, onClick, children }) {
       onClick={onClick}
       aria-pressed={pressed}
       className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-        pressed ? 'bg-primary-700 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+        pressed ? 'bg-primary-700 text-white' : 'bg-surface-subtle text-fg-soft hover:bg-surface-strong'
       }`}
     >
       {children}
@@ -79,10 +79,10 @@ export default function FilterPanel({ onClose }) {
   const entries = Object.entries(localFilters);
 
   return (
-    <section aria-label="Sort and filter documents" className="mt-2 border border-gray-200 rounded-lg bg-white">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-900">Sort &amp; filter</h3>
-        <button type="button" onClick={onClose} aria-label="Close sort and filter" className="p-1 text-gray-600 hover:text-gray-900 rounded">
+    <section aria-label="Sort and filter documents" className="mt-2 border border-line rounded-lg bg-surface">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-line">
+        <h3 className="text-sm font-semibold text-fg">Sort &amp; filter</h3>
+        <button type="button" onClick={onClose} aria-label="Close sort and filter" className="p-1 text-fg-subtle hover:text-fg rounded">
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
@@ -93,16 +93,16 @@ export default function FilterPanel({ onClose }) {
           {entries.length > 0 && (
             <ul className="space-y-2 mb-2">
               {entries.map(([key, values]) => (
-                <li key={key} className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-lg">
+                <li key={key} className="flex items-center justify-between gap-2 p-2 bg-surface-muted rounded-lg">
                   <div className="min-w-0">
-                    <div className="text-xs font-medium text-gray-600 truncate" title={key}>{key}</div>
-                    <div className="text-sm text-gray-900 break-words">{[values].flat().join(', ')}</div>
+                    <div className="text-xs font-medium text-fg-subtle truncate" title={key}>{key}</div>
+                    <div className="text-sm text-fg break-words">{[values].flat().join(', ')}</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleRemoveFilter(key)}
                     aria-label={`Remove filter ${key}`}
-                    className="p-1 text-red-700 hover:text-red-900 flex-shrink-0"
+                    className="p-1 text-danger hover:text-danger-strong flex-shrink-0"
                   >
                     <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
@@ -132,7 +132,7 @@ export default function FilterPanel({ onClose }) {
           <button
             type="button"
             onClick={handleAddFilter}
-            className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-900 rounded-lg hover:bg-gray-200 text-sm font-medium"
+            className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 bg-surface-subtle text-fg rounded-lg hover:bg-surface-strong text-sm font-medium"
           >
             <Plus className="w-4 h-4" aria-hidden="true" />
             Add filter
@@ -180,7 +180,7 @@ export default function FilterPanel({ onClose }) {
         <button
           type="button"
           onClick={handleClear}
-          className="flex-1 px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 text-sm"
+          className="flex-1 px-4 py-2 bg-surface-subtle text-fg-soft rounded-lg hover:bg-surface-strong text-sm"
         >
           Clear filters
         </button>

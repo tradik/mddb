@@ -1,16 +1,164 @@
 @import "tailwindcss";
 
-@theme {
+/* FE-015: `dark:` utilities follow the `dark` class on <html> (set by the
+   inline script in index.html and by the header's theme switch), not the
+   OS setting alone. Screen only, so a printout is always light. */
+@custom-variant dark {
+  @media screen {
+    &:where(.dark, .dark *) {
+      @slot;
+    }
+  }
+}
+
+/* The colour tokens (FE-015). Components use these names — bg-surface,
+   text-fg-muted, border-line, text-danger, bg-warning-soft… — instead of a
+   palette step, and the `.dark` block below redefines every one of them, so
+   a component needs no `dark:` pair of its own. The light values are
+   Tailwind's palette; docs/PANEL.md ("Colours and contrast") lists both
+   modes with their measured contrast, and src/theme-contrast.test.js fails
+   the build when a pair drops below WCAG 2.2 AA. `static` keeps every
+   token in the output, also those only inline styles and this file use. */
+@theme static {
   --color-primary-50: rgb(240 249 255);
   --color-primary-100: rgb(224 242 254);
   --color-primary-200: rgb(186 230 253);
   --color-primary-300: rgb(125 211 252);
   --color-primary-400: rgb(56 189 248);
   --color-primary-500: rgb(14 165 233);
-  --color-primary-600: rgb(2 132 199);
+  /* Darker than the sky-600 it replaces: white text on it reaches 4.5:1. */
+  --color-primary-600: #0272ad;
   --color-primary-700: rgb(3 105 161);
   --color-primary-800: rgb(7 89 133);
   --color-primary-900: rgb(12 74 110);
+
+  /* Surfaces: cards, page/recessed areas, hover and chips, tracks. */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f9fafb;
+  --color-surface-subtle: #f3f4f6;
+  --color-surface-strong: #e5e7eb;
+  /* Text, strongest to faintest. */
+  --color-fg: #101828;
+  --color-fg-soft: #1e2939;
+  --color-fg-muted: #364153;
+  --color-fg-subtle: #4a5565;
+  --color-fg-faint: #5d6574;
+  /* Lines: dividers, card borders, and the borders of inputs and buttons
+     (line-strong, 3:1 against a surface — WCAG 2.2 SC 1.4.11). */
+  --color-line-soft: #f3f4f6;
+  --color-line: #e5e7eb;
+  --color-line-strong: #868e9c;
+  /* Focus rings. */
+  --color-focus: #0369a1;
+
+  /* Each role: a tinted background (soft, muted), its border (line), and
+     text (the role colour, and a stronger one for headings in a notice). */
+  --color-danger-soft: #fef2f2;
+  --color-danger-muted: #ffe2e2;
+  --color-danger-line: #ffc9c9;
+  --color-danger: #c10007;
+  --color-danger-strong: #82181a;
+
+  --color-success-soft: #f0fdf4;
+  --color-success-muted: #dcfce7;
+  --color-success-line: #b9f8cf;
+  --color-success: #007a33;
+  --color-success-strong: #0d542b;
+
+  --color-warning-soft: #fffbeb;
+  --color-warning-muted: #fef3c6;
+  --color-warning-line: #fee685;
+  --color-warning: #973c00;
+  --color-warning-strong: #7b3306;
+
+  --color-info-soft: #eff6ff;
+  --color-info-muted: #dbeafe;
+  --color-info-line: #bedbff;
+  --color-info: #1447e6;
+  --color-info-strong: #1c398e;
+
+  --color-accent-soft: #f0f9ff;
+  --color-accent-muted: #e0f2fe;
+  --color-accent-line: #bae6fd;
+  --color-accent: #0369a1;
+  --color-accent-strong: #0c4a6e;
+
+  --color-note-soft: #faf5ff;
+  --color-note-muted: #f3e8ff;
+  --color-note-line: #e9d4ff;
+  --color-note: #8200db;
+  --color-note-strong: #59168b;
+}
+
+/* Dark values of the same tokens. Screen only: the print view (FE-017)
+   keeps the light ones even when the panel is dark. */
+@media screen {
+  :root.dark {
+    color-scheme: dark;
+
+    --color-surface: #141a24;
+    --color-surface-muted: #0d1119;
+    --color-surface-subtle: #1f2733;
+    --color-surface-strong: #2a3341;
+    --color-fg: #f3f4f6;
+    --color-fg-soft: #e5e7eb;
+    --color-fg-muted: #d1d5dc;
+    --color-fg-subtle: #b8bfca;
+    --color-fg-faint: #99a1af;
+    --color-line-soft: #1f2733;
+    --color-line: #2a3341;
+    --color-line-strong: #6a7282;
+    --color-focus: #38bdf8;
+
+    --color-danger-soft: #2a1214;
+    --color-danger-muted: #45161a;
+    --color-danger-line: #82181a;
+    --color-danger: #ffa2a2;
+    --color-danger-strong: #ffc9c9;
+
+    --color-success-soft: #0c2216;
+    --color-success-muted: #10331f;
+    --color-success-line: #0d542b;
+    --color-success: #7bf1a8;
+    --color-success-strong: #b9f8cf;
+
+    --color-warning-soft: #281c08;
+    --color-warning-muted: #3d2a0a;
+    --color-warning-line: #7b3306;
+    --color-warning: #ffd230;
+    --color-warning-strong: #fee685;
+
+    --color-info-soft: #0f1a33;
+    --color-info-muted: #16264d;
+    --color-info-line: #1c398e;
+    --color-info: #8ec5ff;
+    --color-info-strong: #bedbff;
+
+    --color-accent-soft: #0a1e2e;
+    --color-accent-muted: #0c304a;
+    --color-accent-line: #0c4a6e;
+    --color-accent: #7dd3fc;
+    --color-accent-strong: #bae6fd;
+
+    --color-note-soft: #211232;
+    --color-note-muted: #321a4f;
+    --color-note-line: #59168b;
+    --color-note: #dab2ff;
+    --color-note-strong: #e9d4ff;
+  }
+}
+
+/* Tailwind 4 draws a border without a colour class in currentColor, which
+   made a bare `border-t` a near-black line (a bright one in dark mode). A
+   bare border is a divider here, so it takes the line token. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-line, currentColor);
+  }
 }
 
 :root {
@@ -19,8 +167,8 @@
   font-weight: 400;
 
   color-scheme: light;
-  color: rgba(0, 0, 0, 0.87);
-  background-color: #ffffff;
+  color: var(--color-fg);
+  background-color: var(--color-surface);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -50,16 +198,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--color-surface-subtle);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: var(--color-line-strong);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--color-fg-faint);
 }
 
 /* SSE toast slide-in animation */

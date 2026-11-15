@@ -26,20 +26,20 @@ export default function ClassifyBox({ document: doc }) {
 
   return (
     <div className="space-y-2 text-sm">
-      <fieldset className="flex gap-4 text-gray-800">
+      <fieldset className="flex gap-4 text-fg-soft">
         <legend className="sr-only">What to classify</legend>
         <label className="inline-flex items-center gap-1"><input type="radio" name="classify-source" checked={source === 'document'} onChange={() => setSource('document')} /> This document</label>
         <label className="inline-flex items-center gap-1"><input type="radio" name="classify-source" checked={source === 'text'} onChange={() => setSource('text')} /> Other text</label>
       </fieldset>
       {source === 'text' && (
-        <label className="block text-gray-800">
+        <label className="block text-fg-soft">
           <span className="block mb-1">Text to classify</span>
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} className="w-full px-2 py-1.5 border border-gray-300 rounded" />
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} className="w-full px-2 py-1.5 border border-line-strong rounded" />
         </label>
       )}
-      <label className="block text-gray-800">
+      <label className="block text-fg-soft">
         <span className="block mb-1">Labels (comma-separated)</span>
-        <input value={labels} onChange={(e) => setLabels(e.target.value)} placeholder="devops, finance, cooking" className="w-full px-2 py-1.5 border border-gray-300 rounded" />
+        <input value={labels} onChange={(e) => setLabels(e.target.value)} placeholder="devops, finance, cooking" className="w-full px-2 py-1.5 border border-line-strong rounded" />
       </label>
       <button
         type="button"
@@ -53,18 +53,18 @@ export default function ClassifyBox({ document: doc }) {
       {result && (
         <div role="status">
           {(result.results || []).length === 0 ? (
-            <p className="text-gray-800">No label scored above the threshold.</p>
+            <p className="text-fg-soft">No label scored above the threshold.</p>
           ) : (
             <table className="w-full text-xs" aria-label="Label scores">
-              <thead><tr className="text-left text-gray-800"><th scope="col">Label</th><th scope="col" className="text-right">Score</th></tr></thead>
+              <thead><tr className="text-left text-fg-soft"><th scope="col">Label</th><th scope="col" className="text-right">Score</th></tr></thead>
               <tbody>
                 {result.results.map((r) => (
-                  <tr key={r.label}><td className="text-gray-900">{r.label}</td><td className="text-right text-gray-900">{r.score.toFixed(3)}</td></tr>
+                  <tr key={r.label}><td className="text-fg">{r.label}</td><td className="text-right text-fg">{r.score.toFixed(3)}</td></tr>
                 ))}
               </tbody>
             </table>
           )}
-          <p className="text-xs text-gray-700 mt-1">Model {result.model}, {result.dimensions} dimensions.</p>
+          <p className="text-xs text-fg-muted mt-1">Model {result.model}, {result.dimensions} dimensions.</p>
         </div>
       )}
     </div>

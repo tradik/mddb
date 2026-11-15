@@ -35,7 +35,7 @@ export default function FeatureRow({ feature, busy, onToggle }) {
   const requires = feature.requires || [];
 
   return (
-    <li className="rounded-lg bg-white p-4 shadow">
+    <li className="rounded-lg bg-surface p-4 shadow">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label htmlFor={id} className="relative inline-flex cursor-pointer items-center gap-3">
           <input
@@ -50,22 +50,22 @@ export default function FeatureRow({ feature, busy, onToggle }) {
           />
           <span
             aria-hidden="true"
-            className="relative h-6 w-11 flex-shrink-0 rounded-full bg-gray-500 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-primary-700 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-700 peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-60"
+            className="relative h-6 w-11 flex-shrink-0 rounded-full bg-gray-500 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-primary-700 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-60"
           />
-          <span className="text-sm font-semibold text-gray-900">{featureLabel(name)}</span>
+          <span className="text-sm font-semibold text-fg">{featureLabel(name)}</span>
         </label>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${feature.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-800'}`}>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${feature.enabled ? 'bg-success-muted text-success-strong' : 'bg-surface-strong text-fg-soft'}`}>
           {feature.enabled ? 'Running' : 'Off'}
         </span>
       </div>
-      <div id={`${id}-desc`} className="mt-2 space-y-1 text-sm text-gray-700">
+      <div id={`${id}-desc`} className="mt-2 space-y-1 text-sm text-fg-muted">
         {feature.description && <p>{feature.description}</p>}
-        <p className="text-xs text-gray-600">
-          <code className="text-gray-800">{name}</code> · default {onOff(feature.default)}
+        <p className="text-xs text-fg-subtle">
+          <code className="text-fg-soft">{name}</code> · default {onOff(feature.default)}
           {requires.length > 0 && <> · requires {requires.join(', ')}</>}
         </p>
-        {note && <p className="text-amber-800">{note}</p>}
-        {changed && <p className="text-xs text-gray-600">{changed}</p>}
+        {note && <p className="text-warning-strong">{note}</p>}
+        {changed && <p className="text-xs text-fg-subtle">{changed}</p>}
       </div>
     </li>
   );

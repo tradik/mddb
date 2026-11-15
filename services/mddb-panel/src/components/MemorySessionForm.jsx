@@ -27,15 +27,15 @@ export default function MemorySessionForm({ onCreated }) {
   };
 
   const field = (label, value, setValue) => (
-    <label className="text-sm text-gray-800">
+    <label className="text-sm text-fg-soft">
       <span className="block mb-1">{label}</span>
-      <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+      <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full px-3 py-2 border border-line-strong rounded-lg" />
     </label>
   );
 
   return (
-    <details className="bg-white rounded-lg shadow p-4">
-      <summary className="cursor-pointer text-sm font-semibold text-gray-900">Start a session</summary>
+    <details className="bg-surface rounded-lg shadow p-4">
+      <summary className="cursor-pointer text-sm font-semibold text-fg">Start a session</summary>
       <form onSubmit={submit} className="mt-3 space-y-2">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {field('User ID', userId, setUserId)}

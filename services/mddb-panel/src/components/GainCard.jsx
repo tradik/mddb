@@ -19,7 +19,7 @@ export default function GainCard() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow mb-6 p-6 text-sm text-gray-600">
+      <div className="bg-surface rounded-lg shadow mb-6 p-6 text-sm text-fg-subtle">
         Retrieval gain unavailable: {error}
       </div>
     );
@@ -36,17 +36,17 @@ export default function GainCard() {
   ];
 
   return (
-    <div className="bg-white rounded-lg shadow mb-6 p-6">
+    <div className="bg-surface rounded-lg shadow mb-6 p-6">
       <div className="flex items-center mb-4">
-        <TrendingDown className="w-5 h-5 text-primary-600 mr-2" />
-        <h2 className="text-lg font-semibold text-gray-900">Retrieval gain, last {report.windowDays} days</h2>
+        <TrendingDown className="w-5 h-5 text-accent mr-2" />
+        <h2 className="text-lg font-semibold text-fg">Retrieval gain, last {report.windowDays} days</h2>
       </div>
       <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
         {rows.map(([label, value, note]) => (
           <div key={label} className="contents">
-            <dt className="text-gray-600">{label}</dt>
-            <dd className="font-medium text-gray-900">{value}</dd>
-            <dd className="text-gray-600">{note}</dd>
+            <dt className="text-fg-subtle">{label}</dt>
+            <dd className="font-medium text-fg">{value}</dd>
+            <dd className="text-fg-subtle">{note}</dd>
           </div>
         ))}
       </dl>

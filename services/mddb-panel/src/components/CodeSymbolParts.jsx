@@ -6,23 +6,23 @@ import { passageLocation, precisionStyle } from '../lib/code-symbol';
 export function RelationSection({ label, passages }) {
   return (
     <section className="mb-4">
-      <h3 className="text-sm font-semibold text-gray-900 mb-1">
-        {label} <span className="text-gray-600 font-normal">({passages.length})</span>
+      <h3 className="text-sm font-semibold text-fg mb-1">
+        {label} <span className="text-fg-subtle font-normal">({passages.length})</span>
       </h3>
       {passages.length === 0 ? (
-        <p className="text-xs text-gray-600">None.</p>
+        <p className="text-xs text-fg-subtle">None.</p>
       ) : (
         <ul className="space-y-2">
           {passages.map((p, i) => (
-            <li key={`${passageLocation(p)}-${i}`} className="border border-gray-200 rounded p-2">
+            <li key={`${passageLocation(p)}-${i}`} className="border border-line rounded p-2">
               <div className="text-xs">
-                <span className="font-mono text-blue-800">{passageLocation(p)}</span>
-                {p.symbol && <span className="ml-2 text-gray-700">in {p.symbol}</span>}
-                {p.kind && <span className="ml-2 text-gray-600">{p.kind}</span>}
-                {p.target && <span className="ml-2 text-gray-700">for <span className="font-mono">{p.target}</span></span>}
+                <span className="font-mono text-info-strong">{passageLocation(p)}</span>
+                {p.symbol && <span className="ml-2 text-fg-muted">in {p.symbol}</span>}
+                {p.kind && <span className="ml-2 text-fg-subtle">{p.kind}</span>}
+                {p.target && <span className="ml-2 text-fg-muted">for <span className="font-mono">{p.target}</span></span>}
               </div>
               {p.content && (
-                <pre className="mt-1 text-xs bg-gray-50 p-2 rounded overflow-x-auto">{p.content}</pre>
+                <pre className="mt-1 text-xs bg-surface-muted p-2 rounded overflow-x-auto">{p.content}</pre>
               )}
             </li>
           ))}
@@ -52,8 +52,8 @@ export function PrecisionBadge({ precision, source }) {
  */
 export function CandidatePicker({ candidates, onPick }) {
   return (
-    <section className="mb-4 border border-amber-700 bg-amber-50 rounded p-3" aria-label="Candidates">
-      <p className="text-sm text-gray-900 mb-2">
+    <section className="mb-4 border border-amber-700 bg-warning-soft rounded p-3" aria-label="Candidates">
+      <p className="text-sm text-fg mb-2">
         This name has {candidates.length} definitions. Pick one to see only its references:
       </p>
       <ul className="space-y-1">
@@ -62,7 +62,7 @@ export function CandidatePicker({ candidates, onPick }) {
             <button
               type="button"
               onClick={() => onPick(c)}
-              className="text-sm text-blue-800 underline hover:text-blue-900"
+              className="text-sm text-info-strong underline hover:text-info-strong"
             >
               <span className="font-mono">{c.name}</span> ({c.kind}) in <span className="font-mono">{c.path}</span>
             </button>
@@ -93,9 +93,9 @@ export function LanguagesList() {
 
   return (
     <details onToggle={onToggle} className="mt-4 text-sm">
-      <summary className="cursor-pointer text-gray-800 font-medium">Recognised languages</summary>
-      {error && <p role="alert" className="text-xs text-red-700 mt-1">{error}</p>}
-      {!error && !table && <p className="text-xs text-gray-600 mt-1">Loading…</p>}
+      <summary className="cursor-pointer text-fg-soft font-medium">Recognised languages</summary>
+      {error && <p role="alert" className="text-xs text-danger mt-1">{error}</p>}
+      {!error && !table && <p className="text-xs text-fg-subtle mt-1">Loading…</p>}
       {table && (
         <ul className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
           {extensions.map(([ext, lang]) => (

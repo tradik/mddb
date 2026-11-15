@@ -11,10 +11,10 @@ export default function IndexTrainingNotice({ training }) {
   return (
     // <output> is a polite live region (role "status"); it holds phrasing
     // content only, so the layout uses block spans.
-    <output className="block rounded-lg border border-amber-300 bg-amber-50 p-4">
+    <output className="block rounded-lg border border-warning-line bg-warning-soft p-4">
       <span className="flex items-start gap-2">
-        <Hourglass className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-        <span className="block text-sm text-amber-900">
+        <Hourglass className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+        <span className="block text-sm text-warning-strong">
           <span className="block font-medium">
             Training {indexes} for {training.pending.length} collection{training.pending.length === 1 ? '' : 's'}
             {training.current ? ` (now: ${training.current})` : ''}

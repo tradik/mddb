@@ -93,17 +93,17 @@ export default function StopWordsPanel() {
   const defaultWords = entries.filter((e) => e.isDefault);
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
+    <div className="h-full flex flex-col bg-surface-muted">
+      <div className="bg-surface border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Stop Words</h1>
-            <p className="text-gray-600">Manage FTS stop words per collection</p>
+            <h1 className="text-2xl font-bold text-fg mb-1">Stop Words</h1>
+            <p className="text-fg-subtle">Manage FTS stop words per collection</p>
           </div>
           <button
             onClick={loadStopWords}
             disabled={!collection || loading}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 bg-surface-subtle text-fg-muted rounded hover:bg-surface-strong flex items-center gap-2 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -114,14 +114,14 @@ export default function StopWordsPanel() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Collection & Language Selector */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-surface rounded-lg shadow p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Collection</label>
+                <label className="block text-sm font-medium text-fg-muted mb-2">Collection</label>
                 <select
                   value={collection}
                   onChange={(e) => setCollection(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus"
                 >
                   {collections.length === 0 && (
                     <option value="">No collections available</option>
@@ -134,11 +134,11 @@ export default function StopWordsPanel() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Language (defaults)</label>
+                <label className="block text-sm font-medium text-fg-muted mb-2">Language (defaults)</label>
                 <select
                   value={lang}
                   onChange={(e) => setLang(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus"
                 >
                   <option value="">Default</option>
                   {availableLangs.map((l) => (
@@ -153,43 +153,43 @@ export default function StopWordsPanel() {
 
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+            <div className="bg-danger-soft border border-danger-line rounded-lg p-4 text-danger text-sm">
               {error}
             </div>
           )}
 
           {/* Summary Bar */}
           {!loading && collection && (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-surface rounded-lg shadow p-6">
               <div className="flex items-center gap-6">
-                <div className="text-sm text-gray-700">
-                  <span className="font-semibold text-gray-900">{resolvedLang}</span> language
+                <div className="text-sm text-fg-muted">
+                  <span className="font-semibold text-fg">{resolvedLang}</span> language
                 </div>
-                <div className="text-sm text-gray-700">
-                  <span className="font-semibold text-gray-900">{defaultCount}</span> defaults
+                <div className="text-sm text-fg-muted">
+                  <span className="font-semibold text-fg">{defaultCount}</span> defaults
                 </div>
-                <div className="text-sm text-gray-700">
-                  <span className="font-semibold text-gray-900">{customCount}</span> custom
+                <div className="text-sm text-fg-muted">
+                  <span className="font-semibold text-fg">{customCount}</span> custom
                 </div>
               </div>
             </div>
           )}
 
           {/* Add Form */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-blue-600" />
+          <div className="bg-surface rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-fg mb-4 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-info" />
               Add Stop Words
             </h2>
             <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-3">
               <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">Words (comma-separated)</label>
+                <label className="block text-xs text-fg-faint mb-1">Words (comma-separated)</label>
                 <input
                   type="text"
                   value={newWords}
                   onChange={(e) => setNewWords(e.target.value)}
                   placeholder="e.g. the, a, an, is"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 />
               </div>
               <div className="flex items-end">
@@ -213,21 +213,21 @@ export default function StopWordsPanel() {
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                <p className="text-gray-500 text-sm">Loading stop words...</p>
+                <p className="text-fg-faint text-sm">Loading stop words...</p>
               </div>
             </div>
           ) : (
             <>
               {/* Custom Stop Words */}
-              <div className="bg-white rounded-lg shadow">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">
+              <div className="bg-surface rounded-lg shadow">
+                <div className="px-6 py-4 border-b border-line">
+                  <h2 className="text-lg font-semibold text-fg">
                     Custom Stop Words ({customWords.length})
                   </h2>
                 </div>
                 <div className="p-6">
                   {customWords.length === 0 ? (
-                    <p className="text-gray-500 text-sm text-center py-4">
+                    <p className="text-fg-faint text-sm text-center py-4">
                       No custom stop words for this collection.
                     </p>
                   ) : (
@@ -235,13 +235,13 @@ export default function StopWordsPanel() {
                       {customWords.map((entry) => (
                         <span
                           key={entry.word}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-info-muted text-info-strong rounded-full text-sm font-medium"
                         >
                           {entry.word}
                           <button
                             onClick={() => handleDelete(entry.word)}
                             disabled={deleting === entry.word}
-                            className="ml-1 p-0.5 text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full transition-colors"
+                            className="ml-1 p-0.5 text-info hover:text-info-strong hover:bg-info-muted rounded-full transition-colors"
                             title={`Remove "${entry.word}"`}
                           >
                             {deleting === entry.word ? (
@@ -258,24 +258,24 @@ export default function StopWordsPanel() {
               </div>
 
               {/* Default Stop Words (collapsible) */}
-              <div className="bg-white rounded-lg shadow">
+              <div className="bg-surface rounded-lg shadow">
                 <button
                   onClick={() => setShowDefaults(!showDefaults)}
-                  className="w-full px-6 py-4 border-b border-gray-200 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                  className="w-full px-6 py-4 border-b border-line flex items-center justify-between hover:bg-surface-muted transition-colors"
                 >
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-lg font-semibold text-fg">
                     Default Stop Words ({defaultWords.length})
                   </h2>
                   {showDefaults ? (
-                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                    <ChevronDown className="w-5 h-5 text-fg-faint" />
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-500" />
+                    <ChevronRight className="w-5 h-5 text-fg-faint" />
                   )}
                 </button>
                 {showDefaults && (
                   <div className="p-6">
                     {defaultWords.length === 0 ? (
-                      <p className="text-gray-500 text-sm text-center py-4">
+                      <p className="text-fg-faint text-sm text-center py-4">
                         No default stop words.
                       </p>
                     ) : (
@@ -283,7 +283,7 @@ export default function StopWordsPanel() {
                         {defaultWords.map((entry) => (
                           <span
                             key={entry.word}
-                            className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm"
+                            className="inline-flex items-center px-3 py-1 bg-surface-subtle text-fg-subtle rounded-full text-sm"
                           >
                             {entry.word}
                           </span>

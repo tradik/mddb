@@ -77,7 +77,7 @@ describe('RevisionHistory', () => {
     await renderHistory();
     fireEvent.click(screen.getByText('Rev #2').closest('button'));
     expect(screen.getByText('preview 200 of guide idle')).toBeTruthy();
-    expect(screen.getByText('Rev #2').closest('button').className).toContain('bg-blue-50');
+    expect(screen.getByText('Rev #2').closest('button').className).toContain('bg-info-soft');
   });
 
   test('a restore updates the open document, reloads and closes', async () => {

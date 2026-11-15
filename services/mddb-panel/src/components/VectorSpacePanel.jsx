@@ -82,8 +82,8 @@ export default function VectorSpacePanel() {
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <ScatterChart className="w-5 h-5 text-blue-600" aria-hidden="true" />
+        <h2 className="text-lg font-semibold text-fg flex items-center gap-2">
+          <ScatterChart className="w-5 h-5 text-info" aria-hidden="true" />
           Vector Space
         </h2>
         <button
@@ -96,24 +96,24 @@ export default function VectorSpacePanel() {
         </button>
       </div>
 
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-fg-subtle mb-4">
         2D PCA projection of the collection&apos;s embeddings. Each dot is a document chunk;
         colors group chunks of the same document. Optionally overlay a search query to see
         why results match.
       </p>
 
       <div className="flex flex-wrap gap-3 mb-4">
-        <label className="flex flex-col text-xs font-medium text-gray-700">
+        <label className="flex flex-col text-xs font-medium text-fg-muted">
           <span>Collection</span>
           <input
             type="text"
             value={collection}
             onChange={(e) => setCollection(e.target.value)}
             placeholder="collection name"
-            className="mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm w-48"
+            className="mt-1 px-3 py-2 border border-line-strong rounded-lg text-sm w-48"
           />
         </label>
-        <label className="flex flex-col text-xs font-medium text-gray-700">
+        <label className="flex flex-col text-xs font-medium text-fg-muted">
           <span>Sample (max 2000)</span>
           <input
             type="number"
@@ -121,30 +121,30 @@ export default function VectorSpacePanel() {
             max="2000"
             value={sample}
             onChange={(e) => setSample(Number(e.target.value))}
-            className="mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm w-32"
+            className="mt-1 px-3 py-2 border border-line-strong rounded-lg text-sm w-32"
           />
         </label>
-        <label className="flex flex-col text-xs font-medium text-gray-700 flex-1 min-w-48">
+        <label className="flex flex-col text-xs font-medium text-fg-muted flex-1 min-w-48">
           <span>Query overlay (optional)</span>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="natural language query to project"
-            className="mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="mt-1 px-3 py-2 border border-line-strong rounded-lg text-sm"
           />
         </label>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+        <div className="flex items-center gap-2 p-3 mb-4 bg-danger-soft border border-danger-line rounded-lg text-sm text-danger-strong">
           <AlertCircle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           {error}
         </div>
       )}
 
       {data && (
-        <div className="text-xs text-gray-600 mb-2">
+        <div className="text-xs text-fg-subtle mb-2">
           {data.sampled} of {data.total} vectors projected · {data.dimensions} dimensions
           {data.sampled < data.total && ' (sampled)'}
         </div>
@@ -153,7 +153,7 @@ export default function VectorSpacePanel() {
       <div className="flex gap-4 items-start flex-wrap">
         <svg
           viewBox={`0 0 ${PLOT_SIZE} ${PLOT_SIZE}`}
-          className="border border-gray-200 rounded-lg bg-white max-w-full"
+          className="border border-line rounded-lg bg-white max-w-full"
           width={PLOT_SIZE}
           height={PLOT_SIZE}
           role="img"
@@ -193,20 +193,20 @@ export default function VectorSpacePanel() {
 
         <div className="flex-1 min-w-64">
           {(hovered || selected) && (
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm">
-              <div className="font-medium text-gray-900 break-all">
+            <div className="p-4 bg-surface-muted border border-line rounded-lg text-sm">
+              <div className="font-medium text-fg break-all">
                 {(hovered || selected).key || (hovered || selected).docId}
               </div>
-              <div className="text-gray-600 mt-1">
+              <div className="text-fg-subtle mt-1">
                 Chunk {(hovered || selected).chunkIndex} · doc {(hovered || selected).docId}
               </div>
-              <div className="text-gray-500 mt-1 text-xs">
+              <div className="text-fg-faint mt-1 text-xs">
                 ({(hovered || selected).x.toFixed(4)}, {(hovered || selected).y.toFixed(4)})
               </div>
             </div>
           )}
           {!hovered && !selected && data && (
-            <div className="p-4 text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg">
+            <div className="p-4 text-sm text-fg-faint border border-dashed border-line rounded-lg">
               Hover or click a point to inspect it. Clustered points are semantically similar;
               isolated points are outliers. The crosshair marks the projected query.
             </div>

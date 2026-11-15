@@ -4,11 +4,11 @@ import { outcomeLabels } from '../lib/chat-log';
 // #406: the Log tab's filters — scenario, date range, the three shortcuts an
 // operator reaches for (thumbs-down, no results, refused) and the outcome.
 
-const checkClass = 'h-4 w-4 rounded border-gray-400 text-primary-700 focus:ring-primary-500';
+const checkClass = 'h-4 w-4 rounded border-line-strong text-accent focus:ring-focus';
 
 function Check({ label, checked, onChange }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-gray-800">
+    <label className="flex items-center gap-2 text-sm text-fg-soft">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className={checkClass} />
       {label}
     </label>
@@ -18,7 +18,7 @@ function Check({ label, checked, onChange }) {
 export default function ChatLogFilters({ filters, scenarios, onChange }) {
   const set = (field, value) => onChange({ ...filters, [field]: value });
   return (
-    <fieldset className="mb-4 rounded-lg bg-white p-3 shadow">
+    <fieldset className="mb-4 rounded-lg bg-surface p-3 shadow">
       <legend className="sr-only">Log filters</legend>
       <div className="grid gap-3 md:grid-cols-4">
         <div>

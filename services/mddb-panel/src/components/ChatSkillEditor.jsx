@@ -29,7 +29,7 @@ export default function ChatSkillEditor({ skill, isNew, busy, onSave, onDelete, 
   };
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg bg-white p-4 shadow">
+    <form onSubmit={submit} className="space-y-3 rounded-lg bg-surface p-4 shadow">
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <label htmlFor="skill-name" className={labelClass}>Name</label>
@@ -39,7 +39,7 @@ export default function ChatSkillEditor({ skill, isNew, busy, onSave, onDelete, 
             onChange={(e) => set('name', e.target.value)}
             disabled={!isNew}
             placeholder="humanizer"
-            className={`${inputClass} disabled:bg-gray-100 disabled:text-gray-700`}
+            className={`${inputClass} disabled:bg-surface-subtle disabled:text-fg-muted`}
           />
         </div>
         <div>
@@ -56,7 +56,7 @@ export default function ChatSkillEditor({ skill, isNew, busy, onSave, onDelete, 
           onChange={(e) => setForm((f) => ({ ...f, content: e.target.value, source: null }))}
           className={`${inputClass} font-mono`}
         />
-        <p className="mt-1 text-xs text-gray-600">
+        <p className="mt-1 text-xs text-fg-subtle">
           Source: {sourceLabel(form.source)}.{form.source && ' Editing the instructions detaches the skill from it.'}
         </p>
       </div>
@@ -64,11 +64,11 @@ export default function ChatSkillEditor({ skill, isNew, busy, onSave, onDelete, 
         <button type="submit" disabled={busy} className="flex items-center gap-1.5 rounded bg-primary-700 px-3 py-1.5 text-sm text-white hover:bg-primary-800 disabled:opacity-50">
           <Save className="h-4 w-4" aria-hidden="true" /> {busy ? 'Working…' : 'Save'}
         </button>
-        <button type="button" onClick={readFrontMatter} disabled={busy || !form.content.trim()} className="flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-100 disabled:opacity-50">
+        <button type="button" onClick={readFrontMatter} disabled={busy || !form.content.trim()} className="flex items-center gap-1.5 rounded border border-line-strong px-3 py-1.5 text-sm text-fg-soft hover:bg-surface-subtle disabled:opacity-50">
           <FileText className="h-4 w-4" aria-hidden="true" /> Read front matter
         </button>
         {!isNew && (
-          <button type="button" onClick={onDelete} disabled={busy} className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50">
+          <button type="button" onClick={onDelete} disabled={busy} className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-danger hover:bg-danger-soft disabled:opacity-50">
             <Trash2 className="h-4 w-4" aria-hidden="true" /> Delete
           </button>
         )}

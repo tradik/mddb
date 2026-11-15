@@ -29,9 +29,9 @@ export default function ChatGaps({ filters }) {
 
   const gaps = result?.gaps || [];
   return (
-    <section aria-labelledby="chat-gaps-title" className="rounded-lg bg-white p-4 shadow">
-      <h3 id="chat-gaps-title" className="text-base font-semibold text-gray-900">Docs gaps</h3>
-      <p className="mb-3 text-sm text-gray-700">
+    <section aria-labelledby="chat-gaps-title" className="rounded-lg bg-surface p-4 shadow">
+      <h3 id="chat-gaps-title" className="text-base font-semibold text-fg">Docs gaps</h3>
+      <p className="mb-3 text-sm text-fg-muted">
         Questions whose searches found nothing, or whose best result scored below the threshold
         {result ? ` (${result.threshold})` : ''}. Asked most often first.
       </p>
@@ -46,16 +46,16 @@ export default function ChatGaps({ filters }) {
             onChange={(e) => setThreshold(e.target.value)} className={inputClass} />
         </div>
       </div>
-      {error && <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
-      {result && gaps.length === 0 && <p className="text-sm text-gray-700">No gaps in this window.</p>}
+      {error && <p role="alert" className="mb-3 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
+      {result && gaps.length === 0 && <p className="text-sm text-fg-muted">No gaps in this window.</p>}
       {gaps.length > 0 && (
         <table className="w-full text-left text-sm">
-          <thead className="text-xs text-gray-700">
+          <thead className="text-xs text-fg-muted">
             <tr><th scope="col" className="p-2">Question</th><th scope="col" className="p-2">Asked</th><th scope="col" className="p-2">Found nothing</th><th scope="col" className="p-2">Last asked</th><th scope="col" className="p-2">Scenarios</th></tr>
           </thead>
-          <tbody className="text-gray-900">
+          <tbody className="text-fg">
             {gaps.map((g) => (
-              <tr key={g.question} className="border-t border-gray-200 align-top">
+              <tr key={g.question} className="border-t border-line align-top">
                 <td className="p-2">{g.example}</td>
                 <td className="p-2">{g.count}</td>
                 <td className="p-2">{g.noResults}</td>

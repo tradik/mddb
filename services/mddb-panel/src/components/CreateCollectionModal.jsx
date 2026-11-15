@@ -29,44 +29,44 @@ export default function CreateCollectionModal({ onClose, onCreate }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-md">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <FolderPlus className="w-6 h-6 text-green-600" />
-              <h2 className="text-xl font-bold text-gray-900">Create Collection</h2>
+              <FolderPlus className="w-6 h-6 text-success" />
+              <h2 className="text-xl font-bold text-fg">Create Collection</h2>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-fg-faint hover:text-fg-subtle">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Collection Name <span className="text-red-600">*</span>
+              <label className="block text-sm font-medium text-fg-muted mb-1">
+                Collection Name <span className="text-danger">*</span>
               </label>
               <input
                 type="text"
                 value={collectionName}
                 onChange={(e) => setCollectionName(e.target.value)}
                 placeholder="e.g., blog, docs, notes"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 autoFocus
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-fg-faint mt-1">
                 Use only letters, numbers, underscores, and hyphens
               </p>
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-800">{error}</p>
+              <div className="mb-4 p-3 bg-danger-soft border border-danger-line rounded-lg">
+                <p className="text-sm text-danger-strong">{error}</p>
               </div>
             )}
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-info-soft border border-info-line rounded-lg p-3 mb-4">
+              <p className="text-sm text-info-strong">
                 <strong>Note:</strong> The collection will appear in the sidebar once you upload your first document to it.
               </p>
             </div>
@@ -75,7 +75,7 @@ export default function CreateCollectionModal({ onClose, onCreate }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 text-fg-muted bg-surface-subtle hover:bg-surface-strong rounded-lg transition-colors"
               >
                 Cancel
               </button>

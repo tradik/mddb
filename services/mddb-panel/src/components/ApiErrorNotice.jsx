@@ -14,7 +14,7 @@ export default function ApiErrorNotice({ error, collection = '*', admin = false 
     // The server's own words; the client's message appends the general rules
     // that PermissionScopeHint states below.
     return (
-      <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 space-y-1">
+      <div role="alert" className="rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning-strong space-y-1">
         <p className="font-medium">Not permitted</p>
         <p>{error.body?.error || message}</p>
         <PermissionScopeHint collection={collection} admin={admin} />
@@ -22,6 +22,6 @@ export default function ApiErrorNotice({ error, collection = '*', admin = false 
     );
   }
   return (
-    <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{message}</p>
+    <p role="alert" className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger-strong">{message}</p>
   );
 }

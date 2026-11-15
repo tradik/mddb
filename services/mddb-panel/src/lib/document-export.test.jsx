@@ -41,7 +41,7 @@ describe('documentHtml', () => {
     expect(html).not.toMatch(/javascript:/i);
     expect(html).not.toMatch(/<iframe/i);
     // The metadata value is text, not markup.
-    expect(html).toContain('<dd class="text-gray-700">&lt;b&gt;Ann&lt;/b&gt;</dd>');
+    expect(html).toContain('<dd class="text-fg-muted">&lt;b&gt;Ann&lt;/b&gt;</dd>');
   });
 });
 
@@ -51,6 +51,6 @@ describe('downloadDocumentHtml', () => {
     const [{ blob, filename }] = vi.mocked(saveBlob).mock.calls[0];
     expect(filename).toBe('guide.en.html');
     expect(blob.type).toBe('text/html;charset=utf-8');
-    expect(await blob.text()).toContain('<p class="mb-4 text-gray-700 leading-relaxed">hi</p>');
+    expect(await blob.text()).toContain('<p class="mb-4 text-fg-muted leading-relaxed">hi</p>');
   });
 });

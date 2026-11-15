@@ -20,8 +20,8 @@ describe('ReindexJobsTable', () => {
     expect(rows[0].textContent).toContain('Reindexing… 5% (1 done)');
     expect(rows[1].textContent).toContain('Reindex failed: unknown error');
     expect(rows[1].textContent).toContain('—');
-    expect(screen.getByText('failed').className).toContain('bg-red-100');
-    expect(screen.getByText('queued').className).toContain('bg-gray-100');
+    expect(screen.getByText('failed').className).toContain('bg-danger-muted');
+    expect(screen.getByText('queued').className).toContain('bg-surface-subtle');
     fireEvent.click(screen.getByRole('button', { name: 'Refresh reindex jobs' }));
     expect(onRefresh).toHaveBeenCalled();
   });

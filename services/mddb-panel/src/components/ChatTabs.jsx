@@ -24,7 +24,7 @@ export default function ChatTabs({ tab, onChange }) {
     go(moves[e.key]);
   };
   return (
-    <div role="tablist" aria-label="Chat" className="mb-4 flex gap-1 border-b border-gray-300">
+    <div role="tablist" aria-label="Chat" className="mb-4 flex gap-1 border-b border-line-strong">
       {chatTabs.map((t, i) => (
         <button
           key={t.id}
@@ -37,7 +37,7 @@ export default function ChatTabs({ tab, onChange }) {
           tabIndex={tab === t.id ? 0 : -1}
           onClick={() => onChange(t.id)}
           onKeyDown={(e) => onKeyDown(e, i)}
-          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 ${tab === t.id ? 'border-primary-700 text-primary-900' : 'border-transparent text-gray-700 hover:text-gray-900'}`}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-focus ${tab === t.id ? 'border-primary-700 text-accent-strong' : 'border-transparent text-fg-muted hover:text-fg'}`}
         >
           {t.label}
         </button>

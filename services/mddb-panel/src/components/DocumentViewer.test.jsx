@@ -149,11 +149,11 @@ describe('DocumentViewer', () => {
   test('the close button clears the document; hovering recolours the icon buttons', () => {
     renderWith(doc);
     fireEvent.mouseOver(deleteButton());
-    expect(deleteButton().style.color).toBe('rgb(220, 38, 38)');
+    expect(deleteButton().style.color).toBe('var(--color-danger)');
     fireEvent.mouseOut(deleteButton());
-    expect(deleteButton().style.color).toBe('rgb(156, 163, 175)');
+    expect(deleteButton().style.color).toBe('var(--color-fg-faint)');
     fireEvent.mouseOver(closeButton());
-    expect(closeButton().style.backgroundColor).toBe('rgb(243, 244, 246)');
+    expect(closeButton().style.backgroundColor).toBe('var(--color-surface-subtle)');
     fireEvent.mouseOut(closeButton());
     expect(closeButton().style.backgroundColor).toBe('transparent');
     fireEvent.click(closeButton());

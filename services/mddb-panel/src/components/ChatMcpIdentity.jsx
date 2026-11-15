@@ -11,18 +11,18 @@ export default function ChatMcpIdentity({ id, row, set, secretNames }) {
   if (row.identitySecretRef && !keyNames.includes(row.identitySecretRef)) keyNames.push(row.identitySecretRef);
   return (
     <div className="space-y-2">
-      <label className="flex items-center gap-2 text-sm text-gray-800">
+      <label className="flex items-center gap-2 text-sm text-fg-soft">
         <input
           type="checkbox"
           role="switch"
           checked={row.forwardIdentity}
           onChange={(e) => set('forwardIdentity', e.target.checked)}
           aria-describedby={`${id}-identity-help`}
-          className="h-4 w-4 rounded border-gray-400 text-primary-700 focus:ring-primary-500"
+          className="h-4 w-4 rounded border-line-strong text-accent focus:ring-focus"
         />
         Forward the user&apos;s identity
       </label>
-      <p id={`${id}-identity-help`} className="text-xs text-gray-700">
+      <p id={`${id}-identity-help`} className="text-xs text-fg-muted">
         For a server that answers about the user&apos;s own account. Each call carries a token for the signed-in chat user,
         valid for at most {identityTtlMax} seconds; anonymous visitors are not offered this server&apos;s tools.
       </p>
@@ -34,7 +34,7 @@ export default function ChatMcpIdentity({ id, row, set, secretNames }) {
               <option value="">Choose a secret</option>
               {keyNames.map((name) => <option key={name} value={name} disabled={name === row.secretRef}>{name}</option>)}
             </select>
-            <p className="mt-1 text-xs text-gray-700">At least 32 bytes, never the credential.</p>
+            <p className="mt-1 text-xs text-fg-muted">At least 32 bytes, never the credential.</p>
           </div>
           <div>
             <label htmlFor={`${id}-identity-header`} className={labelClass}>Identity header</label>

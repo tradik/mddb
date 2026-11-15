@@ -42,52 +42,52 @@ const icons = {
  */
 export default function MarkdownToolbar({ onFormat, onTemplate, isMac = false }) {
   return (
-    <div className="flex items-center space-x-1 px-2 py-1 bg-gray-50 border-b border-gray-200 flex-wrap">
+    <div className="flex items-center space-x-1 px-2 py-1 bg-surface-muted border-b border-line flex-wrap">
       {/* Template Dropdown */}
       {onTemplate && (
         <>
           <div className="relative group">
             <button
-              className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors flex items-center space-x-1"
+              className="p-1.5 text-fg-subtle hover:bg-surface-strong rounded transition-colors flex items-center space-x-1"
               title="Templates"
             >
               <FileText className="w-4 h-4" />
               <span className="text-xs">Templates</span>
             </button>
-            <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg hidden group-hover:block z-10 min-w-[200px]">
+            <div className="absolute left-0 top-full mt-1 bg-surface border border-line rounded-lg shadow-lg hidden group-hover:block z-10 min-w-[200px]">
               <button
                 onClick={() => onTemplate('blog')}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-surface-subtle transition-colors"
               >
                 📝 Blog Post
               </button>
               <button
                 onClick={() => onTemplate('documentation')}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-surface-subtle transition-colors"
               >
                 📚 Documentation
               </button>
               <button
                 onClick={() => onTemplate('readme')}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-surface-subtle transition-colors"
               >
                 📄 README
               </button>
               <button
                 onClick={() => onTemplate('api')}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-surface-subtle transition-colors"
               >
                 🔌 API Documentation
               </button>
               <button
                 onClick={() => onTemplate('changelog')}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-surface-subtle transition-colors"
               >
                 📋 Changelog
               </button>
             </div>
           </div>
-          <div className="w-px h-6 bg-gray-300" />
+          <div className="w-px h-6 bg-line" />
         </>
       )}
 
@@ -98,12 +98,12 @@ export default function MarkdownToolbar({ onFormat, onTemplate, isMac = false })
         return (
           <Fragment key={action.id}>
             {index > 0 && action.group !== formatActions[index - 1].group && (
-              <div className="w-px h-6 bg-gray-300" />
+              <div className="w-px h-6 bg-line" />
             )}
             <button
               type="button"
               onClick={() => onFormat?.(action.id)}
-              className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+              className="p-1.5 text-fg-subtle hover:bg-surface-strong rounded transition-colors"
               title={title}
               aria-label={title}
             >

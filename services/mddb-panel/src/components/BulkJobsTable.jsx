@@ -6,11 +6,11 @@ import { useAction } from '../lib/use-action';
 import ApiErrorNotice from './ApiErrorNotice';
 
 const STATUS_CLASS = {
-  pending: 'bg-gray-100 text-gray-900',
-  processing: 'bg-blue-100 text-blue-900',
-  completed: 'bg-green-100 text-green-900',
-  failed: 'bg-red-100 text-red-900',
-  cancelled: 'bg-amber-100 text-amber-950',
+  pending: 'bg-surface-subtle text-fg',
+  processing: 'bg-info-muted text-info-strong',
+  completed: 'bg-success-muted text-success-strong',
+  failed: 'bg-danger-muted text-danger-strong',
+  cancelled: 'bg-warning-muted text-warning-strong',
 };
 
 /**
@@ -27,25 +27,25 @@ export default function BulkJobsTable({ jobs, error, onRefresh }) {
   });
 
   return (
-    <section aria-labelledby="bulk-jobs-title" className="bg-white rounded-lg shadow">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+    <section aria-labelledby="bulk-jobs-title" className="bg-surface rounded-lg shadow">
+      <div className="px-4 py-3 border-b border-line flex items-center justify-between">
         <div>
-          <h3 id="bulk-jobs-title" className="text-base font-semibold text-gray-900">Bulk import jobs</h3>
-          <p className="text-xs text-gray-700">Kept in server memory; a restart forgets them. One worker runs them in order.</p>
+          <h3 id="bulk-jobs-title" className="text-base font-semibold text-fg">Bulk import jobs</h3>
+          <p className="text-xs text-fg-muted">Kept in server memory; a restart forgets them. One worker runs them in order.</p>
         </div>
-        <button type="button" onClick={onRefresh} aria-label="Refresh bulk import jobs" className="p-2 text-gray-800 rounded hover:bg-gray-100">
+        <button type="button" onClick={onRefresh} aria-label="Refresh bulk import jobs" className="p-2 text-fg-soft rounded hover:bg-surface-subtle">
           <RefreshCw className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
       <div className="p-4 space-y-2">
         <ApiErrorNotice error={error || cancelling.error} />
-        {!error && jobs.length === 0 && <p className="text-sm text-gray-700">No bulk import jobs since the server started.</p>}
+        {!error && jobs.length === 0 && <p className="text-sm text-fg-muted">No bulk import jobs since the server started.</p>}
       </div>
       {!error && jobs.length > 0 && (
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm" aria-label="Bulk import jobs">
             <thead>
-              <tr className="text-left text-gray-800">
+              <tr className="text-left text-fg-soft">
                 <th scope="col" className="px-4 py-2">Collection</th>
                 <th scope="col" className="px-4 py-2">Status</th>
                 <th scope="col" className="px-4 py-2">Submitted</th>
@@ -53,21 +53,21 @@ export default function BulkJobsTable({ jobs, error, onRefresh }) {
                 <th scope="col" className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line-soft">
               {jobs.map((job) => (
                 <tr key={job.id}>
-                  <td className="px-4 py-2 text-gray-900">{job.collection}</td>
+                  <td className="px-4 py-2 text-fg">{job.collection}</td>
                   <td className="px-4 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[job.status] || STATUS_CLASS.pending}`}>{job.status}</span>
                   </td>
-                  <td className="px-4 py-2 text-gray-800">{formatUnix(job.submittedAt)}</td>
-                  <td className="px-4 py-2 text-gray-800">
+                  <td className="px-4 py-2 text-fg-soft">{formatUnix(job.submittedAt)}</td>
+                  <td className="px-4 py-2 text-fg-soft">
                     {job.status === 'processing' && (
                       <progress max={job.total} value={job.processed || 0} aria-label={`Progress of ${job.collection}`} className="block w-32" />
                     )}
                     {describeBulkJob(job)}
                     {job.errors?.length > 0 && (
-                      <details className="text-xs text-red-800">
+                      <details className="text-xs text-danger-strong">
                         <summary className="cursor-pointer">{job.errors.length} error messages</summary>
                         <ul className="list-disc pl-4">{job.errors.map((e) => <li key={e}>{e}</li>)}</ul>
                       </details>
@@ -79,7 +79,7 @@ export default function BulkJobsTable({ jobs, error, onRefresh }) {
                         type="button"
                         onClick={() => cancel(job.id)}
                         disabled={cancelling.busy}
-                        className="text-sm text-red-800 underline disabled:opacity-50"
+                        className="text-sm text-danger-strong underline disabled:opacity-50"
                       >
                         Cancel <span className="sr-only">job for {job.collection}</span>
                       </button>

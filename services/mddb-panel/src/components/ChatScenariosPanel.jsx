@@ -24,7 +24,7 @@ import ChatLogPanel from './ChatLogPanel';
 export default function ChatScenariosPanel() {
   const [tab, setTab] = useState('scenarios');
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6">
+    <div className="h-full overflow-y-auto bg-surface-muted p-6">
       <ChatTabs tab={tab} onChange={setTab} />
       <div role="tabpanel" id={`chat-panel-${tab}`} aria-labelledby={`chat-tab-${tab}`}>
         {tab === 'scenarios' && <ScenariosView />}
@@ -120,47 +120,47 @@ function ScenariosView() {
     <>
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <MessageSquare className="h-6 w-6 text-primary-700" aria-hidden="true" />
-          <h2 className="text-xl font-bold text-gray-900">Chat scenarios</h2>
-          <span className="text-xs text-gray-600">version {version}</span>
+          <MessageSquare className="h-6 w-6 text-accent" aria-hidden="true" />
+          <h2 className="text-xl font-bold text-fg">Chat scenarios</h2>
+          <span className="text-xs text-fg-subtle">version {version}</span>
         </div>
         <button type="button" onClick={() => open()} className="flex items-center gap-1.5 rounded bg-primary-700 px-3 py-1.5 text-sm text-white hover:bg-primary-800">
           <Plus className="h-4 w-4" aria-hidden="true" /> New scenario
         </button>
       </div>
-      <p className="mb-4 max-w-3xl text-sm text-gray-700">
+      <p className="mb-4 max-w-3xl text-sm text-fg-muted">
         A scenario is one assistant: who it is, what it must not say, which collections it may search and how it answers.
         A value sent with a chat request wins over the scenario, and the scenario wins over the server default.
         Saving and deleting need admin on &quot;*&quot;.
       </p>
 
-      {error && <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
-      {message && <output className="mb-3 block rounded border border-green-200 bg-green-50 p-2 text-sm text-green-800">{message}</output>}
+      {error && <p role="alert" className="mb-3 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
+      {message && <output className="mb-3 block rounded border border-success-line bg-success-soft p-2 text-sm text-success-strong">{message}</output>}
 
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <nav aria-label="Scenarios" className="rounded-lg bg-white p-3 shadow">
+        <nav aria-label="Scenarios" className="rounded-lg bg-surface p-3 shadow">
           <ChatScenarioList scenarios={scenarios} selected={stored} onSelect={open} />
         </nav>
 
         {form === null ? (
-          <p className="rounded-lg bg-white p-6 text-sm text-gray-700 shadow">Pick a scenario to edit it, or create a new one.</p>
+          <p className="rounded-lg bg-surface p-6 text-sm text-fg-muted shadow">Pick a scenario to edit it, or create a new one.</p>
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
-            <form onSubmit={save} className="rounded-lg bg-white p-4 shadow">
+            <form onSubmit={save} className="rounded-lg bg-surface p-4 shadow">
               <ChatScenarioForm form={form} set={(field, value) => setForm((f) => ({ ...f, [field]: value }))} collections={collections} skills={skills} secrets={secrets} isNew={stored === null} />
               <div className="mt-4 flex items-center gap-2">
                 <button type="submit" disabled={busy} className="flex items-center gap-1.5 rounded bg-primary-700 px-3 py-1.5 text-sm text-white hover:bg-primary-800 disabled:opacity-50">
                   <Save className="h-4 w-4" aria-hidden="true" /> {busy ? 'Working…' : 'Save'}
                 </button>
                 {stored !== null && (
-                  <button type="button" onClick={remove} disabled={busy} className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50">
+                  <button type="button" onClick={remove} disabled={busy} className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-danger hover:bg-danger-soft disabled:opacity-50">
                     <Trash2 className="h-4 w-4" aria-hidden="true" /> Delete
                   </button>
                 )}
               </div>
             </form>
             {stored === null ? (
-              <p className="rounded-lg bg-white p-6 text-sm text-gray-700 shadow">Save the scenario to see its composed prompt.</p>
+              <p className="rounded-lg bg-surface p-6 text-sm text-fg-muted shadow">Save the scenario to see its composed prompt.</p>
             ) : (
               <ChatScenarioPreview name={stored} version={version} />
             )}

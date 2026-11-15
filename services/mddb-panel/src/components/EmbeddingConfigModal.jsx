@@ -9,9 +9,9 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { defaultsFor, initialFields, needsApiKey, switchProvider } from '../lib/embedding-defaults';
 
-const INPUT = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
-const LABEL = 'block text-sm font-medium text-gray-700 mb-1';
-const Required = () => <span className="text-red-600">*</span>;
+const INPUT = 'w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus';
+const LABEL = 'block text-sm font-medium text-fg-muted mb-1';
+const Required = () => <span className="text-danger">*</span>;
 
 /** The fields of a saved configuration, or a new one's defaults. */
 function startFields(config) {
@@ -61,13 +61,13 @@ export default function EmbeddingConfigModal({ config, onClose, onSave }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="embedding-config-title"
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        className="bg-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 id="embedding-config-title" className="text-xl font-bold text-gray-900">
+            <h2 id="embedding-config-title" className="text-xl font-bold text-fg">
               {isEdit ? 'Edit' : 'Add'} Embedding Model
             </h2>
-            <button type="button" onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-700" disabled={loading}>
+            <button type="button" onClick={onClose} aria-label="Close" className="text-fg-faint hover:text-fg-muted" disabled={loading}>
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -78,7 +78,7 @@ export default function EmbeddingConfigModal({ config, onClose, onSave }) {
                 <label htmlFor="emb-id" className={LABEL}>ID <Required /></label>
                 <input id="emb-id" type="text" value={fields.id} onChange={set('id')} placeholder="e.g., openai-small, ollama-nomic"
                   className={INPUT} required disabled={loading} />
-                <p className="text-xs text-gray-600 mt-1">Unique identifier (lowercase, hyphens allowed)</p>
+                <p className="text-xs text-fg-subtle mt-1">Unique identifier (lowercase, hyphens allowed)</p>
               </div>
             )}
 
@@ -98,7 +98,7 @@ export default function EmbeddingConfigModal({ config, onClose, onSave }) {
                 <option value="lexical">Lexical (no model, spelling only)</option>
               </select>
               {provider === 'lexical' && (
-                <p className="text-xs text-gray-700 mt-1" role="note">
+                <p className="text-xs text-fg-muted mt-1" role="note">
                   Lexical vectors match shared words and word fragments, not meaning. Use it for CI or
                   offline installs; configure a model for search by meaning. Dimensions: 256–2048.
                 </p>
@@ -131,7 +131,7 @@ export default function EmbeddingConfigModal({ config, onClose, onSave }) {
                 <label htmlFor="emb-url" className={LABEL}>API URL {provider === 'ollama' && <Required />}</label>
                 <input id="emb-url" type="url" value={fields.apiUrl} onChange={set('apiUrl')} placeholder={hints.urlHint}
                   className={INPUT} required={provider === 'ollama'} disabled={loading} />
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-fg-subtle mt-1">
                   {provider === 'ollama' ? 'Ollama server URL, as mddbd reaches it (not localhost when mddbd runs in a container)' : 'Optional: Leave empty to use default'}
                 </p>
               </div>
@@ -139,19 +139,19 @@ export default function EmbeddingConfigModal({ config, onClose, onSave }) {
 
             <div className="mb-4 flex items-center">
               <input type="checkbox" id="isDefault" checked={fields.isDefault} onChange={set('isDefault')}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" disabled={loading} />
-              <label htmlFor="isDefault" className="ml-2 block text-sm text-gray-700">Set as default embedding model</label>
+                className="h-4 w-4 text-info focus:ring-focus border-line-strong rounded" disabled={loading} />
+              <label htmlFor="isDefault" className="ml-2 block text-sm text-fg-muted">Set as default embedding model</label>
             </div>
 
             {error && (
-              <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-800">{error}</p>
+              <div role="alert" className="mb-4 p-3 bg-danger-soft border border-danger-line rounded-lg">
+                <p className="text-sm text-danger-strong">{error}</p>
               </div>
             )}
 
             <div className="flex justify-end gap-3">
               <button type="button" onClick={onClose} disabled={loading}
-                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
+                className="px-4 py-2 text-fg-muted bg-surface-subtle hover:bg-surface-strong rounded-lg transition-colors">Cancel</button>
               <button type="submit" disabled={loading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}

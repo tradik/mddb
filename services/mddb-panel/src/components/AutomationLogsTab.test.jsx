@@ -84,12 +84,12 @@ describe('AutomationLogsTab', () => {
     expect(rows[0].querySelectorAll('td')[3].title).toBe('https://h');
     expect(rows[1].querySelectorAll('td')[3].title).toBe('/data/b.tar');
     expect(rows[1].querySelectorAll('td')[8].title).toBe('disk full');
-    expect(rows[1].querySelector('td:nth-child(3) span').className).toContain('bg-purple-100');
-    expect(rows[3].querySelector('td:nth-child(3) span').className).toContain('bg-amber-100');
-    expect(rows[0].querySelector('td:nth-child(5) span').className).toContain('bg-green-100');
-    expect(rows[1].querySelector('td:nth-child(5) span').className).toContain('bg-red-100');
-    expect(rows[4].querySelector('td:nth-child(5) span').className).toContain('bg-gray-100');
-    expect(rows[2].querySelector('.text-red-700').textContent).toBe(', 1 failed');
+    expect(rows[1].querySelector('td:nth-child(3) span').className).toContain('bg-note-muted');
+    expect(rows[3].querySelector('td:nth-child(3) span').className).toContain('bg-warning-muted');
+    expect(rows[0].querySelector('td:nth-child(5) span').className).toContain('bg-success-muted');
+    expect(rows[1].querySelector('td:nth-child(5) span').className).toContain('bg-danger-muted');
+    expect(rows[4].querySelector('td:nth-child(5) span').className).toContain('bg-surface-subtle');
+    expect(rows[2].querySelector('.text-danger').textContent).toBe(', 1 failed');
   });
 
   test('the status filter reloads with that status', async () => {

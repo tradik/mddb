@@ -46,28 +46,28 @@ export default function MemoryPanel() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-4">
+    <div className="h-full overflow-y-auto p-6 bg-surface-muted space-y-4">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-fg flex items-center gap-2">
           <MessagesSquare className="w-5 h-5" aria-hidden="true" /> Agent Memory
         </h2>
-        <p className="text-sm text-gray-700">
+        <p className="text-sm text-fg-muted">
           Conversation sessions agents store through the memory API. Messages are embedded for recall; sessions expire after their TTL.
         </p>
       </div>
       <MemoryRecallBox userId={userId.trim()} />
-      <section aria-labelledby="memory-sessions-title" className="bg-white rounded-lg shadow p-4 space-y-3">
-        <h3 id="memory-sessions-title" className="text-base font-semibold text-gray-900">Sessions</h3>
+      <section aria-labelledby="memory-sessions-title" className="bg-surface rounded-lg shadow p-4 space-y-3">
+        <h3 id="memory-sessions-title" className="text-base font-semibold text-fg">Sessions</h3>
         <form onSubmit={filter} className="flex flex-wrap gap-2 items-end">
-          <label className="text-sm text-gray-800">
+          <label className="text-sm text-fg-soft">
             <span className="block mb-1">Filter by user ID</span>
-            <input value={userId} onChange={(e) => setUserId(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg" />
+            <input value={userId} onChange={(e) => setUserId(e.target.value)} className="px-3 py-2 border border-line-strong rounded-lg" />
           </label>
-          <label className="text-sm text-gray-800">
+          <label className="text-sm text-fg-soft">
             <span className="block mb-1">Filter by scenario</span>
-            <input value={scenario} onChange={(e) => setScenario(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg" />
+            <input value={scenario} onChange={(e) => setScenario(e.target.value)} className="px-3 py-2 border border-line-strong rounded-lg" />
           </label>
-          <button type="submit" className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-900 rounded-lg hover:bg-gray-200 text-sm">
+          <button type="submit" className="inline-flex items-center gap-1 px-3 py-2 bg-surface-subtle text-fg rounded-lg hover:bg-surface-strong text-sm">
             <RefreshCw className="w-4 h-4" aria-hidden="true" /> Refresh
           </button>
         </form>

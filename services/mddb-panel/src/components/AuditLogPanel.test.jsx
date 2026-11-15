@@ -77,10 +77,10 @@ describe('AuditLogPanel', () => {
     expect(cells(rows[0])).toEqual([
       '2026-10-30 12:00:00.000', 'admin', 'auth.login', 'OK', '10.0.0.1', '/v1/login', 'curl/8', 'password',
     ]);
-    expect(rows[0].querySelector('span').className).toContain('bg-green-100');
-    expect(rows[1].querySelector('span').className).toContain('bg-red-100');
+    expect(rows[0].querySelector('span').className).toContain('bg-success-muted');
+    expect(rows[1].querySelector('span').className).toContain('bg-danger-muted');
     expect(cells(rows[2])).toEqual(['', '-', '-', 'DENIED', '-', '-', '-', '-']);
-    expect(rows[2].querySelector('span').className).toContain('bg-gray-100');
+    expect(rows[2].querySelector('span').className).toContain('bg-surface-subtle');
     expect(cells(rows[3])[0]).toBe('not-a-number');
     expect(cells(rows[3])[3]).toBe('-');
     expect(screen.getByText(/1,234 dropped/)).toBeTruthy();

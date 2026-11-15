@@ -79,19 +79,19 @@ export default function MarkdownEditor({ value, onChange, placeholder, onSave, s
   };
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'relative'}`}>
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-surface' : 'relative'}`}>
       {/* Markdown Toolbar */}
       <MarkdownToolbar onFormat={runFormat} onTemplate={handleTemplate} isMac={isMac} />
 
       {/* View Mode Toolbar */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
+      <div className="flex items-center justify-between border-b border-line bg-surface-muted px-4 py-2">
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setMode('edit')}
             className={`flex items-center space-x-1 px-3 py-1.5 rounded text-sm transition-colors ${
               mode === 'edit'
                 ? 'bg-primary-600 text-white'
-                : 'text-gray-600 hover:bg-gray-200'
+                : 'text-fg-subtle hover:bg-surface-strong'
             }`}
           >
             <Code className="w-4 h-4" />
@@ -102,7 +102,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, onSave, s
             className={`flex items-center space-x-1 px-3 py-1.5 rounded text-sm transition-colors ${
               mode === 'split'
                 ? 'bg-primary-600 text-white'
-                : 'text-gray-600 hover:bg-gray-200'
+                : 'text-fg-subtle hover:bg-surface-strong'
             }`}
           >
             <span>Split</span>
@@ -112,7 +112,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, onSave, s
             className={`flex items-center space-x-1 px-3 py-1.5 rounded text-sm transition-colors ${
               mode === 'preview'
                 ? 'bg-primary-600 text-white'
-                : 'text-gray-600 hover:bg-gray-200'
+                : 'text-fg-subtle hover:bg-surface-strong'
             }`}
           >
             <Eye className="w-4 h-4" />
@@ -122,7 +122,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, onSave, s
 
         <button
           onClick={() => setIsFullscreen(!isFullscreen)}
-          className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+          className="p-1.5 text-fg-subtle hover:bg-surface-strong rounded transition-colors"
           title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
           aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         >
@@ -138,7 +138,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, onSave, s
       <div className={`flex ${isFullscreen ? 'h-[calc(100vh-48px)]' : 'h-96'}`}>
         {/* Editor */}
         {(mode === 'edit' || mode === 'split') && (
-          <div className={`${mode === 'split' ? 'w-1/2 border-r border-gray-200' : 'w-full'}`}>
+          <div className={`${mode === 'split' ? 'w-1/2 border-r border-line' : 'w-full'}`}>
             <textarea
               ref={textareaRef}
               value={value}
@@ -166,7 +166,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, onSave, s
       )}
 
       {/* Character Count */}
-      <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 text-xs text-gray-500">
+      <div className="border-t border-line px-4 py-2 bg-surface-muted text-xs text-fg-faint">
         {value?.length || 0} characters
         {value && ` • ${value.split('\n').length} lines`}
         {value && ` • ${value.split(/\s+/).filter(w => w).length} words`}

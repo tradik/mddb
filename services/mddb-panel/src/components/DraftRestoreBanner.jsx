@@ -13,7 +13,7 @@ export default function DraftRestoreBanner({ draft, document, onRestore, onDisca
   const moved = Boolean(draft.baseRevision && document.revision && draft.baseRevision !== document.revision);
 
   return (
-    <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+    <div role="alert" className="rounded-lg border border-warning-line bg-warning-soft p-4 text-sm text-warning-strong">
       <p className="font-medium">
         You have an unsaved draft of this document from {new Date(draft.savedAt).toLocaleString()}.
       </p>
@@ -29,14 +29,14 @@ export default function DraftRestoreBanner({ draft, document, onRestore, onDisca
         <button type="button" onClick={onRestore} className="rounded bg-amber-800 px-3 py-1.5 text-white hover:bg-amber-900">
           Restore draft
         </button>
-        <button type="button" onClick={onDiscard} className="rounded border border-amber-800 px-3 py-1.5 hover:bg-amber-100">
+        <button type="button" onClick={onDiscard} className="rounded border border-amber-800 px-3 py-1.5 hover:bg-warning-muted">
           Discard draft
         </button>
         <button
           type="button"
           onClick={() => setShowDiff(!showDiff)}
           aria-expanded={showDiff}
-          className="rounded px-3 py-1.5 underline hover:bg-amber-100"
+          className="rounded px-3 py-1.5 underline hover:bg-warning-muted"
         >
           {showDiff ? 'Hide changes' : 'Show changes'}
         </button>

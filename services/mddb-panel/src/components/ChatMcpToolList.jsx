@@ -9,9 +9,9 @@ import { toolHints, toolInactiveReason } from '../lib/chat-mcp';
 
 function Badge({ tone, children }) {
   const tones = {
-    green: 'bg-green-100 text-green-900',
-    red: 'bg-red-100 text-red-900',
-    gray: 'bg-gray-200 text-gray-800',
+    green: 'bg-success-muted text-success-strong',
+    red: 'bg-danger-muted text-danger-strong',
+    gray: 'bg-surface-strong text-fg-soft',
   };
   return <span className={`rounded-full px-2 py-0.5 text-xs ${tones[tone]}`}>{children}</span>;
 }
@@ -21,7 +21,7 @@ export default function ChatMcpToolList({ id, tools, tested, allowed, onChange, 
   const rows = [...tools, ...allowed.filter((n) => !offered.has(n)).map((name) => ({ name, missing: tested, allowable: true }))];
   const toggle = (name) => onChange(allowed.includes(name) ? allowed.filter((n) => n !== name) : [...allowed, name]);
   return (
-    <ul className="space-y-1 rounded border border-gray-300 p-2" aria-label="Tools of this server">
+    <ul className="space-y-1 rounded border border-line-strong p-2" aria-label="Tools of this server">
       {rows.map((tool) => {
         const { readOnly, destructive } = toolHints(tool);
         const checked = allowed.includes(tool.name);
@@ -29,7 +29,7 @@ export default function ChatMcpToolList({ id, tools, tested, allowed, onChange, 
         const inactive = toolInactiveReason({ featureOff, scenarioEnabled, serverEnabled, allowed: checked });
         const boxId = `${id}-tool-${tool.name}`;
         return (
-          <li key={tool.name} className="text-sm text-gray-800">
+          <li key={tool.name} className="text-sm text-fg-soft">
             <div className="flex flex-wrap items-center gap-2">
               <input
                 id={boxId}
@@ -37,16 +37,16 @@ export default function ChatMcpToolList({ id, tools, tested, allowed, onChange, 
                 checked={checked}
                 disabled={Boolean(blocked) && !checked}
                 onChange={() => toggle(tool.name)}
-                className="h-4 w-4 rounded border-gray-400 text-primary-700 focus:ring-primary-500"
+                className="h-4 w-4 rounded border-line-strong text-accent focus:ring-focus"
               />
               <label htmlFor={boxId} className="font-medium">{tool.name}</label>
               {readOnly && <Badge tone="green">read-only</Badge>}
               {destructive && <Badge tone="red">destructive</Badge>}
               {tool.annotations && !readOnly && !destructive && <Badge tone="gray">may write</Badge>}
-              <span className="text-xs text-gray-700">{inactive ? `Inactive: ${inactive}` : 'Active'}</span>
+              <span className="text-xs text-fg-muted">{inactive ? `Inactive: ${inactive}` : 'Active'}</span>
             </div>
-            {tool.description && <p className="ml-6 text-xs text-gray-600">{tool.description}</p>}
-            {blocked && <p className="ml-6 text-xs text-red-800">Cannot be allowed: {blocked}</p>}
+            {tool.description && <p className="ml-6 text-xs text-fg-subtle">{tool.description}</p>}
+            {blocked && <p className="ml-6 text-xs text-danger-strong">Cannot be allowed: {blocked}</p>}
           </li>
         );
       })}

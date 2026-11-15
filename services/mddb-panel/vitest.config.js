@@ -257,6 +257,9 @@ const coverageFiles = [
   'src/components/DraftRestoreBanner.jsx',
   'src/components/RevisionConflictNotice.jsx',
   'src/components/CollectionSpelling.jsx',
+  // 2.19.7: dark mode (FE-015) — the theme choice and the header switch.
+  'src/lib/theme.js',
+  'src/components/ThemeSwitch.jsx',
 ];
 
 export default mergeConfig(

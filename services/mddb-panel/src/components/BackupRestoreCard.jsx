@@ -31,24 +31,24 @@ export default function BackupRestoreCard() {
   });
 
   return (
-    <div className="bg-white rounded-lg shadow mb-6 p-6 space-y-3">
-      <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-        <Archive className="w-5 h-5 text-primary-600" aria-hidden="true" /> Backup and restore
+    <div className="bg-surface rounded-lg shadow mb-6 p-6 space-y-3">
+      <h2 className="text-lg font-semibold text-fg flex items-center gap-2">
+        <Archive className="w-5 h-5 text-accent" aria-hidden="true" /> Backup and restore
       </h2>
-      <p className="text-sm text-gray-700">Backups are written next to the database and checked for integrity before they are kept. Needs admin on &quot;*&quot;.</p>
+      <p className="text-sm text-fg-muted">Backups are written next to the database and checked for integrity before they are kept. Needs admin on &quot;*&quot;.</p>
       <div className="flex flex-wrap gap-3 items-end">
-        <label className="text-sm text-gray-800">
+        <label className="text-sm text-fg-soft">
           <span className="block mb-1">Backup file name (optional)</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="backup-<timestamp>.db" className="px-3 py-2 border border-gray-300 rounded-lg" />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="backup-<timestamp>.db" className="px-3 py-2 border border-line-strong rounded-lg" />
         </label>
         <button type="button" onClick={backup} disabled={busy} className="px-3 py-2 text-sm rounded-lg bg-primary-700 text-white hover:bg-primary-800 disabled:opacity-50">Back up now</button>
-        <label className="text-sm text-gray-800">
+        <label className="text-sm text-fg-soft">
           <span className="block mb-1">Restore from file</span>
-          <input value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg" />
+          <input value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border border-line-strong rounded-lg" />
         </label>
-        <button type="button" onClick={() => setConfirming(true)} disabled={busy || !from.trim()} className="px-3 py-2 text-sm rounded-lg text-red-800 border border-red-300 hover:bg-red-50 disabled:opacity-50">Restore</button>
+        <button type="button" onClick={() => setConfirming(true)} disabled={busy || !from.trim()} className="px-3 py-2 text-sm rounded-lg text-danger-strong border border-danger-line hover:bg-danger-soft disabled:opacity-50">Restore</button>
       </div>
-      {message && <p role="status" className="text-sm text-gray-900">{message}</p>}
+      {message && <p role="status" className="text-sm text-fg">{message}</p>}
       <ApiErrorNotice error={error} admin />
       {confirming && (
         <ConfirmDialog

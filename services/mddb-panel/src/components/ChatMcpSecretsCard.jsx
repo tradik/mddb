@@ -46,27 +46,27 @@ export default function ChatMcpSecretsCard({ secrets, encryptionReady = true, on
   };
 
   return (
-    <section aria-labelledby="chat-mcp-secrets-heading" className="mt-4 rounded-lg bg-white p-4 shadow">
-      <h3 id="chat-mcp-secrets-heading" className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-        <KeyRound className="h-4 w-4 text-primary-700" aria-hidden="true" /> MCP secrets
+    <section aria-labelledby="chat-mcp-secrets-heading" className="mt-4 rounded-lg bg-surface p-4 shadow">
+      <h3 id="chat-mcp-secrets-heading" className="flex items-center gap-2 text-sm font-semibold text-fg">
+        <KeyRound className="h-4 w-4 text-accent" aria-hidden="true" /> MCP secrets
       </h3>
-      <p className="mt-1 text-xs text-gray-600">
+      <p className="mt-1 text-xs text-fg-subtle">
         Tokens for external MCP servers. Values are write-only: they are never shown again, only replaced.
       </p>
       {secrets === null ? (
-        <p className="mt-2 text-sm text-gray-700">Secrets need admin on &quot;*&quot;.</p>
+        <p className="mt-2 text-sm text-fg-muted">Secrets need admin on &quot;*&quot;.</p>
       ) : (
         <>
           {secrets.length === 0 ? (
-            <p className="mt-2 text-sm text-gray-700">No secrets yet.</p>
+            <p className="mt-2 text-sm text-fg-muted">No secrets yet.</p>
           ) : (
-            <ul className="mt-2 divide-y divide-gray-200 text-sm text-gray-800">
+            <ul className="mt-2 divide-y divide-line text-sm text-fg-soft">
               {secrets.map((s) => (
                 <li key={s.name} className="flex items-center gap-2 py-1">
                   <span className="font-medium">{s.name}</span>
-                  <span className="text-xs text-gray-600">{s.header || 'Authorization: Bearer'} · set</span>
-                  {s.usedBy?.length > 0 && <span className="text-xs text-gray-600">used by {s.usedBy.join(', ')}</span>}
-                  <button type="button" onClick={() => remove(s.name)} aria-label={`Delete secret ${s.name}`} className="ml-auto rounded p-1 text-red-700 hover:bg-red-50">
+                  <span className="text-xs text-fg-subtle">{s.header || 'Authorization: Bearer'} · set</span>
+                  {s.usedBy?.length > 0 && <span className="text-xs text-fg-subtle">used by {s.usedBy.join(', ')}</span>}
+                  <button type="button" onClick={() => remove(s.name)} aria-label={`Delete secret ${s.name}`} className="ml-auto rounded p-1 text-danger hover:bg-danger-soft">
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </li>
@@ -74,7 +74,7 @@ export default function ChatMcpSecretsCard({ secrets, encryptionReady = true, on
             </ul>
           )}
           {!encryptionReady && (
-            <p id="chat-mcp-secrets-locked" className="mt-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+            <p id="chat-mcp-secrets-locked" className="mt-3 rounded border border-warning-line bg-warning-soft p-2 text-sm text-warning-strong">
               Secrets are stored only encrypted, and this server has no encryption key. Set <code>{encryptionKeyVar}</code> and restart mddbd to add one.
             </p>
           )}
@@ -97,8 +97,8 @@ export default function ChatMcpSecretsCard({ secrets, encryptionReady = true, on
           </form>
         </>
       )}
-      {error && <p role="alert" className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
-      {message && <output className="mt-2 block rounded border border-green-200 bg-green-50 p-2 text-sm text-green-800">{message}</output>}
+      {error && <p role="alert" className="mt-2 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
+      {message && <output className="mt-2 block rounded border border-success-line bg-success-soft p-2 text-sm text-success-strong">{message}</output>}
     </section>
   );
 }

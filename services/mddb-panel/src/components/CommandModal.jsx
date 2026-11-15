@@ -355,13 +355,13 @@ export default function CommandModal({ isOpen, onClose, type, params }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-gray-900">API Command</h2>
+        <div className="flex items-center justify-between p-4 border-b border-line">
+          <h2 className="text-lg font-bold text-fg">API Command</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-fg-faint hover:text-fg-subtle transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -376,7 +376,7 @@ export default function CommandModal({ isOpen, onClose, type, params }) {
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'bg-gray-900 text-white'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  : 'text-fg-subtle hover:text-fg hover:bg-surface-subtle'
               }`}
             >
               {tab.label}

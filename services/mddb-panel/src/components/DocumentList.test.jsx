@@ -183,8 +183,8 @@ describe('DocumentList opening a document', () => {
     fireEvent.click(rows()[2]);
     expect(useStore.getState().currentDocument).toEqual({ ...docs[2], collection: 'docs', contentMd: 'Loading content...' });
     expect(mddbClient.getDocument).toHaveBeenCalledWith({ collection: 'docs', key: 'gamma', lang: 'en' });
-    expect(rows()[2].closest('li').className).toContain('bg-blue-50');
-    expect(rows()[0].closest('li').className).not.toContain('bg-blue-50');
+    expect(rows()[2].closest('li').className).toContain('bg-info-soft');
+    expect(rows()[0].closest('li').className).not.toContain('bg-info-soft');
 
     resolve({ key: 'gamma', lang: 'en', contentMd: '# Gamma full' });
     await waitFor(() => expect(useStore.getState().currentDocument.contentMd).toBe('# Gamma full'));
@@ -227,7 +227,7 @@ describe('DocumentList row structure', () => {
     expect(rows()[0].getAttribute('aria-current')).toBeNull();
     fireEvent.click(rows()[0]);
     await waitFor(() => expect(rows()[0].getAttribute('aria-current')).toBe('true'));
-    expect(rows()[0].closest('li').className).toContain('bg-blue-50');
+    expect(rows()[0].closest('li').className).toContain('bg-info-soft');
 
     // Delete asks first and does not open the document.
     vi.mocked(mddbClient.getDocument).mockClear();

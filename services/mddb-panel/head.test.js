@@ -74,3 +74,48 @@ test('the GTM snippet loads once a real id is substituted', () => {
   assert.match(created[0].src, /gtm\.js\?id=GTM-REAL123/);
   assert.equal(w.dataLayer.length, 1);
 });
+
+// FE-015: the inline theme script sets the `dark` class before the first
+// paint, from the same localStorage key src/lib/theme.js writes.
+const themeSnippet = html.match(/<script>\s*(\(function \(w, d\)[\s\S]*?)<\/script>/)[1];
+
+/** Runs the theme snippet; returns whether it set the `dark` class. */
+function runThemeSnippet({ stored = null, prefersDark = false, storageThrows = false, mediaThrows = false }) {
+  let dark = null;
+  const w = {
+    localStorage: {
+      getItem: (key) => {
+        if (storageThrows) throw new Error('blocked');
+        return key === 'mddb.theme' ? stored : null;
+      },
+    },
+    matchMedia: (query) => {
+      if (mediaThrows) throw new Error('none');
+      return { matches: query === '(prefers-color-scheme: dark)' && prefersDark };
+    },
+  };
+  const d = { documentElement: { classList: { toggle: (name, on) => { if (name === 'dark') dark = on; } } } };
+  new Function('window', 'document', themeSnippet)(w, d);
+  return dark;
+}
+
+test('the theme snippet uses the key of src/lib/theme.js', async () => {
+  const { THEME_KEY } = await import('./src/lib/theme.js');
+  assert.ok(themeSnippet.includes(`'${THEME_KEY}'`));
+});
+
+test('the theme snippet follows the stored choice, then the system', () => {
+  assert.equal(runThemeSnippet({ stored: 'dark' }), true);
+  assert.equal(runThemeSnippet({ stored: 'light', prefersDark: true }), false);
+  assert.equal(runThemeSnippet({ stored: 'system', prefersDark: true }), true);
+  assert.equal(runThemeSnippet({}), false);
+});
+
+test('the theme snippet stays light when storage or matchMedia throw', () => {
+  assert.equal(runThemeSnippet({ storageThrows: true, prefersDark: true }), true);
+  assert.equal(runThemeSnippet({ storageThrows: true, mediaThrows: true }), false);
+});
+
+test('the theme snippet runs before the app script', () => {
+  assert.ok(html.indexOf(themeSnippet) < html.indexOf('/src/main.jsx'));
+});

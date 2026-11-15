@@ -33,23 +33,23 @@ export default function ShortcutsDialog({ isMac, onClose }) {
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={onKeyDown}
-        className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full"
+        className="bg-surface rounded-lg shadow-xl p-6 max-w-md w-full"
       >
-        <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
-          <Keyboard className="w-5 h-5 text-gray-700" aria-hidden="true" />
+        <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold text-fg mb-4">
+          <Keyboard className="w-5 h-5 text-fg-muted" aria-hidden="true" />
           Keyboard shortcuts
         </h2>
         <table className="w-full text-sm">
           <tbody>
             {shortcutList(isMac).map(({ keys, description }) => (
-              <tr key={keys} className="border-t border-gray-200">
-                <th scope="row" className="py-1.5 pr-4 text-left font-mono font-medium text-gray-900 whitespace-nowrap">{keys}</th>
-                <td className="py-1.5 text-gray-700">{description}</td>
+              <tr key={keys} className="border-t border-line">
+                <th scope="row" className="py-1.5 pr-4 text-left font-mono font-medium text-fg whitespace-nowrap">{keys}</th>
+                <td className="py-1.5 text-fg-muted">{description}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="mt-3 text-xs text-gray-700">
+        <p className="mt-3 text-xs text-fg-muted">
           <kbd className="font-mono">/</kbd> and <kbd className="font-mono">?</kbd> work when the focus is not in a form field.
         </p>
         <div className="mt-4 flex justify-end">
@@ -57,7 +57,7 @@ export default function ShortcutsDialog({ isMac, onClose }) {
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            className="px-4 py-2 text-fg-soft bg-surface-subtle hover:bg-surface-strong rounded-lg"
           >
             Close
           </button>

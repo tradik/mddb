@@ -178,8 +178,8 @@ export default function VectorSearchPanel() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">Select a collection to search</p>
+          <Search className="w-12 h-12 text-line-strong mx-auto mb-3" />
+          <p className="text-fg-faint">Select a collection to search</p>
         </div>
       </div>
     );
@@ -188,9 +188,9 @@ export default function VectorSearchPanel() {
   return (
     <div className="h-full flex flex-col">
       {/* Search Controls */}
-      <div className="p-4 border-b border-gray-200 space-y-4">
+      <div className="p-4 border-b border-line space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+          <label className="block text-xs font-semibold text-fg-faint uppercase tracking-wider mb-1">
             Semantic Query
           </label>
           <textarea
@@ -199,13 +199,13 @@ export default function VectorSearchPanel() {
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSearch())}
             placeholder="Describe what you're looking for..."
             rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+            className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus resize-none"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-medium text-fg-subtle mb-1">
               Top K: {vectorTopK}
             </label>
             <input
@@ -218,7 +218,7 @@ export default function VectorSearchPanel() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-medium text-fg-subtle mb-1">
               Threshold: {Math.round(vectorThreshold * 100)}%
             </label>
             <input
@@ -234,11 +234,11 @@ export default function VectorSearchPanel() {
 
         <div className="flex items-center space-x-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Algorithm</label>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">Algorithm</label>
             <select
               value={vectorAlgorithm}
               onChange={(e) => setVectorAlgorithm(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="px-2 py-1.5 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
             >
               {VECTOR_ALGORITHMS.map((a) => (
                 <option key={a.value} value={a.value}>{a.label}</option>
@@ -246,23 +246,23 @@ export default function VectorSearchPanel() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Distance Metric</label>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">Distance Metric</label>
             <select
               value={vectorDistanceMetric}
               onChange={(e) => setVectorDistanceMetric(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="px-2 py-1.5 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
             >
               <option value="cosine">Cosine Similarity</option>
               <option value="dot_product">Dot Product</option>
               <option value="euclidean">Euclidean</option>
             </select>
           </div>
-          <label className="flex items-center space-x-2 text-sm text-gray-600 mt-4">
+          <label className="flex items-center space-x-2 text-sm text-fg-subtle mt-4">
             <input
               type="checkbox"
               checked={includeContent}
               onChange={(e) => setIncludeContent(e.target.checked)}
-              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              className="rounded border-line-strong text-accent focus:ring-focus"
             />
             <span>Include content</span>
           </label>
@@ -278,11 +278,11 @@ export default function VectorSearchPanel() {
         <MetaFilterBar collection={currentCollection} />
 
         {(positive.length > 0 || negative.length > 0) && (
-          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700">
+          <div className="flex items-center justify-between rounded-lg bg-surface-muted px-3 py-2 text-xs text-fg-muted">
             <span>
               Feedback for the next search: {positive.length} relevant, {negative.length} not relevant
             </span>
-            <button type="button" onClick={() => setFeedback({})} className="font-medium text-primary-700 hover:underline">
+            <button type="button" onClick={() => setFeedback({})} className="font-medium text-accent hover:underline">
               Clear
             </button>
           </div>
@@ -291,7 +291,7 @@ export default function VectorSearchPanel() {
         <div className="flex items-center justify-end space-x-2">
           <button
             onClick={() => setShowCommand(true)}
-            className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="flex items-center space-x-2 px-3 py-2 bg-surface-subtle text-fg-muted rounded-lg hover:bg-surface-strong transition-colors"
           >
             <Terminal className="w-4 h-4" />
             <span className="text-sm font-medium">Command</span>
@@ -321,11 +321,11 @@ export default function VectorSearchPanel() {
       <div className="flex-1 overflow-y-auto">
         {vectorResults.length > 0 && (
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500">
+            <span className="text-xs font-medium text-fg-faint">
               {vectorResults.length} result{vectorResults.length !== 1 ? 's' : ''} found
             </span>
             {vectorSearchStats && (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-fg-faint">
                 {vectorSearchStats.durationMs}ms | {vectorSearchStats.indexSize} indexed
               </span>
             )}
@@ -335,15 +335,15 @@ export default function VectorSearchPanel() {
         {vectorError && (
           <div className={`m-4 p-3 rounded-lg flex items-start space-x-2 ${
             indexPending
-              ? 'bg-amber-50 border border-amber-200'
-              : 'bg-red-50 border border-red-200'
+              ? 'bg-warning-soft border border-warning-line'
+              : 'bg-danger-soft border border-danger-line'
           }`}>
             {indexPending ? (
-              <RotateCcw className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0 animate-spin" />
+              <RotateCcw className="w-4 h-4 text-warning mt-0.5 flex-shrink-0 animate-spin" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 text-danger mt-0.5 flex-shrink-0" />
             )}
-            <p className={`text-sm ${indexPending ? 'text-amber-800' : 'text-red-700'}`}>
+            <p className={`text-sm ${indexPending ? 'text-warning-strong' : 'text-danger'}`}>
               {vectorError}
             </p>
           </div>
@@ -353,12 +353,12 @@ export default function VectorSearchPanel() {
 
         {vectorResults.length === 0 && !vectorLoading && !vectorError && vectorQuery && (
           <div className="flex items-center justify-center h-32">
-            <p className="text-gray-400 text-sm">No results found</p>
+            <p className="text-fg-faint text-sm">No results found</p>
           </div>
         )}
 
         {vectorResults.length > 0 && (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-line">
             {vectorResults.map((result, idx) => {
               const doc = result.document;
               const pct = Math.round(result.score * 100);
@@ -373,7 +373,7 @@ export default function VectorSearchPanel() {
                       aria-pressed={mark === 'positive'}
                       aria-label={`Mark ${doc.key} relevant`}
                       title="Relevant: pull the next search towards it"
-                      className={`rounded p-1 ${mark === 'positive' ? 'bg-green-100 text-green-800' : 'text-gray-500 hover:bg-gray-100'}`}
+                      className={`rounded p-1 ${mark === 'positive' ? 'bg-success-muted text-success-strong' : 'text-fg-faint hover:bg-surface-subtle'}`}
                     >
                       <ThumbsUp className="h-3.5 w-3.5" />
                     </button>
@@ -383,7 +383,7 @@ export default function VectorSearchPanel() {
                       aria-pressed={mark === 'negative'}
                       aria-label={`Mark ${doc.key} not relevant`}
                       title="Not relevant: push the next search away from it"
-                      className={`rounded p-1 ${mark === 'negative' ? 'bg-red-100 text-red-800' : 'text-gray-500 hover:bg-gray-100'}`}
+                      className={`rounded p-1 ${mark === 'negative' ? 'bg-danger-muted text-danger-strong' : 'text-fg-faint hover:bg-surface-subtle'}`}
                     >
                       <ThumbsDown className="h-3.5 w-3.5" />
                     </button>
@@ -391,25 +391,25 @@ export default function VectorSearchPanel() {
                 )}
                 <button
                   onClick={() => handleResultClick(result)}
-                  className="w-full text-left p-4 pb-9 hover:bg-gray-50 transition-colors"
+                  className="w-full text-left p-4 pb-9 hover:bg-surface-muted transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent-muted text-accent text-xs font-bold">
                         {result.rank || idx + 1}
                       </span>
-                      <h4 className="font-medium text-gray-900 truncate">
+                      <h4 className="font-medium text-fg truncate">
                         {doc?.key}
                       </h4>
-                      <span className="text-xs text-gray-500">{doc?.lang}</span>
+                      <span className="text-xs text-fg-faint">{doc?.lang}</span>
                     </div>
-                    <span className="text-sm font-semibold text-primary-600">
+                    <span className="text-sm font-semibold text-accent">
                       {pct}%
                     </span>
                   </div>
 
                   {/* Score bar */}
-                  <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                  <div className="w-full bg-surface-strong rounded-full h-1.5 mb-2">
                     <div
                       className="bg-primary-500 h-1.5 rounded-full transition-all"
                       style={{ width: `${pct}%` }}
@@ -422,7 +422,7 @@ export default function VectorSearchPanel() {
                       {Object.entries(doc.meta).slice(0, 3).map(([key, values]) => (
                         <span
                           key={key}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-subtle text-fg-muted"
                         >
                           {key}: {Array.isArray(values) ? values.join(', ') : values}
                         </span>
@@ -438,12 +438,12 @@ export default function VectorSearchPanel() {
       </div>
 
       {/* Reindex Footer */}
-      <div className="p-3 border-t border-gray-200">
+      <div className="p-3 border-t border-line">
         {reindexResult && (
           <div className={`mb-2 p-2 rounded text-xs ${
             reindexResult.error
-              ? 'bg-red-50 text-red-700'
-              : 'bg-green-50 text-green-700'
+              ? 'bg-danger-soft text-danger'
+              : 'bg-success-soft text-success'
           }`}>
             {reindexResult.error
               ? reindexResult.error
@@ -454,7 +454,7 @@ export default function VectorSearchPanel() {
         <button
           onClick={handleReindex}
           disabled={reindexing}
-          className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-surface-subtle text-fg-muted rounded-lg hover:bg-surface-strong transition-colors disabled:opacity-50"
         >
           <RotateCcw className={`w-4 h-4 ${reindexing ? 'animate-spin' : ''}`} />
           <span className="text-sm font-medium">

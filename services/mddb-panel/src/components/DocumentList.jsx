@@ -149,7 +149,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading documents...</p>
+          <p className="text-fg-faint">Loading documents...</p>
         </div>
       </div>
     );
@@ -159,8 +159,8 @@ export default function DocumentList({ sseRefreshKey } = {}) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <p className="text-red-600 mb-2">Error loading documents</p>
-          <p className="text-sm text-gray-500">{documentsError}</p>
+          <p className="text-danger mb-2">Error loading documents</p>
+          <p className="text-sm text-fg-faint">{documentsError}</p>
         </div>
       </div>
     );
@@ -181,9 +181,9 @@ export default function DocumentList({ sseRefreshKey } = {}) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-line">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">
+          <h3 className="text-sm font-semibold text-fg-muted">
             {totalCount > 0 ? (
               <>{rangeStart}–{rangeEnd} of {totalCount.toLocaleString()}</>
             ) : (
@@ -196,7 +196,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
               onClick={() => setShowFilters(!showFilters)}
               aria-expanded={showFilters}
               disabled={!currentCollection}
-              className="px-3 py-1.5 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200 disabled:opacity-50"
+              className="px-3 py-1.5 bg-surface-subtle text-fg-soft text-xs rounded hover:bg-surface-strong disabled:opacity-50"
             >
               Sort &amp; filter{activeFilters > 0 && ` (${activeFilters})`}
             </button>
@@ -205,13 +205,13 @@ export default function DocumentList({ sseRefreshKey } = {}) {
               onClick={() => setShowFacets(!showFacets)}
               aria-expanded={showFacets}
               disabled={!currentCollection}
-              className="px-3 py-1.5 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200 disabled:opacity-50"
+              className="px-3 py-1.5 bg-surface-subtle text-fg-soft text-xs rounded hover:bg-surface-strong disabled:opacity-50"
             >
               Facets
             </button>
             <button
               onClick={() => setShowCommand(true)}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-surface-subtle text-fg-muted text-xs rounded hover:bg-surface-strong flex items-center gap-1.5"
             >
               <Terminal className="w-3.5 h-3.5" />
               Command
@@ -227,20 +227,20 @@ export default function DocumentList({ sseRefreshKey } = {}) {
             </button>
             <button
               onClick={loadDocuments}
-              className="text-xs text-blue-600 hover:text-blue-700"
+              className="text-xs text-info hover:text-info"
             >
               Refresh
             </button>
           </div>
         </div>
         <div className="relative mt-2">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-faint" />
           <input
             type="text"
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             placeholder="Filter by key..."
-            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full pl-8 pr-3 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
           />
         </div>
         {showFilters && currentCollection && <FilterPanel onClose={() => setShowFilters(false)} />}
@@ -252,26 +252,26 @@ export default function DocumentList({ sseRefreshKey } = {}) {
         )}
         {shownDocs.length > 0 && (
           <>
-            <label className="mt-2 flex items-center gap-2 text-xs text-gray-800">
+            <label className="mt-2 flex items-center gap-2 text-xs text-fg-soft">
               <input type="checkbox" checked={allShownSelected} onChange={() => selection.toggleAll(shownDocs)} />
               Select all shown
             </label>
             <SelectionActionBar collection={currentCollection} documents={selection.selected} readOnly={readOnly} onClear={selection.clear} onDeleted={afterBatchDelete} />
           </>
         )}
-        {batchOutcome && <p role="status" className="mt-1 text-xs text-gray-800">{batchOutcome}</p>}
+        {batchOutcome && <p role="status" className="mt-1 text-xs text-fg-soft">{batchOutcome}</p>}
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {documents.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">No documents found</p>
+              <FileText className="w-12 h-12 text-fg-faint mx-auto mb-2" />
+              <p className="text-fg-faint">No documents found</p>
             </div>
           </div>
         ) : (
-          <ul className="divide-y divide-gray-200">
+          <ul className="divide-y divide-line">
             {shownDocs.map((doc) => {
               const selected = currentDocument?.key === doc.key && currentDocument?.lang === doc.lang;
               // The row and its delete are sibling controls: a button inside a
@@ -279,8 +279,8 @@ export default function DocumentList({ sseRefreshKey } = {}) {
               return (
                 <li
                   key={`${doc.key}-${doc.lang}`}
-                  className={`flex items-start hover:bg-gray-50 transition-colors ${
-                    selected ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                  className={`flex items-start hover:bg-surface-muted transition-colors ${
+                    selected ? 'bg-info-soft border-l-4 border-blue-600' : ''
                   }`}
                 >
                   <input
@@ -294,16 +294,16 @@ export default function DocumentList({ sseRefreshKey } = {}) {
                     type="button"
                     onClick={() => handleDocumentClick(doc)}
                     aria-current={selected ? 'true' : undefined}
-                    className="flex-1 min-w-0 text-left p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+                    className="flex-1 min-w-0 text-left p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-medium text-gray-900 truncate flex-1">
+                      <h4 className="font-medium text-fg truncate flex-1">
                         {doc.key}
                       </h4>
-                      <span className="text-xs text-gray-500">{doc.lang}</span>
+                      <span className="text-xs text-fg-faint">{doc.lang}</span>
                     </div>
 
-                    <div className="flex items-center space-x-3 text-xs text-gray-500">
+                    <div className="flex items-center space-x-3 text-xs text-fg-faint">
                       <div className="flex items-center space-x-1">
                         <Calendar className="w-3 h-3" />
                         <span>
@@ -320,7 +320,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
 
                     {doc.meta && Object.entries(doc.meta).slice(0, 2).map(([key, values]) => (
                       <div key={key} className="mt-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-subtle text-fg-soft">
                           {key}: {Array.isArray(values) ? values.join(', ') : values}
                         </span>
                       </div>
@@ -330,7 +330,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
                     <button
                       type="button"
                       onClick={(e) => handleDelete(doc, e)}
-                      className="m-3 p-1 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700"
+                      className="m-3 p-1 text-fg-faint hover:text-danger hover:bg-danger-soft rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700"
                       title="Delete document"
                       aria-label={`Delete ${doc.key} (${doc.lang})`}
                     >
@@ -346,22 +346,22 @@ export default function DocumentList({ sseRefreshKey } = {}) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="p-3 border-t border-gray-200 flex items-center justify-between">
-          <span className="text-xs text-gray-500">
+        <div className="p-3 border-t border-line flex items-center justify-between">
+          <span className="text-xs text-fg-faint">
             Page {currentPage} of {totalPages}
           </span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setOffset(Math.max(0, offset - limit))}
               disabled={offset === 0}
-              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => setOffset(offset + limit)}
               disabled={rangeEnd >= totalCount}
-              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -372,18 +372,18 @@ export default function DocumentList({ sseRefreshKey } = {}) {
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
+          <div className="bg-surface rounded-lg p-6 max-w-sm mx-4">
             <div className="flex items-center mb-4">
-              <Trash2 className="w-6 h-6 text-red-600 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Delete Document</h3>
+              <Trash2 className="w-6 h-6 text-danger mr-3" />
+              <h3 className="text-lg font-semibold text-fg">Delete Document</h3>
             </div>
-            <p className="text-gray-600 mb-6">
+            <p className="text-fg-subtle mb-6">
               Are you sure you want to delete "{deleteConfirm.key}" ({deleteConfirm.lang})? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="px-4 py-2 text-fg-muted bg-surface-subtle hover:bg-surface-strong rounded-lg transition-colors"
               >
                 Cancel
               </button>

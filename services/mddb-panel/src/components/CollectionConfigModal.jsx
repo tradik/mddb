@@ -191,20 +191,20 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Settings2 className="w-6 h-6 text-blue-600" />
-              <h2 className="text-xl font-bold text-gray-900">Collection Settings</h2>
+              <Settings2 className="w-6 h-6 text-info" />
+              <h2 className="text-xl font-bold text-fg">Collection Settings</h2>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-fg-faint hover:text-fg-subtle">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <p className="text-sm text-gray-500 mb-4">
-            Configure <span className="font-medium text-gray-700">{collection}</span>
+          <p className="text-sm text-fg-faint mb-4">
+            Configure <span className="font-medium text-fg-muted">{collection}</span>
           </p>
 
           {loading ? (
@@ -218,11 +218,11 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <label className="block text-sm font-medium text-fg-muted mb-1">Type</label>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 >
                   {COLLECTION_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -234,26 +234,26 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-fg-muted mb-1">Description</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Brief description of this collection..."
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm resize-none"
                 />
               </div>
 
               {/* Icon */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Icon (emoji)</label>
+                <label className="block text-sm font-medium text-fg-muted mb-1">Icon (emoji)</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={icon}
                     onChange={(e) => setIcon(e.target.value)}
                     placeholder="e.g. 📚"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="flex-1 px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                     maxLength={4}
                   />
                   {icon && (
@@ -264,23 +264,23 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Color */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                <label className="block text-sm font-medium text-fg-muted mb-1">Color</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
-                    className="w-10 h-10 rounded border border-gray-300 cursor-pointer"
+                    className="w-10 h-10 rounded border border-line-strong cursor-pointer"
                   />
                   <input
                     type="text"
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
                     placeholder="#3b82f6"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                    className="flex-1 px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm font-mono"
                   />
                   <div
-                    className="w-8 h-8 rounded-full border border-gray-200"
+                    className="w-8 h-8 rounded-full border border-line"
                     style={{ backgroundColor: color }}
                   />
                 </div>
@@ -288,11 +288,11 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Storage Backend */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Storage Backend</label>
+                <label className="block text-sm font-medium text-fg-muted mb-1">Storage Backend</label>
                 <select
                   value={storageBackend}
                   onChange={(e) => setStorageBackend(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 >
                   {STORAGE_BACKENDS.map((b) => (
                     <option key={b.value} value={b.value}>
@@ -300,96 +300,96 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-fg-faint mt-1">
                   {STORAGE_BACKENDS.find(b => b.value === storageBackend)?.description}
                 </p>
               </div>
 
               {/* S3 Configuration */}
               {storageBackend === 's3' && (
-                <div className="space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">S3 / MinIO Settings</p>
+                <div className="space-y-3 p-3 bg-surface-muted rounded-lg border border-line">
+                  <p className="text-xs font-medium text-fg-subtle uppercase tracking-wide">S3 / MinIO Settings</p>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Endpoint *</label>
+                      <label className="block text-xs text-fg-faint mb-0.5">Endpoint *</label>
                       <input
                         type="text"
                         value={storageConfig.endpoint}
                         onChange={(e) => setStorageConfig({ ...storageConfig, endpoint: e.target.value })}
                         placeholder="s3.amazonaws.com"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Bucket *</label>
+                      <label className="block text-xs text-fg-faint mb-0.5">Bucket *</label>
                       <input
                         type="text"
                         value={storageConfig.bucket}
                         onChange={(e) => setStorageConfig({ ...storageConfig, bucket: e.target.value })}
                         placeholder="my-mddb-bucket"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Region</label>
+                      <label className="block text-xs text-fg-faint mb-0.5">Region</label>
                       <input
                         type="text"
                         value={storageConfig.region}
                         onChange={(e) => setStorageConfig({ ...storageConfig, region: e.target.value })}
                         placeholder="us-east-1"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Prefix</label>
+                      <label className="block text-xs text-fg-faint mb-0.5">Prefix</label>
                       <input
                         type="text"
                         value={storageConfig.prefix}
                         onChange={(e) => setStorageConfig({ ...storageConfig, prefix: e.target.value })}
                         placeholder="mddb/"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Access Key</label>
+                      <label className="block text-xs text-fg-faint mb-0.5">Access Key</label>
                       <input
                         type="text"
                         value={storageConfig.accessKey}
                         onChange={(e) => setStorageConfig({ ...storageConfig, accessKey: e.target.value })}
                         placeholder="AKIAIOSFODNN7EXAMPLE"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Secret Key</label>
+                      <label className="block text-xs text-fg-faint mb-0.5">Secret Key</label>
                       <input
                         type="password"
                         value={storageConfig.secretKey}
                         onChange={(e) => setStorageConfig({ ...storageConfig, secretKey: e.target.value })}
                         placeholder={storageConfig.secretKeySet ? 'Stored — leave blank to keep' : 'wJalrXUtnFEMI/K7MDENG...'}
                         aria-describedby="storage-secret-hint"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                       />
                       {/* GO-035: the server never sends a stored secret back,
                           so an empty field means "unchanged", not "none". Say
                           so, or saving looks like it silently dropped one. */}
-                      <p id="storage-secret-hint" className="mt-0.5 text-[11px] text-gray-600">
+                      <p id="storage-secret-hint" className="mt-0.5 text-[11px] text-fg-subtle">
                         {storageConfig.secretKeySet
                           ? 'A secret is stored. Leave blank to keep it, or type a new one to replace it.'
                           : 'No secret stored yet.'}
                       </p>
                     </div>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                  <label className="flex items-center gap-2 text-sm text-fg-subtle cursor-pointer">
                     <input
                       type="checkbox"
                       checked={storageConfig.useTLS}
                       onChange={(e) => setStorageConfig({ ...storageConfig, useTLS: e.target.checked })}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-line-strong text-info focus:ring-focus"
                     />
                     Use TLS (HTTPS)
                   </label>
@@ -398,18 +398,18 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* In-Memory Warning */}
               {storageBackend === 'memory' && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800">Data in this collection will be lost when the server restarts. Use for temporary/scratch data only.</p>
+                <div className="p-3 bg-warning-soft border border-warning-line rounded-lg">
+                  <p className="text-sm text-warning-strong">Data in this collection will be lost when the server restarts. Use for temporary/scratch data only.</p>
                 </div>
               )}
 
               {/* Vector Quantization */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Vector Quantization</label>
+                <label className="block text-sm font-medium text-fg-muted mb-1">Vector Quantization</label>
                 <select
                   value={quantization}
                   onChange={(e) => setQuantization(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                 >
                   {QUANTIZATION_LEVELS.map((q) => (
                     <option key={q.value} value={q.value}>
@@ -417,36 +417,36 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-fg-faint mt-1">
                   {QUANTIZATION_LEVELS.find(q => q.value === quantization)?.description}
                 </p>
               </div>
 
               {/* Quantization Warning */}
               {quantization !== 'float32' && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">After changing quantization, run <span className="font-mono text-xs bg-blue-100 px-1 rounded">vector-reindex --force</span> to re-encode existing vectors.</p>
+                <div className="p-3 bg-info-soft border border-info-line rounded-lg">
+                  <p className="text-sm text-info-strong">After changing quantization, run <span className="font-mono text-xs bg-info-muted px-1 rounded">vector-reindex --force</span> to re-encode existing vectors.</p>
                 </div>
               )}
 
               {/* Temporal Tracking */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Temporal Tracking</label>
-                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <label className="block text-sm font-medium text-fg-muted">Temporal Tracking</label>
+                <label className="flex items-center gap-2 text-sm text-fg-subtle cursor-pointer">
                   <input
                     type="checkbox"
                     checked={trackAccess}
                     onChange={(e) => setTrackAccess(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-line-strong text-info focus:ring-focus"
                   />
                   Track document access events
                 </label>
-                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <label className="flex items-center gap-2 text-sm text-fg-subtle cursor-pointer">
                   <input
                     type="checkbox"
                     checked={trackHot}
                     onChange={(e) => setTrackHot(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-line-strong text-info focus:ring-focus"
                   />
                   Maintain hot-docs leaderboard
                 </label>
@@ -454,25 +454,25 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Spell Correction */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Spell Correction</label>
-                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <label className="block text-sm font-medium text-fg-muted">Spell Correction</label>
+                <label className="flex items-center gap-2 text-sm text-fg-subtle cursor-pointer">
                   <input
                     type="checkbox"
                     checked={spellCorrect}
                     onChange={(e) => setSpellCorrect(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-line-strong text-info focus:ring-focus"
                   />
                   Auto-correct FTS queries
                 </label>
                 {spellCorrect && (
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Override spell language (optional)</label>
+                    <label className="block text-xs text-fg-faint mb-0.5">Override spell language (optional)</label>
                     <input
                       type="text"
                       value={spellLang}
                       onChange={(e) => setSpellLang(e.target.value)}
                       placeholder="e.g. en, de, fr (leave empty to use query lang)"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                     />
                   </div>
                 )}
@@ -480,42 +480,42 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Revision Retention (v2.9.15+) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Revision History Retention</label>
+                <label className="block text-sm font-medium text-fg-muted mb-1">Revision History Retention</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
                     min="0"
                     value={maxRevisions}
                     onChange={(e) => setMaxRevisions(e.target.value)}
-                    className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-32 px-3 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-focus text-sm"
                   />
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-fg-faint">
                     {Number(maxRevisions) > 0
                       ? `Keep last ${maxRevisions} revisions per document`
                       : 'Unlimited (default) — every update retained'}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-fg-faint mt-1">
                   Older revisions are trimmed synchronously on every write so history can&apos;t grow unbounded on high-churn collections.
                 </p>
               </div>
 
               {/* Retrieval profile (RAG-001, v2.12.0+) */}
               <div>
-                <span className="block text-sm font-medium text-gray-700 mb-1">Retrieval Defaults</span>
-                <p className="text-xs text-gray-500 mb-2">
+                <span className="block text-sm font-medium text-fg-muted mb-1">Retrieval Defaults</span>
+                <p className="text-xs text-fg-faint mb-2">
                   Search settings stored with the collection instead of repeated by every client.
                   A request that passes its own value always wins; leave a field empty to keep MDDB&apos;s default.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="cc-search-type" className="block text-xs text-gray-500 mb-0.5">Default search type</label>
+                    <label htmlFor="cc-search-type" className="block text-xs text-fg-faint mb-0.5">Default search type</label>
                     <select
                       id="cc-search-type"
                       value={retrievalSearchType}
                       onChange={(e) => setRetrievalSearchType(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                     >
                       <option value="">MDDB default</option>
                       <option value="fts">Full-text</option>
@@ -525,7 +525,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   </div>
 
                   <div>
-                    <label htmlFor="cc-top-k" className="block text-xs text-gray-500 mb-0.5">Results per search (topK)</label>
+                    <label htmlFor="cc-top-k" className="block text-xs text-fg-faint mb-0.5">Results per search (topK)</label>
                     <input
                       id="cc-top-k"
                       type="number"
@@ -534,17 +534,17 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                       value={retrievalTopK}
                       onChange={(e) => setRetrievalTopK(e.target.value)}
                       placeholder="per-endpoint default"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="cc-granularity" className="block text-xs text-gray-500 mb-0.5">Granularity</label>
+                    <label htmlFor="cc-granularity" className="block text-xs text-fg-faint mb-0.5">Granularity</label>
                     <select
                       id="cc-granularity"
                       value={retrievalMode}
                       onChange={(e) => setRetrievalMode(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                     >
                       <option value="">MDDB default (whole document)</option>
                       <option value="parent">Whole document</option>
@@ -557,12 +557,12 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   </div>
 
                   <div>
-                    <label htmlFor="cc-hybrid-fusion" className="block text-xs text-gray-500 mb-0.5">Hybrid fusion</label>
+                    <label htmlFor="cc-hybrid-fusion" className="block text-xs text-fg-faint mb-0.5">Hybrid fusion</label>
                     <select
                       id="cc-hybrid-fusion"
                       value={hybridStrategy}
                       onChange={(e) => setHybridStrategy(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                     >
                       <option value="">MDDB default (alpha)</option>
                       <option value="alpha">Alpha blend</option>
@@ -573,7 +573,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
                   {hybridStrategy !== 'rrf' && (
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">
+                      <label className="block text-xs text-fg-faint mb-0.5">
                         Keyword ↔ semantic balance {hybridAlpha !== '' && `(${hybridAlpha})`}
                       </label>
                       <input
@@ -584,14 +584,14 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                         value={hybridAlpha}
                         onChange={(e) => setHybridAlpha(e.target.value)}
                         placeholder="0.5"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                       />
-                      <p className="text-xs text-gray-400 mt-0.5">0 = keyword only, 1 = semantic only</p>
+                      <p className="text-xs text-fg-faint mt-0.5">0 = keyword only, 1 = semantic only</p>
                     </div>
                   )}
 
                   <div>
-                    <label htmlFor="cc-context-budget" className="block text-xs text-gray-500 mb-0.5">Context budget (tokens)</label>
+                    <label htmlFor="cc-context-budget" className="block text-xs text-fg-faint mb-0.5">Context budget (tokens)</label>
                     <input
                       id="cc-context-budget"
                       type="number"
@@ -599,9 +599,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                       value={contextTokenBudget}
                       onChange={(e) => setContextTokenBudget(e.target.value)}
                       placeholder="no cap"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                     />
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-fg-faint mt-0.5">
                       Drops results from the tail once the total would exceed this. Approximate, not tokenised.
                     </p>
                   </div>
@@ -617,13 +617,13 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Response prompt (RAG-002, v2.12.0+) */}
               <div>
-                <label htmlFor="cc-response-prompt" className="block text-sm font-medium text-gray-700 mb-1">Answer Formatting</label>
-                <p className="text-xs text-gray-500 mb-2">
+                <label htmlFor="cc-response-prompt" className="block text-sm font-medium text-fg-muted mb-1">Answer Formatting</label>
+                <p className="text-xs text-fg-faint mb-2">
                   How answers drawn from this collection should be shaped — numbered steps for runbooks,
                   code blocks for API docs. Applied automatically by the chat service and handed to MCP agents
                   with their search results, so it travels with the data instead of living in every client.
-                  Use <code className="px-1 bg-gray-100 rounded">{'{{collection}}'}</code> and{' '}
-                  <code className="px-1 bg-gray-100 rounded">{'{{query}}'}</code> as placeholders.
+                  Use <code className="px-1 bg-surface-subtle rounded">{'{{collection}}'}</code> and{' '}
+                  <code className="px-1 bg-surface-subtle rounded">{'{{query}}'}</code> as placeholders.
                 </p>
                 <textarea
                   id="cc-response-prompt"
@@ -631,9 +631,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   onChange={(e) => setResponsePrompt(e.target.value.slice(0, 4096))}
                   rows={4}
                   placeholder="e.g. Answer as numbered steps. Quote the exact command for each step and name the file it belongs in."
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-1.5 border border-line-strong rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-focus"
                 />
-                <p className={`text-xs mt-0.5 ${responsePrompt.length > 3800 ? 'text-amber-600' : 'text-gray-400'}`}>
+                <p className={`text-xs mt-0.5 ${responsePrompt.length > 3800 ? 'text-warning' : 'text-fg-faint'}`}>
                   {responsePrompt.length} / 4096 characters
                   {responsePrompt.length > 3800 && ' — this is prepended to every prompt, so it competes with the answer for context'}
                 </p>
@@ -641,17 +641,17 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* At-Rest Encryption (ISO 27001 A.8.24 / SOC 2 CC6.7) */}
               <div>
-                <span className="block text-sm font-medium text-gray-700 mb-1">At-Rest Encryption</span>
-                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <span className="block text-sm font-medium text-fg-muted mb-1">At-Rest Encryption</span>
+                <label className="flex items-center gap-2 text-sm text-fg-subtle cursor-pointer">
                   <input
                     type="checkbox"
                     checked={encrypted}
                     onChange={(e) => setEncrypted(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-line-strong text-info focus:ring-focus"
                   />
                   <span>Encrypt this collection (AES-256-GCM)</span>
                 </label>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-fg-faint mt-1">
                   Requires <span className="font-mono">MDDB_ENCRYPTION_KEY</span> to be set on the server. Legacy plaintext documents remain readable after enabling.
                 </p>
               </div>
@@ -659,18 +659,18 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
               {/* Custom Metadata */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Custom Metadata</label>
+                  <label className="block text-sm font-medium text-fg-muted">Custom Metadata</label>
                   <button
                     type="button"
                     onClick={addMetaEntry}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                    className="flex items-center gap-1 text-xs text-info hover:text-info"
                   >
                     <Plus className="w-3 h-3" />
                     Add
                   </button>
                 </div>
                 {customMeta.length === 0 ? (
-                  <p className="text-xs text-gray-400">No custom metadata defined</p>
+                  <p className="text-xs text-fg-faint">No custom metadata defined</p>
                 ) : (
                   <div className="space-y-2">
                     {customMeta.map((entry, idx) => (
@@ -680,19 +680,19 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                           value={entry.key}
                           onChange={(e) => updateMetaEntry(idx, 'key', e.target.value)}
                           placeholder="Key"
-                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                         />
                         <input
                           type="text"
                           value={entry.value}
                           onChange={(e) => updateMetaEntry(idx, 'value', e.target.value)}
                           placeholder="Value"
-                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus"
                         />
                         <button
                           type="button"
                           onClick={() => removeMetaEntry(idx)}
-                          className="p-1 text-red-400 hover:text-red-600"
+                          className="p-1 text-danger hover:text-danger-strong"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -704,8 +704,8 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Error */}
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-800">{error}</p>
+                <div className="p-3 bg-danger-soft border border-danger-line rounded-lg">
+                  <p className="text-sm text-danger-strong">{error}</p>
                 </div>
               )}
 
@@ -714,7 +714,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="flex-1 px-4 py-2 text-fg-muted bg-surface-subtle hover:bg-surface-strong rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

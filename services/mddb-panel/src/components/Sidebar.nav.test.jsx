@@ -135,13 +135,13 @@ describe('Sidebar collections', () => {
     for (const [name, icon] of [['b', 'globe'], ['c', 'image'], ['d', 'music'], ['e', 'file-text'], ['f', 'folder'], ['g', 'folder']]) {
       expect(row(name).querySelector(`svg[class*="lucide-${icon}"]`), `${name} shows ${icon}`).not.toBeNull();
     }
-    expect(row('a').className).toContain('bg-blue-100');
-    expect(row('b').className).not.toContain('bg-blue-100');
+    expect(row('a').className).toContain('bg-info-muted');
+    expect(row('b').className).not.toContain('bg-info-muted');
 
     fireEvent.click(screen.getByText('b'));
     expect(useStore.getState().currentCollection).toBe('b');
     expect(useStore.getState().viewMode).toBe('documents');
-    expect(row('b').className).toContain('bg-blue-100');
+    expect(row('b').className).toContain('bg-info-muted');
   });
 
   test('an answer without configs, or a refused one, leaves the folder icon', async () => {
@@ -168,12 +168,12 @@ describe('Sidebar administration', () => {
     expect(screen.queryByRole('button', { name: 'Users' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Cluster' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Automation' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'System Info' }).className).toContain('bg-blue-100');
+    expect(screen.getByRole('button', { name: 'System Info' }).className).toContain('bg-info-muted');
 
     fireEvent.click(screen.getByRole('button', { name: 'Configuration' }));
     expect(useStore.getState().viewMode).toBe('config');
-    expect(screen.getByRole('button', { name: 'Configuration' }).className).toContain('bg-blue-100');
-    expect(screen.getByRole('button', { name: 'System Info' }).className).not.toContain('bg-blue-100');
+    expect(screen.getByRole('button', { name: 'Configuration' }).className).toContain('bg-info-muted');
+    expect(screen.getByRole('button', { name: 'System Info' }).className).not.toContain('bg-info-muted');
 
     act(() => useStore.setState({ config: { authEnabled: true, replicationRole: 'primary', automationsEnabled: false } }));
     expect(screen.getByRole('button', { name: 'Users' })).toBeTruthy();

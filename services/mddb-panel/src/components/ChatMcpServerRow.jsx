@@ -34,7 +34,7 @@ export default function ChatMcpServerRow({ index, row, set, remove, secrets, sce
   };
 
   return (
-    <li className="space-y-2 rounded border border-gray-300 p-3">
+    <li className="space-y-2 rounded border border-line-strong p-3">
       <div className="grid gap-2 md:grid-cols-2">
         <div>
           <label htmlFor={`${id}-name`} className={labelClass}>Server name</label>
@@ -63,27 +63,27 @@ export default function ChatMcpServerRow({ index, row, set, remove, secrets, sce
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-800">
+        <label className="flex items-center gap-2 text-sm text-fg-soft">
           <input
             type="checkbox"
             role="switch"
             checked={row.enabled}
             onChange={(e) => set('enabled', e.target.checked)}
-            className="h-4 w-4 rounded border-gray-400 text-primary-700 focus:ring-primary-500"
+            className="h-4 w-4 rounded border-line-strong text-accent focus:ring-focus"
           />
           Server enabled
         </label>
-        <button type="button" onClick={test} disabled={busy || !row.url.trim()} className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:opacity-50">
+        <button type="button" onClick={test} disabled={busy || !row.url.trim()} className="flex items-center gap-1 rounded border border-line-strong px-2 py-1 text-sm text-fg-soft hover:bg-surface-subtle disabled:opacity-50">
           <PlugZap className="h-4 w-4" aria-hidden="true" /> {busy ? 'Testing…' : 'Test connection'}
         </button>
-        <button type="button" onClick={remove} aria-label={`Remove server ${row.name || index + 1}`} className="ml-auto rounded p-1 text-gray-700 hover:bg-gray-100">
+        <button type="button" onClick={remove} aria-label={`Remove server ${row.name || index + 1}`} className="ml-auto rounded p-1 text-fg-muted hover:bg-surface-subtle">
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
       <ChatMcpIdentity id={id} row={row} set={set} secretNames={(secrets || []).map((s) => s.name)} />
-      {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
+      {error && <p role="alert" className="rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
       {inspected && (
-        <p className="text-xs text-gray-700">
+        <p className="text-xs text-fg-muted">
           Connected to {inspected.serverName || 'the server'} {inspected.serverVersion}: {inspected.tools.length} tools.
         </p>
       )}

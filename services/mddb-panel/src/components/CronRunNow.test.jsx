@@ -33,7 +33,7 @@ describe('RunNowButton', () => {
     expect(button.disabled).toBe(true);
     refuse(new Error('the previous run of this rule is still going'));
     expect((await screen.findByRole('status')).textContent).toContain('still going');
-    expect(screen.getByRole('status').className).toContain('text-red-700');
+    expect(screen.getByRole('status').className).toContain('text-danger');
   });
 
   test('a 503 says to start the server with MDDB_CRONS=true, not the raw error (2.19.6)', async () => {
@@ -57,7 +57,7 @@ describe('LastRunResult', () => {
     render(<LastRunResult rule={rule} />);
     const line = screen.getByText(/Last run:/);
     expect(line.textContent).toContain('Last run: error · +2 ~0 =0 −0 ✕1 · 1 of 3 sources failed');
-    expect(line.className).toContain('text-red-700');
+    expect(line.className).toContain('text-danger');
   });
 
   test('a git sync names the ref and links the commit to the forge (2.19.5)', () => {
@@ -84,6 +84,6 @@ describe('LastRunResult', () => {
     render(<LastRunResult rule={{ id: 'b1', backup: {}, lastResult: { status: 'success' } }} />);
     const line = screen.getByText(/Last run:/);
     expect(line.textContent).toContain('Last run: success');
-    expect(line.className).toContain('text-gray-600');
+    expect(line.className).toContain('text-fg-subtle');
   });
 });

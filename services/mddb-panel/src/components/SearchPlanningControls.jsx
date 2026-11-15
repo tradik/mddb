@@ -5,13 +5,13 @@
 // box shows only when its handler is given.
 export default function SearchPlanningControls({ explain, onExplainChange, decomposition, onDecompositionChange }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-700">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-fg-muted">
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
           checked={explain}
           onChange={(e) => onExplainChange(e.target.checked)}
-          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          className="rounded border-line-strong text-accent focus:ring-focus"
         />
         <span>Explain plan</span>
       </label>
@@ -21,7 +21,7 @@ export default function SearchPlanningControls({ explain, onExplainChange, decom
             type="checkbox"
             checked={decomposition === 'auto'}
             onChange={(e) => onDecompositionChange(e.target.checked ? 'auto' : 'off')}
-            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            className="rounded border-line-strong text-accent focus:ring-focus"
           />
           <span>Split multi-part questions</span>
         </label>

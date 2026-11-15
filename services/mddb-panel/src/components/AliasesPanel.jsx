@@ -9,7 +9,7 @@ import { useStore } from '../lib/store';
 // lists only aliases whose collection the caller may read; creating or moving
 // one needs write on the new target and on the old one.
 
-const inputClass = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+const inputClass = 'w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus';
 
 /** Aliases view: list, create or move, delete. */
 export default function AliasesPanel() {
@@ -67,40 +67,40 @@ export default function AliasesPanel() {
   const collections = (stats?.collections || []).map((c) => c.name);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+    <div className="flex-1 overflow-y-auto p-6 bg-surface-muted">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-surface rounded-lg shadow p-6">
           <div className="flex items-center mb-2">
-            <Link2 className="w-5 h-5 text-primary-600 mr-2" aria-hidden="true" />
-            <h2 className="text-lg font-semibold text-gray-900">Collection aliases</h2>
+            <Link2 className="w-5 h-5 text-accent mr-2" aria-hidden="true" />
+            <h2 className="text-lg font-semibold text-fg">Collection aliases</h2>
           </div>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-fg-subtle mb-4">
             An alias is a stable name for a collection: REST, gRPC, MCP and GraphQL accept it wherever they take a
             collection. Moving an alias to another collection is atomic — a running search sees the old collection or
             the new one, never both. An alias cannot take the name of an existing collection or point at another
             alias, and deleting it leaves its collection.
           </p>
 
-          {error && <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
-          {message && <output className="mb-3 block rounded border border-green-200 bg-green-50 p-2 text-sm text-green-800">{message}</output>}
+          {error && <p role="alert" className="mb-3 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
+          {message && <output className="mb-3 block rounded border border-success-line bg-success-soft p-2 text-sm text-success-strong">{message}</output>}
 
           {aliases.length === 0 ? (
-            <p className="text-sm text-gray-600">No aliases.</p>
+            <p className="text-sm text-fg-subtle">No aliases.</p>
           ) : (
-            <ul className="divide-y divide-gray-200 mb-4">
+            <ul className="divide-y divide-line mb-4">
               {aliases.map((a) => (
                 <li key={a.alias} className="py-2 flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-gray-900">{a.alias}</span>
-                    <ArrowRight className="w-4 h-4 text-gray-600" aria-label="points at" />
-                    <span className="text-gray-700">{a.collection}</span>
+                    <span className="font-medium text-fg">{a.alias}</span>
+                    <ArrowRight className="w-4 h-4 text-fg-subtle" aria-label="points at" />
+                    <span className="text-fg-muted">{a.collection}</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => remove(a.alias)}
                     disabled={busy}
                     aria-label={`Delete alias ${a.alias}`}
-                    className="rounded p-1.5 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    className="rounded p-1.5 text-danger hover:bg-danger-soft disabled:opacity-50"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -111,7 +111,7 @@ export default function AliasesPanel() {
 
           <form onSubmit={save} className="mt-4 grid gap-2 md:grid-cols-[1fr_1fr_auto] items-end">
             <div>
-              <label htmlFor="alias-name" className="block text-xs text-gray-600">Alias</label>
+              <label htmlFor="alias-name" className="block text-xs text-fg-subtle">Alias</label>
               <input
                 id="alias-name"
                 value={form.alias}
@@ -121,7 +121,7 @@ export default function AliasesPanel() {
               />
             </div>
             <div>
-              <label htmlFor="alias-collection" className="block text-xs text-gray-600">Collection</label>
+              <label htmlFor="alias-collection" className="block text-xs text-fg-subtle">Collection</label>
               <input
                 id="alias-collection"
                 list="alias-collections"
@@ -142,7 +142,7 @@ export default function AliasesPanel() {
               Save alias
             </button>
           </form>
-          <p className="mt-2 text-xs text-gray-600">Saving an existing alias moves it to the new collection.</p>
+          <p className="mt-2 text-xs text-fg-subtle">Saving an existing alias moves it to the new collection.</p>
         </div>
       </div>
     </div>

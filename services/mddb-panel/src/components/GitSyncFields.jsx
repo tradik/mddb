@@ -78,8 +78,8 @@ export default function GitSyncFields({ value, onChange }) {
         secrets={secrets}
         hint="Verifies POST /v1/automation/{id}/hook (GitHub X-Hub-Signature-256, GitLab X-Gitlab-Token, Gitea/Forgejo signatures). Empty: no webhook."
       />
-      {secretsError && <p role="alert" className="md:col-span-2 text-xs text-red-700">Stored secrets could not be listed: {secretsError}</p>}
-      <p className="md:col-span-2 text-xs text-gray-600">
+      {secretsError && <p role="alert" className="md:col-span-2 text-xs text-danger">Stored secrets could not be listed: {secretsError}</p>}
+      <p className="md:col-span-2 text-xs text-fg-subtle">
         Secret values are write-only: set them in Chat → MCP secrets (needs MDDB_ENCRYPTION_KEY). This form only names them.
       </p>
       <Check wide checked={value.adopt} onChange={set('adopt')}>

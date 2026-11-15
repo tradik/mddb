@@ -63,13 +63,13 @@ export default function SecurityDashboard() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-line flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <Shield className="w-5 h-5 text-primary-600" />
+          <h3 className="text-lg font-semibold text-fg flex items-center gap-2">
+            <Shield className="w-5 h-5 text-accent" />
             Security Dashboard
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-fg-faint mt-0.5">
             ISO 27001 / SOC 2 compliance posture and recent incidents.
           </p>
         </div>
@@ -86,17 +86,17 @@ export default function SecurityDashboard() {
       <div className="p-4 space-y-4">
         <ProductionStatusCard compliance={compliance} error={complianceErr} />
 
-        <section className="border border-gray-200 rounded-lg bg-white">
-          <header className="px-4 py-2 border-b border-gray-200">
-            <h4 className="text-sm font-semibold text-gray-900">Recent auth failures (last hour)</h4>
+        <section className="border border-line rounded-lg bg-surface">
+          <header className="px-4 py-2 border-b border-line">
+            <h4 className="text-sm font-semibold text-fg">Recent auth failures (last hour)</h4>
           </header>
           <div className="p-3">
             {authFailures.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">No authentication failures recorded in the last hour.</p>
+              <p className="text-xs text-fg-faint italic">No authentication failures recorded in the last hour.</p>
             ) : (
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-gray-600 border-b border-gray-200">
+                  <tr className="text-left text-fg-subtle border-b border-line">
                     <th className="py-1 font-semibold">Actor</th>
                     <th className="py-1 font-semibold">IP</th>
                     <th className="py-1 font-semibold text-right">Count</th>
@@ -105,14 +105,14 @@ export default function SecurityDashboard() {
                 </thead>
                 <tbody>
                   {authFailures.slice(0, 10).map((row, idx) => (
-                    <tr key={idx} className="border-b border-gray-100">
+                    <tr key={idx} className="border-b border-line-soft">
                       <td className="py-1 font-mono">{row.actor || '-'}</td>
                       <td className="py-1 font-mono">{row.ip || '-'}</td>
                       <td className="py-1 text-right font-semibold">{row.count}</td>
                       <td className="py-1 text-right">
                         <button
                           onClick={() => openAuditFor({ actor: row.actor, result: 'fail' })}
-                          className="text-primary-600 hover:text-primary-700 inline-flex items-center gap-1"
+                          className="text-accent hover:text-accent inline-flex items-center gap-1"
                         >
                           <FileSearch className="w-3 h-3" />
                           View
@@ -126,20 +126,20 @@ export default function SecurityDashboard() {
           </div>
         </section>
 
-        <section className="border border-gray-200 rounded-lg bg-white">
-          <header className="px-4 py-2 border-b border-gray-200 flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900">Rate-limit & metrics</h4>
+        <section className="border border-line rounded-lg bg-surface">
+          <header className="px-4 py-2 border-b border-line flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-fg">Rate-limit & metrics</h4>
             <a
               href="/metrics"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-primary-600 hover:text-primary-700 inline-flex items-center gap-1"
+              className="text-xs text-accent hover:text-accent inline-flex items-center gap-1"
             >
               View Prometheus metrics
               <ExternalLink className="w-3 h-3" />
             </a>
           </header>
-          <div className="p-3 text-xs text-gray-600">
+          <div className="p-3 text-xs text-fg-subtle">
             Rate-limit breaches and other operational counters are exported on the <span className="font-mono">/metrics</span> endpoint
             (Prometheus format). Subscribe via a webhook for the <span className="font-mono">security.rate_limit_exceeded</span>{' '}
             event to receive real-time alerts.
@@ -148,12 +148,12 @@ export default function SecurityDashboard() {
 
         <ExporterStatusSection exporters={exporters} />
 
-        <section className="border border-gray-200 rounded-lg bg-white">
-          <header className="px-4 py-2 border-b border-gray-200 flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900">Recent incident events</h4>
+        <section className="border border-line rounded-lg bg-surface">
+          <header className="px-4 py-2 border-b border-line flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-fg">Recent incident events</h4>
             <button
               onClick={() => openAuditFor({ action: 'security.' })}
-              className="text-xs text-primary-600 hover:text-primary-700 inline-flex items-center gap-1"
+              className="text-xs text-accent hover:text-accent inline-flex items-center gap-1"
             >
               Open Audit Log
               <FileSearch className="w-3 h-3" />
@@ -161,19 +161,19 @@ export default function SecurityDashboard() {
           </header>
           <div className="p-3">
             {incidents.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">No recent security or ops incidents recorded.</p>
+              <p className="text-xs text-fg-faint italic">No recent security or ops incidents recorded.</p>
             ) : (
               <ul className="space-y-1 text-xs">
                 {incidents.map((e, idx) => (
-                  <li key={idx} className="flex items-start gap-2 border-b border-gray-100 pb-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <li key={idx} className="flex items-start gap-2 border-b border-line-soft pb-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-gray-900">{e.action}</p>
-                      <p className="text-gray-500">
+                      <p className="font-mono text-fg">{e.action}</p>
+                      <p className="text-fg-faint">
                         {formatTs(e.ts)} · actor={e.actor || '-'} · ip={e.ip || '-'}
                       </p>
                       {e.detail && (
-                        <p className="text-gray-600 truncate" title={e.detail}>
+                        <p className="text-fg-subtle truncate" title={e.detail}>
                           {e.detail}
                         </p>
                       )}
@@ -192,25 +192,25 @@ export default function SecurityDashboard() {
 function ProductionStatusCard({ compliance, error }) {
   if (error) {
     return (
-      <section className="border border-red-200 rounded-lg bg-red-100 p-4">
-        <p className="text-sm text-red-900">Failed to load compliance status: {error}</p>
+      <section className="border border-danger-line rounded-lg bg-danger-muted p-4">
+        <p className="text-sm text-danger-strong">Failed to load compliance status: {error}</p>
       </section>
     );
   }
   if (!compliance) {
     return (
-      <section className="border border-gray-200 rounded-lg bg-white p-4">
-        <p className="text-sm text-gray-500">Loading compliance status…</p>
+      <section className="border border-line rounded-lg bg-surface p-4">
+        <p className="text-sm text-fg-faint">Loading compliance status…</p>
       </section>
     );
   }
   if (compliance.production && compliance.compliant) {
     return (
-      <section className="border border-green-200 rounded-lg bg-green-100 p-4 flex items-start gap-3">
-        <CheckCircle2 className="w-5 h-5 text-green-900 flex-shrink-0 mt-0.5" />
+      <section className="border border-success-line rounded-lg bg-success-muted p-4 flex items-start gap-3">
+        <CheckCircle2 className="w-5 h-5 text-success-strong flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-semibold text-green-900">Production mode active</p>
-          <p className="text-xs text-green-900 mt-0.5">
+          <p className="text-sm font-semibold text-success-strong">Production mode active</p>
+          <p className="text-xs text-success-strong mt-0.5">
             All ISO 27001 / SOC 2 envelope variables are configured.
           </p>
         </div>
@@ -218,22 +218,22 @@ function ProductionStatusCard({ compliance, error }) {
     );
   }
   return (
-    <section className="border border-red-200 rounded-lg bg-red-100 p-4">
+    <section className="border border-danger-line rounded-lg bg-danger-muted p-4">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="w-5 h-5 text-red-900 flex-shrink-0 mt-0.5" />
+        <AlertTriangle className="w-5 h-5 text-danger-strong flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-sm font-semibold text-red-900">
+          <p className="text-sm font-semibold text-danger-strong">
             {compliance.production ? 'Production mode — missing requirements' : 'Development mode (not compliant)'}
           </p>
-          <p className="text-xs text-red-900 mt-0.5">
+          <p className="text-xs text-danger-strong mt-0.5">
             The following envelope variables must be set for ISO 27001 / SOC 2 compliance:
           </p>
           <ul className="mt-2 space-y-1">
             {(compliance.missing || []).map((m) => (
-              <li key={m.envVar} className="text-xs text-red-900">
+              <li key={m.envVar} className="text-xs text-danger-strong">
                 <span className="font-mono font-semibold">{m.envVar}</span>
-                <span className="text-red-800"> — want {m.want}</span>
-                <span className="block text-[10px] text-red-800 ml-2">{m.reason}</span>
+                <span className="text-danger-strong"> — want {m.want}</span>
+                <span className="block text-[10px] text-danger-strong ml-2">{m.reason}</span>
               </li>
             ))}
           </ul>
@@ -245,21 +245,21 @@ function ProductionStatusCard({ compliance, error }) {
 
 function ExporterStatusSection({ exporters }) {
   return (
-    <section className="border border-gray-200 rounded-lg bg-white">
-      <header className="px-4 py-2 border-b border-gray-200 flex items-center gap-2">
-        <Send className="w-4 h-4 text-primary-600" />
-        <h4 className="text-sm font-semibold text-gray-900">Audit log export</h4>
+    <section className="border border-line rounded-lg bg-surface">
+      <header className="px-4 py-2 border-b border-line flex items-center gap-2">
+        <Send className="w-4 h-4 text-accent" />
+        <h4 className="text-sm font-semibold text-fg">Audit log export</h4>
       </header>
       <div className="p-3">
         {exporters.length === 0 ? (
-          <p className="text-xs text-gray-500 italic">
+          <p className="text-xs text-fg-faint italic">
             No external sinks configured. Set <span className="font-mono">MDDB_AUDIT_EXPORT_WEBHOOK_URL</span>
             {' '}or <span className="font-mono">MDDB_AUDIT_EXPORT_SYSLOG_ADDR</span> to mirror audit events to a SIEM or syslog collector.
           </p>
         ) : (
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-600 border-b border-gray-200">
+              <tr className="text-left text-fg-subtle border-b border-line">
                 <th className="py-1 font-semibold">Sink</th>
                 <th className="py-1 font-semibold">Target</th>
                 <th className="py-1 font-semibold text-right">Delivered</th>
@@ -270,13 +270,13 @@ function ExporterStatusSection({ exporters }) {
             </thead>
             <tbody>
               {exporters.map((e, idx) => (
-                <tr key={idx} className="border-b border-gray-100">
+                <tr key={idx} className="border-b border-line-soft">
                   <td className="py-1 font-mono">{e.name}</td>
-                  <td className="py-1 font-mono text-gray-600 truncate max-w-[200px]" title={e.target}>{maskTarget(e.target)}</td>
-                  <td className="py-1 text-right font-mono text-green-700">{e.delivered}</td>
-                  <td className="py-1 text-right font-mono text-red-700">{e.failed}</td>
-                  <td className="py-1 text-right font-mono text-amber-700">{e.dropped}</td>
-                  <td className="py-1 text-gray-500 truncate max-w-[260px]" title={e.lastError || ''}>{e.lastError || ''}</td>
+                  <td className="py-1 font-mono text-fg-subtle truncate max-w-[200px]" title={e.target}>{maskTarget(e.target)}</td>
+                  <td className="py-1 text-right font-mono text-success">{e.delivered}</td>
+                  <td className="py-1 text-right font-mono text-danger">{e.failed}</td>
+                  <td className="py-1 text-right font-mono text-warning">{e.dropped}</td>
+                  <td className="py-1 text-fg-faint truncate max-w-[260px]" title={e.lastError || ''}>{e.lastError || ''}</td>
                 </tr>
               ))}
             </tbody>

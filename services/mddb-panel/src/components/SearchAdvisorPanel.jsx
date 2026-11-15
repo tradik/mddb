@@ -19,10 +19,10 @@ import {
 
 function Stat({ label, value, hint }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3">
-      <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className="mt-0.5 text-lg font-semibold text-gray-900">{value}</div>
-      {hint && <div className="mt-0.5 text-[11px] text-gray-500">{hint}</div>}
+    <div className="rounded-lg border border-line bg-surface p-3">
+      <div className="text-xs font-medium text-fg-faint">{label}</div>
+      <div className="mt-0.5 text-lg font-semibold text-fg">{value}</div>
+      {hint && <div className="mt-0.5 text-[11px] text-fg-faint">{hint}</div>}
     </div>
   );
 }
@@ -30,9 +30,9 @@ function Stat({ label, value, hint }) {
 function Setting({ label, value }) {
   if (!value && value !== 0) return null;
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-gray-100 py-1.5 last:border-0">
-      <span className="text-xs text-gray-600">{label}</span>
-      <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold text-gray-900">
+    <div className="flex items-baseline justify-between gap-3 border-b border-line-soft py-1.5 last:border-0">
+      <span className="text-xs text-fg-subtle">{label}</span>
+      <code className="rounded bg-surface-subtle px-1.5 py-0.5 text-xs font-semibold text-fg">
         {String(value)}
       </code>
     </div>
@@ -78,13 +78,13 @@ export default function SearchAdvisorPanel() {
   const coverage = embeddedCoverage(profile);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-gray-50 p-4">
+    <div className="flex h-full flex-col overflow-y-auto bg-surface-muted p-4">
       <div className="mb-4 flex items-center gap-2">
-        <Compass className="h-5 w-5 text-primary-600" aria-hidden="true" />
-        <h2 className="text-base font-semibold text-gray-900">Search Advisor</h2>
+        <Compass className="h-5 w-5 text-accent" aria-hidden="true" />
+        <h2 className="text-base font-semibold text-fg">Search Advisor</h2>
       </div>
 
-      <p className="mb-4 max-w-2xl text-sm text-gray-600">
+      <p className="mb-4 max-w-2xl text-sm text-fg-subtle">
         Measures this collection and recommends how to search it — search type,
         ranking algorithm, vector index, result shape — with a reason for every
         choice. It measures the corpus, not your queries, so disagreeing with a
@@ -95,7 +95,7 @@ export default function SearchAdvisorPanel() {
         <div>
           <label
             htmlFor="advisor-collection"
-            className="mb-1 block text-xs font-medium text-gray-600"
+            className="mb-1 block text-xs font-medium text-fg-subtle"
           >
             Collection
           </label>
@@ -108,7 +108,7 @@ export default function SearchAdvisorPanel() {
               setApplied(false);
             }}
             placeholder="collection name"
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="rounded-lg border border-line-strong px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
           />
         </div>
         <button
@@ -128,7 +128,7 @@ export default function SearchAdvisorPanel() {
             type="button"
             onClick={() => measure({ apply: true })}
             disabled={applying}
-            className="inline-flex items-center gap-2 rounded-lg border border-primary-600 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-primary-600 px-3 py-2 text-sm font-medium text-accent hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
             title="Store this as the collection's retrieval profile, so every client inherits it"
           >
             {applied ? (
@@ -142,7 +142,7 @@ export default function SearchAdvisorPanel() {
       {error && (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800"
+          className="mb-4 flex items-start gap-2 rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger-strong"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
@@ -152,10 +152,10 @@ export default function SearchAdvisorPanel() {
       {advice?.warnings?.length > 0 && (
         <div
           role="alert"
-          className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3"
+          className="mb-4 rounded-lg border border-warning-line bg-warning-soft p-3"
         >
           {advice.warnings.map((w) => (
-            <div key={w} className="flex items-start gap-2 text-sm text-amber-900">
+            <div key={w} className="flex items-start gap-2 text-sm text-warning-strong">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <span>{w}</span>
             </div>
@@ -165,7 +165,7 @@ export default function SearchAdvisorPanel() {
 
       {profile && (
         <>
-          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+          <h3 className="mb-2 text-sm font-semibold text-fg">
             What this collection looks like
           </h3>
           <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -216,8 +216,8 @@ export default function SearchAdvisorPanel() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">Recommended</h3>
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <h3 className="mb-2 text-sm font-semibold text-fg">Recommended</h3>
               <Setting label="Search type" value={advice.searchType} />
               <Setting label="Ranking algorithm" value={advice.ftsAlgorithm} />
               <Setting label="Vector index" value={advice.vectorAlgorithm} />
@@ -238,11 +238,11 @@ export default function SearchAdvisorPanel() {
               ) : null}
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">Why</h3>
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <h3 className="mb-2 text-sm font-semibold text-fg">Why</h3>
               <ul className="space-y-2">
                 {(advice.reasons || []).map((reason) => (
-                  <li key={reason} className="text-xs leading-relaxed text-gray-700">
+                  <li key={reason} className="text-xs leading-relaxed text-fg-muted">
                     {reason}
                   </li>
                 ))}
@@ -253,7 +253,7 @@ export default function SearchAdvisorPanel() {
       )}
 
       {!advice && !loading && !error && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-fg-faint">
           Pick a collection and measure it.
         </p>
       )}

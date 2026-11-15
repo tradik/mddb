@@ -354,7 +354,7 @@ describe('GroupsPanel permissions modal', () => {
     });
     await openPermissions();
     const dialog = modal('Group Permissions: ops');
-    const grants = [...dialog.querySelectorAll('.space-y-2 > .bg-gray-50')].map((g) => g.textContent);
+    const grants = [...dialog.querySelectorAll('.space-y-2 > .bg-surface-muted')].map((g) => g.textContent);
     expect(grants).toEqual(['*ReadWriteAdmin (global)', 'blogAdmin (this collection)', 'docsRead']);
   });
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Header: the search-mode switch, Refresh, Logout, and the result-cap notice
-// (#368) it mounts for every view.
+// (#368) it mounts for every view, and the theme switch (FE-015).
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
 
@@ -32,7 +32,7 @@ describe('Header', () => {
     render(<Header onRefresh={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: label }));
     expect(useStore.getState().searchMode).toBe(mode);
-    expect(screen.getByRole('button', { name: label }).className).toContain('bg-white');
+    expect(screen.getByRole('button', { name: label }).className).toContain('bg-surface');
   });
 
   test('Refresh calls the handler; Logout shows only when signed in', () => {
@@ -60,6 +60,12 @@ describe('Header', () => {
     expect(notice.textContent).toContain('The last search (/fts) was capped at 1000 results');
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  test('carries the light / dark / system theme switch (FE-015)', () => {
+    render(<Header onRefresh={() => {}} />);
+    expect(screen.getByRole('group', { name: 'Colour theme' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Dark theme' })).toBeTruthy();
   });
 
   test('a cap without a number names the server limit', () => {
