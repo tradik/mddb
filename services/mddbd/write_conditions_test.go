@@ -252,9 +252,9 @@ func TestDelete_ConditionalOtherSurfaces(t *testing.T) {
 
 func TestGRPCDeleteError(t *testing.T) {
 	for err, want := range map[error]codes.Code{
-		errDocNotFound: codes.NotFound,
+		errDocNotFound:                        codes.NotFound,
 		&RevisionConflictError{Expected: "a"}: codes.Aborted,
-		errors.New("disk"):                     codes.Internal,
+		errors.New("disk"):                    codes.Internal,
 	} {
 		if got := status.Code(grpcDeleteError(err)); got != want {
 			t.Errorf("%v: %v, want %v", err, got, want)
