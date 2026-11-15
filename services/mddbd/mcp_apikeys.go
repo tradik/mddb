@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"mddb/internal/boltx"
@@ -87,12 +88,11 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64, toolsets ...string
 		Toolsets:  toolsets,
 	}
 
-	data, err := json.Marshal(apiKey)
-	if err != nil {
-		return nil, "", err
-	}
+	// Marshal cannot fail on a struct of strings, numbers, a bool and a
+	// string slice.
+	data, _ := json.Marshal(apiKey)
 
-	err = s.handle().Update(func(tx *bolt.Tx) error {
+	err := s.handle().Update(func(tx *bolt.Tx) error {
 		// The bucket is created at startup, but a restore or replication
 		// snapshot can install a database that never had it; the other
 		// methods treat that as "no keys", so Create recreates it rather than
@@ -202,10 +202,7 @@ func (s *mcpAPIKeyStore) Disable(key string) error {
 			return err
 		}
 		ak.Disabled = true
-		updated, err := json.Marshal(ak)
-		if err != nil {
-			return err
-		}
+		updated, _ := json.Marshal(ak) // cannot fail: see Create
 		slog.Info("MCP API key disabled", "name", ak.Name)
 		return b.Put([]byte(key), updated)
 	})
@@ -327,39 +324,26 @@ func (s *Server) handleMCPAPIKeyList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMCPAPIKeyDelete(w http.ResponseWriter, r *http.Request) {
-	if s.mcpKeyStore == nil {
-		http.Error(w, `{"error":"MCP API key store not initialized"}`, http.StatusServiceUnavailable)
-		return
-	}
-	if s.AuthManager != nil {
-		if err := s.AuthManager.CheckPermission(r.Context(), "*", PermAdmin); err != nil {
-			http.Error(w, `{"error":"admin permission required"}`, http.StatusForbidden)
-			return
-		}
-	}
-
-	var req struct {
-		Key string `json:"key"`
-	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
-		return
-	}
-
-	if err := s.mcpKeyStore.Delete(req.Key); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusNotFound)
-		return
-	}
-
-	if s.mcpAuth != nil {
-		s.mcpAuth.InvalidateCache()
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"status":"deleted"}`))
+	s.changeMCPAPIKey(w, r, (*mcpAPIKeyStore).Delete, `{"status":"deleted"}`)
 }
 
 func (s *Server) handleMCPAPIKeyDisable(w http.ResponseWriter, r *http.Request) {
+	s.changeMCPAPIKey(w, r, (*mcpAPIKeyStore).Disable, `{"status":"disabled"}`)
+}
+
+// mcpAPIKeyRef names the key a delete or disable acts on: the full key, or —
+// since 2.19.6, for a caller that only has the listing — its fingerprint.
+type mcpAPIKeyRef struct {
+	Key         string `json:"key"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// errMCPKeyAmbiguous: two stored keys share the fingerprint given.
+var errMCPKeyAmbiguous = errors.New("fingerprint matches more than one key: use the key")
+
+// changeMCPAPIKey runs a delete or disable: admin only, the key named by its
+// value or its fingerprint, the auth cache invalidated afterwards.
+func (s *Server) changeMCPAPIKey(w http.ResponseWriter, r *http.Request, apply func(*mcpAPIKeyStore, string) error, done string) {
 	if s.mcpKeyStore == nil {
 		http.Error(w, `{"error":"MCP API key store not initialized"}`, http.StatusServiceUnavailable)
 		return
@@ -371,16 +355,22 @@ func (s *Server) handleMCPAPIKeyDisable(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	var req struct {
-		Key string `json:"key"`
-	}
+	var req mcpAPIKeyRef
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 		return
 	}
 
-	if err := s.mcpKeyStore.Disable(req.Key); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusNotFound)
+	key, err := s.mcpKeyStore.resolve(req)
+	if err == nil {
+		err = apply(s.mcpKeyStore, key)
+	}
+	if err != nil {
+		status := http.StatusNotFound
+		if errors.Is(err, errMCPKeyAmbiguous) {
+			status = http.StatusConflict
+		}
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), status)
 		return
 	}
 
@@ -389,7 +379,38 @@ func (s *Server) handleMCPAPIKeyDisable(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"status":"disabled"}`))
+	_, _ = w.Write([]byte(done))
+}
+
+// resolve returns the key a reference names: the key itself when given, else
+// the one stored key with that fingerprint. Four bytes of SHA-256 rarely
+// collide, but when two keys share them neither is acted on.
+func (s *mcpAPIKeyStore) resolve(ref mcpAPIKeyRef) (string, error) {
+	if ref.Key != "" || ref.Fingerprint == "" {
+		return ref.Key, nil
+	}
+	var matches []string
+	err := s.handle().View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(mcpAPIKeyBucket))
+		if b == nil {
+			return nil
+		}
+		return b.ForEach(func(k, _ []byte) error {
+			if keyFingerprint(string(k)) == ref.Fingerprint {
+				matches = append(matches, string(k))
+			}
+			return nil
+		})
+	})
+	switch {
+	case err != nil:
+		return "", err
+	case len(matches) > 1:
+		return "", errMCPKeyAmbiguous
+	case len(matches) == 0:
+		return "", fmt.Errorf("key not found")
+	}
+	return matches[0], nil
 }
 
 // InvalidateCache clears the dynamic key cache after key changes.

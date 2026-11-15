@@ -1375,8 +1375,9 @@ paths:
         - MCP
       summary: Delete MCP API key
       description: |
-        Permanently removes a key, identified by its full value. The MCP auth
-        cache is invalidated, so the key stops working immediately.
+        Permanently removes a key, identified by its full value or (2.19.6)
+        by its fingerprint. The MCP auth cache is invalidated, so the key
+        stops working immediately.
 
         Requires admin authentication.
       operationId: deleteMCPKey
@@ -9855,13 +9856,19 @@ components:
 
     MCPAPIKeyRef:
       type: object
-      description: Identifies an existing key by its full value.
-      required:
-        - key
+      description: |
+        Identifies an existing key: by its full value, or (2.19.6) by the
+        `fingerprint` the listing shows. `key` wins when both are sent.
       properties:
         key:
           type: string
           example: mcp_4f3c2a1b8e7d6c5b4a39281706f5e4d3
+        fingerprint:
+          type: string
+          description: |
+            The key's fingerprint from `GET /v1/mcp/keys` (2.19.6). Two
+            stored keys sharing it are refused with 409.
+          example: 9f2a41c7
 
     RotationJob:
       type: object

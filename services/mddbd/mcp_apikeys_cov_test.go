@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -319,5 +320,85 @@ func TestCovDKeyToolsets(t *testing.T) {
 	name, sets, ok := mw.validateFromStore("mcp_legacy")
 	if !ok || name != "legacy" || sets == nil || len(sets) != 0 {
 		t.Errorf("retired toolset = %q %v %v; want valid key limited to nothing", name, sets, ok)
+	}
+}
+
+// TestCovDKeyByFingerprint: since 2.19.6 a delete or disable may name the key
+// by the fingerprint the listing shows (the panel has nothing else), while a
+// request with the key works as before.
+func TestCovDKeyByFingerprint(t *testing.T) {
+	s, mw := covDKeyServer(t)
+	ctx := context.Background()
+	_, key, err := s.mcpKeyStore.Create("by-fp", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fp := keyFingerprint(key)
+
+	rec := covDKeyRequest(s, s.handleMCPAPIKeyDisable, http.MethodPost, `{"fingerprint":"`+fp+`"}`, ctx)
+	if rec.Code != http.StatusOK || rec.Body.String() != `{"status":"disabled"}` {
+		t.Fatalf("disable by fingerprint = %d %s", rec.Code, rec.Body)
+	}
+	if _, _, ok := mw.validateKey(key); ok {
+		t.Error("key disabled by fingerprint still accepted")
+	}
+	rec = covDKeyRequest(s, s.handleMCPAPIKeys, http.MethodDelete, `{"fingerprint":"`+fp+`"}`, ctx)
+	if rec.Code != http.StatusOK || s.mcpKeyStore.Count() != 0 {
+		t.Fatalf("delete by fingerprint = %d %s, %d keys left", rec.Code, rec.Body, s.mcpKeyStore.Count())
+	}
+	for _, body := range []string{`{"fingerprint":"` + fp + `"}`, `{"fingerprint":"00000000"}`, `{}`} {
+		if rec := covDKeyRequest(s, s.handleMCPAPIKeyDelete, http.MethodPost, body, ctx); rec.Code != http.StatusNotFound {
+			t.Errorf("delete %s = %d, want 404", body, rec.Code)
+		}
+	}
+}
+
+// covDFingerprintTwins finds two keys with the same four-byte fingerprint —
+// a birthday search over about 2^16 candidates.
+func covDFingerprintTwins(t *testing.T) (string, string) {
+	t.Helper()
+	seen := map[string]string{}
+	for i := 0; i < 1<<22; i++ {
+		k := mcpKeySchemePrefix + "twin" + strconv.Itoa(i)
+		fp := keyFingerprint(k)
+		if other, ok := seen[fp]; ok {
+			return other, k
+		}
+		seen[fp] = k
+	}
+	t.Fatal("no fingerprint collision found")
+	return "", ""
+}
+
+func TestCovDKeyFingerprintAmbiguousOrUnreadable(t *testing.T) {
+	s, _ := covDKeyServer(t)
+	ctx := context.Background()
+	a, b := covDFingerprintTwins(t)
+	if err := s.mcpKeyStore.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(mcpAPIKeyBucket))
+		for _, k := range []string{a, b} {
+			if err := bucket.Put([]byte(k), []byte(`{"name":"twin"}`)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"fingerprint":"` + keyFingerprint(a) + `"}`
+	if rec := covDKeyRequest(s, s.handleMCPAPIKeyDelete, http.MethodPost, body, ctx); rec.Code != http.StatusConflict {
+		t.Errorf("ambiguous fingerprint = %d %s, want 409", rec.Code, rec.Body)
+	}
+	if s.mcpKeyStore.Count() != 2 {
+		t.Error("an ambiguous fingerprint must not delete either key")
+	}
+
+	covDDropKeyBucket(t, s.mcpKeyStore.db)
+	if _, err := s.mcpKeyStore.resolve(mcpAPIKeyRef{Fingerprint: "00000000"}); err == nil {
+		t.Error("no bucket: the fingerprint names no key")
+	}
+	_ = s.mcpKeyStore.db.Close()
+	if _, err := s.mcpKeyStore.resolve(mcpAPIKeyRef{Fingerprint: "00000000"}); err == nil {
+		t.Error("closed database: resolve must fail")
 	}
 }
