@@ -14,22 +14,34 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 ## Features
 
 ### 📊 Server Statistics Dashboard
+
+![Panel sidebar with server statistics (documents, revisions, database size), the embedding provider and the list of collections with document counts](panel-server-stats.png)
+
 - Real-time database statistics
 - Total documents and revisions count
 - Database size monitoring
 - Collections overview
 
 ### 📁 Collection Browser
+
+![Panel with the docs collection selected in the sidebar and its document list with metadata previews](panel-collection-browser.png)
+
 - List all collections with document counts
 - Quick collection switching
 - Visual collection organization
 
 ### 📄 Document Management
+
+![Document viewer showing REPLICATION.md with its metadata, the Expiry and Classify boxes and the rendered content](panel-document-viewer.png)
+
 - Browse documents with metadata preview
 - View full document content
 - Display rich metadata
 - **Edit documents** - Modify content and metadata
 - **Markdown editor with live preview** - Split view with real-time rendering
+
+  ![Edit Document dialog: metadata rows and the Markdown editor in split view, source on the left and the rendered preview on the right](panel-document-editor.png)
+
 - **Markdown toolbar** - Quick formatting (bold, italic, headings, lists, tables, etc.)
 - **Syntax highlighting** - Code blocks with 100+ language support
 - **Templates** - Pre-built templates for common document types
@@ -38,6 +50,9 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 - View document revision information
 
 ### 🌐 API Endpoints Browser
+
+![API Endpoints page with HTTP, gRPC and MCP tabs and the HTTP table of methods, paths, descriptions and auth icons](panel-api-endpoints.png)
+
 - Tabbed view of all HTTP, gRPC, and MCP endpoints
 - HTTP tab with method badges, paths, descriptions, and auth status icons
 - gRPC tab with method names and descriptions
@@ -45,6 +60,9 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 - Link to versioned OpenAPI spec on GitHub (auto-detects server version)
 
 ### 🔍 Advanced Filtering
+
+![Vector search on the places collection with the metadata filter open and the category values landmark and museum selected](panel-metadata-filter.png)
+
 - Filter documents by metadata fields
 - Multiple filter criteria support
 - Sort by date, key, or custom fields
@@ -52,6 +70,8 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 - Configurable result limits
 
 ### 🗺️ Vector Space Explorer
+
+![Vector Space page: a 2D projection of the docs collection's embeddings, one coloured dot per chunk, with a crosshair marking the projected query](panel-vector-space.png)
 
 - 2D PCA projection of a collection's embeddings (server-side, sampled)
 - Each dot is a document chunk; colors group chunks of the same document
@@ -87,12 +107,18 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   shows the ref and the short commit linked to its page on the forge, and
   *up to date … nothing downloaded or written* when the commit was the last
   run's.
+
+  ![Automation rule editor for a git source: repository URL, ref latest-release, include and exclude globs, token and webhook secrets picked by name](panel-automation-git-source.png)
+
 - **Search playground**: vector index `Auto (server chooses)` on vector,
   hybrid and cross-collection search; *Explain plan* shows how the search ran
   (index, filter strategy, candidates, reasons, feedback, query parts);
   *Split multi-part questions* sends `queryDecomposition: "auto"`; vector
   results can be marked relevant / not relevant and the next search sends
   them as relevance feedback.
+
+  ![Vector search with Explain plan ticked: the How this search ran box names the index, filter strategy and candidates above the ranked results](panel-search-explain-plan.png)
+
 - **Result cap**: when a search answer says `limitCapped` (or `/v1/search`
   sends `X-Limit-Capped`), a notice names the endpoint and the limit.
 - **Collection settings**: vector index, summary mode and weight, result cap
@@ -122,6 +148,9 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   `GET /v1/collection-config` returns. Each bar is a `progressbar` whose
   `aria-valuetext` repeats the numbers; amber from 80%, red at the limit,
   and the state is also said in words.
+
+  ![Collection settings with a quota: one bar per limit, documents at 86% in amber with Close to the limit, stored bytes and vectors in blue](panel-collection-quota.png)
+
 - **Accessibility fixes** (2.18.10): a document row and its delete button are
   sibling buttons (a button nested in a button was invalid HTML and hid the
   delete from screen readers); the create-user, create-group, edit-group and
@@ -135,11 +164,17 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 - **Collection Aliases** page: aliases and their collections, create or move
   an alias (one atomic step), delete one (its collection stays). An alias
   cannot take the name of a collection or point at another alias.
+
+  ![Collection Aliases page listing code pointing at mddbd and docs-current pointing at docs, with the form to create or move an alias](panel-collection-aliases.png)
+
 - **Retrieval Evaluation** page: a collection's stored evaluation set
   (`/v1/eval-queries`; expected keys, optional grades 0–3) and a run of it
   (`POST /v1/eval`) under up to four presets, with *k* from 1 to 100. The
   table shows recall@k, nDCG@k, MRR, p50/p99 latency and tokens, marks the
   best nDCG, and gives each failed configuration's error. Cancel stops the run.
+
+  ![Retrieval Evaluation run over six stored queries with four configurations: recall, nDCG, MRR, latency and tokens, best nDCG marked](panel-retrieval-evaluation.png)
+
 - **Code Symbols** page: `GET /v1/symbol` for one name in one collection.
   It lists definitions, references, callers, callees, tests and siblings as
   path:line passages, with their text when asked, and says when a list was
@@ -151,6 +186,11 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   the only cue (contrast above 7:1, WCAG 2.2). An ambiguous name lists its
   candidates; choosing one asks again with its qualified name and file.
   Passages from facts say which definition they are `for`.
+
+  ![Code Symbols lookup of syncSource in the mddbd collection with the badge Precision: semantic (gopls) and its definitions, references and callers as path:line passages](panel-code-symbols.png)
+
+  ![Code Symbols lookup of an ambiguous name: the list of its eight definitions to pick from, each with its type and file](panel-code-symbol-candidates.png)
+
 - **Indexing status** (System page): queued embedding and metadata work for
   the server or one collection, with a progress bar, image embedding, and the
   collections whose index is still training. It refreshes every 5 s until
@@ -160,6 +200,9 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   the file size, the space a compaction gives back, bytes per collection by
   category (content, metadata, full text, vectors, other), with a text
   alternative, and bytes per bucket.
+
+  ![System page cards: Indexing status at 100% embedded, and Storage with file size, space a compaction reclaims and bytes per collection by category](panel-indexing-storage.png)
+
 - **Collection settings** list the syncs writing to and the triggers watching
   the collection (`GET /v1/automation?collection=`), each sync or backup with
   its last result and a Run now button; a git source shows its repository
@@ -186,6 +229,8 @@ A scenario is one assistant: its prompt, what it must not say, the
 collections it may search, its style, model and limits. The chat service
 polls the store's version counter, shown next to the page title, and picks
 up a saved scenario without a restart.
+
+![Chat scenarios tab: the scenario list, the editor of docs-assistant with prompt, guardrails and allowed collections, and the composed prompt with its size](panel-chat-scenarios.png)
 
 - **List**: every scenario the signed-in user may read (read permission on
   all of its collections), with an *off* badge on a disabled one.
@@ -223,6 +268,9 @@ refused request (403) reads *Not permitted* and says which grant it needs.
   `/v1/memory/*`, filtered by user and scenario; a session's history, *Add a
   message*, *Summarize*, *Start a session*, and a *Recall* box showing what
   an agent gets back for a query. The API has no delete — sessions expire.
+
+  ![Agent Memory page: the Recall box, the sessions table and one session's history of user and assistant messages](panel-agent-memory.png)
+
 - **Collection Schemas** page: the collections that validate metadata, a JSON
   editor for a collection's schema with parse errors inline, *Delete schema*
   (confirmed) and *Validate a document*, a dry run of `/v1/validate`.
@@ -235,6 +283,9 @@ refused request (403) reads *Not permitted* and says which grant it needs.
 - **Duplicates** page: `/v1/find-duplicates` with mode (identical, similar,
   both, minhash), threshold, document limit and distance; each group's
   documents open in the viewer or are deleted after a confirmation.
+
+  ![Duplicates page on the places collection: groups of identical content and similar meaning, each document with Open and Delete](panel-duplicates.png)
+
 - **My Account** page (with authentication on): the signed-in identity from
   `/v1/auth/me` — also named in the header — and the user's own API keys:
   create with an optional expiry (the secret is shown once, with a copy
@@ -270,6 +321,8 @@ instructions in the `SKILL.md` format that scenarios attach
 (`/v1/chat/skills`, [API.md](API.md#chat-skills-v1chatskills)). Skills are
 part of system prompts, so the whole tab needs admin on `"*"`.
 
+![Chat skills tab: the skill list with versions, the editor of cite-sources, and a line diff of version 1 against version 2](panel-chat-skills.png)
+
 - **List**: name, description, version, size, source (host, path and short
   commit, or *pasted*) and how many scenarios use it.
 - **Editor**: name (fixed once saved), description and the instructions.
@@ -301,6 +354,8 @@ The scenario editor has a section *External knowledge (MCP)* (MCP-005,
 [API.md](API.md#external-mcp-servers-v1chatmcp)): foreign MCP servers whose
 read-only tools the assistant may call next to its collections.
 
+![External knowledge (MCP) section of a scenario: server name, URL, credential, timeout and result limit, Test connection, and an allowed tool marked Active](panel-chat-mcp-server.png)
+
 - **Add an MCP server**: a name, an `https://` URL (MCP Streamable HTTP), a
   credential picked from the stored secrets, a timeout and a result limit
   (empty: 8000 ms and 4000 characters), and a *Server enabled* switch.
@@ -324,12 +379,16 @@ read-only tools the assistant may call next to its collections.
   (`encryptionReady: false`) the form is disabled and says to set the key
   and restart mddbd; a refusal from the server is shown as it is.
 
+  ![MCP secrets card: stored secret names marked set, the scenario using each, and the write-only form to set or replace a value](panel-chat-mcp-secrets.png)
+
 ### Chat conversation log (2.19.0)
 
 The Chat page's third tab, *Log* (#406,
 [API.md](API.md#chat-conversation-log-v1chatlog)), shows what visitors asked
 the scenarios that log their turns, and how the assistant did. It needs a
 global administrator: the log holds every user's turns.
+
+![Conversation log: turns with time, scenario, user, question, answer, outcome and rating, one row expanded to its model, tokens and tool calls](panel-chat-log.png)
 
 - **Filters**: scenario, a date range (from / to, a whole day each), an
   outcome (*answered*, *no results*, *refused*, *error*), and the shortcuts
@@ -349,6 +408,8 @@ global administrator: the log holds every user's turns.
   count, how many found nothing, the last time asked and the scenarios —
   what to document next. *Minimum count* and *Score threshold* narrow it.
 
+  ![Docs gaps view: questions whose searches found nothing, with how often they were asked, the last time and the scenario](panel-chat-docs-gaps.png)
+
 The scenario editor has a *Conversation log* section: *Log every turn of this
 scenario* (off by default), *Log retention (days)* for anonymous visitors'
 logs (empty or 0: the server's 30 days) and *Redact e-mails, tokens and card
@@ -367,6 +428,8 @@ packs, classification, duplicates, images, webhooks, collection schemas,
 collection aliases, cross search, search tuning and full-text tuning.
 Documents, collections,
 full-text and vector search, auth and backups are always on and not listed.
+
+![Features page: modules grouped by category, each with its switch, description and default, and Turn on all / Turn off all buttons](panel-features.png)
 
 - **Categories**: the modules sit under the same headings as their pages in
   the menu — Search, Data, Chat, Integrations — and a module a
@@ -420,6 +483,9 @@ open, so a first visit shows the same pages as before.
 - **Search the menu**: the box above the groups filters pages by name,
   ignoring case and accents, and opens every group with a match; Escape
   clears it.
+
+  ![Sidebar menu filtered by the text ch: only the matching pages remain, under their open groups](panel-menu-search.png)
+
 - **Every group folds**, the one of the page on screen too (2.19.2; before,
   System could not be folded on the default page, System Info). Reaching a
   page in a folded group from elsewhere unfolds that group; a fold is kept

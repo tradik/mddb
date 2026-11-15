@@ -294,6 +294,8 @@ radius, pick the algorithm and hit Search. Results are drawn as pins
 and listed to the right; clicking a pin opens the document in the
 shared viewer.
 
+![Geo Search tab: OpenStreetMap map with a 5 km radius around the query point, result pins, and the nearest places listed with distances](panel-geo-search.png)
+
 No map-provider key is needed — OpenStreetMap tiles are used directly
 with their public attribution. If you need a different tile source
 (Mapbox, Stamen, Carto), edit the `tileLayer` URL in

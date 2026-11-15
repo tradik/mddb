@@ -71,6 +71,8 @@ curl -X PUT http://localhost:11023/v1/collection-config \
 
 In the web admin panel, open **Collection Settings** for any collection and select the desired quantization level from the **Vector Quantization** dropdown.
 
+![Collection Settings dialog with the Vector Quantization dropdown set to float32 (no compression)](panel-collection-settings.png)
+
 ### Check Quantization Status
 
 ```bash

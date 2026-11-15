@@ -301,6 +301,8 @@ unset MDDB_ENCRYPTION_KEYS_PREVIOUS
 
 The admin panel exposes the same workflow under **Sidebar → Encryption**: keyID, per-collection coverage, "Start rotation" button, and a job table.
 
+![At-rest encryption page: the primary key id, read-only previous keys and per-collection key coverage](panel-encryption.png)
+
 ---
 
 ## Audit Log Export (ISO 27001 / SOC 2)

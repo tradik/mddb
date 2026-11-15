@@ -1007,6 +1007,8 @@ the secret's value and content type `application/json`.
 
 The MDDB Panel (React web UI) includes an **Automations** section under the Administration area. From the Panel you can:
 
+![Automation page: rules of every type with schedules, sync and backup targets, last results and Run now, edit and delete buttons](panel-automation.png)
+
 - **List** all webhooks, triggers, and crons with status badges (enabled/disabled).
 - **Create** new automation rules using a form-based UI with type selection.
 - **Edit** existing rules inline.
@@ -1017,6 +1019,9 @@ The MDDB Panel (React web UI) includes an **Automations** section under the Admi
 - **Choose a cron rule's action** (2.18.10): call a webhook, take a [scheduled backup](BACKUP.md) (local directory or S3, retention `keep`, collections) or [sync a source](#synced-sources) (sitemap, URL list or S3 prefix, `prune`, `maxDocuments`, max MiB per document). A stored S3 secret is never shown: leave the field blank to keep it.
 - **Run a sync or backup now** (2.19.0): the Run now button of a sync or backup rule starts it and shows the job id; the rule's row shows its last result (status, the sync's counts, the error).
 - **Sync a git repository** (2.19.5): *Git repository* as the source shows the repository URL, the ref (a branch, a tag or `latest-release`, explained under the field), include and exclude globs (one per line), the forge (only for a host other than github.com, gitlab.com and codeberg.org), the token and webhook secrets — picked by name from the stored secrets, each marked *set* or not; their values are written in Chat → MCP secrets and never shown — and *Adopt*. A git rule's last result names the ref and the short commit, linked to the commit's page on the forge, and says plainly when the commit was the last run's: *up to date … nothing downloaded or written*.
+
+  ![Automation rule editor for a git source: repository URL, ref latest-release, include and exclude globs, token and webhook secrets picked by name](panel-automation-git-source.png)
+
 - **Read the log** (Logs tab): rule type, status, HTTP status, and per run what it did — the webhook URL, the backup's target and how many old backups retention removed, or a sync's added / updated / unchanged / deleted / failed counts.
 
 The Panel communicates with the same `/v1/automation` REST API documented above. No additional configuration is required.

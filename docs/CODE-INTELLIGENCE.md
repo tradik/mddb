@@ -49,6 +49,8 @@ Code Symbols page shows the same answer. Run `mddb-cli autoindex . --semantic`
 again after changes: it sends only the documents whose content or facts
 changed.
 
+![Code Symbols page asking for the definition and implementations of the syncSource interface, with source text: three implementing structs found by gopls](panel-code-implementations.png)
+
 ## Language servers
 
 `mddb-cli` uses the first server it finds on `PATH`, one language at a time.

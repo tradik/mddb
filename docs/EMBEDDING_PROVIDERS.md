@@ -337,6 +337,8 @@ export MDDB_EMBEDDING_DIMENSIONS=1536
 
 5. Click **Create**
 
+![Add Embedding Model dialog: ID, name, provider, model, dimensions, API key, API URL and Set as default](panel-embedding-model-form.png)
+
 ### Import Current Config
 
 If you're using environment variables and want to migrate to database config:

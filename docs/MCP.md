@@ -329,6 +329,8 @@ Key features:
 - **Cache** — lookups cached for `MDDB_MCP_API_KEY_CACHE_TTL` (default 60s), auto-invalidated on create/delete/disable
 - **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab)
 
+  ![LLM Connections page, API Keys tab: a new key shown once with a copy button, and the stored key docs-agent](panel-mcp-api-keys.png)
+
 ### OAuth 2.1 for claude.ai connectors (v2.18.1)
 
 Claude Code and the Claude API's MCP connector send an API key. claude.ai's
