@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.6] - 2026-11-15
+
 ### Added
 
 - **Conditional create (#423).** `POST /v1/add` takes `ifAbsent: true` and writes the document only when it does not exist yet. If it exists, the answer is `409 {"error":"revision conflict","expectedRevision":"","currentRevision":"…"}` and nothing is written. The check runs inside the write's transaction, so two clients creating the same key at once cannot both succeed. A document past its TTL counts as absent. Combining `ifAbsent` with `expectedRevision` is a `400`. The same option exists as gRPC `AddRequest.if_absent` (field 8, `ABORTED`), MCP `add_document` `if_absent` and GraphQL `addDocument(ifAbsent:)`. The Elasticsearch-compatible `_create` now uses this check instead of reading the document before writing it.
