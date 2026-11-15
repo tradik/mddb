@@ -8,11 +8,11 @@
     "source": "github"
   },
   "websiteUrl": "https://mddb.tradik.com",
-  "version": "2.19.5",
+  "version": "2.19.6",
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "docker.io/tradik/mddb:2.19.5",
+      "identifier": "docker.io/tradik/mddb:2.19.6",
       "runtimeHint": "docker",
       "transport": {
         "type": "stdio"
