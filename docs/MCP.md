@@ -682,9 +682,9 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 
 | Tool | Description |
 |------|-------------|
-| `add_document` | Add or update a document in MDDB. |
-| `search_documents` | Search documents with filters and sorting. |
-| `delete_document` | Delete a document from MDDB. |
+| `add_document` | Add or update a document in MDDB. `expected_revision` writes only over that revision; `if_absent` (v2.19.6) only when the document does not exist yet, otherwise a revision conflict and nothing written. |
+| `search_documents` | Search documents with filters and sorting. Since v2.19.6 each document carries `revision`, the value `POST /v1/get` returns (also without the body; not in a `fields` projection). |
+| `delete_document` | Delete a document from MDDB. `expected_revision` (v2.19.6) deletes only while the document is at that revision. |
 | `import_url` | Import a markdown document from a URL. |
 | `set_ttl` | Set or remove time-to-live on a document. |
 | `validate_document` | Validate document metadata against collection schema without adding the document. |

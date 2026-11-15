@@ -61,7 +61,7 @@ func (m *mockGraphQLAdapter) AddDocument(ctx context.Context, collection, key, l
 }
 
 //nolint:unused // Mock method reserved for future GraphQL adapter tests
-func (m *mockGraphQLAdapter) DeleteDocument(ctx context.Context, collection, key, lang string) error {
+func (m *mockGraphQLAdapter) DeleteDocument(ctx context.Context, collection, key, lang string, _ *string) error {
 	return ErrInvalidRequest
 }
 

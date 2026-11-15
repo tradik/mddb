@@ -20,8 +20,8 @@ func (r *mutationResolver) UpdateDocument(ctx context.Context, input UpdateDocum
 }
 
 // DeleteDocument is the resolver for the deleteDocument field.
-func (r *mutationResolver) DeleteDocument(ctx context.Context, collection string, key string, lang string) (bool, error) {
-	if err := r.server.DeleteDocument(ctx, collection, key, lang); err != nil {
+func (r *mutationResolver) DeleteDocument(ctx context.Context, collection string, key string, lang string, expectedRevision *string) (bool, error) {
+	if err := r.server.DeleteDocument(ctx, collection, key, lang, expectedRevision); err != nil {
 		return false, err
 	}
 	return true, nil

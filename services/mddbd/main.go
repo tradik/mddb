@@ -212,6 +212,9 @@ type AddRequest struct {
 	// ExpectedRevision makes the write conditional (INT-021): 409 unless
 	// the document is at this revision. Empty = unconditional.
 	ExpectedRevision string `json:"expectedRevision,omitempty"`
+	// IfAbsent makes it a create (#423): 409 with the current revision when
+	// the document exists. Cannot be combined with ExpectedRevision.
+	IfAbsent bool `json:"ifAbsent,omitempty"`
 }
 
 // GetRequest is the HTTP request body for retrieving a document.
@@ -252,6 +255,9 @@ type DeleteRequest struct {
 	Collection string `json:"collection"`
 	Key        string `json:"key"`
 	Lang       string `json:"lang"`
+	// ExpectedRevision makes the delete conditional (#424): 409 unless the
+	// document is at this revision. Empty = unconditional.
+	ExpectedRevision string `json:"expectedRevision,omitempty"`
 }
 
 // DeleteCollectionRequest is the HTTP request body for deleting an entire collection.

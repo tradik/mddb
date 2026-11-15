@@ -372,6 +372,9 @@ message AddRequest {
   string content_md = 5;
   bool save_revision = 6;  // Optional: save revision history (default: false)
   int64 ttl = 7;           // Optional: time-to-live in seconds (0 = no expiry)
+  // (v2.19.6, #423) create only: fail with ABORTED, writing nothing, when the
+  // document already exists (an expired one counts as absent).
+  bool if_absent = 8;
 }
 
 // Batch add request
@@ -1015,6 +1018,9 @@ message DeleteDocumentRequest {
   string collection = 1;
   string key = 2;
   string lang = 3;
+  // (v2.19.6, #424) delete only if the document is still at this revision
+  // (Document.revision); otherwise ABORTED. Empty = unconditional.
+  string expected_revision = 4;
 }
 
 message DeleteDocumentResponse {

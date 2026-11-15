@@ -93,7 +93,7 @@ func TestSemanticFactsSharedCases(t *testing.T) {
 			s, cleanup := newHandlerTestServer(t)
 			defer cleanup()
 			meta, content = tc.input()
-			if _, _, err := s.addDocumentIf("facts", tc.Key, "en", meta, content, 0, false, ""); err != nil {
+			if _, _, err := s.addDocumentIf("facts", tc.Key, "en", meta, content, 0, false, writeCondition{}); err != nil {
 				t.Fatalf("add: %v", err)
 			}
 			if got := symMeta(getDocMeta(t, s, "facts", tc.Key)); !reflect.DeepEqual(got, tc.Stored) {

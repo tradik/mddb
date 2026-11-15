@@ -35,6 +35,10 @@ describe('MddbClient', () => {
     const started = await startServer({
       Add: (call, cb) => {
         lastCall = { method: 'Add', request: call.request, metadata: call.metadata.getMap() };
+        if (call.request.if_absent && call.request.key === 'taken') {
+          cb({ code: grpc.status.ABORTED, message: 'revision conflict: document already exists, current "r1"' });
+          return;
+        }
         cb(null, {
           id: `${call.request.collection}|${call.request.key}|${call.request.lang}`,
           key: call.request.key,
@@ -53,7 +57,15 @@ describe('MddbClient', () => {
       },
       Search: (call, cb) => {
         lastCall = { method: 'Search', request: call.request, metadata: call.metadata.getMap() };
-        cb(null, { documents: [{ key: 'a' }, { key: 'b' }], total: 2 });
+        cb(null, { documents: [{ key: 'a', revision: 'r1' }, { key: 'b', revision: 'r2' }], total: 2 });
+      },
+      DeleteDocument: (call, cb) => {
+        lastCall = { method: 'DeleteDocument', request: call.request, metadata: call.metadata.getMap() };
+        if (call.request.expected_revision === 'stale') {
+          cb({ code: grpc.status.ABORTED, message: 'revision conflict: expected stale, current "r2"' });
+          return;
+        }
+        cb(null, { status: 'deleted', key: call.request.key });
       },
       Stats: (call, cb) => {
         lastCall = { method: 'Stats', request: call.request, metadata: call.metadata.getMap() };
@@ -126,6 +138,45 @@ describe('MddbClient', () => {
       assert.equal(lastCall.request.collection, 'blog');
       assert.equal(lastCall.request.content_md, '# Hello');
       assert.deepEqual(lastCall.request.meta.tag.values, ['go', 'grpc']);
+    } finally {
+      client.close();
+    }
+  });
+
+  test('Add with if_absent creates only a new document (#423)', async () => {
+    const client = new MddbClient(address);
+    try {
+      await client.Add({ collection: 'blog', key: 'fresh', lang: 'en', content_md: 'x', if_absent: true });
+      assert.equal(lastCall.request.if_absent, true);
+      await assert.rejects(
+        () => client.Add({ collection: 'blog', key: 'taken', lang: 'en', content_md: 'x', if_absent: true }),
+        (err) => err.code === grpc.status.ABORTED && /already exists/.test(err.message)
+      );
+    } finally {
+      client.close();
+    }
+  });
+
+  test('DeleteDocument with expected_revision is conditional (#424)', async () => {
+    const client = new MddbClient(address);
+    try {
+      const res = await client.DeleteDocument({ collection: 'blog', key: 'post', lang: 'en', expected_revision: 'r2' });
+      assert.equal(res.status, 'deleted');
+      assert.equal(lastCall.request.expected_revision, 'r2');
+      await assert.rejects(
+        () => client.DeleteDocument({ collection: 'blog', key: 'post', lang: 'en', expected_revision: 'stale' }),
+        (err) => err.code === grpc.status.ABORTED
+      );
+    } finally {
+      client.close();
+    }
+  });
+
+  test('Search results carry each document revision (#425)', async () => {
+    const client = new MddbClient(address);
+    try {
+      const res = await client.Search({ collection: 'blog' });
+      assert.deepEqual(res.documents.map((d) => d.revision), ['r1', 'r2']);
     } finally {
       client.close();
     }

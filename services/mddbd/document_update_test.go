@@ -79,11 +79,11 @@ func TestUpdate_UnconditionalAndAdd(t *testing.T) {
 	}
 	// A conditional add of a document that does not exist yet conflicts.
 	var c *RevisionConflictError
-	if _, _, err := s.addDocumentIf("fs", "new.md", "en", nil, "z", 0, true, "abc"); !errors.As(err, &c) || c.Current != "" {
+	if _, _, err := s.addDocumentIf("fs", "new.md", "en", nil, "z", 0, true, writeCondition{ExpectedRevision: "abc"}); !errors.As(err, &c) || c.Current != "" {
 		t.Fatalf("conditional create: %v", err)
 	}
 	cur, _ := s.loadDocByRef("fs", "a.md", "en")
-	if _, _, err := s.addDocumentIf("fs", "a.md", "en", nil, "w", 0, true, docRevision(cur)); err != nil {
+	if _, _, err := s.addDocumentIf("fs", "a.md", "en", nil, "w", 0, true, writeCondition{ExpectedRevision: docRevision(cur)}); err != nil {
 		t.Fatalf("conditional upsert at the right revision: %v", err)
 	}
 	if docRevision(nil) != "" || (&RevisionConflictError{Expected: "a"}).Error() == "" {

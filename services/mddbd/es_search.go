@@ -160,10 +160,15 @@ func (s *Server) esList(ctx context.Context, index string, spec *esSearchSpec, w
 	if whole {
 		limit = math.MaxInt
 	}
-	docs, total, err := s.shapedListing(ctx, listingQuery{Collection: index, Filter: filter, SortBy: spec.SortField,
+	page, total, err := s.shapedListing(ctx, listingQuery{Collection: index, Filter: filter, SortBy: spec.SortField,
 		Asc: spec.SortAsc, Limit: limit}, LimitReport{})
 	if err != nil {
 		return nil, err
+	}
+	// A hit is the _source Elasticsearch defines, which has no revision.
+	docs := make([]storage.Doc, len(page))
+	for i := range page {
+		docs[i] = page[i].Doc
 	}
 	res := &esResult{Total: total}
 	if whole {

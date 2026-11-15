@@ -42,6 +42,7 @@ var mcpToolOutputSchemas = map[string]map[string]interface{}{
 						"content_md": map[string]interface{}{"type": "string"},
 						"added_at":   map[string]interface{}{"type": "string"},
 						"updated_at": map[string]interface{}{"type": "string"},
+						"revision":   map[string]interface{}{"type": "string"},
 					},
 				},
 			},

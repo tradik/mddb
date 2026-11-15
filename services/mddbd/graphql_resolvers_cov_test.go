@@ -70,7 +70,7 @@ func covFCollectionCalls() []covFAdapterCall {
 			return covFIgnore(a.UpdateDocument(ctx, gql.UpdateDocumentInput{Collection: "docs", Key: "k1", Lang: "en"}))
 		}},
 		{"DeleteDocument", func(ctx context.Context, a *GraphQLAdapter) error {
-			return a.DeleteDocument(ctx, "docs", "k1", "en")
+			return a.DeleteDocument(ctx, "docs", "k1", "en", nil)
 		}},
 		{"DeleteCollection", func(ctx context.Context, a *GraphQLAdapter) error {
 			return covFIgnore(a.DeleteCollection(ctx, "docs"))

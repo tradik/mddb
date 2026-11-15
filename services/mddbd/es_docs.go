@@ -90,13 +90,14 @@ func (s *Server) esPut(index, id string, doc *esDocument, lang string, create bo
 	if doc.Lang != "" {
 		lang = doc.Lang
 	}
-	if create {
-		if _, err := s.loadDocByRef(index, id, lang); err == nil {
-			return 0, "", &esUpstreamError{Status: http.StatusConflict,
-				Message: "[" + id + "]: version conflict, document already exists"}
-		}
+	// _create is a conditional create (#423): checked inside the write, so
+	// two creates of one id cannot both succeed.
+	_, isNew, err := s.addDocumentIf(index, id, lang, doc.Meta, doc.Content, 0, true, writeCondition{IfAbsent: create})
+	var conflict *RevisionConflictError
+	if errors.As(err, &conflict) {
+		return 0, "", &esUpstreamError{Status: http.StatusConflict,
+			Message: "[" + id + "]: version conflict, document already exists"}
 	}
-	_, isNew, err := s.addDocumentIf(index, id, lang, doc.Meta, doc.Content, 0, true, "")
 	if err != nil {
 		return 0, "", err
 	}

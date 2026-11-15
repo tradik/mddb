@@ -44,7 +44,8 @@ func (s *Server) handleAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	saved, _, err := s.addDocumentIf(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, req.TTL, true, req.ExpectedRevision)
+	saved, _, err := s.addDocumentIf(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, req.TTL, true,
+		writeCondition{ExpectedRevision: req.ExpectedRevision, IfAbsent: req.IfAbsent})
 	if err != nil {
 		writeDocWriteError(w, err)
 		return
@@ -145,9 +146,6 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		bad(w, err)
 		return
-	}
-	if page == nil {
-		page = []storage.Doc{}
 	}
 	w.Header().Set("X-Total-Count", fmt.Sprintf("%d", total))
 	writeLimitHeaders(w, limitReport) // the body is a bare array

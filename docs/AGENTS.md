@@ -246,7 +246,8 @@ hybrid search on it uses full text.
 | `positive` / `negative` | Relevance feedback: keys of hits that answered and that did not; the next search moves towards the first | [SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189) |
 | Summaries | The client writes a short summary in meta `summary`; with `retrieval.summaryMode` `blend` or `expand` it is embedded and searched as a second representation. MDDB never generates a summary | [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189) |
 | `wait_for_index`, `wait_for_keys` | Full text finds a document as soon as its write returns; its embedding comes later. These make a vector search wait for named keys instead of polling `get_indexing_status` | [MCP.md](MCP.md#searching-what-you-just-wrote-v2188) |
-| `expected_revision` | Conditional write: fails with a conflict when another agent wrote the document in between | [API.md](API.md#patch-v1update) |
+| `expected_revision` | Conditional write: fails with a conflict when another agent wrote the document in between. `delete_document` takes it too; `search_documents` results carry each `revision` | [API.md](API.md#patch-v1update) |
+| `if_absent` | `add_document` creates only: fails with a conflict when the document already exists, so two agents cannot both create it | [API.md](API.md#post-v1add) |
 | `run_eval`, `add_eval_query` | Measure recall@k and nDCG@k of several configurations on your own questions before choosing one | [API.md](API.md#post-v1eval) |
 
 ```json

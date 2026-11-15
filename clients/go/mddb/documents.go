@@ -29,6 +29,12 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]Document, err
 	return docs, nil
 }
 
+// Delete removes a single document. A missing document is an *APIError with
+// status 404; a lost conditional delete one with status 409.
+func (c *Client) Delete(ctx context.Context, req DeleteRequest) error {
+	return c.doJSON(ctx, "POST", "/v1/delete", req, nil)
+}
+
 // SetTTL sets or clears a document's expiry and returns the updated document.
 func (c *Client) SetTTL(ctx context.Context, req SetTTLRequest) (*Document, error) {
 	var doc Document

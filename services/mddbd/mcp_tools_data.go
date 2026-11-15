@@ -16,6 +16,7 @@ func (s *MCPToolServer) toolAddDocument(ctx context.Context, args map[string]int
 		Meta:       mcpGetMetaMap(args, "meta"),
 
 		ExpectedRevision: mcpGetString(args, "expected_revision"),
+		IfAbsent:         mcpGetBool(args, "if_absent"),
 	}
 
 	doc, err := s.client.Add(ctx, req)
@@ -86,6 +87,8 @@ func (s *MCPToolServer) toolDeleteDocument(ctx context.Context, args map[string]
 		Collection: mcpGetString(args, "collection"),
 		Key:        mcpGetString(args, "key"),
 		Lang:       mcpGetString(args, "lang"),
+
+		ExpectedRevision: mcpGetString(args, "expected_revision"),
 	}
 
 	if err := s.client.Delete(ctx, req); err != nil {

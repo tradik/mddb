@@ -65,6 +65,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 				"type": "object",
 				"properties": map[string]interface{}{
 					"expected_revision": map[string]interface{}{"type": "string", "description": "Write only if the document is still at this revision (from a previous read or write); otherwise fail with a revision conflict instead of overwriting someone else's change"},
+					"if_absent":         map[string]interface{}{"type": "boolean", "description": "Create only: fail with a revision conflict, writing nothing, when the document already exists. Cannot be combined with expected_revision"},
 					"collection":        map[string]interface{}{"type": "string"},
 					"key":               map[string]interface{}{"type": "string"},
 					"lang":              map[string]interface{}{"type": "string"},
@@ -100,9 +101,10 @@ func mcpBuiltinToolsCore() []MCPTool {
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
-					"collection": map[string]interface{}{"type": "string"},
-					"key":        map[string]interface{}{"type": "string"},
-					"lang":       map[string]interface{}{"type": "string"},
+					"collection":        map[string]interface{}{"type": "string"},
+					"key":               map[string]interface{}{"type": "string"},
+					"lang":              map[string]interface{}{"type": "string"},
+					"expected_revision": map[string]interface{}{"type": "string", "description": "Delete only if the document is still at this revision (from a previous read or write); otherwise fail with a revision conflict instead of removing someone else's change"},
 				},
 				"required": []string{"collection", "key", "lang"},
 			},
