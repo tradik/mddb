@@ -224,6 +224,23 @@ const coverageFiles = [
   'src/components/WebhooksPanel.jsx',
   'src/components/CommandModal.jsx',
   'src/components/CurationPanel.jsx',
+  // 2.19.7: the document viewer's More menu — compare a revision or another
+  // document (FE-013), download HTML and print (FE-017), custom templates in
+  // `_templates` (FE-018).
+  'src/lib/meta-diff.js',
+  'src/lib/document-html.js',
+  'src/lib/document-export.jsx',
+  'src/lib/custom-templates.js',
+  'src/lib/markdown-templates.js',
+  'src/components/MetaDiff.jsx',
+  'src/components/RevisionHistory.jsx',
+  'src/components/RevisionPreview.jsx',
+  'src/components/DocumentActions.jsx',
+  'src/components/DocumentCompare.jsx',
+  'src/components/DocumentPrint.jsx',
+  'src/components/DocumentPrintView.jsx',
+  'src/components/TemplatePicker.jsx',
+  'src/components/SaveTemplateDialog.jsx',
 ];
 
 export default mergeConfig(

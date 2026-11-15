@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // NewDocumentModal: key/language inputs, adding and removing metadata (button
 // and Enter key), the markdown content with its default, the busy state while
-// addDocument runs, the optional onSuccess callback and a refused create.
+// addDocument runs, the optional onSuccess callback, a refused create and a
+// template (FE-018) replacing the content and metadata.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
 
@@ -10,6 +11,11 @@ vi.mock('./MarkdownEditor', () => ({
   default: ({ value, onChange }) => (
     <textarea aria-label="markdown" value={value} onChange={(e) => onChange(e.target.value)} />
   ),
+}));
+
+// The picker has its own suite; a stand-in hands over a template.
+vi.mock('./TemplatePicker', () => ({
+  default: ({ onPick }) => <button onClick={() => onPick({ contentMd: '# Meeting', meta: { type: ['notes'] } })}>pick template</button>,
 }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
@@ -114,6 +120,23 @@ describe('NewDocumentModal', () => {
     expect(screen.getByRole('button', { name: 'Create Document' }).disabled).toBe(false);
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('a picked template replaces the content and the metadata (FE-018)', async () => {
+    mddbClient.addDocument.mockResolvedValue({});
+    const { keyInput } = setup();
+    fireEvent.change(screen.getByPlaceholderText('Key (e.g., author)'), { target: { value: 'author' } });
+    fireEvent.change(screen.getByPlaceholderText('Value'), { target: { value: 'Ann' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'pick template' }));
+    expect(screen.getByLabelText('markdown').value).toBe('# Meeting');
+    expect(screen.queryByDisplayValue('author')).toBeNull();
+    expect(screen.getByDisplayValue('type')).toBeTruthy();
+    fireEvent.change(keyInput, { target: { value: 'standup' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Create Document' })));
+    expect(mddbClient.addDocument).toHaveBeenCalledWith({
+      collection: 'blog', key: 'standup', lang: 'en_US', meta: { type: ['notes'] }, contentMd: '# Meeting',
+    });
   });
 
   test('Cancel and the X button close without saving', () => {

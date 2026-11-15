@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
-import { X, RotateCcw, Eye, Loader2, AlertCircle, Check, Clock } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, Eye, Loader2, AlertCircle, Check, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import RevisionPreview from './RevisionPreview';
 
+/**
+ * RevisionHistory is the full-page list of a document's revisions. Picking
+ * one opens RevisionPreview: what it changed against the current version
+ * (FE-013), its rendering, and Restore.
+ */
 export default function RevisionHistory({ document, onClose }) {
   const { setCurrentDocument } = useStore();
   const [revisions, setRevisions] = useState([]);
@@ -15,11 +19,7 @@ export default function RevisionHistory({ document, onClose }) {
   const [restoring, setRestoring] = useState(false);
   const [restoreSuccess, setRestoreSuccess] = useState(false);
 
-  useEffect(() => {
-    loadRevisions();
-  }, [document]);
-
-  const loadRevisions = async () => {
+  const loadRevisions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -34,7 +34,11 @@ export default function RevisionHistory({ document, onClose }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [document]);
+
+  useEffect(() => {
+    loadRevisions();
+  }, [loadRevisions]);
 
   const handleRestore = async (timestamp) => {
     setRestoring(true);
@@ -70,13 +74,14 @@ export default function RevisionHistory({ document, onClose }) {
             <h2 className="text-xl font-semibold text-gray-900">
               Revision History
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-600 mt-1">
               {document.collection} / {document.key} ({document.lang})
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+            aria-label="Close revision history"
+            className="p-2 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100"
           >
             <X className="w-5 h-5" />
           </button>
@@ -90,7 +95,7 @@ export default function RevisionHistory({ document, onClose }) {
           {loading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-              <span className="ml-2 text-sm text-gray-500">Loading revisions...</span>
+              <span className="ml-2 text-sm text-gray-600">Loading revisions...</span>
             </div>
           )}
 
@@ -110,7 +115,7 @@ export default function RevisionHistory({ document, onClose }) {
 
           {!loading && revisions.length === 0 && !error && (
             <div className="flex items-center justify-center py-12">
-              <p className="text-sm text-gray-500">No revisions found</p>
+              <p className="text-sm text-gray-600">No revisions found</p>
             </div>
           )}
 
@@ -123,7 +128,7 @@ export default function RevisionHistory({ document, onClose }) {
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-500">
+                <span className="text-xs font-medium text-gray-600">
                   {idx === 0 ? 'Latest' : `Rev #${revisions.length - idx}`}
                 </span>
                 <Clock className="w-3 h-3 text-gray-400" />
@@ -147,60 +152,17 @@ export default function RevisionHistory({ document, onClose }) {
         {/* Revision Preview */}
         <div className="flex-1 overflow-y-auto">
           {selectedRevision ? (
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {format(new Date(selectedRevision.timestamp * 1000), 'PPpp')}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Content length: {selectedRevision.contentMd?.length || 0} characters
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleRestore(selectedRevision.timestamp)}
-                  disabled={restoring}
-                  className="flex items-center space-x-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
-                >
-                  {restoring ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Restoring...</span>
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="w-4 h-4" />
-                      <span>Restore this version</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {selectedRevision.meta && Object.keys(selectedRevision.meta).length > 0 && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Metadata</h4>
-                  <div className="space-y-1">
-                    {Object.entries(selectedRevision.meta).map(([k, v]) => (
-                      <div key={k} className="text-sm">
-                        <span className="font-medium text-gray-700">{k}:</span>{' '}
-                        <span className="text-gray-600">{Array.isArray(v) ? v.join(', ') : v}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="border border-gray-200 rounded-lg p-4 bg-white prose prose-sm max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {selectedRevision.contentMd || '(empty)'}
-                </ReactMarkdown>
-              </div>
-            </div>
+            <RevisionPreview
+              revision={selectedRevision}
+              current={document}
+              restoring={restoring}
+              onRestore={handleRestore}
+            />
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <Eye className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">Select a revision to preview</p>
+                <p className="text-gray-600">Select a revision to preview</p>
               </div>
             </div>
           )}

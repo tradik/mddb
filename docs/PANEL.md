@@ -44,10 +44,77 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 
 - **Markdown toolbar** - Quick formatting (bold, italic, headings, lists, tables, etc.)
 - **Syntax highlighting** - Code blocks with 100+ language support
-- **Templates** - Pre-built templates for common document types
+- **Templates** - Pre-built templates for common document types, plus your
+  team's own templates kept in the `_templates` collection (2.19.7)
 - **Create new documents** - Add documents directly from UI
 - Copy markdown content to clipboard
-- View document revision information
+- View document revision information, with what each revision changed
+  before you restore it (2.19.7)
+- **More** menu in the viewer (2.19.7): *Compare with…* another document,
+  *Download HTML*, *Print / PDF* and *Save as template* — see
+  [Document viewer: compare, export, templates](#document-viewer-compare-export-templates-2197)
+
+### Document viewer: compare, export, templates (2.19.7)
+
+**Revision changes.** The revision history (the *Revision: N (History)* link
+in the viewer's footer) opens a revision on its **Changes** view: the
+metadata keys it has that the current version does not (and the other way
+round) and a line diff of its content against the current version, both
+read "this revision → current". **Preview** shows the revision rendered as
+the viewer renders documents. *Restore this version* is next to both views,
+so you see what a restore undoes before you press it. Each changed line
+carries a `+`/`-` sign and a screen-reader word ("added", "removed"), and
+each metadata change says "added", "removed" or "changed", so nothing rests
+on colour alone. Very large documents (a differing middle part of more than
+about 2,000 × 2,000 lines) are shown as the old part removed and the new
+part added, instead of a line-by-line match, so the page does not stall.
+
+**Compare with…** (More menu) compares the open document with any other one
+you can read: it starts from the same collection and key, so typing another
+language (`pl_PL`) compares two translations; any collection and key work.
+The result is the same metadata list and line diff, from the open document
+to the other one. A missing document or a refused read shows the server's
+error.
+
+**Download HTML** saves the document as one standalone file,
+`<key>.<lang>.html` (characters a file system refuses are replaced by `-`):
+the key as the title, collection, language and last update, the metadata and
+the rendered content, with a small inline style sheet. The content is
+rendered by the viewer's own Markdown renderer and its sanitizer, so raw
+`<script>`, `<iframe>`, event-handler attributes and `javascript:` links in a
+document do not reach the file; the file also carries a
+Content-Security-Policy that allows no scripts at all. The renderer that
+turns the page into a file is loaded on the first download only.
+
+**Print / PDF** opens the browser's print dialog with only the document on
+the page — no sidebar, header or buttons; choose "Save as PDF" there to get
+a PDF. The panel adds no PDF library; page size, margins and headers are the
+browser's print settings.
+
+**Custom templates.** Templates are ordinary documents in the reserved
+collection `_templates`: the document's key is the template name, its
+Markdown the starting content and its metadata the new document's default
+metadata. They are shared by every panel connected to the server and get
+revisions, backups and replication like any document; you can also edit or
+delete them in the `_templates` collection itself.
+
+- *Save as template* (More menu) writes the open document to `_templates`
+  under a name (its key by default) in the document's language, with its
+  metadata as defaults unless you clear that box. A template of the same
+  name and language is replaced; the earlier one stays in its revision
+  history. The first saved template creates the collection.
+- *New Document* has a **Start from template** list: *Blank document*, the
+  built-in templates and, under *Custom (_templates)*, up to 200 custom ones
+  by name and language. Picking a template replaces the content and the
+  metadata in the form.
+- Permissions are the server's: listing templates needs read permission on
+  `_templates`, saving one needs write permission. Without read permission
+  the list offers only the built-in templates and says why; a refused save
+  shows *Not permitted* with the grant it needs. If `_templates` does not
+  exist yet, the list simply has no custom templates.
+- `_templates` is an ordinary collection name for the server's `/v1` API;
+  only the optional Elasticsearch-compatible surface (`/es`) refuses index
+  names starting with `_`, so templates are not reachable there.
 
 ### 🌐 API Endpoints Browser
 
@@ -689,6 +756,10 @@ Both development and production servers proxy `/v1/*` requests to mddbd:
 
 4. **Copy Content**: Use the "Copy" button to copy markdown content to clipboard.
 
+5. **More**: Compare with another document, download the document as HTML,
+   print it or save it as PDF, or save it as a template (see
+   [Document viewer: compare, export, templates](#document-viewer-compare-export-templates-2197)).
+
 ### Filtering Documents
 
 1. **Open Filters**: Click the "Filters" button in the toolbar.
@@ -754,6 +825,8 @@ Both development and production servers proxy `/v1/*` requests to mddbd:
 3. **Fill Details**:
    - Enter unique document key
    - Select language
+   - Optionally start from a template (built-in or from `_templates`);
+     it replaces the content and the metadata
    - Add metadata (optional)
    - Write markdown content
 
@@ -792,7 +865,16 @@ services/mddb-panel/
 │   │   ├── DocumentList.jsx     # Document browser
 │   │   ├── DocumentViewer.jsx   # Document details view
 │   │   ├── DocumentEditor.jsx   # Document editing modal
+│   │   ├── DocumentActions.jsx  # The viewer's More menu (compare, HTML, print, template)
+│   │   ├── DocumentCompare.jsx  # Compare with… another document (FE-013)
+│   │   ├── DocumentPrint.jsx    # Print / PDF: the document alone under <body> (FE-017)
+│   │   ├── DocumentPrintView.jsx # A document as a page of its own (print and HTML export)
+│   │   ├── RevisionHistory.jsx  # Revision list and restore
+│   │   ├── RevisionPreview.jsx  # One revision: its changes against the current version, preview
+│   │   ├── MetaDiff.jsx         # Metadata keys added, removed, changed
 │   │   ├── NewDocumentModal.jsx # New document creation
+│   │   ├── TemplatePicker.jsx   # Start from template: built-in and `_templates` (FE-018)
+│   │   ├── SaveTemplateDialog.jsx # Save as template
 │   │   ├── MarkdownEditor.jsx   # Markdown editor with preview
 │   │   ├── MarkdownView.jsx     # Markdown renderer shared by the preview and the document viewer
 │   │   ├── MarkdownToolbar.jsx  # Formatting toolbar
@@ -828,7 +910,12 @@ services/mddb-panel/
 │   │   ├── chat-scenario.js     # Scenario form state and its conversion
 │   │   ├── chat-mcp.js          # MCP server rows and inactive reasons
 │   │   ├── chat-log.js          # Log filters to query parameters, labels (#406)
-│   │   ├── markdown-templates.js # Document templates
+│   │   ├── markdown-templates.js # Built-in document templates
+│   │   ├── custom-templates.js  # Templates in the `_templates` collection
+│   │   ├── line-diff.js         # Line diff (skills, revisions, documents)
+│   │   ├── meta-diff.js         # Metadata diff
+│   │   ├── document-html.js     # The standalone page of an HTML export
+│   │   ├── document-export.jsx  # Download HTML
 │   │   └── store.js             # Zustand store
 │   ├── App.jsx                  # Main application
 │   ├── main.jsx                 # Entry point

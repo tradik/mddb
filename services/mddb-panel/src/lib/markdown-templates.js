@@ -464,3 +464,12 @@ export function getTemplate(type) {
 export function getTemplateList() {
   return Object.keys(templates);
 }
+
+/** The names the template pickers show for the built-in templates (FE-018). */
+export const templateLabels = {
+  blog: 'Blog Post',
+  documentation: 'Documentation',
+  readme: 'README',
+  api: 'API Documentation',
+  changelog: 'Changelog',
+};

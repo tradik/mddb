@@ -58,7 +58,11 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - Filter documents by metadata fields
 - Sort by date, key, or custom fields
 - Copy document content
-- View revision history
+- View revision history, with what a revision changed before restoring it
+- Compare a document with any other one (another language, key or collection)
+- Download a document as standalone HTML, or print it / save it as PDF
+- Custom document templates shared through the `_templates` collection
+  (see [docs/PANEL.md](../../docs/PANEL.md#document-viewer-compare-export-templates-2197))
 - Hybrid search mode (BM25 + vector with alpha blending / RRF)
 - Command modal with copy-ready API examples (curl, PHP, Python, JavaScript)
 

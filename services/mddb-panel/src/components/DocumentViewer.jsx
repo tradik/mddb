@@ -7,6 +7,7 @@ import RevisionHistory from './RevisionHistory';
 import ImagePreview from './ImagePreview';
 import DocumentTools from './DocumentTools';
 import MarkdownView from './MarkdownView';
+import DocumentActions from './DocumentActions';
 
 // Error Boundary component
 class ErrorBoundary extends Component {
@@ -231,6 +232,8 @@ export default function DocumentViewer() {
                 </>
               )}
             </button>
+            {/* FE-013/017/018: compare, export, print, save as template */}
+            <DocumentActions document={currentDocument} />
             <button
               onClick={handleDelete}
               style={{ padding: '8px', color: '#9ca3af', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}

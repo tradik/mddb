@@ -2,7 +2,8 @@
 // DocumentViewer: nothing without a document, the loading state before its
 // content arrives, header/metadata/content/footer with their fallbacks, long
 // values that must not widen the pane, Copy, the editor and revision overlays, the
-// delete dialog, hover colours and the Markdown error boundary's raw view.
+// delete dialog, hover colours, the More menu (DocumentActions) and the
+// Markdown error boundary's raw view.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
 import { format } from 'date-fns';
@@ -16,6 +17,7 @@ vi.mock('./RevisionHistory', () => ({
 }));
 vi.mock('./ImagePreview', () => ({ default: ({ docKey }) => <div>image preview {docKey}</div> }));
 vi.mock('./DocumentTools', () => ({ default: ({ document }) => <div>document tools {document.key}</div> }));
+vi.mock('./DocumentActions', () => ({ default: ({ document }) => <div>document actions {document.key}</div> }));
 // The Markdown itself renders through MarkdownView (its own suite); a
 // stand-in throws on a marker so the error boundary can be exercised.
 vi.mock('./MarkdownView', () => ({
@@ -76,6 +78,7 @@ describe('DocumentViewer', () => {
     expect(screen.getByText('Ann')).toBeTruthy();
     expect(screen.getByText('image preview guide')).toBeTruthy();
     expect(screen.getByText('document tools guide')).toBeTruthy();
+    expect(screen.getByText('document actions guide')).toBeTruthy();
     expect(screen.getByText('# Guide')).toBeTruthy();
     expect(screen.getByText('docs')).toBeTruthy();
     expect(screen.getByText(format(new Date(doc.addedAt * 1000), 'PP'))).toBeTruthy();

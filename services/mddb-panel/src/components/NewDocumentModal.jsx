@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Plus, AlertCircle } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import MarkdownEditor from './MarkdownEditor';
+import TemplatePicker from './TemplatePicker';
 
 export default function NewDocumentModal({ collection, onClose, onSuccess }) {
   const [key, setKey] = useState('');
@@ -126,6 +127,14 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
               </select>
             </div>
           </div>
+
+          {/* FE-018: built-in templates and the team's own from _templates */}
+          <TemplatePicker
+            onPick={(template) => {
+              setContentMd(template.contentMd);
+              setMetadata(template.meta);
+            }}
+          />
 
           {/* Metadata Section */}
           <div>

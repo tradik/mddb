@@ -77,3 +77,27 @@ body {
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
 }
+
+/* FE-017: Print / PDF. DocumentPrint puts the document under <body> as
+   .mddb-print-root while the print dialog is open; the printout shows only
+   that, without the panel's navigation, and the screen never shows it. */
+.mddb-print-root {
+  display: none;
+}
+
+@media print {
+  body > :not(.mddb-print-root) {
+    display: none !important;
+  }
+
+  .mddb-print-root {
+    display: block;
+  }
+
+  /* Long code lines wrap on paper instead of being cut at the margin. */
+  .mddb-print-root pre,
+  .mddb-print-root code {
+    white-space: pre-wrap !important;
+    overflow: visible !important;
+  }
+}
