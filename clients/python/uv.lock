@@ -364,7 +364,7 @@ wheels = [
 
 [[package]]
 name = "mddb-client"
-version = "2.19.6"
+version = "2.19.7"
 source = { editable = "." }
 dependencies = [
     { name = "grpcio" },

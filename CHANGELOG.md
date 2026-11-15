@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.7] - 2026-11-15
+
 ### Added
 
 - **Export selected documents (FE-014).** `POST /v1/export` takes an optional `keys` list (`[{"key","lang"}]`) and exports only those documents, in the order listed, each once. A key that names no document is skipped, and an entry without `key` or `lang` is refused with 400. With `filterMeta` as well, only listed documents that also match are exported. Without `keys` the export is unchanged. The MCP tool `export_documents` takes the same `keys`. In the panel, the document list's selection bar (formerly the batch-delete bar) has *Export ZIP* / *Export NDJSON* for the ticked documents, with the file named by the server. Selection and export now also work on read-only collections, where *Delete selected* stays hidden.
