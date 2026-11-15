@@ -21,18 +21,19 @@ import (
 // per-request SaveRevision flag); all other callers pass true to preserve the
 // always-record-a-revision behaviour they have always had.
 func (s *Server) addDocument(collection, key, lang string, meta map[string][]string, contentMD string, ttl int64, saveRevision bool) (storage.Doc, bool, error) {
-	return s.addDocumentIf(collection, key, lang, meta, contentMD, ttl, saveRevision, writeCondition{})
+	return s.addDocumentIf(docWrite{collection: collection, key: key, lang: lang, meta: meta, contentMD: contentMD, ttl: ttl, saveRevision: saveRevision, cond: writeCondition{}})
 }
 
 // addDocumentIf is addDocument made conditional: with cond.ExpectedRevision
 // set, the write succeeds only if the document is at that revision — and
 // fails if it does not exist yet (INT-021); with cond.IfAbsent, only if it
 // does not exist (#423). The zero condition is unconditional.
-func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]string, contentMD string, ttl int64, saveRevision bool, cond writeCondition) (storage.Doc, bool, error) {
-	return s.addDocumentWith(collection, key, lang, meta, contentMD, ttl, saveRevision, cond, postBatchOptions{})
+func (s *Server) addDocumentIf(w docWrite) (storage.Doc, bool, error) {
+	return s.addDocumentWith(w, postBatchOptions{})
 }
 
-// docWrite is one document write through addDocumentWith.
+// docWrite is one document write through addDocumentIf / addDocumentWith;
+// now is set by addDocumentWith.
 type docWrite struct {
 	collection, key, lang string
 	meta                  map[string][]string
@@ -54,12 +55,12 @@ type docWriteResult struct {
 // opts: a system document that must not be embedded, indexed for full text
 // or sent to webhooks (a chat conversation, #405) says so here and still
 // takes the one write path.
-func (s *Server) addDocumentWith(collection, key, lang string, meta map[string][]string, contentMD string, ttl int64, saveRevision bool, cond writeCondition, opts postBatchOptions) (storage.Doc, bool, error) {
-	if err := s.validateDocWrite(collection, key, lang, meta, contentMD, cond); err != nil {
+func (s *Server) addDocumentWith(w docWrite, opts postBatchOptions) (storage.Doc, bool, error) {
+	if err := s.validateDocWrite(w.collection, w.key, w.lang, w.meta, w.contentMD, w.cond); err != nil {
 		return storage.Doc{}, false, err
 	}
-	w := docWrite{collection: collection, key: key, lang: lang, meta: meta, contentMD: contentMD, ttl: ttl,
-		saveRevision: saveRevision, cond: cond, now: time.Now().Unix()}
+	w.now = time.Now().Unix()
+	collection, key, lang := w.collection, w.key, w.lang
 	var res docWriteResult
 	var bo binlog.BinlogOps
 	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {

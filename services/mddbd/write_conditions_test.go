@@ -87,7 +87,7 @@ func TestAdd_IfAbsentReplacesExpired(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.addDocumentIf("art", "old", "en", nil, "fresh", 0, true, writeCondition{IfAbsent: true}); err != nil {
+	if _, _, err := s.addDocumentIf(docWrite{collection: "art", key: "old", lang: "en", meta: nil, contentMD: "fresh", ttl: 0, saveRevision: true, cond: writeCondition{IfAbsent: true}}); err != nil {
 		t.Fatalf("expired counts as absent: %v", err)
 	}
 	if d, _ := s.loadDocByRef("art", "old", "en"); d.ContentMD != "fresh" || d.ExpiresAt != 0 {
@@ -107,7 +107,7 @@ func TestAdd_IfAbsentConcurrentCreates(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_, _, errs[i] = s.addDocumentIf("art", "race", "en", nil, "writer "+itoa(i), 0, true, writeCondition{IfAbsent: true})
+			_, _, errs[i] = s.addDocumentIf(docWrite{collection: "art", key: "race", lang: "en", meta: nil, contentMD: "writer " + itoa(i), ttl: 0, saveRevision: true, cond: writeCondition{IfAbsent: true}})
 		}(i)
 	}
 	wg.Wait()
@@ -318,7 +318,7 @@ func TestSearch_RevisionCoversHiddenFacts(t *testing.T) {
 	content := "package svc\n"
 	idx := "v1 " + semanticContentHash(content) + " 000000000000 gopls/0.24.0"
 	meta := map[string][]string{MetaKeySymIndex: {idx}, MetaKeySymRefs: {"svc/log.go#Log 1,2"}}
-	if _, _, err := s.addDocumentIf(factsCollection, "svc/a.go", "en", meta, content, 0, false, writeCondition{}); err != nil {
+	if _, _, err := s.addDocumentIf(docWrite{collection: factsCollection, key: "svc/a.go", lang: "en", meta: meta, contentMD: content, ttl: 0, saveRevision: false, cond: writeCondition{}}); err != nil {
 		t.Fatal(err)
 	}
 	addTestDoc(t, s, factsCollection, "svc/b.md", "en", "plain", nil)
@@ -340,7 +340,7 @@ func TestWriteConditionValidate(t *testing.T) {
 	if err := (writeCondition{IfAbsent: true, ExpectedRevision: "r"}).validate(); !errors.Is(err, errConflictingConditions) {
 		t.Fatalf("combined: %v", err)
 	}
-	if _, _, err := (&Server{}).addDocumentIf("c", "k", "en", nil, "x", 0, true, writeCondition{IfAbsent: true, ExpectedRevision: "r"}); !errors.Is(err, errConflictingConditions) {
+	if _, _, err := (&Server{}).addDocumentIf(docWrite{collection: "c", key: "k", lang: "en", meta: nil, contentMD: "x", ttl: 0, saveRevision: true, cond: writeCondition{IfAbsent: true, ExpectedRevision: "r"}}); !errors.Is(err, errConflictingConditions) {
 		t.Fatalf("refused before any transaction: %v", err)
 	}
 	if err := (writeCondition{}).validate(); err != nil {

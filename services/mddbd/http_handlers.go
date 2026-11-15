@@ -44,8 +44,7 @@ func (s *Server) handleAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	saved, _, err := s.addDocumentIf(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, req.TTL, true,
-		writeCondition{ExpectedRevision: req.ExpectedRevision, IfAbsent: req.IfAbsent})
+	saved, _, err := s.addDocumentIf(docWrite{collection: req.Collection, key: req.Key, lang: req.Lang, meta: req.Meta, contentMD: req.ContentMD, ttl: req.TTL, saveRevision: true, cond: writeCondition{ExpectedRevision: req.ExpectedRevision, IfAbsent: req.IfAbsent}})
 	if err != nil {
 		writeDocWriteError(w, err)
 		return

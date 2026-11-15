@@ -117,32 +117,9 @@ func (s *Server) handleDocMeta(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var doc storage.Doc
-	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
-		bByK := tx.Bucket([]byte("bykey"))
-		bDocs := tx.Bucket([]byte("docs"))
-		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))
-		if docID == nil {
-			return errDocNotFound
-		}
-		v := bDocs.Get(storage.DocKey(collection, string(docID)))
-		if v == nil {
-			return errDocNotFound
-		}
-		d, err := loadDoc(v)
-		if err != nil {
-			return err
-		}
-		doc = *d
-		return nil
-	})
+	doc, err := s.liveDocByKey(collection, key, lang)
 	if err != nil {
 		bad(w, err)
-		return
-	}
-
-	if doc.ExpiresAt > 0 && doc.ExpiresAt < time.Now().Unix() {
-		bad(w, errDocNotFound)
 		return
 	}
 
@@ -292,4 +269,34 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ok(w, stats)
+}
+
+// liveDocByKey loads one document by collection, key and language, as the
+// metadata endpoints read it (REST and gRPC share it): errDocNotFound when
+// the key is unknown, its document is gone, or it is past its TTL.
+func (s *Server) liveDocByKey(collection, key, lang string) (storage.Doc, error) {
+	var doc storage.Doc
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
+		docID := tx.Bucket([]byte("bykey")).Get(storage.ByKeyKey(collection, key, lang))
+		if docID == nil {
+			return errDocNotFound
+		}
+		v := tx.Bucket([]byte("docs")).Get(storage.DocKey(collection, string(docID)))
+		if v == nil {
+			return errDocNotFound
+		}
+		d, err := loadDoc(v)
+		if err != nil {
+			return err
+		}
+		doc = *d
+		return nil
+	})
+	if err != nil {
+		return storage.Doc{}, err
+	}
+	if doc.ExpiresAt > 0 && doc.ExpiresAt < time.Now().Unix() {
+		return storage.Doc{}, errDocNotFound
+	}
+	return doc, nil
 }

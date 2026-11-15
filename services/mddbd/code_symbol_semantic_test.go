@@ -65,7 +65,7 @@ func addSemDoc(t *testing.T, s *Server, path string, f semFile) {
 			meta[key] = vals
 		}
 	}
-	if _, _, err := s.addDocumentIf(semColl, path, "en", meta, f.content, 0, false, writeCondition{}); err != nil {
+	if _, _, err := s.addDocumentIf(docWrite{collection: semColl, key: path, lang: "en", meta: meta, contentMD: f.content, ttl: 0, saveRevision: false, cond: writeCondition{}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -214,7 +214,7 @@ func TestLookupSymbolSemantic_EditedContentFallsBack(t *testing.T) {
 	// The file changes and nobody recomputes its facts: the write drops them.
 	edited := semRepo["net/conn.go"].content + "\n// edited\n"
 	meta := map[string][]string{"path": {"net/conn.go"}, MetaKeySymIndex: {"v1 " + semanticContentHash(semRepo["net/conn.go"].content) + " 000000000000 gopls/0.24.0"}}
-	if _, _, err := s.addDocumentIf(semColl, "net/conn.go", "en", meta, edited, 0, false, writeCondition{}); err != nil {
+	if _, _, err := s.addDocumentIf(docWrite{collection: semColl, key: "net/conn.go", lang: "en", meta: meta, contentMD: edited, ttl: 0, saveRevision: false, cond: writeCondition{}}); err != nil {
 		t.Fatal(err)
 	}
 	res := lookup(t, s, SymbolRequest{Collection: semColl, Name: "Close", Path: "net/conn.go"})

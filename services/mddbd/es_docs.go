@@ -92,7 +92,7 @@ func (s *Server) esPut(index, id string, doc *esDocument, lang string, create bo
 	}
 	// _create is a conditional create (#423): checked inside the write, so
 	// two creates of one id cannot both succeed.
-	_, isNew, err := s.addDocumentIf(index, id, lang, doc.Meta, doc.Content, 0, true, writeCondition{IfAbsent: create})
+	_, isNew, err := s.addDocumentIf(docWrite{collection: index, key: id, lang: lang, meta: doc.Meta, contentMD: doc.Content, ttl: 0, saveRevision: true, cond: writeCondition{IfAbsent: create}})
 	var conflict *RevisionConflictError
 	if errors.As(err, &conflict) {
 		return 0, "", &esUpstreamError{Status: http.StatusConflict,

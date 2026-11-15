@@ -18,7 +18,7 @@ func TestMetaValuesWithPrefix(t *testing.T) {
 		"svc/b.go": {"svc/log.go#Log 7"},
 	} {
 		meta := map[string][]string{MetaKeySymIndex: {idx}, MetaKeySymRefs: refs}
-		if _, _, err := s.addDocumentIf(factsCollection, key, "en", meta, content, 0, false, writeCondition{}); err != nil {
+		if _, _, err := s.addDocumentIf(docWrite{collection: factsCollection, key: key, lang: "en", meta: meta, contentMD: content, ttl: 0, saveRevision: false, cond: writeCondition{}}); err != nil {
 			t.Fatal(err)
 		}
 	}

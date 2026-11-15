@@ -69,8 +69,7 @@ func (c *DirectClient) Stats(ctx context.Context) (*MCPStats, error) {
 
 // Add creates a new document via the direct client.
 func (c *DirectClient) Add(ctx context.Context, req *MCPAddRequest) (*MCPDocument, error) {
-	saved, _, err := c.server.addDocumentIf(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, 0, true,
-		writeCondition{ExpectedRevision: req.ExpectedRevision, IfAbsent: req.IfAbsent})
+	saved, _, err := c.server.addDocumentIf(docWrite{collection: req.Collection, key: req.Key, lang: req.Lang, meta: req.Meta, contentMD: req.ContentMD, ttl: 0, saveRevision: true, cond: writeCondition{ExpectedRevision: req.ExpectedRevision, IfAbsent: req.IfAbsent}})
 	if err != nil {
 		return nil, err
 	}

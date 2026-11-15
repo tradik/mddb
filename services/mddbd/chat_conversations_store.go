@@ -183,8 +183,7 @@ func (s *Server) chatSave(coll string, conv *ChatConversation) error {
 		"scenario": {conv.Scenario},
 		"ended":    {strconv.FormatBool(conv.Ended)},
 	}
-	saved, _, err := s.addDocumentWith(coll, conv.ID, chatLang, meta, string(body),
-		int64(conv.RetentionDays)*secondsPerDay, false, writeCondition{}, chatWriteOpts)
+	saved, _, err := s.addDocumentWith(docWrite{collection: coll, key: conv.ID, lang: chatLang, meta: meta, contentMD: string(body), ttl: int64(conv.RetentionDays) * secondsPerDay, saveRevision: false, cond: writeCondition{}}, chatWriteOpts)
 	if err != nil {
 		return err
 	}
