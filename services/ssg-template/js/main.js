@@ -51,6 +51,36 @@
         }
     });
 
+    // Mobile docs menu: the sidebar collapses behind a toggle (CSS, below
+    // 768px) that shows the page being read. Escape or picking a link closes it.
+    const sidebarEl = document.querySelector('.sidebar');
+    const sidebarToggle = sidebarEl && sidebarEl.querySelector('.sidebar-toggle');
+    if (sidebarToggle) {
+        const current = sidebarEl.querySelector('.sidebar-list a.active');
+        const currentSlot = sidebarToggle.querySelector('[data-sidebar-current]');
+        if (current && currentSlot) {
+            currentSlot.textContent = current.textContent;
+        }
+        const setSidebarOpen = function (open) {
+            sidebarEl.classList.toggle('open', open);
+            sidebarToggle.setAttribute('aria-expanded', String(open));
+        };
+        sidebarToggle.addEventListener('click', function () {
+            setSidebarOpen(!sidebarEl.classList.contains('open'));
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && sidebarEl.classList.contains('open')) {
+                setSidebarOpen(false);
+                sidebarToggle.focus();
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (!sidebarEl.contains(e.target)) {
+                setSidebarOpen(false);
+            }
+        });
+    }
+
     // Mark active nav link
     document.querySelectorAll('.nav-links a').forEach(function (link) {
         const href = link.getAttribute('href').replace(/\/$/, '');

@@ -19,6 +19,11 @@
     scrollbar-color: var(--border) transparent;
 }
 .sidebar-inner { padding: 1.5rem 1rem; }
+
+/* Mobile docs menu toggle — hidden on wide screens, where the sidebar is a
+   sticky column. Below 768px it replaces the 50-link list that used to push
+   every page's content below several screens of navigation. */
+.sidebar-toggle { display: none; }
 .sidebar-section { margin-bottom: 1.5rem; }
 .sidebar-group-title {
     font-size: .7rem;
@@ -233,6 +238,63 @@
         position: static;
         border-right: none;
         border-bottom: 1px solid var(--border);
+    }
+    /* With JavaScript the list collapses behind a toggle that names the page
+       being read; without it (no .js on <html>) the list stays open. */
+    .js .sidebar {
+        position: sticky;
+        top: var(--navbar-h);
+        z-index: 50;
+        overflow: visible;
+    }
+    .js .sidebar-toggle {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        width: 100%;
+        min-height: 48px;
+        padding: .75rem 1rem;
+        background: var(--bg-secondary);
+        border: 0;
+        font: inherit;
+        font-size: .9rem;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+    }
+    .js .sidebar-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+    .sidebar-toggle-label { font-weight: 600; color: var(--primary); }
+    .sidebar-toggle-current {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: var(--text-secondary);
+    }
+    .sidebar-toggle-current:not(:empty)::before { content: "/ "; color: var(--text-muted); }
+    .sidebar-toggle-chevron {
+        width: .55rem;
+        height: .55rem;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg);
+        transition: transform .2s ease;
+        margin-left: auto;
+    }
+    .js .sidebar.open .sidebar-toggle-chevron { transform: rotate(-135deg); }
+    .js .sidebar-inner { display: none; }
+    .js .sidebar.open .sidebar-inner {
+        display: block;
+        position: absolute;
+        left: 0;
+        right: 0;
+        max-height: calc(100vh - var(--navbar-h) - 48px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        box-shadow: var(--shadow-lg);
     }
     .main-content { padding: 1.5rem 1rem; }
     .doc-title { font-size: 1.75rem; }
