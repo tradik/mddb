@@ -160,8 +160,7 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 	// then FTS/geo/webhooks/SSE/temporal/embedding via firePostBatchHooks).
 	// addDocument also refreshes the read cache (GO-002), so the gRPC Get path
 	// stays coherent without re-marshaling here.
-	saved, _, err := g.server.addDocumentIf(req.Collection, req.Key, req.Lang, meta, req.ContentMd, req.Ttl, req.SaveRevision,
-		writeCondition{IfAbsent: req.IfAbsent})
+	saved, _, err := g.server.addDocumentIf(docWrite{collection: req.Collection, key: req.Key, lang: req.Lang, meta: meta, contentMD: req.ContentMd, ttl: req.Ttl, saveRevision: req.SaveRevision, cond: writeCondition{IfAbsent: req.IfAbsent}})
 	var conflict *RevisionConflictError
 	if errors.As(err, &conflict) { // #423: the document exists
 		return nil, status.Error(codes.Aborted, conflict.Error())

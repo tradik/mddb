@@ -376,7 +376,7 @@ func TestAddDocumentWithSkipsFTS(t *testing.T) {
 	s, cleanup := newHandlerTestServer(t)
 	defer cleanup()
 	for key, opts := range map[string]postBatchOptions{"quiet": {SkipFTS: true}, "loud": {}} {
-		if _, _, err := s.addDocumentWith("optsdoc", key, "en", nil, "zeppelin "+key, 0, false, writeCondition{}, opts); err != nil {
+		if _, _, err := s.addDocumentWith(docWrite{collection: "optsdoc", key: key, lang: "en", meta: nil, contentMD: "zeppelin " + key, ttl: 0, saveRevision: false, cond: writeCondition{}}, opts); err != nil {
 			t.Fatal(err)
 		}
 	}

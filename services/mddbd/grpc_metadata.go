@@ -3,14 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"mddb/internal/storage"
 	proto "mddb/proto"
 	"strings"
-	"time"
 
 	"mddb/internal/schema"
 
-	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -283,34 +280,12 @@ func (g *GRPCServer) GetDocumentMeta(ctx context.Context, req *proto.GetDocument
 		}
 	}
 
-	var doc storage.Doc
-	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bByK := tx.Bucket([]byte("bykey"))
-		bDocs := tx.Bucket([]byte("docs"))
-		docID := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
-		if docID == nil {
-			return errDocNotFound
-		}
-		v := bDocs.Get(storage.DocKey(req.Collection, string(docID)))
-		if v == nil {
-			return errDocNotFound
-		}
-		d, err := loadDoc(v)
-		if err != nil {
-			return err
-		}
-		doc = *d
-		return nil
-	})
+	doc, err := g.server.liveDocByKey(req.Collection, req.Key, req.Lang)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
 			return nil, status.Error(codes.NotFound, "document not found")
 		}
 		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if doc.ExpiresAt > 0 && doc.ExpiresAt < time.Now().Unix() {
-		return nil, status.Error(codes.NotFound, "document not found")
 	}
 
 	protoMeta := make(map[string]*proto.MetaValues)
