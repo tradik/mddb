@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Conditional create (#423).** `POST /v1/add` takes `ifAbsent: true` and writes the document only when it does not exist yet. If it exists, the answer is `409 {"error":"revision conflict","expectedRevision":"","currentRevision":"…"}` and nothing is written. The check runs inside the write's transaction, so two clients creating the same key at once cannot both succeed. A document past its TTL counts as absent. Combining `ifAbsent` with `expectedRevision` is a `400`. The same option exists as gRPC `AddRequest.if_absent` (field 8, `ABORTED`), MCP `add_document` `if_absent` and GraphQL `addDocument(ifAbsent:)`. The Elasticsearch-compatible `_create` now uses this check instead of reading the document before writing it.
+- **Conditional delete (#424).** `POST /v1/delete` takes `expectedRevision` and deletes only while the document is at that revision. Otherwise it returns the same `409` as `PATCH /v1/update`; a missing document is a conflict with an empty `currentRevision`. The same option exists as gRPC `DeleteDocumentRequest.expected_revision` (field 4, `ABORTED`), MCP `delete_document` `expected_revision` and GraphQL `deleteDocument(expectedRevision:)`. Requests without it behave as before.
+- **Revision in search results (#425).** Every `POST /v1/search` result carries `revision`, the same value `POST /v1/get` returns; gRPC `Search`, MCP `search_documents` and GraphQL `search` carry it too. A client can edit documents from a list with conditional writes without reading each one first.
+- **Go client:** `Document.Revision`, `AddRequest.IfAbsent` and `ExpectedRevision`, `DeleteRequest.ExpectedRevision`, `Client.Delete`, and `(*APIError).RevisionConflict()`.
+- **MCP API keys by fingerprint.** `DELETE /v1/mcp/keys` and `POST /v1/mcp/keys/disable` also accept `{"fingerprint"}`, which is what the key list shows; if two keys share a fingerprint, the answer is `409` and neither key changes. `{"key"}` works as before.
+
+### Fixed
+
+- **Panel: the sidebar footer shows the panel's real version.** It always read v2.11.4.
+- **Panel: the documented "Advanced Filtering" can be reached.** A collection's document list has a "Sort & filter" control: metadata filters, sort by added date, updated date or key, order, and documents per page. The component existed but nothing showed it.
+- **Panel: modal backgrounds are translucent again.** Tailwind 4 dropped `bg-opacity-*`, so 17 overlays were solid black.
+- **Panel: the document viewer stays inside the window** next to the sidebar. Long keys and metadata wrap, and Markdown is rendered the same way as in the editor preview: headings, links and inline code.
+- **Panel: long collection names in the menu end with an ellipsis** instead of running into the document count.
+- **Panel: the collection icon placeholder shows 📚**, not the escape code `\u{1F4DA}`.
+- **Panel: the cron hint lists the accepted forms.** These are 5 fields, 6 with seconds first, or `@daily` / `@every 1h`; the hint said 6 fields only.
+- **Panel: "Run now" explains the 503 it gets when the scheduler is off.** Start the server with `MDDB_CRONS=true`. The docs say so too.
+- **Panel: Disable and Delete work for MCP API keys.** They sent the `mcp_` marker instead of the key and always got a 404; keys are now listed and acted on by fingerprint.
+- **`GET /v1/mcp/config` and the panel's LLM Connections page put addresses on the server domain.** They use `MDDB_MCP_DOMAIN` or the Server Domain field. A server listening on an explicit address used to produce `localhost127.0.0.1:…`, and `restBaseUrl` ignored the domain.
+
 ## [2.19.5] - 2026-11-14
 
 ### Added
