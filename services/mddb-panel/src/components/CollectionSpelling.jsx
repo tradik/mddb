@@ -8,6 +8,11 @@ import { replaceWord } from '../lib/spell-words';
  * the browser's own spellcheck stays as it is; when switched on, each word
  * with a suggestion is listed with a button that replaces it everywhere.
  */
+/** "1 suggestion", "3 suggestions". */
+function suggestionCount(n) {
+  return n === 1 ? '1 suggestion' : `${n} suggestions`;
+}
+
 export default function CollectionSpelling({ collection, lang, text, onChange }) {
   const [enabled, setEnabled] = useState(false);
   const toggleId = useId();
@@ -23,12 +28,12 @@ export default function CollectionSpelling({ collection, lang, text, onChange })
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
           />
-          Check spelling against the collection dictionary
+          <span>Check spelling against the collection dictionary</span>
         </label>
         {enabled && (
-          <span role="status" className="text-xs text-fg-muted">
-            {checking ? 'Checking…' : `${suggestions.length} suggestion${suggestions.length === 1 ? '' : 's'}`}
-          </span>
+          <output className="text-xs text-fg-muted">
+            {checking ? 'Checking…' : suggestionCount(suggestions.length)}
+          </output>
         )}
       </div>
       {enabled && error && (

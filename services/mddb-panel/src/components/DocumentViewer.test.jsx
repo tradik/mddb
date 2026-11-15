@@ -146,16 +146,11 @@ describe('DocumentViewer', () => {
     expect(screen.queryByText('revisions guide')).toBeNull();
   });
 
-  test('the close button clears the document; hovering recolours the icon buttons', () => {
+  test('the close button clears the document; hover and keyboard focus share the CSS colours', () => {
     renderWith(doc);
-    fireEvent.mouseOver(deleteButton());
-    expect(deleteButton().style.color).toBe('var(--color-danger)');
-    fireEvent.mouseOut(deleteButton());
-    expect(deleteButton().style.color).toBe('var(--color-fg-faint)');
-    fireEvent.mouseOver(closeButton());
-    expect(closeButton().style.backgroundColor).toBe('var(--color-surface-subtle)');
-    fireEvent.mouseOut(closeButton());
-    expect(closeButton().style.backgroundColor).toBe('transparent');
+    expect(deleteButton().className).toContain('hover:text-danger');
+    expect(deleteButton().className).toContain('focus-visible:text-danger');
+    expect(closeButton().className).toContain('focus-visible:bg-surface-subtle');
     fireEvent.click(closeButton());
     expect(useStore.getState().currentDocument).toBeNull();
   });

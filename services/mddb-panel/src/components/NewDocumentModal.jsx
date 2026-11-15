@@ -93,10 +93,11 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-fg-muted mb-2">
+              <label htmlFor="new-document-key" className="block text-sm font-medium text-fg-muted mb-2">
                 Document Key *
               </label>
               <input
+                id="new-document-key"
                 type="text"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
@@ -109,10 +110,11 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-fg-muted mb-2">
+              <label htmlFor="new-document-lang" className="block text-sm font-medium text-fg-muted mb-2">
                 Language *
               </label>
               <select
+                id="new-document-lang"
                 value={lang}
                 onChange={(e) => setLang(e.target.value)}
                 className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-focus"
@@ -196,14 +198,14 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
 
           {/* Content Section */}
           <div>
-            <label className="block text-sm font-medium text-fg-muted mb-2">
+            <h3 className="block text-sm font-medium text-fg-muted mb-2">
               Content (Markdown)
-            </label>
+            </h3>
             <div className="border border-line-strong rounded-lg overflow-hidden">
               <MarkdownEditor
                 value={contentMd}
                 onChange={setContentMd}
-                onSave={() => { if (!creating && key && lang) handleCreate(); }}
+                onSave={() => { if (!creating && key && lang) void handleCreate(); }}
                 placeholder="# New Document&#10;&#10;Start writing your markdown content here..."
               />
             </div>

@@ -33,6 +33,20 @@ function added(b, j) {
 }
 
 /**
+ * common[i][j]: the length of the longest common subsequence of the middle
+ * parts from line i (old) and j (new) on, counted from `start`.
+ */
+function lcsTable(a, b, start, rows, cols) {
+  const common = Array.from({ length: rows + 1 }, () => new Array(cols + 1).fill(0));
+  for (let i = rows - 1; i >= 0; i -= 1) {
+    for (let j = cols - 1; j >= 0; j -= 1) {
+      common[i][j] = a[start + i] === b[start + j] ? common[i + 1][j + 1] + 1 : Math.max(common[i + 1][j], common[i][j + 1]);
+    }
+  }
+  return common;
+}
+
+/**
  * Diffs a[start:endA] against b[start:endB] into `out`, by the longest
  * common subsequence, or as a plain replacement when the table would be too big.
  */
@@ -44,14 +58,7 @@ function diffMiddle(a, b, start, endA, endB, out) {
     for (let j = start; j < endB; j += 1) out.push(added(b, j));
     return;
   }
-  // common[i][j]: the length of the longest common subsequence of the
-  // middle parts from line i (old) and j (new) on, counted from `start`.
-  const common = Array.from({ length: rows + 1 }, () => new Array(cols + 1).fill(0));
-  for (let i = rows - 1; i >= 0; i -= 1) {
-    for (let j = cols - 1; j >= 0; j -= 1) {
-      common[i][j] = a[start + i] === b[start + j] ? common[i + 1][j + 1] + 1 : Math.max(common[i + 1][j], common[i][j + 1]);
-    }
-  }
+  const common = lcsTable(a, b, start, rows, cols);
   let i = 0;
   let j = 0;
   while (i < rows || j < cols) {

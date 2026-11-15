@@ -254,12 +254,12 @@ export default function DocumentList({ sseRefreshKey } = {}) {
           <>
             <label className="mt-2 flex items-center gap-2 text-xs text-fg-soft">
               <input type="checkbox" checked={allShownSelected} onChange={() => selection.toggleAll(shownDocs)} />
-              Select all shown
+              <span>Select all shown</span>
             </label>
             <SelectionActionBar collection={currentCollection} documents={selection.selected} readOnly={readOnly} onClear={selection.clear} onDeleted={afterBatchDelete} />
           </>
         )}
-        {batchOutcome && <p role="status" className="mt-1 text-xs text-fg-soft">{batchOutcome}</p>}
+        {batchOutcome && <output className="block mt-1 text-xs text-fg-soft">{batchOutcome}</output>}
       </div>
 
       <div className="flex-1 overflow-y-auto">

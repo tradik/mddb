@@ -58,11 +58,11 @@ export default function TemplatePicker({ onPick }) {
         A template replaces the content and the metadata below.
       </p>
       {error && (
-        <p role="status" className="text-xs text-warning-strong mt-1">
+        <output className="block text-xs text-warning-strong mt-1">
           {error.status === 403
             ? `Custom templates are not shown: you have no read permission on ${templateCollection}.`
             : `Custom templates could not be loaded: ${error.message}`}
-        </p>
+        </output>
       )}
     </div>
   );

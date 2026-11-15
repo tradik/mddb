@@ -33,7 +33,7 @@ export default function DocumentPrintView({ document }) {
           ))}
         </dl>
       )}
-      <MarkdownView scheme="light">{document.contentMd || ''}</MarkdownView>
+      <MarkdownView scheme="light" wrapCode>{document.contentMd || ''}</MarkdownView>
     </article>
   );
 }

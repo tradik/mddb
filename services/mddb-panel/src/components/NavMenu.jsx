@@ -50,7 +50,7 @@ export default function NavMenu({ authEnabled = false, clusterEnabled = false, a
         />
       </div>
       {groups.length === 0 && (
-        <p role="status" className="text-sm text-fg-subtle px-3">No menu entries match “{query.trim()}”.</p>
+        <output className="block text-sm text-fg-subtle px-3">No menu entries match “{query.trim()}”.</output>
       )}
       <div className="space-y-2">
         {groups.map((group) => {

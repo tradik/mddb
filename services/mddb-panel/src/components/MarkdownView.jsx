@@ -24,6 +24,12 @@ const CODE_THEMES = { light: a11yOneLight, dark: vscDarkPlus };
 /** The mode the code blocks below render in; MarkdownView provides it. */
 const SchemeContext = createContext('light');
 
+/** Whether highlighted code wraps long lines (the print view and HTML export). */
+const WrapContext = createContext(false);
+
+/** Inline styles that make a highlighted block wrap instead of scrolling. */
+const WRAPPED_CODE = { overflow: 'visible', whiteSpace: 'pre-wrap' };
+
 /**
  * CodeBlock styles the three shapes of `code`. react-markdown 9+ no longer
  * says whether code is inline: a fenced block carries a language class or
@@ -32,10 +38,11 @@ const SchemeContext = createContext('light');
 function CodeBlock({ node, className, children, ...props }) {
   const text = String(children);
   const scheme = useContext(SchemeContext);
+  const wrap = useContext(WrapContext);
   const language = /language-(\w+)/.exec(className || '')?.[1];
   if (language) {
     return (
-      <SyntaxHighlighter style={CODE_THEMES[scheme]} language={language} PreTag="div" className="my-4 rounded-lg max-w-full overflow-x-auto border border-line" {...props}>
+      <SyntaxHighlighter style={CODE_THEMES[scheme]} language={language} wrapLongLines={wrap} customStyle={wrap ? WRAPPED_CODE : undefined} PreTag="div" className="my-4 rounded-lg max-w-full overflow-x-auto border border-line" {...props}>
         {text.replace(/\n$/, '')}
       </SyntaxHighlighter>
     );
@@ -98,16 +105,20 @@ const rehypePlugins = [rehypeRaw, rehypeSanitize];
 /**
  * `scheme` forces a mode ("light" for the print view and the HTML export,
  * which are always light); without it the code follows the panel's theme.
+ * `wrapCode` wraps long lines of highlighted code instead of scrolling them,
+ * for paper and the exported page.
  */
-export default function MarkdownView({ children, scheme }) {
+export default function MarkdownView({ children, scheme, wrapCode = false }) {
   const { resolved } = useTheme();
   return (
     <SchemeContext.Provider value={scheme || resolved}>
-      <div className="min-w-0 break-words">
-        <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
-          {children}
-        </ReactMarkdown>
-      </div>
+      <WrapContext.Provider value={wrapCode}>
+        <div className="min-w-0 break-words">
+          <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+            {children}
+          </ReactMarkdown>
+        </div>
+      </WrapContext.Provider>
     </SchemeContext.Provider>
   );
 }

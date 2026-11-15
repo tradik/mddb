@@ -44,7 +44,10 @@ export default function SelectionActionBar({ collection, documents, readOnly = f
     const parts = [`Deleted ${result.deleted || 0}`];
     const notFound = result.notFound ?? result.not_found;
     if (notFound) parts.push(`${notFound} already gone`);
-    if (result.failed) parts.push(`${result.failed} failed${result.errors?.length ? `: ${result.errors.join('; ')}` : ''}`);
+    if (result.failed) {
+      const reasons = result.errors?.length ? `: ${result.errors.join('; ')}` : '';
+      parts.push(`${result.failed} failed${reasons}`);
+    }
     onDeleted(`${parts.join(', ')}.`);
   });
 

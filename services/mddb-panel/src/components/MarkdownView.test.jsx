@@ -6,8 +6,8 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 
 vi.mock('react-syntax-highlighter', () => ({
-  Prism: ({ children, language, className, style }) => (
-    <pre data-language={language} data-theme={style.name} className={className}>{children}</pre>
+  Prism: ({ children, language, className, style, wrapLongLines, customStyle }) => (
+    <pre data-language={language} data-theme={style.name} data-wrap={String(Boolean(wrapLongLines))} data-white-space={customStyle?.whiteSpace} className={className}>{children}</pre>
   ),
 }));
 vi.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({ vscDarkPlus: { name: 'vscDarkPlus' } }));
@@ -87,5 +87,15 @@ describe('MarkdownView', () => {
     const { container } = render(<MarkdownView scheme="light">{markdown}</MarkdownView>);
     expect(container.querySelector('pre[data-language="js"]').dataset.theme).toBe('a11yOneLight');
     setTheme('light');
+  });
+
+  test('wrapCode wraps highlighted code (print, HTML export); by default it scrolls', () => {
+    const { container, rerender } = render(<MarkdownView>{markdown}</MarkdownView>);
+    const pre = () => container.querySelector('pre[data-language="js"]');
+    expect(pre().dataset.wrap).toBe('false');
+    expect(pre().dataset.whiteSpace).toBeUndefined();
+    rerender(<MarkdownView wrapCode>{markdown}</MarkdownView>);
+    expect(pre().dataset.wrap).toBe('true');
+    expect(pre().dataset.whiteSpace).toBe('pre-wrap');
   });
 });

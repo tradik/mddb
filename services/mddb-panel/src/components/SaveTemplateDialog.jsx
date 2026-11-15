@@ -33,13 +33,13 @@ export default function SaveTemplateDialog({ document, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} className="bg-surface rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+      <dialog open aria-modal="true" aria-labelledby={`${id}-title`} className="relative m-0 border-0 bg-surface text-fg rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
         <h3 id={`${id}-title`} className="text-lg font-semibold text-fg">Save as template</h3>
         {saved ? (
           <>
-            <p role="status" className="text-sm text-success-strong">
+            <output className="block text-sm text-success-strong">
               Saved "{saved}" to {templateCollection}. It is offered in New Document on every panel of this server.
-            </p>
+            </output>
             <div className="flex justify-end">
               <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-white bg-primary-700 rounded-lg hover:bg-primary-800">Close</button>
             </div>
@@ -60,7 +60,7 @@ export default function SaveTemplateDialog({ document, onClose }) {
             </div>
             <label className="flex items-center gap-2 text-sm text-fg-soft">
               <input type="checkbox" checked={includeMeta} onChange={(e) => setIncludeMeta(e.target.checked)} />
-              Keep this document's metadata as the template's defaults
+              <span>Keep this document's metadata as the template's defaults</span>
             </label>
             <ApiErrorNotice error={error} collection={templateCollection} />
             <div className="flex justify-end gap-3">
@@ -76,7 +76,7 @@ export default function SaveTemplateDialog({ document, onClose }) {
             </div>
           </form>
         )}
-      </div>
+      </dialog>
     </div>
   );
 }

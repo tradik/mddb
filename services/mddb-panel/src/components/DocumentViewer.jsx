@@ -237,9 +237,7 @@ export default function DocumentViewer() {
             <DocumentActions document={currentDocument} />
             <button
               onClick={handleDelete}
-              style={{ padding: '8px', color: 'var(--color-fg-faint)', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
-              onMouseOver={(e) => { e.target.style.color = 'var(--color-danger)'; e.target.style.backgroundColor = 'var(--color-danger-soft)'; }}
-              onMouseOut={(e) => { e.target.style.color = 'var(--color-fg-faint)'; e.target.style.backgroundColor = 'transparent'; }}
+              className="p-2 rounded-lg text-fg-faint hover:text-danger hover:bg-danger-soft focus-visible:text-danger focus-visible:bg-danger-soft"
               title="Delete document"
               aria-label="Delete document"
             >
@@ -247,9 +245,7 @@ export default function DocumentViewer() {
             </button>
             <button
               onClick={clearCurrentDocument}
-              style={{ padding: '8px', color: 'var(--color-fg-faint)', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
-              onMouseOver={(e) => { e.target.style.color = 'var(--color-fg-subtle)'; e.target.style.backgroundColor = 'var(--color-surface-subtle)'; }}
-              onMouseOut={(e) => { e.target.style.color = 'var(--color-fg-faint)'; e.target.style.backgroundColor = 'transparent'; }}
+              className="p-2 rounded-lg text-fg-faint hover:text-fg-subtle hover:bg-surface-subtle focus-visible:text-fg-subtle focus-visible:bg-surface-subtle"
               title="Close document"
               aria-label="Close document"
             >

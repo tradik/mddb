@@ -17,23 +17,28 @@ export default function ShortcutsDialog({ isMac, onClose }) {
     return () => opener?.focus?.();
   }, []);
 
-  const onKeyDown = (e) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      onClose();
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-    }
-  };
+  // Escape closes; Tab stays on Close (the only control). Listened for on the
+  // document, so it works wherever the focus is while the dialog is open.
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div
-        role="dialog"
+      <dialog
+        open
         aria-modal="true"
         aria-labelledby={titleId}
-        onKeyDown={onKeyDown}
-        className="bg-surface rounded-lg shadow-xl p-6 max-w-md w-full"
+        className="relative m-0 border-0 bg-surface text-fg rounded-lg shadow-xl p-6 max-w-md w-full"
       >
         <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold text-fg mb-4">
           <Keyboard className="w-5 h-5 text-fg-muted" aria-hidden="true" />
@@ -62,7 +67,7 @@ export default function ShortcutsDialog({ isMac, onClose }) {
             Close
           </button>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

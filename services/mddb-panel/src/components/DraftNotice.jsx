@@ -9,17 +9,20 @@ import { readDraft, removeDraft, draftDiffers } from '../lib/drafts';
  * when the draft equals the stored document.
  */
 export default function DraftNotice({ document, onOpen }) {
-  const [, setDiscarded] = useState(0);
-  const draft = readDraft(document);
+  // The draft is read from storage on each render; this state only records
+  // which document's draft was discarded here, so the notice goes away.
+  const [discardedFor, setDiscardedFor] = useState(null);
+  const documentId = `${document.collection}|${document.key}|${document.lang}`;
+  const draft = discardedFor === documentId ? null : readDraft(document);
   if (!draft || !draftDiffers(draft, document)) return null;
 
   const discard = () => {
     removeDraft(document);
-    setDiscarded((n) => n + 1);
+    setDiscardedFor(documentId);
   };
 
   return (
-    <div role="status" className="flex flex-wrap items-center gap-3 border-b border-warning-line bg-warning-soft px-4 py-2 text-sm text-warning-strong">
+    <output className="flex flex-wrap items-center gap-3 border-b border-warning-line bg-warning-soft px-4 py-2 text-sm text-warning-strong">
       <span className="flex-1 min-w-0">
         This document has an unsaved draft from {new Date(draft.savedAt).toLocaleString()}.
       </span>
@@ -29,6 +32,6 @@ export default function DraftNotice({ document, onOpen }) {
       <button type="button" onClick={discard} className="rounded px-3 py-1 underline hover:bg-warning-muted">
         Discard draft
       </button>
-    </div>
+    </output>
   );
 }

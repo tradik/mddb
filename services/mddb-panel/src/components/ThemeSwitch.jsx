@@ -16,7 +16,8 @@ const OPTIONS = [
 export default function ThemeSwitch() {
   const { theme, setTheme } = useTheme();
   return (
-    <div role="group" aria-label="Colour theme" className="flex items-center bg-surface-subtle rounded-lg p-0.5">
+    <fieldset className="flex items-center bg-surface-subtle rounded-lg p-0.5">
+      <legend className="sr-only">Colour theme</legend>
       {OPTIONS.map(({ value, label, Icon }) => (
         <button
           key={value}
@@ -32,6 +33,6 @@ export default function ThemeSwitch() {
           <Icon className="w-4 h-4" aria-hidden="true" />
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 }

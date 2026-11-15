@@ -28,6 +28,18 @@ describe('extractWords', () => {
   });
 });
 
+describe('extractWords edge cases', () => {
+  test('a "<" without a ">" on its line is text, not a tag', () => {
+    expect(extractWords('price < cost\nand > more')).toEqual(['price', 'cost', 'and', 'more']);
+    expect(extractWords('open <never closed')).toEqual(['open', 'never', 'closed']);
+  });
+
+  test('null input has no words', () => {
+    expect(extractWords(null)).toEqual([]);
+    expect(extractWords()).toEqual([]);
+  });
+});
+
 describe('matchCase', () => {
   test('keeps all caps, a capital first letter, or lower case', () => {
     expect(matchCase('TEH', 'the')).toBe('THE');

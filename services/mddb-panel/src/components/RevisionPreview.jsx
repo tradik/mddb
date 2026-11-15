@@ -47,10 +47,11 @@ export default function RevisionPreview({ revision, current, restoring, onRestor
         </button>
       </div>
 
-      <div role="group" aria-label="Revision view" className="inline-flex gap-1 p-1 mb-4 bg-surface-subtle rounded-lg">
+      <fieldset className="inline-flex gap-1 p-1 mb-4 bg-surface-subtle rounded-lg">
+        <legend className="sr-only">Revision view</legend>
         {tab('changes', 'Changes')}
         {tab('preview', 'Preview')}
-      </div>
+      </fieldset>
 
       {view === 'changes' ? (
         <div className="space-y-4">

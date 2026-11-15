@@ -2,14 +2,10 @@
 
 /* FE-015: `dark:` utilities follow the `dark` class on <html> (set by the
    inline script in index.html and by the header's theme switch), not the
-   OS setting alone. Screen only, so a printout is always light. */
-@custom-variant dark {
-  @media screen {
-    &:where(.dark, .dark *) {
-      @slot;
-    }
-  }
-}
+   OS setting alone. The printout stays light because it shows only the
+   print view, which uses no `dark:` utility, and the dark token values
+   below apply on screen only. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* The colour tokens (FE-015). Components use these names — bg-surface,
    text-fg-muted, border-line, text-danger, bg-warning-soft… — instead of a
@@ -235,17 +231,17 @@ body {
 
 @media print {
   body > :not(.mddb-print-root) {
-    display: none !important;
+    display: none;
   }
 
   .mddb-print-root {
     display: block;
   }
 
-  /* Long code lines wrap on paper instead of being cut at the margin. */
-  .mddb-print-root pre,
+  /* Long code lines wrap on paper instead of being cut at the margin; the
+     highlighted blocks wrap through MarkdownView's `wrapCode`. */
   .mddb-print-root code {
-    white-space: pre-wrap !important;
-    overflow: visible !important;
+    white-space: pre-wrap;
+    overflow: visible;
   }
 }

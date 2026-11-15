@@ -20,8 +20,17 @@ export function escapeHtml(text) {
  * "en-US"; anything that is not a language tag gives "" (no attribute).
  */
 export function htmlLang(lang) {
-  const tag = String(lang ?? '').replace(/_/g, '-');
+  const tag = String(lang ?? '').replaceAll('_', '-');
   return /^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$/.test(tag) ? tag : '';
+}
+
+/** `name` without leading dots and dashes or trailing dashes. */
+function trimDashes(name) {
+  let start = 0;
+  while (start < name.length && (name[start] === '-' || name[start] === '.')) start += 1;
+  let end = name.length;
+  while (end > start && name[end - 1] === '-') end -= 1;
+  return name.slice(start, end);
 }
 
 /**
@@ -30,7 +39,7 @@ export function htmlLang(lang) {
  * e.g. "docs-intro.en_US.html".
  */
 export function exportFileName(doc, ext) {
-  const safe = (s) => String(s ?? '').replace(/[\\/:*?"<>|\s]+/g, '-').replace(/^[-.]+|-+$/g, '');
+  const safe = (s) => trimDashes(String(s ?? '').replace(/[\\/:*?"<>|\s]+/g, '-'));
   const name = [safe(doc.key) || 'document', safe(doc.lang)].filter(Boolean).join('.');
   return `${name}.${ext}`;
 }
@@ -61,9 +70,10 @@ dd { margin: 0; }
  */
 export function standaloneHtml({ title, lang, body }) {
   const langAttr = htmlLang(lang);
+  const htmlOpen = langAttr ? `<html lang="${langAttr}">` : '<html>';
   return [
     '<!doctype html>',
-    `<html${langAttr ? ` lang="${langAttr}"` : ''}>`,
+    htmlOpen,
     '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',

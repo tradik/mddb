@@ -200,7 +200,7 @@ function App() {
             className="flex-shrink-0 w-6 bg-surface-subtle hover:bg-surface-strong border-r border-line flex items-center justify-center transition-colors"
             title="Show sidebar"
           >
-            <svg className="w-3 h-3 text-fg-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            <svg aria-hidden="true" className="w-3 h-3 text-fg-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
           </button>
         )}
 
