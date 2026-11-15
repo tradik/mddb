@@ -209,6 +209,21 @@ const coverageFiles = [
   'src/lib/embedding-defaults.js',
   'src/components/EmbeddingConfigModal.jsx',
   'src/components/EmbeddingModelsPanel.jsx',
+  // 2.19.6: panel fixes — sort and filter in the document list, one Markdown
+  // renderer for the viewer and the editor preview, LLM Connections addresses
+  // on the Server Domain.
+  'src/components/FilterPanel.jsx',
+  'src/components/MarkdownView.jsx',
+  'src/components/MarkdownEditor.jsx',
+  'src/components/MCPConfigPanel.jsx',
+  'src/lib/server-address.js',
+  // 2.19.6: the modal overlays (bg-black/50 for Tailwind 4) — files touched
+  // by that fix that had no tests.
+  'src/components/CreateCollectionModal.jsx',
+  'src/components/NewDocumentModal.jsx',
+  'src/components/WebhooksPanel.jsx',
+  'src/components/CommandModal.jsx',
+  'src/components/CurationPanel.jsx',
 ];
 
 export default mergeConfig(

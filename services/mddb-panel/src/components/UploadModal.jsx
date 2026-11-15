@@ -111,7 +111,7 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
   }, { direct: 0, converted: 0 });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
@@ -321,7 +321,7 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
 
       {/* Loading overlay */}
       {loading && (
-        <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center rounded-lg">
+        <div className="absolute inset-0 bg-white/90 flex items-center justify-center rounded-lg">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
             <p className="text-sm font-medium text-gray-900">

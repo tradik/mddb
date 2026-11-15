@@ -20,7 +20,8 @@ vi.mock('./UploadModal', () => ({
     </div>
   ),
 }));
-// FacetsPanel has its own suite.
+// FacetsPanel and FilterPanel have their own suites.
+vi.mock('./FilterPanel', () => ({ default: ({ onClose }) => <div>filter panel<button onClick={onClose}>close filters</button></div> }));
 vi.mock('./FacetsPanel', () => ({ default: ({ collection, filters }) => <div>facets for {collection} {JSON.stringify(filters)}</div> }));
 vi.mock('./CommandModal', () => ({
   default: ({ isOpen, onClose, params }) => (isOpen ? (
@@ -323,6 +324,28 @@ describe('DocumentList modals', () => {
     fireEvent.click(screen.getByRole('button', { name: 'stub success' }));
     await waitFor(() => expect(mddbClient.search).toHaveBeenCalledTimes(2));
     expect(console.error).toHaveBeenCalledWith('Failed to refresh stats:', expect.any(Error));
+  });
+});
+
+describe('DocumentList sort and filter', () => {
+  test('Sort & filter opens the panel, counts the active filters, and its close hides it', async () => {
+    await renderList({ filters: { tag: ['a'], author: ['jo'] } });
+    const toggle = screen.getByRole('button', { name: 'Sort & filter (2)' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('filter panel')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'close filters' }));
+    expect(screen.queryByText('filter panel')).toBeNull();
+  });
+
+  test('without filters the button carries no count, and without a collection it is off', async () => {
+    await renderList();
+    expect(screen.getByRole('button', { name: 'Sort & filter' })).toBeTruthy();
+    cleanup();
+    useStore.setState({ currentCollection: null });
+    render(<DocumentList />);
+    expect(screen.getByRole('button', { name: 'Sort & filter' }).disabled).toBe(true);
   });
 });
 

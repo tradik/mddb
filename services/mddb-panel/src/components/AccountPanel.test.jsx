@@ -119,7 +119,7 @@ describe('AccountPanel', () => {
 });
 
 describe('MCPAPIKeysPanel', () => {
-  const mcpKey = { name: 'claude-prod', keyPrefix: 'mk_abc...', expiresAt: 0 };
+  const mcpKey = { name: 'claude-prod', keyPrefix: 'mcp_', fingerprint: '9f2a41c7', expiresAt: 0 };
 
   beforeEach(() => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -133,6 +133,12 @@ describe('MCPAPIKeysPanel', () => {
     expect(screen.getByText('claude-prod')).toBeTruthy();
     expect(screen.getByText('DISABLED')).toBeTruthy();
     expect(screen.getByText(/^expires /)).toBeTruthy();
+    // 2.19.6: keys are told apart by their fingerprint, not by "mcp_" alone;
+    // a server without fingerprints still shows its prefix.
+    const id = screen.getByText('mcp_… · 9f2a41c7');
+    expect(id.getAttribute('title')).toContain('Not part of the key');
+    expect(screen.getByText('mk_old...')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete key claude-prod' })).toBeTruthy();
 
     const name = screen.getByPlaceholderText('Key name (e.g. claude-prod)');
     await act(async () => fireEvent.keyDown(name, { key: 'Enter' }));
@@ -145,9 +151,9 @@ describe('MCPAPIKeysPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
 
     await act(async () => fireEvent.click(screen.getByTitle('Disable key')));
-    expect(mddbClient.disableMCPAPIKey).toHaveBeenCalledWith('mk_abc');
+    expect(mddbClient.disableMCPAPIKey).toHaveBeenCalledWith({ fingerprint: '9f2a41c7' });
     await act(async () => fireEvent.click(screen.getAllByTitle('Delete key')[0]));
-    expect(mddbClient.deleteMCPAPIKey).toHaveBeenCalledWith('mk_abc');
+    expect(mddbClient.deleteMCPAPIKey).toHaveBeenCalledWith({ fingerprint: '9f2a41c7' });
     window.confirm.mockReturnValueOnce(false);
     await act(async () => fireEvent.click(screen.getAllByTitle('Delete key')[1]));
     expect(mddbClient.deleteMCPAPIKey).toHaveBeenCalledTimes(1);

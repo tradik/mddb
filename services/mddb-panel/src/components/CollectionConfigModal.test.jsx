@@ -147,6 +147,9 @@ describe('CollectionConfigModal with a stored config', () => {
     expect(field('Type').value).toBe('website');
     expect(field('Description').value).toBe('Product docs');
     expect(field('Icon (emoji)').value).toBe('D');
+    // 2.19.6: the example is the emoji itself, not its JS escape sequence.
+    expect(field('Icon (emoji)').placeholder).toBe('e.g. \u{1F4DA}');
+    expect(field('Icon (emoji)').placeholder).not.toContain('\\u');
     expect(field('Color').value).toBe('#ff0000');
     expect(field('Storage Backend').value).toBe('s3');
     expect(field('Endpoint *').value).toBe('minio:9000');

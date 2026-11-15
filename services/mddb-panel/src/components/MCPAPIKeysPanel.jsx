@@ -3,6 +3,66 @@ import { Key, Plus, Trash2, Ban, AlertCircle } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import OneTimeSecret from './OneTimeSecret';
 
+/**
+ * KeyId tells keys apart without showing key material: the scheme marker and
+ * the fingerprint (four bytes of SHA-256 of the key, the identifier the server
+ * log uses too). A server without fingerprints (before SEC-012) lists its
+ * prefix only.
+ */
+function KeyId({ apiKey }) {
+  if (!apiKey.fingerprint) {
+    return <span className="ml-2 text-xs text-gray-600 font-mono">{apiKey.keyPrefix}</span>;
+  }
+  return (
+    <span
+      className="ml-2 text-xs text-gray-600 font-mono"
+      title="Fingerprint: four bytes of SHA-256 of the key, as the server log shows it. Not part of the key."
+    >
+      {apiKey.keyPrefix}… · {apiKey.fingerprint}
+    </span>
+  );
+}
+
+/** One listed key: its name, identifier, state, and the disable and delete buttons. */
+function KeyRow({ apiKey, onDisable, onDelete }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex-1 min-w-0">
+        <span className="font-medium text-sm">{apiKey.name}</span>
+        <KeyId apiKey={apiKey} />
+        {apiKey.disabled && (
+          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-700">DISABLED</span>
+        )}
+        {apiKey.expiresAt > 0 && (
+          <span className="ml-2 text-xs text-gray-600">
+            expires {new Date(apiKey.expiresAt * 1000).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center space-x-1">
+        {!apiKey.disabled && (
+          <button
+            onClick={() => { void onDisable({ fingerprint: apiKey.fingerprint }); }}
+            title="Disable key"
+            aria-label={`Disable key ${apiKey.name}`}
+            className="p-1.5 text-gray-600 hover:text-yellow-700 rounded"
+          >
+            <Ban className="w-4 h-4" aria-hidden="true" />
+          </button>
+        )}
+        <button
+          onClick={() => { void onDelete({ fingerprint: apiKey.fingerprint }); }}
+          title="Delete key"
+          aria-label={`Delete key ${apiKey.name}`}
+          className="p-1.5 text-gray-600 hover:text-red-700 rounded"
+        >
+          <Trash2 className="w-4 h-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function MCPAPIKeysPanel() {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -102,50 +162,19 @@ export default function MCPAPIKeysPanel() {
       {createdKey && <OneTimeSecret secret={createdKey} onDismiss={() => setCreatedKey(null)} />}
 
       {/* Key list */}
-      {loading ? (
-        <p className="text-sm text-gray-400">Loading keys...</p>
-      ) : keys.length === 0 ? (
-        <p className="text-sm text-gray-400">No API keys configured. Create one above.</p>
-      ) : (
+      {loading && <p className="text-sm text-gray-600">Loading keys...</p>}
+      {!loading && keys.length === 0 && (
+        <p className="text-sm text-gray-600">No API keys configured. Create one above.</p>
+      )}
+      {!loading && keys.length > 0 && (
         <div className="border rounded-lg divide-y">
           {keys.map((k, i) => (
-            <div key={i} className="flex items-center justify-between px-4 py-3">
-              <div className="flex-1">
-                <span className="font-medium text-sm">{k.name}</span>
-                <span className="ml-2 text-xs text-gray-400 font-mono">{k.keyPrefix}</span>
-                {k.disabled && (
-                  <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-600">DISABLED</span>
-                )}
-                {k.expiresAt > 0 && (
-                  <span className="ml-2 text-xs text-gray-400">
-                    expires {new Date(k.expiresAt * 1000).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center space-x-1">
-                {!k.disabled && (
-                  <button
-                    onClick={() => handleDisable(k.keyPrefix.replace('...', ''))}
-                    title="Disable key"
-                    className="p-1.5 text-gray-400 hover:text-yellow-600 rounded"
-                  >
-                    <Ban className="w-4 h-4" />
-                  </button>
-                )}
-                <button
-                  onClick={() => handleDelete(k.keyPrefix.replace('...', ''))}
-                  title="Delete key"
-                  className="p-1.5 text-gray-400 hover:text-red-600 rounded"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <KeyRow key={k.fingerprint || i} apiKey={k} onDisable={handleDisable} onDelete={handleDelete} />
           ))}
         </div>
       )}
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-600">
         Use keys via <code className="bg-gray-100 px-1 rounded">X-API-Key</code> header
         or <code className="bg-gray-100 px-1 rounded">Authorization: Bearer</code>.
         Enable with <code className="bg-gray-100 px-1 rounded">MDDB_MCP_API_KEY_ENABLED=true</code>.

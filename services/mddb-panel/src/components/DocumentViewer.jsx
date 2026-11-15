@@ -1,17 +1,12 @@
 import { X, Calendar, Tag, FileText, Copy, Check, Edit, Trash2, Loader2, AlertTriangle, History } from 'lucide-react';
 import { useState, Component } from 'react';
 import { format } from 'date-fns';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useStore } from '../lib/store';
 import DocumentEditor from './DocumentEditor';
 import RevisionHistory from './RevisionHistory';
 import ImagePreview from './ImagePreview';
 import DocumentTools from './DocumentTools';
+import MarkdownView from './MarkdownView';
 
 // Error Boundary component
 class ErrorBoundary extends Component {
@@ -182,12 +177,14 @@ export default function DocumentViewer() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
       {/* Header */}
       <div style={{ borderBottom: '1px solid #e5e7eb', padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+        {/* 2.19.6: the title side may shrink (minWidth 0) and long keys wrap,
+            so the buttons stay on screen next to an open sidebar. */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ flex: '1 1 12rem', minWidth: 0 }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '4px', overflowWrap: 'anywhere' }}>
               {currentDocument.key}
             </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px', color: '#6b7280' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '16px', rowGap: '4px', fontSize: '14px', color: '#4b5563' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <FileText style={{ width: '16px', height: '16px' }} />
                 <span>{currentDocument.lang}</span>
@@ -200,7 +197,7 @@ export default function DocumentViewer() {
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             <button
               onClick={() => setShowEditor(true)}
               style={{
@@ -240,6 +237,7 @@ export default function DocumentViewer() {
               onMouseOver={(e) => { e.target.style.color = '#dc2626'; e.target.style.backgroundColor = '#fef2f2'; }}
               onMouseOut={(e) => { e.target.style.color = '#9ca3af'; e.target.style.backgroundColor = 'transparent'; }}
               title="Delete document"
+              aria-label="Delete document"
             >
               <Trash2 style={{ width: '20px', height: '20px' }} />
             </button>
@@ -248,6 +246,8 @@ export default function DocumentViewer() {
               style={{ padding: '8px', color: '#9ca3af', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
               onMouseOver={(e) => { e.target.style.color = '#4b5563'; e.target.style.backgroundColor = '#f3f4f6'; }}
               onMouseOut={(e) => { e.target.style.color = '#9ca3af'; e.target.style.backgroundColor = 'transparent'; }}
+              title="Close document"
+              aria-label="Close document"
             >
               <X style={{ width: '20px', height: '20px' }} />
             </button>
@@ -264,11 +264,12 @@ export default function DocumentViewer() {
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {Object.entries(currentDocument.meta).map(([key, values]) => (
-              <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '500', color: '#374151', minWidth: '80px' }}>
+              <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', minWidth: 0 }}>
+                <span style={{ fontSize: '12px', fontWeight: '500', color: '#374151', minWidth: '80px', maxWidth: '40%', overflowWrap: 'anywhere' }}>
                   {key}:
                 </span>
-                <div style={{ fontSize: '14px', color: '#111827' }}>
+                {/* A long value (a URL, a list) wraps instead of widening the pane. */}
+                <div style={{ fontSize: '14px', color: '#111827', minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>
                   {Array.isArray(values) ? values.join(', ') : values}
                 </div>
               </div>
@@ -281,7 +282,7 @@ export default function DocumentViewer() {
       <DocumentTools key={`${currentDocument.collection}|${currentDocument.key}|${currentDocument.lang}`} document={currentDocument} />
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minWidth: 0 }}>
         <h4 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
           Content
         </h4>
@@ -291,47 +292,16 @@ export default function DocumentViewer() {
 
         <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e5e7eb', margin: '0', maxWidth: '100%', overflow: 'hidden' }}>
           <ErrorBoundary>
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw, rehypeSanitize]}
-              components={{
-                code: ({ node, inline, className, children, ...props }) => {
-                  const match = /language-(\w+)/.exec(className || '');
-                  const language = match ? match[1] : '';
-
-                  return !inline && language ? (
-                    <SyntaxHighlighter
-                      style={vscDarkPlus}
-                      language={language}
-                      PreTag="div"
-                      customStyle={{ margin: '16px 0', borderRadius: '8px', maxWidth: '100%', overflowX: 'auto' }}
-                      {...props}
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
-                  ) : inline ? (
-                    <code style={{ backgroundColor: '#f3f4f6', color: '#dc2626', padding: '2px 6px', borderRadius: '4px', fontSize: '14px', fontFamily: 'monospace' }} {...props}>
-                      {children}
-                    </code>
-                  ) : (
-                    <code style={{ display: 'block', backgroundColor: '#111827', color: '#f9fafb', padding: '16px', borderRadius: '8px', overflowX: 'auto', fontSize: '14px', fontFamily: 'monospace', margin: '16px 0', maxWidth: '100%', wordWrap: 'break-word' }} {...props}>
-                      {children}
-                    </code>
-                  );
-                },
-              }}
-            >
-              {currentDocument.contentMd}
-            </ReactMarkdown>
+            <MarkdownView>{currentDocument.contentMd}</MarkdownView>
           </ErrorBoundary>
         </div>
       </div>
 
       {/* Footer Info */}
       <div style={{ borderTop: '1px solid #e5e7eb', padding: '16px', backgroundColor: '#f9fafb' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
-          <div>
-            <span style={{ color: '#6b7280' }}>Collection:</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', fontSize: '12px' }}>
+          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={currentDocument.collection || undefined}>
+            <span style={{ color: '#4b5563' }}>Collection:</span>
             <span style={{ marginLeft: '8px', fontWeight: '500', color: '#111827' }}>
               {currentDocument.collection || 'N/A'}
             </span>

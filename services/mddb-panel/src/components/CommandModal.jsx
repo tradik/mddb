@@ -316,21 +316,22 @@ const TABS = [
   { key: 'javascript', label: 'JavaScript' },
 ];
 
+/** The code generator of each language tab. */
+const GENERATORS = {
+  curl: generateCurl,
+  php: generatePHP,
+  python: generatePython,
+  javascript: generateJavaScript,
+};
+
 export default function CommandModal({ isOpen, onClose, type, params }) {
   const [activeTab, setActiveTab] = useState('curl');
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
-  const getCode = () => {
-    switch (activeTab) {
-      case 'curl': return generateCurl(type, params);
-      case 'php': return generatePHP(type, params);
-      case 'python': return generatePython(type, params);
-      case 'javascript': return generateJavaScript(type, params);
-      default: return '';
-    }
-  };
+  // Each tab of TABS has its generator; the tab buttons set no other value.
+  const getCode = () => GENERATORS[activeTab](type, params);
 
   const code = getCode();
 
@@ -353,7 +354,7 @@ export default function CommandModal({ isOpen, onClose, type, params }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">

@@ -35,6 +35,15 @@ describe('RunNowButton', () => {
     expect((await screen.findByRole('status')).textContent).toContain('still going');
     expect(screen.getByRole('status').className).toContain('text-red-700');
   });
+
+  test('a 503 says to start the server with MDDB_CRONS=true, not the raw error (2.19.6)', async () => {
+    client.runAutomation.mockRejectedValue(Object.assign(new Error('API Error (503): the cron scheduler is not running'), { status: 503 }));
+    render(<RunNowButton rule={sync} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Run Docs now' }));
+    const status = await screen.findByRole('status');
+    expect(status.textContent).toContain('MDDB_CRONS=true');
+    expect(status.textContent).not.toContain('API Error');
+  });
 });
 
 describe('LastRunResult', () => {

@@ -91,6 +91,10 @@ function SyncFields({ value, onChange, collections }) {
   );
 }
 
+// What the server's cron parser takes (services/mddbd/automation_cron.go):
+// five fields, six with seconds first, or a descriptor.
+const CRON_HINT = '5 fields: min hour day month weekday (e.g. 0 4 * * *), or 6 with seconds first, or @daily / @every 1h';
+
 export default function CronActionFields({ form, setForm, webhooks, collections }) {
   return (
     <>
@@ -98,9 +102,9 @@ export default function CronActionFields({ form, setForm, webhooks, collections 
         name="Schedule (cron expression)"
         value={form.schedule}
         onChange={(schedule) => setForm({ ...form, schedule })}
-        placeholder="0 0 9 * * *"
+        placeholder="0 9 * * *"
         mono
-        hint="6 fields: sec min hour day month weekday"
+        hint={CRON_HINT}
       />
       <Select name="Action" value={form.cronAction} onChange={(cronAction) => setForm({ ...form, cronAction })}>
         <option value="webhook">Call a webhook</option>

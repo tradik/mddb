@@ -295,7 +295,7 @@ function CreateUserModal({ onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
@@ -380,7 +380,7 @@ function CreateUserModal({ onClose, onSuccess }) {
 // Delete Confirmation Modal Component
 function DeleteConfirmModal({ title, message, onConfirm, onCancel }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">{title}</h2>
         <p className="text-gray-600 mb-6">{message}</p>
@@ -471,7 +471,7 @@ function PermissionsModal({ user, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">

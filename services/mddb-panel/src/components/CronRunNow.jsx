@@ -53,6 +53,17 @@ function GitRunAt({ result }) {
 }
 
 /**
+ * runError is the message of a refused run. A 503 means the server runs no
+ * cron scheduler, so it says what to set instead of the raw error.
+ */
+function runError(err) {
+  if (err.status === 503) {
+    return 'The cron scheduler is not running: start the server with MDDB_CRONS=true to run rules.';
+  }
+  return err.message;
+}
+
+/**
  * RunNowButton runs a sync or backup rule now (2.19.0) — through the code
  * its schedule fires — and reports the job id, or why the server refused
  * (409 while the previous run is still going). The run goes on in the
@@ -69,7 +80,7 @@ export function RunNowButton({ rule }) {
       const started = await mddbClient.runAutomation(rule.id);
       setMessage({ ok: true, text: `Started: job ${started.jobId}` });
     } catch (err) {
-      setMessage({ ok: false, text: err.message });
+      setMessage({ ok: false, text: runError(err) });
     } finally {
       setRunning(false);
     }
