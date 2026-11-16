@@ -26,7 +26,7 @@ type vectorReindexJob struct {
 	ID         string              `json:"jobId"`
 	Collection string              `json:"collection"`
 	Force      bool                `json:"force"`
-	Status     string              `json:"status"` // running, completed, failed
+	Status     string              `json:"status"` // queued (GO-054: waiting for a reindex slot), running, completed, failed
 	StartedAt  time.Time           `json:"startedAt"`
 	FinishedAt *time.Time          `json:"finishedAt,omitempty"`
 	Done       int                 `json:"done"`
@@ -35,6 +35,12 @@ type vectorReindexJob struct {
 	Error      string              `json:"error,omitempty"`
 	Result     vectorReindexResult `json:"result"`
 }
+
+// reindexQueued is a job waiting for a reindex slot (GO-054).
+const reindexQueued = "queued"
+
+// active reports a job that has not finished: queued or running.
+func (j *vectorReindexJob) active() bool { return j.Status == "running" || j.Status == reindexQueued }
 
 type reindexJobs struct {
 	mu   sync.Mutex
@@ -66,15 +72,15 @@ var errReindexRunning = errors.New("a reindex of this collection is already runn
 
 // start registers a job, unless one for the collection is running, and
 // drops the oldest finished jobs past the limit.
-func (j *reindexJobs) start(collection string, force bool) (*vectorReindexJob, error) {
+func (j *reindexJobs) start(collection string, force bool) (vectorReindexJob, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if j.jobs == nil {
 		j.jobs = map[string]*vectorReindexJob{}
 	}
 	for _, job := range j.jobs {
-		if job.Collection == collection && job.Status == "running" {
-			return job, errReindexRunning
+		if job.Collection == collection && job.active() {
+			return *job, errReindexRunning // a copy: its goroutine changes the job
 		}
 	}
 	b := make([]byte, 8)
@@ -85,7 +91,7 @@ func (j *reindexJobs) start(collection string, force bool) (*vectorReindexJob, e
 	for len(j.jobs) > maxReindexJobs {
 		oldest := ""
 		for id, jb := range j.jobs {
-			if jb.Status != "running" && (oldest == "" || jb.StartedAt.Before(j.jobs[oldest].StartedAt)) {
+			if !jb.active() && (oldest == "" || jb.StartedAt.Before(j.jobs[oldest].StartedAt)) {
 				oldest = id
 			}
 		}
@@ -94,7 +100,7 @@ func (j *reindexJobs) start(collection string, force bool) (*vectorReindexJob, e
 		}
 		delete(j.jobs, oldest)
 	}
-	return job, nil
+	return *job, nil
 }
 
 func (j *reindexJobs) update(id string, fn func(*vectorReindexJob)) {
@@ -109,30 +115,39 @@ func (j *reindexJobs) update(id string, fn func(*vectorReindexJob)) {
 func (s *Server) startReindexJob(collection string, force bool) (vectorReindexJob, error) {
 	job, err := s.reindexJobs.start(collection, force)
 	if err != nil {
-		return *job, err
+		return job, err
 	}
-	go func(id string) {
-		res, err := s.reindexVectors(context.Background(), collection, force, func(done int, r vectorReindexResult) {
-			s.reindexJobs.update(id, func(j *vectorReindexJob) {
-				j.Done, j.Result = done, r
-				if r.Total > 0 {
-					j.Percent = float64(int(1000*float64(done)/float64(r.Total))) / 10
-				}
-				if el := time.Since(j.StartedAt).Seconds(); done > 0 && el > 0 {
-					j.EtaSeconds = int(float64(r.Total-done) / (float64(done) / el))
-				}
-			})
-		})
-		now := time.Now()
+	go s.runReindexJob(job.ID, collection, force) // job is a copy the goroutine does not touch
+	return job, nil
+}
+
+// runReindexJob runs a started job: it waits for a reindex slot (GO-054),
+// showing "queued" meanwhile, then reindexes and records the outcome.
+func (s *Server) runReindexJob(id, collection string, force bool) {
+	ctx, release, _ := s.reindexSlot(context.Background(), collection, func() {
+		s.reindexJobs.update(id, func(j *vectorReindexJob) { j.Status = reindexQueued })
+	})
+	defer release()
+	s.reindexJobs.update(id, func(j *vectorReindexJob) { j.Status = "running" })
+	res, err := s.reindexVectors(ctx, collection, force, func(done int, r vectorReindexResult) {
 		s.reindexJobs.update(id, func(j *vectorReindexJob) {
-			j.FinishedAt, j.Result, j.EtaSeconds = &now, res, 0
-			j.Status = "completed"
-			if err != nil {
-				j.Status, j.Error = "failed", err.Error()
+			j.Done, j.Result = done, r
+			if r.Total > 0 {
+				j.Percent = float64(int(1000*float64(done)/float64(r.Total))) / 10
+			}
+			if el := time.Since(j.StartedAt).Seconds(); done > 0 && el > 0 {
+				j.EtaSeconds = int(float64(r.Total-done) / (float64(done) / el))
 			}
 		})
-	}(job.ID)
-	return *job, nil
+	})
+	now := time.Now()
+	s.reindexJobs.update(id, func(j *vectorReindexJob) {
+		j.FinishedAt, j.Result, j.EtaSeconds = &now, res, 0
+		j.Status = "completed"
+		if err != nil {
+			j.Status, j.Error = "failed", err.Error()
+		}
+	})
 }
 
 // handleVectorReindexJobs answers GET /v1/vector-reindex/jobs and

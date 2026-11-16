@@ -21,8 +21,27 @@ func (s *Server) accessUnaryInterceptor() grpc.UnaryServerInterceptor {
 		if err := s.authorizeRPC(ctx, info.FullMethod, req); err != nil {
 			return nil, err
 		}
+		ctx, release, err := s.admitRPC(ctx, info.FullMethod)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
 		return handler(ctx, req)
 	}
+}
+
+// admitRPC applies the tenant's and the credential's request limits (GO-054)
+// to a call of a collection method, as a gRPC status error.
+func (s *Server) admitRPC(ctx context.Context, method string) (context.Context, func(), error) {
+	rule := grpcAccessRules[method]
+	if rule.class != accessCollection {
+		return ctx, func() {}, nil
+	}
+	ctx, release, err := s.admitRequest(ctx, rule.op)
+	if err != nil {
+		return ctx, release, grpcError(codes.Canceled, err)
+	}
+	return ctx, release, nil
 }
 
 // accessStreamInterceptor gates streaming calls: a call whose rule needs no
@@ -36,9 +55,23 @@ func (s *Server) accessStreamInterceptor() grpc.StreamServerInterceptor {
 			}
 			return handler(srv, ss)
 		}
-		return handler(srv, accessStream{ServerStream: ss, s: s, method: info.FullMethod})
+		ctx, release, err := s.admitRPC(ss.Context(), info.FullMethod)
+		if err != nil {
+			return err
+		}
+		defer release()
+		return handler(srv, accessStream{ServerStream: admittedStream{ss, ctx}, s: s, method: info.FullMethod})
 	}
 }
+
+// admittedStream is a stream whose context carries the admission (GO-054).
+type admittedStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+// Context is the admitted request's context.
+func (a admittedStream) Context() context.Context { return a.ctx }
 
 // accessStream checks every request message a stream receives (Export).
 type accessStream struct {

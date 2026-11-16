@@ -29,6 +29,7 @@ type Metrics struct {
 	histograms map[string]*histogram // "method|path" -> histogram
 	opsCount   map[string]int64      // operation counters (e.g. "fts_search|bm25" -> count)
 	gauges     map[string]*gauge     // event-set gauges by name (gauges.go)
+	counters   map[string]*gauge     // event-added counters by name (gauges.go, GO-054)
 
 	shape *QueryShape // query-shape counters (OPS-025), on even when metrics are off
 }
@@ -81,6 +82,8 @@ type DBStats struct {
 	// EmbeddingBudgetUsed is the share of today's embedding budget each
 	// collection with one has spent, 0-1 (GO-043).
 	EmbeddingBudgetUsed map[string]float64
+	// Tenants is each tenant's use, limits and queues (GO-054).
+	Tenants TenantGauges
 }
 
 // FullnessGauge is the share of one collection quota in use.
@@ -524,6 +527,7 @@ func writeQuotaGauges(buf *strings.Builder, ds DBStats) {
 		}
 		buf.WriteString("\n")
 	}
+	writeTenantGauges(buf, ds) // GO-054: the tenant-wide quotas and queues
 }
 
 func writef(b *strings.Builder, format string, args ...any) {

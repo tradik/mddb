@@ -142,6 +142,13 @@ var configKeys = map[string]configClass{
 	"MDDB_RATE_LIMIT_BY": cfgPublic, "MDDB_RATE_LIMIT_ENABLED": cfgPublic, "MDDB_RATE_LIMIT_REQUESTS": cfgPublic,
 	"MDDB_RATE_LIMIT_WINDOW": cfgPublic, "MDDB_REPLICATION_ROLE": cfgPublic, "MDDB_SEARCH_CACHE_SIZE": cfgPublic,
 	"MDDB_SEARCH_MAX_CONCURRENT": cfgPublic, "MDDB_SEARCH_MAX_LIMIT": cfgPublic,
+	// GO-054: tenant request limits, reindex slots, embedding parking.
+	"MDDB_TENANT_READ_RPS": cfgPublic, "MDDB_TENANT_WRITE_RPS": cfgPublic,
+	"MDDB_KEY_READ_RPS": cfgPublic, "MDDB_KEY_WRITE_RPS": cfgPublic,
+	"MDDB_TENANT_MAX_CONCURRENT_SEARCHES": cfgPublic, "MDDB_TENANT_MAX_CONCURRENT_WRITES": cfgPublic,
+	"MDDB_TENANT_MAX_CONCURRENT_REINDEXES": cfgPublic, "MDDB_TENANT_QUEUE_TIMEOUT_MS": cfgPublic,
+	"MDDB_TENANT_VECTOR_RAM_SHARE": cfgPublic, "MDDB_REINDEX_MAX_CONCURRENT": cfgPublic,
+	"MDDB_EMBEDDING_PARK_MAX":      cfgPublic,
 	"MDDB_SEARCH_QUEUE_TIMEOUT_MS": cfgPublic, "MDDB_SEARCH_STATS": cfgPublic, "MDDB_SHUTDOWN_TIMEOUT_SEC": cfgPublic,
 	"MDDB_SPELL": cfgPublic, "MDDB_SSE_ENABLED": cfgPublic, "MDDB_SSE_MAX_CLIENTS": cfgPublic,
 	"MDDB_SSE_MAX_PER_IP": cfgPublic, "MDDB_STATS_TTL": cfgPublic, "MDDB_STATS_WAIT": cfgPublic,

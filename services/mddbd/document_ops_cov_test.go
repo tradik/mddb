@@ -194,13 +194,14 @@ func covHNextSSE(t *testing.T, c *sseClient) string {
 // covHNextJob returns the next queued embedding job.
 func covHNextJob(t *testing.T, s *Server) EmbeddingJob {
 	t.Helper()
-	select {
-	case j := <-s.EmbeddingWorker.jobs:
-		return j
-	case <-time.After(5 * time.Second):
+	stop := make(chan struct{})
+	timer := time.AfterFunc(5*time.Second, func() { close(stop) })
+	defer timer.Stop()
+	p, ok := s.EmbeddingWorker.queue.Pop(stop)
+	if !ok {
 		t.Fatal("no embedding job")
-		return EmbeddingJob{}
 	}
+	return p.Value
 }
 
 func TestCovHWritePipelineSideEffects(t *testing.T) {

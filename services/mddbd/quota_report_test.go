@@ -68,12 +68,12 @@ func TestQuotaReportFiresAgainAfterInterval(t *testing.T) {
 	s.WebhookManager = nil
 	qe := &QuotaError{Collection: "q", Resource: quotaDocuments, Limit: 1, Used: 1}
 	_ = s.reportQuota(qe)
-	first := s.quotas().reported["q|documents"]
+	first := s.quotas().reported["|q|documents"]
 	time.Sleep(time.Millisecond)
 	if err := s.reportQuota(qe); !errors.Is(err, qe) {
 		t.Fatalf("reportQuota returned %v", err)
 	}
-	if s.quotas().reported["q|documents"] == first {
+	if s.quotas().reported["|q|documents"] == first {
 		t.Fatal("a refusal after the interval was not reported again")
 	}
 }

@@ -551,6 +551,42 @@ full-text and vector search, auth and backups are always on and not listed.
   (a server without `/v1/features`, a network error), every module counts as
   on, so the panel behaves as it did before.
 
+### Tenants: quotas, request limits and usage (2.19.8)
+
+"Tenants" in the menu's Security group shows what each tenant uses and what
+it may use ([MULTI_TENANCY.md](MULTI_TENANCY.md)). A tenant owns the
+collections named `tenant/…`; its quota caps all of them together, and its
+request limits cap how fast and how many at once its users and API keys may
+call the server.
+
+- **The list** (`GET /v1/tenants`, global admin): every tenant that has a
+  configuration or a user, with its documents, stored bytes and collections —
+  "9 of 10 (90%)" where the tenant quota sets a limit — the jobs it has
+  waiting in the indexing and embedding queues, the searches, writes and
+  reindexes it has running, and the requests and writes refused since the
+  server started.
+- **Details** of a tenant: one bar per quota limit (documents, stored bytes,
+  vectors, collections, its share of the vector RAM limit as an estimate,
+  embedding calls and tokens today), each bar a `<progress>` whose text says
+  the numbers, amber near the limit and red at it. Below: the request limits
+  in force (the tenant's own over the server defaults, "none" for no limit),
+  each queue's depth with the jobs taken so far and their average and longest
+  wait, jobs parked while waiting for room or for the embedding budget, the
+  refusals by reason (`tenant.readRate`, `key.writeRate`,
+  `tenant.searchConcurrency`, `quota.documents`, …) and the tenant's
+  collections.
+- **Setting the quota and limits** (global admin): a form with one field per
+  limit, `PUT /v1/tenants/{id}`. An empty quota field is no limit; an empty
+  request limit takes the server default and `-1` lifts the default for this
+  tenant. The vector RAM share is a fraction from 0 to 1. Values are checked
+  before anything is sent. *Remove its quota and limits*
+  (`DELETE /v1/tenants/{id}`) leaves the tenant with the server defaults only.
+- **A tenant's own admin** — a tenant user with read on every collection of
+  the tenant (`"*"`) — is refused the list; the page then shows that tenant's
+  report (`GET /v1/tenants/{id}/usage`), read-only. Any other user is told why
+  there is nothing to show.
+- Usage is read when the page opens and on *Reload*; it is not polled.
+
 ### Menu: groups and search (2.19.0)
 
 The sidebar menu is grouped. Each group is a disclosure button
@@ -565,7 +601,7 @@ open, so a first visit shows the same pages as before.
 | Data | Collection Aliases, Collection Schemas, Embedding Models, Import, Duplicates, Temporal Analytics |
 | Chat | Chat, Agent Memory, LLM Connections |
 | Integrations | Automation, Webhooks, API Endpoints |
-| Security | Users, Groups, My Account (with authentication), Security, Encryption, Audit Log |
+| Security | Users, Groups, My Account (with authentication), Tenants (2.19.8), Security, Encryption, Audit Log |
 | System | System Info, Cluster (with replication), Configuration, Features, Client Settings |
 
 - **Search the menu**: the box above the groups filters pages by name,

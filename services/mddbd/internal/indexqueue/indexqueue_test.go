@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"mddb/internal/binlog"
+	"mddb/internal/fairq"
 	"mddb/internal/storage"
 	"mddb/internal/testsync"
 	"os"
@@ -37,11 +38,11 @@ func TestIndexQueue_EnqueueFallbackWhenFull(t *testing.T) {
 	defer cancel()
 	iq := &IndexQueue{
 		store:  s,
-		queue:  make(chan *IndexJob, 1),
+		queue:  fairq.New[*IndexJob](1),
 		ctx:    ctx,
 		cancel: cancel,
 	}
-	iq.queue <- &IndexJob{Collection: "c", DocID: "filler"} // buffer now full
+	iq.queue.TryPush("", &IndexJob{Collection: "c", DocID: "filler"}) // buffer now full
 
 	job := &IndexJob{
 		Collection: "c",
@@ -78,8 +79,8 @@ func TestIndexQueue_EnqueueFallbackError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	iq := &IndexQueue{store: s, queue: make(chan *IndexJob, 1), ctx: ctx, cancel: cancel}
-	iq.queue <- &IndexJob{Collection: "c", DocID: "filler"} // full
+	iq := &IndexQueue{store: s, queue: fairq.New[*IndexJob](1), ctx: ctx, cancel: cancel}
+	iq.queue.TryPush("", &IndexJob{Collection: "c", DocID: "filler"}) // full
 
 	cleanup() // close the DB so the fallback's write transaction fails
 

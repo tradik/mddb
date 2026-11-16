@@ -368,6 +368,10 @@ func bad(w http.ResponseWriter, err error) {
 	if writeReadOnlyError(w, err) {
 		return
 	}
+	// GO-054: a tenant's rate or concurrency limit is 429 wherever it surfaces.
+	if writeTenantLimit(w, err) {
+		return
+	}
 	// DOC-018: a request for something that does not exist is not a bad
 	// request; the body keeps its shape.
 	if errors.Is(err, errNotFound) {

@@ -166,6 +166,8 @@ tags:
     description: Document revision history and restore operations
   - name: Collection Config
     description: Per-collection type, description, icon, color, and custom metadata
+  - name: Tenants
+    description: Tenant quotas, request limits and usage (v2.19.8+, GO-054)
   - name: Features
     description: Module switches (v2.19.0+, GO-049) — optional modules such as
       chat, geo or temporal an administrator turns on and off; a disabled
@@ -6000,6 +6002,136 @@ paths:
         "403":
           description: Forbidden, or read-only mode
 
+  /v1/tenants:
+    get:
+      tags:
+        - Tenants
+      summary: Every tenant with its limits and usage
+      description: |
+        Global admin only. Every configured tenant and every tenant a user is
+        assigned to, each with the report of GET /v1/tenants/{id}/usage.
+      operationId: listTenants
+      responses:
+        "200":
+          description: The tenants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenants:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TenantUsageReport"
+                  total:
+                    type: integer
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: Not a global admin
+
+  /v1/tenants/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The tenant, e.g. acme
+        schema:
+          type: string
+          pattern: "^[a-zA-Z0-9_-]{1,64}$"
+    get:
+      tags:
+        - Tenants
+      summary: A tenant's quota and limits
+      description: A global admin, or the tenant's own admin (a user of the tenant with read on "*").
+      operationId: getTenant
+      responses:
+        "200":
+          description: The stored and the effective configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantConfigView"
+        "400":
+          description: Not a valid tenant name
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: Neither a global admin nor the tenant's own admin
+    put:
+      tags:
+        - Tenants
+      summary: Set a tenant's quota and limits
+      description: |
+        Global admin only, on a writable server. A part left out is kept; a
+        part sent as null or {} is removed. Sending neither removes nothing.
+      operationId: setTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quota:
+                  $ref: "#/components/schemas/TenantQuota"
+                limits:
+                  $ref: "#/components/schemas/TenantLimits"
+      responses:
+        "200":
+          description: The tenant's configuration now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantConfigView"
+        "400":
+          description: A negative quota, a share outside 0-1 or a limit below -1
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: Not a global admin, or read-only mode
+    delete:
+      tags:
+        - Tenants
+      summary: Remove a tenant's quota and limits
+      description: Global admin only. The tenant has no limits of its own afterwards; server defaults still apply.
+      operationId: deleteTenant
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [deleted] }
+                  tenant: { type: string }
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: Not a global admin, or read-only mode
+
+  /v1/tenants/{id}/usage:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-zA-Z0-9_-]{1,64}$"
+    get:
+      tags:
+        - Tenants
+      summary: A tenant's usage, queues and refusals
+      description: A global admin, or the tenant's own admin.
+      operationId: getTenantUsage
+      responses:
+        "200":
+          description: The report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantUsageReport"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: Neither a global admin nor the tenant's own admin
+
   /v1/features:
     get:
       tags:
@@ -9553,10 +9685,107 @@ components:
         code: { type: string, enum: [QUOTA_EXCEEDED] }
         status: { type: integer, enum: [429, 507] }
         collection: { type: string, description: Empty for the server-wide limits }
-        resource: { type: string, enum: [documents, bytes, vectors, diskReserve, vectorRam, embeddingCalls, embeddingTokens] }
+        tenant: { type: string, description: "(v2.19.8, GO-054) Present when the limit is the tenant's: the sum over its collections" }
+        resource: { type: string, enum: [documents, bytes, vectors, collections, diskReserve, vectorRam, embeddingCalls, embeddingTokens] }
         limit: { type: integer, format: int64 }
         used: { type: integer, format: int64, description: "Current use; for diskReserve, the bytes available" }
         retryAfterSeconds: { type: integer, description: Embedding budget only }
+    TenantLimit:
+      type: object
+      description: >
+        (v2.19.8, GO-054) A request refused by its tenant's or its credential's
+        rate or concurrency limit. The same body on every surface: the REST
+        body, an MCP tool error's structuredContent, GraphQL error extensions;
+        gRPC answers RESOURCE_EXHAUSTED with the message.
+      required: [error, code, status, scope, limit, max, retryAfterSeconds]
+      properties:
+        error: { type: string, example: "rate limited: tenant \"acme\" is at its writeRate limit of 50, retry after 1s (429)" }
+        code: { type: string, enum: [TENANT_LIMIT] }
+        status: { type: integer, enum: [429] }
+        tenant: { type: string, description: "Empty for a global user's credential" }
+        scope: { type: string, enum: [tenant, key], description: "The tenant as a whole, or one credential (API key or user)" }
+        limit: { type: string, enum: [readRate, writeRate, searchConcurrency, writeConcurrency] }
+        max: { type: integer, description: The limit's value }
+        retryAfterSeconds: { type: integer, example: 1 }
+    TenantQuota:
+      type: object
+      description: >
+        (v2.19.8, GO-054) What all of a tenant's collections may use together.
+        A zero or absent field is no limit.
+      properties:
+        maxDocuments: { type: integer, format: int64 }
+        maxBytes: { type: integer, format: int64, description: Stored bytes, counted as a collection quota's maxBytes }
+        maxVectors: { type: integer, format: int64 }
+        maxCollections: { type: integer, format: int64, description: Collections holding documents (or configured); a document for a further, empty collection is refused }
+        embeddingCallsPerDay: { type: integer, format: int64 }
+        embeddingTokensPerDay: { type: integer, format: int64 }
+        vectorRamShare: { type: number, format: double, minimum: 0, maximum: 1, description: "Share of MDDB_VECTOR_RAM_LIMIT_BYTES; 0 uses MDDB_TENANT_VECTOR_RAM_SHARE" }
+    TenantLimits:
+      type: object
+      description: >
+        (v2.19.8, GO-054) A tenant's request limits. 0 or absent takes the
+        server default (MDDB_TENANT_* / MDDB_KEY_*); -1 lifts it.
+      properties:
+        readPerSecond: { type: integer, minimum: -1 }
+        writePerSecond: { type: integer, minimum: -1 }
+        keyReadPerSecond: { type: integer, minimum: -1, description: Per credential of the tenant }
+        keyWritePerSecond: { type: integer, minimum: -1 }
+        maxConcurrentSearches: { type: integer, minimum: -1 }
+        maxConcurrentWrites: { type: integer, minimum: -1 }
+        maxConcurrentReindexes: { type: integer, minimum: -1 }
+    TenantConfigView:
+      type: object
+      properties:
+        tenant: { type: string }
+        quota: { $ref: "#/components/schemas/TenantQuota" }
+        limits: { $ref: "#/components/schemas/TenantLimits" }
+        effectiveLimits:
+          allOf:
+            - $ref: "#/components/schemas/TenantLimits"
+          description: The limits in force, 0 meaning none
+    TenantQueue:
+      type: object
+      properties:
+        depth: { type: integer, description: Jobs waiting now }
+        taken:
+          type: object
+          description: Jobs workers took off the queue since start
+          properties:
+            jobs: { type: integer, format: int64 }
+            waitSecondsTotal: { type: number }
+            maxWaitSeconds: { type: number }
+    TenantUsageReport:
+      type: object
+      description: (v2.19.8, GO-054) A tenant's configuration, use, queues and refusals.
+      properties:
+        tenant: { type: string }
+        quota: { $ref: "#/components/schemas/TenantQuota" }
+        limits: { $ref: "#/components/schemas/TenantLimits" }
+        effectiveLimits: { $ref: "#/components/schemas/TenantLimits" }
+        vectorRamLimitBytes: { type: integer, format: int64, description: "The tenant's share of the vector RAM limit; 0 for none" }
+        usage:
+          type: object
+          properties:
+            documents: { type: integer, format: int64 }
+            bytes: { type: integer, format: int64 }
+            vectors: { type: integer, format: int64 }
+            collections: { type: integer, format: int64 }
+            vectorRamBytes: { type: integer, format: int64, description: "Estimate: the tenant's share of the vectors times the index's size" }
+            embeddingCalls: { type: integer, format: int64, description: Today (UTC), counted while the tenant has an embedding budget }
+            embeddingTokens: { type: integer, format: int64 }
+        collectionNames: { type: array, items: { type: string } }
+        queues:
+          type: object
+          description: "index, embedding, embeddingParked (depth only)"
+          additionalProperties: { $ref: "#/components/schemas/TenantQueue" }
+        inFlight:
+          type: object
+          description: Searches, writes and reindexes holding one of the tenant's slots now
+          additionalProperties: { type: integer }
+        refusals:
+          type: object
+          description: "Refusals since start per reason: tenant.readRate, key.writeRate, tenant.searchConcurrency, quota.documents, ..."
+          additionalProperties: { type: integer, format: int64 }
     SearchBusy:
       type: object
       description: (v2.19.8, GO-053) A query refused at the search concurrency limit.
@@ -16097,7 +16326,9 @@ components:
         The client is over the API rate limit (MDDB_RATE_LIMIT_ENABLED=true,
         MDDB_RATE_LIMIT_REQUESTS per MDDB_RATE_LIMIT_WINDOW seconds). A call
         that embeds can also be refused by the collection's daily embedding
-        budget, with a QuotaExceeded body.
+        budget, with a QuotaExceeded body. Since v2.19.8 (GO-054) a request
+        over its tenant's or its credential's rate or concurrency limit is
+        refused with a TenantLimit body.
       headers:
         Retry-After:
           description: Seconds to wait before retrying

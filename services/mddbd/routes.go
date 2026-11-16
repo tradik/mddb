@@ -124,6 +124,9 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	// GO-049: module switches.
 	mux.HandleFunc("/v1/features", s.handleFeatures)
 	mux.HandleFunc("/v1/features/", s.handleFeatures)
+	// GO-054: tenant quotas, limits and usage.
+	mux.HandleFunc("/v1/tenants", s.handleTenants)
+	mux.HandleFunc("/v1/tenants/", s.handleTenants)
 	mux.HandleFunc(chatMcpSecretsPath, s.handleChatMcpSecrets) // MCP-005
 	mux.HandleFunc(chatMcpSecretsPath+"/", s.handleChatMcpSecrets)
 	mux.HandleFunc(chatMcpInspectPath, s.handleChatMcpInspect)

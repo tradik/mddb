@@ -34,7 +34,7 @@ func (a *serverMetricsStats) EmbeddingQueueSize() (int, bool) {
 	if a.s.EmbeddingWorker == nil {
 		return 0, false
 	}
-	return len(a.s.EmbeddingWorker.jobs), true
+	return a.s.EmbeddingWorker.queue.Len(), true
 }
 
 // EmbeddingCacheStats reports the embedding cache when one is in use (RAG-003).
@@ -104,6 +104,7 @@ func (a *serverMetricsStats) DBStats() metrics.DBStats {
 		ds.SchemaCount = len(a.s.SchemaManager.List())
 	}
 	ds.Fullness, ds.EmbeddingBudgetUsed = a.s.quotaGauges() // GO-043
+	ds.Tenants = a.s.tenantGauges()                         // GO-054
 
 	a.cachedDB = &ds
 	a.cacheStamp = time.Now()

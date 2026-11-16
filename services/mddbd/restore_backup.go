@@ -165,39 +165,8 @@ func (s *Server) rebuildInMemoryState() {
 		go s.loadVectorIndex()
 	}
 
-	// Re-point FTS and its managers at the new handle; their in-memory caches
-	// are rebuilt from it. Before SEC-015/016 these kept the closed handle
-	// after a snapshot restore, so every search errored until restart.
-	if s.FTSIndex != nil {
-		s.FTSIndex.Reload(s.DB)
-	}
-	if s.SynonymManager != nil {
-		if err := s.SynonymManager.Reload(s.DB); err != nil {
-			slog.Warn("synonym reload after restore failed", "err", err)
-		}
-	}
-	if s.StopWordManager != nil {
-		if err := s.StopWordManager.Reload(s.DB); err != nil {
-			slog.Warn("stopword reload after restore failed", "err", err)
-		}
-	}
-
-	// The managers of the server's own data follow s.DB (FollowDB), so they
-	// already write to the new file; their in-memory state is reloaded from
-	// it here. Before 2.18.3 they kept the closed handle, and every write to
-	// users, keys, automations, configs or curation rules failed until a
-	// restart.
-	for name, reload := range map[string]func() error{
-		"collection configs": func() error { return reloadIf(s.CollectionManager != nil, s.CollectionManager.LoadAll) },
-		"aliases":            func() error { return reloadIf(s.Aliases != nil, s.Aliases.LoadAll) },
-		"auth":               func() error { return reloadIf(s.AuthManager != nil, s.AuthManager.LoadAll) },
-		"automations":        func() error { return reloadIf(s.AutomationManager != nil, s.AutomationManager.LoadAll) },
-		"curation rules":     func() error { return reloadIf(s.CurationManager != nil, s.CurationManager.LoadAll) },
-	} {
-		if err := reload(); err != nil {
-			slog.Warn("reload after restore failed", "what", name, "err", err)
-		}
-	}
+	s.reloadFTSManagers()
+	s.reloadDataManagers()
 	if s.SpellManager != nil {
 		s.SpellManager.LoadAll()
 	}
@@ -219,6 +188,46 @@ func (s *Server) rebuildInMemoryState() {
 	s.clearReadCaches()
 
 	slog.Info("in-memory state rebuilt after database swap")
+}
+
+// reloadFTSManagers re-points FTS and its managers at the new handle; their
+// in-memory caches are rebuilt from it. Before SEC-015/016 these kept the
+// closed handle after a snapshot restore, so every search errored until
+// restart.
+func (s *Server) reloadFTSManagers() {
+	if s.FTSIndex != nil {
+		s.FTSIndex.Reload(s.DB)
+	}
+	if s.SynonymManager != nil {
+		if err := s.SynonymManager.Reload(s.DB); err != nil {
+			slog.Warn("synonym reload after restore failed", "err", err)
+		}
+	}
+	if s.StopWordManager != nil {
+		if err := s.StopWordManager.Reload(s.DB); err != nil {
+			slog.Warn("stopword reload after restore failed", "err", err)
+		}
+	}
+}
+
+// reloadDataManagers reloads the managers of the server's own data. They
+// follow s.DB (FollowDB), so they already write to the new file; their
+// in-memory state is reloaded from it here. Before 2.18.3 they kept the
+// closed handle, and every write to users, keys, automations, configs or
+// curation rules failed until a restart.
+func (s *Server) reloadDataManagers() {
+	for name, reload := range map[string]func() error{
+		"collection configs": func() error { return reloadIf(s.CollectionManager != nil, s.CollectionManager.LoadAll) },
+		"aliases":            func() error { return reloadIf(s.Aliases != nil, s.Aliases.LoadAll) },
+		"auth":               func() error { return reloadIf(s.AuthManager != nil, s.AuthManager.LoadAll) },
+		"automations":        func() error { return reloadIf(s.AutomationManager != nil, s.AutomationManager.LoadAll) },
+		"curation rules":     func() error { return reloadIf(s.CurationManager != nil, s.CurationManager.LoadAll) },
+		"tenant configs":     func() error { return reloadIf(s.Tenants != nil, s.Tenants.LoadAll) }, // GO-054
+	} {
+		if err := reload(); err != nil {
+			slog.Warn("reload after restore failed", "what", name, "err", err)
+		}
+	}
 }
 
 // clearReadCaches drops every read cache in place — same objects (and their

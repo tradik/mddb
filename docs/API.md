@@ -5122,6 +5122,9 @@ admin on `*`, "authenticated" for any valid token or API key. See
 | POST | `/v1/temporal/query` | `read` | [TEMPORAL-TRACK.md](TEMPORAL-TRACK.md#query-event-history) (needs `MDDB_TEMPORAL=true`) |
 | POST | `/v1/temporal/hot` | `read` | [TEMPORAL-TRACK.md](TEMPORAL-TRACK.md#hot-documents-leaderboard) (needs `MDDB_TEMPORAL=true`) |
 | POST | `/v1/temporal/histogram` | `read` | [TEMPORAL-TRACK.md](TEMPORAL-TRACK.md#activity-histogram) (needs `MDDB_TEMPORAL=true`) |
+| GET | `/v1/tenants` | global admin | [MULTI_TENANCY.md](MULTI_TENANCY.md#the-tenant-endpoints) (v2.19.8+) |
+| GET, PUT, DELETE | `/v1/tenants/{id}` | GET: global admin or the tenant's own admin; PUT, DELETE: global admin | [MULTI_TENANCY.md](MULTI_TENANCY.md#the-tenant-endpoints) (v2.19.8+) |
+| GET | `/v1/tenants/{id}/usage` | global admin or the tenant's own admin | [MULTI_TENANCY.md](MULTI_TENANCY.md#the-tenant-endpoints) (v2.19.8+) |
 
 Without `MDDB_SPELL` or `MDDB_TEMPORAL` the spell and temporal routes answer
 404 with a JSON body naming the module that is off (2.19.0+; before, the mux's

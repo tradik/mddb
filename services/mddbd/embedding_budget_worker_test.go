@@ -72,7 +72,7 @@ func TestEmbeddingWorkerStopDropsParkTimer(t *testing.T) {
 	if got := w.processJob(EmbeddingJob{Collection: "c", DocID: "d", ContentMD: "body"}); got != jobParked {
 		t.Fatalf("outcome = %v, want parked", got)
 	}
-	w.park(EmbeddingJob{Collection: "c", DocID: "d", ContentMD: "body"})
+	w.park(EmbeddingJob{Collection: "c", DocID: "d", ContentMD: "body"}, w.budget.nextCheck())
 	w.Start(1)
 	w.Stop()
 	if w.parkTimer != nil {
@@ -81,7 +81,7 @@ func TestEmbeddingWorkerStopDropsParkTimer(t *testing.T) {
 
 	// A release racing a stop gives up instead of blocking on a full queue.
 	limits.set("c", nil)
-	w.jobs <- EmbeddingJob{Collection: "c", DocID: "filler"}
+	w.queue.TryPush("", EmbeddingJob{Collection: "c", DocID: "filler"})
 	done := make(chan struct{})
 	go func() {
 		w.releaseParked()

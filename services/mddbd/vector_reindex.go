@@ -43,6 +43,12 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 	if s.Embedding == nil {
 		return res, errNoEmbeddingProvider
 	}
+	// GO-054: a slot of the server's and the tenant's reindex limits.
+	ctx, release, err := s.reindexSlot(ctx, collection, nil)
+	if err != nil {
+		return res, err
+	}
+	defer release()
 
 	chunkSize := s.chunkSizeFor(collection) // #325
 	chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"

@@ -26,13 +26,17 @@ const NOTE = {
   over: 'At or over the limit: new writes are refused, or embeddings wait until midnight UTC.',
 };
 
-export default function QuotaUsage({ quota, usage }) {
-  const rows = usageRows(quota, usage);
+const COLLECTION_NOTE = 'Embedding use counts from midnight UTC, only while the collection has an embedding budget, and from zero after a restart.';
+
+// The tenant view (GO-054) reuses the bars with a tenant's limits: `fields`,
+// `title`, `note` and the heading's `id` default to the collection's.
+export default function QuotaUsage({ quota, usage, fields, title = 'Quota usage', note = COLLECTION_NOTE, id = 'cc-quota-usage' }) {
+  const rows = usageRows(quota, usage, fields);
   if (rows.length === 0) return null;
 
   return (
-    <section aria-labelledby="cc-quota-usage" className="border border-line rounded p-3">
-      <h3 id="cc-quota-usage" className="text-sm font-medium text-fg-muted mb-2">Quota usage</h3>
+    <section aria-labelledby={id} className="border border-line rounded p-3">
+      <h3 id={id} className="text-sm font-medium text-fg-muted mb-2">{title}</h3>
       <ul className="space-y-3">
         {rows.map((r) => (
           <li key={r.key}>
@@ -55,9 +59,7 @@ export default function QuotaUsage({ quota, usage }) {
           </li>
         ))}
       </ul>
-      <p className="text-xs text-fg-subtle mt-2">
-        Embedding use counts from midnight UTC, only while the collection has an embedding budget, and from zero after a restart.
-      </p>
+      <p className="text-xs text-fg-subtle mt-2">{note}</p>
     </section>
   );
 }

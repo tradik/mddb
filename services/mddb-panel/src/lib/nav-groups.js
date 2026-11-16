@@ -10,7 +10,7 @@
 import {
   Server, Settings, Network, Users, UsersIcon, Sliders, GitBranch, BookOpen, Ban, Zap, Globe, Shuffle,
   Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2,
-  MessageSquare, ToggleRight, Brain, Database, MessagesSquare, FileCheck, Import, CopyX, UserRound,
+  MessageSquare, ToggleRight, Brain, Database, MessagesSquare, FileCheck, Import, CopyX, UserRound, Building2,
 } from 'lucide-react';
 import { isViewEnabled } from './features';
 
@@ -59,6 +59,7 @@ export const NAV_GROUPS = [
       { mode: 'users', icon: Users, label: 'Users', when: 'auth' },
       { mode: 'groups', icon: UsersIcon, label: 'Groups', when: 'auth' },
       { mode: 'account', icon: UserRound, label: 'My Account', when: 'auth' },
+      { mode: 'tenants', icon: Building2, label: 'Tenants' }, // GO-054
       { mode: 'security', icon: Shield, label: 'Security' },
       { mode: 'encryption', icon: Lock, label: 'Encryption' },
       { mode: 'auditLog', icon: FileSearch, label: 'Audit Log' },

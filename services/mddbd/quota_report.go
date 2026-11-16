@@ -23,8 +23,11 @@ var quotaReportInterval = time.Minute
 // qe, so a caller can refuse and report in one statement.
 func (s *Server) reportQuota(qe *QuotaError) error {
 	s.Metrics.IncOp("quota_exceeded", qe.Resource)
+	if tenant := quotaTenant(qe); tenant != "" { // GO-054
+		s.countTenantRefusal(tenant, "quota."+qe.Resource)
+	}
 	qs := s.quotas()
-	key := qe.Collection + "|" + qe.Resource
+	key := qe.Tenant + "|" + qe.Collection + "|" + qe.Resource
 	now := time.Now().UnixNano()
 	qs.mu.Lock()
 	last, seen := qs.reported[key]
@@ -36,7 +39,7 @@ func (s *Server) reportQuota(qe *QuotaError) error {
 	if !due {
 		return qe
 	}
-	slog.Warn("quota exceeded", "collection", qe.Collection, "resource", qe.Resource,
+	slog.Warn("quota exceeded", "tenant", qe.Tenant, "collection", qe.Collection, "resource", qe.Resource,
 		"used", qe.Used, "limit", qe.Limit, "retryAfter", qe.RetryAfter)
 	if s.WebhookManager != nil {
 		detail := qe.detail()
@@ -44,6 +47,15 @@ func (s *Server) reportQuota(qe *QuotaError) error {
 		s.WebhookManager.FireCollectionEvent(webhooks.EventQuotaExceeded, qe.Collection, detail)
 	}
 	return qe
+}
+
+// quotaTenant is the tenant a refusal counts against: the tenant whose limit
+// it is, or the tenant of the refused collection.
+func quotaTenant(qe *QuotaError) string {
+	if qe.Tenant != "" {
+		return qe.Tenant
+	}
+	return TenantOfCollection(qe.Collection)
 }
 
 // quotaGauges is every quota's use for /metrics: the fullness of each

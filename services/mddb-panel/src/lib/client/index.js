@@ -14,6 +14,7 @@ import { batchMethods } from './batch';
 import { importMethods } from './imports';
 import { maintenanceMethods } from './maintenance';
 import { featureMethods } from './features'; // GO-049
+import { tenantMethods } from './tenants'; // GO-054
 
 export const adminMethods = {
   ...memoryMethods,
@@ -26,4 +27,5 @@ export const adminMethods = {
   ...importMethods,
   ...maintenanceMethods,
   ...featureMethods,
+  ...tenantMethods,
 };

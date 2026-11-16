@@ -497,8 +497,9 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 | `MDDB_EMBEDDING_CHUNK_ENABLED` | `true` | bool | Enable text chunking before embedding |
 | `MDDB_EMBEDDING_CHUNK_MODE` | `""` | string | `code` or `prose` for every document; empty decides per document. A collection's `embedding.chunkMode` takes precedence (v2.18.1+) |
 | `MDDB_EMBEDDING_CHUNK_SIZE` | `1500` | int | Maximum chunk size in characters. A collection can set its own with `embedding.chunkSize` in its collection config (v2.18.1+) |
-| `MDDB_EMBEDDING_QUEUE_SIZE` | `1000` | int | (v2.15.0+) Pending embedding jobs the worker will hold. Raise it for large imports; it was hardcoded before |
-| `MDDB_EMBEDDING_QUEUE_WAIT` | `5s` | duration | (v2.15.0+) How long a write waits for room in a full queue before the document is stored without its vector. `0` restores the pre-2.15.0 behaviour of giving up immediately — faster ingest, and documents that no vector or hybrid search can reach until reindexed |
+| `MDDB_EMBEDDING_QUEUE_SIZE` | `1000` | int | (v2.15.0+) Pending embedding jobs the worker will hold — per tenant since v2.19.8 (collections outside any namespace share one queue), and the workers take one tenant's job after another's. Raise it for large imports; it was hardcoded before |
+| `MDDB_EMBEDDING_QUEUE_WAIT` | `5s` | duration | (v2.15.0+) How long a write waits for room in its tenant's full queue. Since v2.19.8 a job that found no room is **parked** — it stays `pending` in `/v1/indexing-status` and goes back on the queue as soon as there is room — instead of being dropped. `0` parks at once |
+| `MDDB_EMBEDDING_PARK_MAX` | `100000` | int | (v2.19.8+) Jobs the worker keeps parked — waiting for room in the queue or for an embedding budget — over all tenants. Past it a job is dropped as before: stored without its vector, counted in `/v1/vector-stats` `queue.dropped` and `mddb_operations_total{operation="embedding",label="dropped"}`. `0` restores the drop-when-full behaviour of 2.15–2.19.7 |
 | `MDDB_EMBEDDING_CACHE_SIZE` | `1024` | int | (v2.12.0+) Embeddings held in the query cache; `0` disables caching and restores the pre-2.12.0 path exactly |
 | `MDDB_EMBEDDING_CACHE_TTL` | `3600` | int | (v2.12.0+) Cache entry lifetime in seconds |
 
@@ -830,6 +831,27 @@ Server-wide limits that protect the node, next to the per-collection `quota`
 Each refusal is counted in `mddb_operations_total{operation="quota_exceeded",label="<resource>"}`,
 logged, and sent as a `quota.exceeded` webhook (at most once a minute per
 collection and resource).
+
+### Tenant limits (v2.19.8+)
+
+Defaults for every tenant's request limits and vector RAM share
+([MULTI_TENANCY.md](MULTI_TENANCY.md#tenant-limits-and-isolation-v2198)).
+A tenant's own `limits` (`PUT /v1/tenants/{id}`) override them; `-1` there
+lifts a default for that tenant. Every default is `0` — no limit — so a server
+that sets none behaves as before, and so does a user without a tenant.
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_TENANT_READ_RPS` | `0` (off) | int | Read and search requests per second one tenant may make, over all its credentials and every surface. Over it: `429` + `Retry-After`, gRPC `RESOURCE_EXHAUSTED`, code `TENANT_LIMIT` |
+| `MDDB_TENANT_WRITE_RPS` | `0` (off) | int | The same for write requests |
+| `MDDB_KEY_READ_RPS` | `0` (off) | int | Read and search requests per second of one credential — an API key, or a user signed in with a password. Applies to global users' credentials too once set |
+| `MDDB_KEY_WRITE_RPS` | `0` (off) | int | The same for write requests |
+| `MDDB_TENANT_MAX_CONCURRENT_SEARCHES` | `0` (off) | int | Search slots (`MDDB_SEARCH_MAX_CONCURRENT`) one tenant may hold at once; the rest stay free for the others |
+| `MDDB_TENANT_MAX_CONCURRENT_WRITES` | `0` (off) | int | Write requests one tenant may run at once |
+| `MDDB_TENANT_QUEUE_TIMEOUT_MS` | `2000` | int | How long a request waits for one of its tenant's search or write slots before it is refused |
+| `MDDB_TENANT_MAX_CONCURRENT_REINDEXES` | `0` (off) | int | Vector reindexes one tenant may run at once. A reindex over it waits (an async job shows `queued`) |
+| `MDDB_REINDEX_MAX_CONCURRENT` | `0` (off) | int | Vector reindexes the server runs at once, over all tenants. Waits like the tenant limit |
+| `MDDB_TENANT_VECTOR_RAM_SHARE` | `0` (off) | float | Share (0–1) of `MDDB_VECTOR_RAM_LIMIT_BYTES` one tenant's in-memory vectors may take; a tenant quota's `vectorRamShare` overrides it. Does nothing without the server limit |
 
 ---
 

@@ -31,7 +31,10 @@ type quotaState struct {
 
 	mu       sync.Mutex
 	usage    map[string]usageEntry
-	reported map[string]int64 // collection|resource → unix time of the last report
+	reported map[string]int64 // tenant|collection|resource → unix time of the last report
+	// recent is each collection's usage and when it was counted, for the
+	// tenant totals (GO-054, tenant_quota.go).
+	recent map[string]recentUsage
 }
 
 // quotaUsage is what a collection holds in its docs bucket.
@@ -69,8 +72,10 @@ func (s *Server) quotas() *quotaState {
 			vectorRAMLimit: envconf.Int64("MDDB_VECTOR_RAM_LIMIT_BYTES", 0),
 			usage:          make(map[string]usageEntry),
 			reported:       make(map[string]int64),
+			recent:         make(map[string]recentUsage),
 		}
 		qs.budget = newEmbeddingBudget(s.collectionQuota, s.reportQuota)
+		qs.budget.tenantOf = s.tenantQuotaOf // GO-054: the tenant's daily budget
 		s.quota = qs
 	})
 	return s.quota
@@ -82,32 +87,43 @@ func (s *Server) quotas() *quotaState {
 // one map lookup. A write that does not grow the collection — an update to a
 // smaller document — is never refused by a quota, so a collection over a
 // lowered limit can still be cut down to size.
+//
+// GO-054: a collection of a tenant with a quota is also held to the tenant's
+// limits — the sum over its collections — and to its share of the vector RAM
+// limit; see tenant_quota.go.
 func (s *Server) checkWriteQuota(tx *bolt.Tx, collection string, writes func() []quotaWrite) error {
 	qs := s.quotas()
 	if qe := qs.checkDiskReserve(s.Path); qe != nil {
 		return s.reportQuota(qe)
 	}
 	q := s.collectionQuota(collection)
-	ramCheck := qs.vectorRAMLimit > 0 && s.Embedding != nil && !s.collectionDiskOnly(collection)
-	if !q.limitsStorage() && !ramCheck {
+	tenant, tq := s.tenantQuotaOf(collection)
+	ramCheck := qs.vectorRAMLimit > 0 && s.Embedding != nil && s.VectorIndex != nil && !s.collectionDiskOnly(collection)
+	storage := q.limitsStorage() || tq.limitsStorage()
+	if !storage && !ramCheck {
 		return nil
 	}
 	delta := writeDelta(tx, writes())
 	if delta.docs <= 0 && delta.bytes <= 0 {
 		return nil
 	}
-	if ramCheck && s.VectorIndex != nil {
-		if used := s.VectorIndex.MemoryBytes(); used >= qs.vectorRAMLimit {
-			return s.reportQuota(&QuotaError{Resource: quotaVectorRAM, Limit: qs.vectorRAMLimit, Used: used})
+	if ramCheck {
+		if qe := s.vectorRAMExceeded(tenant, tq, qs.vectorRAMLimit); qe != nil {
+			return s.reportQuota(qe)
 		}
 	}
-	if !q.limitsStorage() {
+	if !storage {
 		return nil
 	}
 	base := qs.currentUsage(tx, collection)
 	next := quotaUsage{docs: base.docs + delta.docs, bytes: base.bytes + delta.bytes}
 	if qe := s.storageQuotaExceeded(collection, q, base, next, delta); qe != nil {
 		return s.reportQuota(qe)
+	}
+	if tq.limitsStorage() {
+		if qe := s.tenantQuotaExceeded(tx, tenant, collection, tq, base, delta); qe != nil {
+			return s.reportQuota(qe)
+		}
 	}
 	// Captured now: a closed transaction no longer knows its database.
 	db, txid := tx.DB(), tx.ID()
@@ -117,6 +133,9 @@ func (s *Server) checkWriteQuota(tx *bolt.Tx, collection string, writes func() [
 
 // storageQuotaExceeded compares a write's outcome with the collection's limits.
 func (s *Server) storageQuotaExceeded(collection string, q *CollectionQuota, base, next, delta quotaUsage) *QuotaError {
+	if !q.limitsStorage() {
+		return nil
+	}
 	switch {
 	case q.MaxDocuments > 0 && delta.docs > 0 && next.docs > q.MaxDocuments:
 		return &QuotaError{Collection: collection, Resource: quotaDocuments, Limit: q.MaxDocuments, Used: base.docs}

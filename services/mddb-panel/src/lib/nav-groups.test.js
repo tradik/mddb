@@ -11,7 +11,7 @@ describe('the menu data', () => {
   test('six groups in order, every page once, each with an icon and a label', () => {
     expect(NAV_GROUPS.map((g) => g.label)).toEqual(['Search', 'Data', 'Chat', 'Integrations', 'Security', 'System']);
     const all = modes(NAV_GROUPS);
-    expect(all).toHaveLength(34);
+    expect(all).toHaveLength(35);
     expect(new Set(all).size).toBe(all.length);
     for (const item of NAV_GROUPS.flatMap((g) => g.items)) {
       expect(item.icon, item.mode).toBeTruthy();
@@ -36,11 +36,11 @@ describe('helpers', () => {
   });
 
   test('visibleGroups lists the allowed entries; without auth or replication they are left out', () => {
-    expect(modes(visibleGroups(everything))).toHaveLength(34);
+    expect(modes(visibleGroups(everything))).toHaveLength(35);
     const shown = modes(visibleGroups(plain));
     expect(shown).not.toContain('users');
     expect(shown).not.toContain('cluster');
-    expect(shown).toHaveLength(30);
+    expect(shown).toHaveLength(31);
   });
 
   test('the search matches labels, case and diacritics aside, and drops empty groups', () => {

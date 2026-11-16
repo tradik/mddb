@@ -35,11 +35,12 @@ function usageLevel(percent) {
  * One row per limit the quota sets: what is used, the limit, the share in
  * percent (above 100 when a limit was lowered below what the collection
  * holds) and the text that names both, e.g. "1,234 / 5,000 documents".
- * Empty without a quota or without usage.
+ * Empty without a quota or without usage. `fields` names the limits to read
+ * (a tenant's quota has more of them, GO-054).
  */
-export function usageRows(quota, usage) {
+export function usageRows(quota, usage, fields = USAGE_FIELDS) {
   if (!quota || !usage) return [];
-  return USAGE_FIELDS.filter((f) => quota[f.limit] > 0).map((f) => {
+  return fields.filter((f) => quota[f.limit] > 0).map((f) => {
     const used = usage[f.used] || 0;
     const limit = quota[f.limit];
     const percent = Math.round((used / limit) * 100);

@@ -113,18 +113,48 @@ const searchRetryAfterSeconds = 1
 // gate again further down — a REST route that reaches the core, an evaluation
 // running its queries — holds one slot, not two. Callers pass the returned
 // context on and call release.
+//
+// GO-054: a tenant with a MaxConcurrentSearches limit first takes one of its
+// own slots, so it can never hold more of the server's than that — the rest
+// stay free for the other tenants. A tenant at its limit is refused with a
+// TenantLimitError (429), not ErrSearchBusy: the server is not busy, the
+// tenant is.
 func (s *Server) searchSlot(ctx context.Context) (context.Context, func(), error) {
-	if s.SearchLimiter == nil || ctx.Value(searchSlotKey{}) != nil {
+	if ctx.Value(searchSlotKey{}) != nil {
 		return ctx, func() {}, nil
+	}
+	releaseTenant, err := s.tenantSearchSlot(ctx)
+	if err != nil {
+		return ctx, func() {}, err
+	}
+	if s.SearchLimiter == nil {
+		if releaseTenant == nil {
+			return ctx, func() {}, nil
+		}
+		return context.WithValue(ctx, searchSlotKey{}, true), releaseTenant, nil
 	}
 	release, err := s.SearchLimiter.Acquire(ctx)
 	if err != nil {
+		if releaseTenant != nil {
+			releaseTenant()
+		}
 		if errors.Is(err, ErrSearchBusy) {
 			s.reportSearchBusy(ctx)
 		}
 		return ctx, release, err
 	}
+	if releaseTenant != nil {
+		release = bothReleases(release, releaseTenant)
+	}
 	return context.WithValue(ctx, searchSlotKey{}, true), release, nil
+}
+
+// bothReleases releases a server slot, then the tenant's.
+func bothReleases(server, tenant func()) func() {
+	return func() {
+		server()
+		tenant()
+	}
 }
 
 // reportSearchBusy logs and counts one refused query.
@@ -184,7 +214,7 @@ func (s *Server) withSearchLimit(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, release, err := s.searchSlot(r.Context())
 		if err != nil {
-			if !writeSearchBusy(w, err) {
+			if !writeSearchBusy(w, err) && !writeTenantLimit(w, err) { // GO-054: the tenant's search limit
 				// The client's own context ended; nothing to report.
 				http.Error(w, `{"error":"request cancelled"}`, http.StatusRequestTimeout)
 			}

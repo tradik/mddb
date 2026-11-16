@@ -80,14 +80,14 @@ func newWriteProbe(t *testing.T) *writeProbe {
 func (p *writeProbe) drainJobs() []EmbeddingJob {
 	var mine []EmbeddingJob
 	for {
-		select {
-		case job := <-p.worker.jobs:
-			p.worker.run(job)
-			if job.DocID == p.docID {
-				mine = append(mine, job)
-			}
-		default:
+		popped, ok := p.worker.queue.TryPop()
+		if !ok {
 			return mine
+		}
+		job := popped.Value
+		p.worker.run(job)
+		if job.DocID == p.docID {
+			mine = append(mine, job)
 		}
 	}
 }

@@ -164,6 +164,32 @@ max by (collection, resource) (mddb_collection_fullness) > 0.9
 
 See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189).
 
+### Tenants (v2.19.8+)
+
+Per-tenant use, refusals and background-queue waits (GO-054). `tenant` is the
+namespace before the first `/` of a collection name; `tenant=""` is every
+collection outside a namespace (and, for refusals, a global user's
+credential). The gauges cover every configured tenant and every tenant a user
+is assigned to; queue depths cover any tenant with jobs waiting.
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `mddb_tenant_usage` | gauge | `tenant`, `resource` | What the tenant's collections hold: `documents`, `bytes`, `vectors`, `collections`, `vectorRam` (estimated bytes of the in-memory index), and today's `embeddingCalls` / `embeddingTokens` (counted while the tenant has an embedding budget) |
+| `mddb_tenant_fullness` | gauge | `tenant`, `resource` | Share of a tenant quota in use, 0–1 (above 1 when a limit was lowered below current use); only limits that are set |
+| `mddb_tenant_queue_depth` | gauge | `tenant`, `queue` | Jobs waiting: `index` (metadata indexing), `embedding`, `embeddingParked` (waiting for room or for an embedding budget) |
+| `mddb_tenant_refusals_total` | counter | `tenant`, `reason` | Requests and writes refused: `tenant.readRate`, `tenant.writeRate`, `key.readRate`, `key.writeRate`, `tenant.searchConcurrency`, `tenant.writeConcurrency`, `quota.<resource>` |
+| `mddb_tenant_queue_wait_seconds_total` | counter | `tenant`, `queue` | Total time the tenant's jobs waited in `index` or `embedding` before a worker took them |
+| `mddb_tenant_queue_jobs_total` | counter | `tenant`, `queue` | Jobs a worker took off the queue; divide the wait by it for the mean |
+
+The gauges share the 15-second cache above; the counters are exact. Mean
+queue wait per tenant over five minutes:
+
+```promql
+rate(mddb_tenant_queue_wait_seconds_total[5m]) / rate(mddb_tenant_queue_jobs_total[5m])
+```
+
+See [MULTI_TENANCY.md](MULTI_TENANCY.md#tenant-limits-and-isolation-v2198).
+
 ### Retrieval gain (v2.18.8+)
 
 | Metric | Type | Labels | Description |

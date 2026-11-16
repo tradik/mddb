@@ -20,10 +20,12 @@ import (
 // stallEmbeddingWorker gives a server an embedding queue with one slot, no
 // workers draining it and no patience, so the second document of any batch is
 // abandoned. That is the shape of a real overrun, arrived at in a millisecond
-// rather than by writing four thousand documents.
+// rather than by writing four thousand documents. Parking is off
+// (MDDB_EMBEDDING_PARK_MAX=0, GO-054), which is what makes a full queue drop.
 func stallEmbeddingWorker(t *testing.T, srv *Server) {
 	t.Helper()
 	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "0")
+	t.Setenv("MDDB_EMBEDDING_PARK_MAX", "0")
 
 	vs := vector.NewVectorStore(srv.DB)
 	if err := vs.EnsureBucket(); err != nil {

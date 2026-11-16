@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -180,6 +181,21 @@ func (s *Server) authorizeResource(ctx context.Context, u *url.URL) error {
 		return s.authorizeMCP(ctx, ruleRead, []string{strings.SplitN(path, "/", 2)[0]})
 	}
 	return nil // an unsupported scheme, refused by the reader
+}
+
+// admitTool applies the tenant's and the credential's request limits (GO-054)
+// to a tool of a collection, on a server the tools run in.
+func (s *MCPToolServer) admitTool(ctx context.Context, name string) (context.Context, func(), error) {
+	dc, ok := s.client.(*DirectClient)
+	rule := mcpToolAccessRules[name]
+	if !ok || dc.server == nil || rule.class != accessCollection {
+		return ctx, func() {}, nil
+	}
+	ctx, release, err := dc.server.admitRequest(ctx, rule.op)
+	if err != nil {
+		return ctx, release, fmt.Errorf("tool %q: %w", name, err)
+	}
+	return ctx, release, nil
 }
 
 // authorizeMCP applies a rule to an MCP call that carries the main auth's

@@ -73,9 +73,20 @@ func (s *Server) accessFieldMiddleware(ctx context.Context, next graphql.Resolve
 	for name, v := range fc.Args {
 		names = append(names, argCollections(name, v)...)
 	}
-	if err := s.authorize(ctx, graphqlAccessRules[key], names); err != nil {
+	rule := graphqlAccessRules[key]
+	if err := s.authorize(ctx, rule, names); err != nil {
 		return nil, gqlerror.Errorf("%s: %s", err, key)
 	}
+	if rule.class != accessCollection {
+		return next(ctx)
+	}
+	// GO-054: the tenant's and the credential's request limits; the error
+	// presenter puts the refusal's detail in the extensions.
+	ctx, release, err := s.admitRequest(ctx, rule.op)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return next(ctx)
 }
 

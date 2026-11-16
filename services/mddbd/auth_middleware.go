@@ -50,75 +50,18 @@ func (am *AuthManager) HTTPMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Try to extract token
-		token := extractTokenFromRequest(r)
-
-		// An API key sent as `Authorization: Bearer` is an API key, not a JWT.
-		//
-		// It used to be parsed as one and refused with "invalid token", which
-		// names the credential when the problem was the header — and the MCP
-		// middleware next door has always accepted the key in either place, so
-		// two surfaces of one server disagreed and clients met the stricter one
-		// first (#212). The prefix decides it outright: nothing is validated
-		// twice, and a JWT can never be mistaken for a key.
-		apiKey := r.Header.Get("X-API-Key")
-		// INT-019: the Elasticsearch clients send api_key=... as
-		// `Authorization: ApiKey <key>`. Read only on /es, so /v1 accepts
-		// exactly the credentials it always has.
-		if apiKey == "" && isESPath(r.URL.Path) {
-			apiKey = esAPIKey(r)
-		}
-		if apiKey == "" && strings.HasPrefix(token, APIKeyPrefix) {
-			apiKey, token = token, ""
-		}
+		apiKey, token := requestCredentials(r)
 
 		// If no bearer token, try API key
-		if token == "" {
-			if apiKey != "" {
-				username, err := am.ValidateAPIKey(apiKey)
-				if err != nil {
-					am.auditAuth(r, "", "auth.apikey", "fail", err.Error())
-					http.Error(w, `{"error":"invalid api key"}`, http.StatusUnauthorized)
-					return
-				}
-
-				// Generate short-lived JWT from API key; tenant confinement
-				// travels with the token (GenerateTenantJWT strips Admin
-				// for tenant users).
-				isAdmin := am.IsAdmin(username)
-				tenant := am.UserTenant(username)
-				token, err = apiKeySessionToken(username, tenant, isAdmin, am.config.JWTSecret, 1*3600*time.Second) // 1h
-				if err != nil {
-					am.auditAuth(r, username, "auth.apikey", "fail", "jwt generation failed")
-					http.Error(w, `{"error":"failed to generate token"}`, http.StatusInternalServerError)
-					return
-				}
-				am.auditAuth(r, username, "auth.apikey", "ok", "")
+		if token == "" && apiKey != "" {
+			var ok bool
+			if token, r, ok = am.apiKeySession(w, r, apiKey); !ok {
+				return
 			}
 		}
 
-		// No token found
-		if token == "" {
-			am.auditAuth(r, "", "auth.missing", "fail", "")
-			http.Error(w, `{"error":"missing authentication"}`, http.StatusUnauthorized)
-			return
-		}
-
-		// Validate JWT
-		claims, err := ValidateJWT(token, am.config.JWTSecret)
-		if err != nil {
-			am.auditAuth(r, "", "auth.jwt", "fail", "invalid token")
-			http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
-			return
-		}
-
-		// Check if user still exists and is not disabled.
-		// Return identical response for both cases to avoid
-		// leaking user existence (timing/enumeration side-channel).
-		user, err := am.GetUser(claims.Username)
-		if err != nil || user.Disabled {
-			am.auditAuth(r, claims.Username, "auth.jwt", "fail", "user disabled or not found")
-			http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
+		claims, ok := am.sessionClaims(w, r, token)
+		if !ok {
 			return
 		}
 
@@ -126,6 +69,80 @@ func (am *AuthManager) HTTPMiddleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), authContextKey, claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// requestCredentials reads a request's API key and bearer token.
+//
+// An API key sent as `Authorization: Bearer` is an API key, not a JWT.
+//
+// It used to be parsed as one and refused with "invalid token", which
+// names the credential when the problem was the header — and the MCP
+// middleware next door has always accepted the key in either place, so
+// two surfaces of one server disagreed and clients met the stricter one
+// first (#212). The prefix decides it outright: nothing is validated
+// twice, and a JWT can never be mistaken for a key.
+func requestCredentials(r *http.Request) (apiKey, token string) {
+	token = extractTokenFromRequest(r)
+	apiKey = r.Header.Get("X-API-Key")
+	// INT-019: the Elasticsearch clients send api_key=... as
+	// `Authorization: ApiKey <key>`. Read only on /es, so /v1 accepts
+	// exactly the credentials it always has.
+	if apiKey == "" && isESPath(r.URL.Path) {
+		apiKey = esAPIKey(r)
+	}
+	if apiKey == "" && strings.HasPrefix(token, APIKeyPrefix) {
+		apiKey, token = token, ""
+	}
+	return apiKey, token
+}
+
+// apiKeySession turns a valid API key into a short-lived session token — the
+// tenant confinement travels with it (GenerateTenantJWT strips Admin for
+// tenant users) — and records the key on the request (GO-054: per-key
+// limits). ok is false when it answered a refusal.
+func (am *AuthManager) apiKeySession(w http.ResponseWriter, r *http.Request, apiKey string) (string, *http.Request, bool) {
+	username, err := am.ValidateAPIKey(apiKey)
+	if err != nil {
+		am.auditAuth(r, "", "auth.apikey", "fail", err.Error())
+		http.Error(w, `{"error":"invalid api key"}`, http.StatusUnauthorized)
+		return "", r, false
+	}
+	isAdmin := am.IsAdmin(username)
+	tenant := am.UserTenant(username)
+	token, err := apiKeySessionToken(username, tenant, isAdmin, am.config.JWTSecret, 1*3600*time.Second) // 1h
+	if err != nil {
+		am.auditAuth(r, username, "auth.apikey", "fail", "jwt generation failed")
+		http.Error(w, `{"error":"failed to generate token"}`, http.StatusInternalServerError)
+		return "", r, false
+	}
+	am.auditAuth(r, username, "auth.apikey", "ok", "")
+	return token, r.WithContext(withAPIKeyID(r.Context(), apiKey)), true
+}
+
+// sessionClaims validates the session token and its user. ok is false when
+// it answered a refusal.
+func (am *AuthManager) sessionClaims(w http.ResponseWriter, r *http.Request, token string) (*JWTClaims, bool) {
+	if token == "" {
+		am.auditAuth(r, "", "auth.missing", "fail", "")
+		http.Error(w, `{"error":"missing authentication"}`, http.StatusUnauthorized)
+		return nil, false
+	}
+	claims, err := ValidateJWT(token, am.config.JWTSecret)
+	if err != nil {
+		am.auditAuth(r, "", "auth.jwt", "fail", "invalid token")
+		http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
+		return nil, false
+	}
+	// Check if user still exists and is not disabled.
+	// Return identical response for both cases to avoid
+	// leaking user existence (timing/enumeration side-channel).
+	user, err := am.GetUser(claims.Username)
+	if err != nil || user.Disabled {
+		am.auditAuth(r, claims.Username, "auth.jwt", "fail", "user disabled or not found")
+		http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
+		return nil, false
+	}
+	return claims, true
 }
 
 // auditAuth records an authentication attempt. Safe on nil server.

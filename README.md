@@ -415,6 +415,7 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **User Management** - Multi-user with admin roles
 - ✅ **[Native Multi-Tenancy](docs/MULTI_TENANCY.md)** - Namespace isolation per tenant, enforced centrally across HTTP/gRPC/GraphQL/MCP; zero config for single-tenant deployments
 - ✅ **[Per-Collection Quotas](docs/MULTI_TENANCY.md)** - `maxDocuments`, `maxBytes`, `maxVectors` and a daily embedding budget per collection (507/429 on every protocol), plus `MDDB_DISK_RESERVE_BYTES` and `MDDB_VECTOR_RAM_LIMIT_BYTES`
+- ✅ **[Tenant Isolation](docs/MULTI_TENANCY.md#tenant-limits-and-isolation-v2198)** - Tenant-wide quotas (documents, bytes, vectors, collections, embedding budget, vector RAM share), per-tenant and per-key request rate and concurrency limits, background queues shared fairly between tenants, `GET /v1/tenants/{id}/usage` and `mddb_tenant_*` metrics
 - ✅ **Group Permissions** - Organize users into groups
 - ✅ **[TLS / HTTPS](docs/TLS.md)** - `MDDB_TLS_ENABLED=true`, `MDDB_TLS_CERT`, `MDDB_TLS_KEY`, taking a user-supplied PEM cert and key, TLS 1.2 minimum
 - ✅ **[Mutual TLS (mTLS)](docs/TLS.md#quick-start-mtls--clients-must-present-certificates)** - `MDDB_TLS_CLIENT_CA` points to a PEM bundle of trusted client CAs; `MDDB_TLS_CLIENT_AUTH=require` (default) or `request`. Rejects unauthenticated clients when `require`

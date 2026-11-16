@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"time"
 
 	"mddb/internal/storage"
 
@@ -61,6 +62,7 @@ func (qs *quotaState) remember(db *bolt.DB, txid int, collection string, u quota
 		return
 	}
 	qs.usage[collection] = usageEntry{db: db, txid: txid, usage: u}
+	qs.recent[collection] = recentUsage{at: time.Now(), usage: u} // GO-054: tenant totals
 }
 
 // scanUsage counts a collection's documents and their stored bytes.

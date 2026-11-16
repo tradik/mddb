@@ -4,14 +4,16 @@ import ImportPanel from './ImportPanel';
 import DuplicatesPanel from './DuplicatesPanel';
 import AccountPanel from './AccountPanel';
 import DocumentViewer from './DocumentViewer';
+import TenantsPanel from './TenantsPanel';
 
-/** The pages added in 2.19.0, by view mode. */
+/** The pages added in 2.19.0 and after, by view mode. */
 const PAGES = {
   memory: MemoryPanel,
   schemas: SchemasPanel,
   import: ImportPanel,
   duplicates: DuplicatesPanel,
   account: AccountPanel,
+  tenants: TenantsPanel, // GO-054
 };
 
 /** Pages whose documents open in the viewer beside them. */

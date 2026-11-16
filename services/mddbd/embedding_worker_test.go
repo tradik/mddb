@@ -162,8 +162,10 @@ func TestEmbeddingWorker_EnqueueFull(t *testing.T) {
 	}
 
 	// Drop immediately rather than waiting: this test is about what happens
-	// when the queue gives up, and the default now waits first (#232).
+	// when the queue gives up, and the default now waits first (#232) and
+	// then parks the job (GO-054), unless parking is off.
 	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "0")
+	t.Setenv("MDDB_EMBEDDING_PARK_MAX", "0")
 
 	// Buffer size of 1 and no workers started to fill the queue
 	w := NewEmbeddingWorker(provider, vs, vi, 1)
@@ -372,6 +374,7 @@ func TestAbandonedJobsAreCounted(t *testing.T) {
 	provider := &embWorkerMockProvider{model: "test-model", dims: 3, vector: []float32{0.1, 0.2, 0.3}}
 
 	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "0")
+	t.Setenv("MDDB_EMBEDDING_PARK_MAX", "0") // GO-054: parking off
 	w := NewEmbeddingWorker(provider, vs, vi, 1)
 
 	_ = w.Enqueue(EmbeddingJob{Collection: "c", DocID: "fits", ContentMD: "one"})

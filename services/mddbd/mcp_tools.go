@@ -40,6 +40,11 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 	if err := s.gateTool(ctx, name, args); err != nil {
 		return "", err
 	}
+	ctx, release, err := s.admitTool(ctx, name) // GO-054: tenant request limits
+	if err != nil {
+		return "", err
+	}
+	defer release()
 
 	switch name {
 	case "add_document":

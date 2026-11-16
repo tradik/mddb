@@ -264,6 +264,13 @@ const coverageFiles = [
   // 2.19.7: dark mode (FE-015) — the theme choice and the header switch.
   'src/lib/theme.js',
   'src/components/ThemeSwitch.jsx',
+  // 2.19.8: tenant quotas, request limits and usage (GO-054).
+  'src/lib/client/tenants.js',
+  'src/lib/tenant-usage.js',
+  'src/components/TenantsPanel.jsx',
+  'src/components/TenantsTable.jsx',
+  'src/components/TenantDetail.jsx',
+  'src/components/TenantForm.jsx',
 ];
 
 export default mergeConfig(

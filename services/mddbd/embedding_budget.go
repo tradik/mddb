@@ -27,6 +27,10 @@ type embeddingBudget struct {
 	limits func(collection string) *CollectionQuota
 	notify func(qe *QuotaError) error // reports a refusal (reportQuota)
 	now    func() time.Time
+	// tenantOf is the collection's tenant and its quota (GO-054); nil, or a
+	// nil quota, means no tenant budget. A tenant's spend is counted under
+	// tenantBudgetKey and stops every collection of the tenant.
+	tenantOf func(collection string) (string, *TenantQuota)
 
 	mu   sync.Mutex
 	day  string
@@ -77,25 +81,50 @@ func (b *embeddingBudget) check(collection string) error {
 // exhausted is check without the report, for looking at parked documents
 // again: a recheck is not a new refusal.
 func (b *embeddingBudget) exhausted(collection string) *QuotaError {
-	q := b.limits(collection)
-	if !q.limitsEmbedding() {
+	if q := b.limits(collection); q.limitsEmbedding() {
+		if qe := b.spent(collection, q.EmbeddingCallsPerDay, q.EmbeddingTokensPerDay); qe != nil {
+			qe.Collection = collection
+			return qe
+		}
+	}
+	tenant, tq := b.tenantQuota(collection) // GO-054
+	if !tq.limitsEmbedding() {
 		return nil
 	}
-	b.mu.Lock()
-	b.rollLocked()
-	u := b.used[collection]
-	b.mu.Unlock()
+	qe := b.spent(tenantBudgetKey(tenant), tq.EmbeddingCallsPerDay, tq.EmbeddingTokensPerDay)
+	if qe != nil {
+		qe.Collection, qe.Tenant = collection, tenant
+	}
+	return qe
+}
+
+// spent is the refusal for a key that used up a calls or tokens limit today,
+// nil while it has budget left.
+func (b *embeddingBudget) spent(key string, calls, tokens int64) *QuotaError {
+	u := b.today(key)
 	var qe *QuotaError
 	switch {
-	case q.EmbeddingCallsPerDay > 0 && u.calls >= q.EmbeddingCallsPerDay:
-		qe = &QuotaError{Collection: collection, Resource: quotaEmbeddingCalls, Limit: q.EmbeddingCallsPerDay, Used: u.calls}
-	case q.EmbeddingTokensPerDay > 0 && u.tokens >= q.EmbeddingTokensPerDay:
-		qe = &QuotaError{Collection: collection, Resource: quotaEmbeddingTokens, Limit: q.EmbeddingTokensPerDay, Used: u.tokens}
+	case calls > 0 && u.calls >= calls:
+		qe = &QuotaError{Resource: quotaEmbeddingCalls, Limit: calls, Used: u.calls}
+	case tokens > 0 && u.tokens >= tokens:
+		qe = &QuotaError{Resource: quotaEmbeddingTokens, Limit: tokens, Used: u.tokens}
 	default:
 		return nil
 	}
 	qe.RetryAfter = b.resetIn()
 	return qe
+}
+
+// tenantBudgetKey is where a tenant's spend is counted: a key no collection
+// name can be.
+func tenantBudgetKey(tenant string) string { return "\x00tenant:" + tenant }
+
+// tenantQuota is the collection's tenant and its quota, nil without one.
+func (b *embeddingBudget) tenantQuota(collection string) (string, *TenantQuota) {
+	if b.tenantOf == nil {
+		return "", nil
+	}
+	return b.tenantOf(collection)
 }
 
 // spend records one provider call embedding text for the collection. Only
@@ -105,18 +134,28 @@ func (b *embeddingBudget) spend(collection, text string) {
 }
 
 // spendTokens records one provider call of the given size: an image's, whose
-// tokens are counted from its pixels (RAG-010).
+// tokens are counted from its pixels (RAG-010). It counts for the collection
+// when it has a budget, and for its tenant when that has one (GO-054).
 func (b *embeddingBudget) spendTokens(collection string, tokens int64) {
-	if !b.limits(collection).limitsEmbedding() {
+	var keys []string
+	if b.limits(collection).limitsEmbedding() {
+		keys = append(keys, collection)
+	}
+	if tenant, tq := b.tenantQuota(collection); tq.limitsEmbedding() {
+		keys = append(keys, tenantBudgetKey(tenant))
+	}
+	if len(keys) == 0 {
 		return
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.rollLocked()
-	u := b.used[collection]
-	u.calls++
-	u.tokens += tokens
-	b.used[collection] = u
+	for _, k := range keys {
+		u := b.used[k]
+		u.calls++
+		u.tokens += tokens
+		b.used[k] = u
+	}
 }
 
 // today is the collection's spend this UTC day; zero for a collection

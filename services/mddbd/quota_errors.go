@@ -33,9 +33,12 @@ const (
 // RESOURCE_EXHAUSTED for both.
 type QuotaError struct {
 	Collection string // "" for the server-wide limits (diskReserve, vectorRam)
-	Resource   string
-	Limit      int64
-	Used       int64
+	// Tenant is set when the limit is the tenant's (GO-054): the sum over
+	// its collections, not the collection's own.
+	Tenant   string
+	Resource string
+	Limit    int64
+	Used     int64
 	// RetryAfter is set for the embedding budget only: the time until it
 	// resets. Storage limits do not reset by themselves.
 	RetryAfter time.Duration
@@ -47,7 +50,10 @@ func (e *QuotaError) Error() string {
 		return fmt.Sprintf("quota exceeded: %d bytes available on disk, below the reserve of %d (507)", e.Used, e.Limit)
 	}
 	what := fmt.Sprintf("%s of collection %q", e.Resource, e.Collection)
-	if e.Collection == "" {
+	switch {
+	case e.Tenant != "":
+		what = fmt.Sprintf("%s of tenant %q", e.Resource, e.Tenant)
+	case e.Collection == "":
 		what = e.Resource
 	}
 	msg := fmt.Sprintf("quota exceeded: %s is %d, limit %d", what, e.Used, e.Limit)
@@ -84,6 +90,9 @@ func (e *QuotaError) detail() map[string]any {
 	}
 	if e.RetryAfter > 0 {
 		d["retryAfterSeconds"] = e.retryAfterSeconds()
+	}
+	if e.Tenant != "" {
+		d["tenant"] = e.Tenant
 	}
 	return d
 }
@@ -123,7 +132,7 @@ func grpcError(code codes.Code, err error) error {
 	if asReadOnlyError(err) != nil { // AGT-005
 		code = codes.PermissionDenied
 	}
-	if errors.Is(err, ErrSearchBusy) { // GO-053: the search concurrency limit
+	if errors.Is(err, ErrSearchBusy) || asTenantLimitError(err) != nil { // GO-053, GO-054
 		code = codes.ResourceExhausted
 	}
 	return status.Error(code, err.Error())
@@ -155,6 +164,9 @@ func mcpQuotaContent(err error) map[string]any {
 	}
 	if re := asReadOnlyError(err); re != nil {
 		return re.detail()
+	}
+	if te := tenantLimitDetail(err); te != nil { // GO-054
+		return te
 	}
 	return searchBusyDetail(err) // GO-053: nil unless the search limit refused
 }

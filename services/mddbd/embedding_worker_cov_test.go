@@ -114,6 +114,7 @@ func TestCovAEmbeddingEnqueueWaitBlank(t *testing.T) {
 
 func TestCovADropJobCountsMetric(t *testing.T) {
 	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "0")
+	t.Setenv("MDDB_EMBEDDING_PARK_MAX", "0") // GO-054: no parking, so a full queue drops
 	w := NewEmbeddingWorker(&mockEmbedding{dims: 4, model: "m"}, covAVectorStore(t, true), vec.NewVectorIndex(), 1)
 	w.metrics = covAMetrics(t)
 	if !w.Enqueue(EmbeddingJob{Collection: "c", DocID: "a"}) {

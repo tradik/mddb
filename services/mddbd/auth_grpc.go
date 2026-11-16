@@ -22,36 +22,13 @@ func (am *AuthManager) authenticateContext(ctx context.Context) (context.Context
 		return nil, status.Error(codes.Unauthenticated, "missing metadata")
 	}
 
-	// Try to extract token from authorization metadata
-	var token string
-	if values := md.Get("authorization"); len(values) > 0 {
-		auth := values[0]
-		// Support both "Bearer <token>" and raw token
-		if strings.HasPrefix(strings.ToLower(auth), "bearer ") {
-			token = strings.TrimPrefix(auth, "Bearer ")
-			token = strings.TrimPrefix(token, "bearer ")
-		} else {
-			token = auth
-		}
-	}
+	token := metadataBearer(md)
 
 	// If no bearer token, try x-api-key
-	if token == "" {
-		if values := md.Get("x-api-key"); len(values) > 0 {
-			apiKey := values[0]
-			username, err := am.ValidateAPIKey(apiKey)
-			if err != nil {
-				return nil, status.Error(codes.Unauthenticated, "invalid api key")
-			}
-
-			// Generate short-lived JWT from API key; tenant confinement
-			// travels with the token.
-			isAdmin := am.IsAdmin(username)
-			tenant := am.UserTenant(username)
-			token, err = GenerateTenantJWT(username, tenant, isAdmin, am.config.JWTSecret, 1*time.Hour)
-			if err != nil {
-				return nil, status.Error(codes.Internal, "failed to generate token")
-			}
+	if values := md.Get("x-api-key"); token == "" && len(values) > 0 {
+		var err error
+		if ctx, token, err = am.grpcAPIKeySession(ctx, values[0]); err != nil {
+			return nil, err
 		}
 	}
 
@@ -74,6 +51,35 @@ func (am *AuthManager) authenticateContext(ctx context.Context) (context.Context
 
 	// Inject claims into context
 	return context.WithValue(ctx, authContextKey, claims), nil
+}
+
+// metadataBearer is the token of the authorization metadata: "Bearer <token>"
+// or the raw token; "" when there is none.
+func metadataBearer(md metadata.MD) string {
+	values := md.Get("authorization")
+	if len(values) == 0 {
+		return ""
+	}
+	auth := values[0]
+	if strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+		return strings.TrimPrefix(strings.TrimPrefix(auth, "Bearer "), "bearer ")
+	}
+	return auth
+}
+
+// grpcAPIKeySession turns a valid API key into a short-lived session token,
+// as the HTTP middleware does — the tenant confinement travels with it — and
+// records the key in the context (GO-054: per-key limits).
+func (am *AuthManager) grpcAPIKeySession(ctx context.Context, apiKey string) (context.Context, string, error) {
+	username, err := am.ValidateAPIKey(apiKey)
+	if err != nil {
+		return ctx, "", status.Error(codes.Unauthenticated, "invalid api key")
+	}
+	token, err := apiKeySessionToken(username, am.UserTenant(username), am.IsAdmin(username), am.config.JWTSecret, 1*time.Hour)
+	if err != nil {
+		return ctx, "", status.Error(codes.Internal, "failed to generate token")
+	}
+	return withAPIKeyID(ctx, apiKey), token, nil
 }
 
 // GRPCUnaryInterceptor returns a gRPC unary interceptor for authentication.

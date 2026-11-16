@@ -66,8 +66,27 @@ func (s *Server) httpGate(pattern string, next http.Handler) http.Handler {
 			writeAccessDenied(w, err)
 			return
 		}
-		next.ServeHTTP(w, r)
+		s.serveAdmitted(w, r, rule, next)
 	})
+}
+
+// serveAdmitted runs an authorized collection request through the tenant's
+// and the credential's request limits (GO-054), and every other request as
+// it is.
+func (s *Server) serveAdmitted(w http.ResponseWriter, r *http.Request, rule accessRule, next http.Handler) {
+	if rule.class != accessCollection {
+		next.ServeHTTP(w, r)
+		return
+	}
+	ctx, release, err := s.admitRequest(r.Context(), rule.op)
+	if err != nil {
+		if !writeTenantLimit(w, err) {
+			http.Error(w, `{"error":"request cancelled"}`, http.StatusRequestTimeout)
+		}
+		return
+	}
+	defer release()
+	next.ServeHTTP(w, r.WithContext(ctx))
 }
 
 // requestCollections reads the collections a request names, from the query

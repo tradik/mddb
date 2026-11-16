@@ -131,6 +131,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/aliases/":             ruleHandler,
 	"/v1/chat/scenarios/":      ruleHandler, // #403: admin to write, the scenario's collections to read
 	"/v1/features/":            ruleHandler, // GO-049: PUT needs admin, checked in the handler
+	"/v1/tenants/":             ruleHandler, // GO-054: a global admin, or for reads the tenant's own admin
 	"/v1/chat/conversations":   ruleHandler, // the chat collection of the caller's tenant (#405)
 	"/v1/chat/conversations/":  ruleHandler,
 	"/v1/events":               ruleHandler, // each event is filtered by permission
@@ -148,6 +149,7 @@ var httpAccessRules = map[string]accessRule{
 
 	// Global administration.
 	"/v1/backup":                        ruleAdmin,
+	"/v1/tenants":                       ruleAdmin, // GO-054: every tenant's limits and usage
 	"/v1/restore":                       ruleAdmin,
 	"/v1/geo-reindex":                   ruleAdmin,
 	"/v1/embedding-configs":             ruleAdmin,

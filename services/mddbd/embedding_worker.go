@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
+	"mddb/internal/fairq"
 	"mddb/internal/metrics"
 	"mddb/internal/pending"
 	"mddb/internal/tracing"
@@ -45,7 +46,7 @@ type EmbeddingWorker struct {
 	provider     embedding.Provider
 	vectorStore  *vec.VectorStore
 	vectorIndex  *vec.VectorIndex
-	jobs         chan EmbeddingJob
+	queue        *fairq.Queue[EmbeddingJob] // GO-054: per tenant, served in turn (embedding_queue.go)
 	wg           sync.WaitGroup
 	stopCh       chan struct{}
 	chunkSize    int
@@ -83,11 +84,18 @@ type EmbeddingWorker struct {
 	// budget is the server's per-collection embedding budget (GO-043); nil
 	// when nothing set it, which is every worker built outside a server.
 	// Jobs of a collection that spent its budget are parked here, still
-	// pending, until releaseParked finds room for them.
+	// pending, until releaseParked finds room for them. So are jobs that
+	// found their tenant's queue full (GO-054), instead of being dropped.
 	budget    *embeddingBudget
 	parkMu    sync.Mutex
 	parked    []EmbeddingJob
 	parkTimer *time.Timer
+	parkDue   time.Time // when parkTimer fires
+	parkMax   int       // MDDB_EMBEDDING_PARK_MAX: past it a job is dropped
+
+	// observe is told the tenant and queue wait of every job a worker takes
+	// (GO-054: mddb_tenant_queue_wait_seconds). nil = nobody asks.
+	observe func(tenant string, waited time.Duration)
 }
 
 // jobOutcome is what processing a job came to.
@@ -133,7 +141,8 @@ func NewEmbeddingWorker(provider embedding.Provider, store *vec.VectorStore, ind
 		provider:     provider,
 		vectorStore:  store,
 		vectorIndex:  index,
-		jobs:         make(chan EmbeddingJob, bufferSize),
+		queue:        fairq.New[EmbeddingJob](bufferSize),
+		parkMax:      max(envconf.Int("MDDB_EMBEDDING_PARK_MAX", 100000), 0),
 		stopCh:       make(chan struct{}),
 		chunkSize:    envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500),
 		chunkEnabled: envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true",
@@ -143,7 +152,8 @@ func NewEmbeddingWorker(provider embedding.Provider, store *vec.VectorStore, ind
 	}
 }
 
-// EmbeddingQueueSize is how many pending jobs the worker will hold.
+// EmbeddingQueueSize is how many pending jobs the worker will hold for one
+// tenant (GO-054: per tenant, so one tenant's import cannot fill it for all).
 //
 // It was 1000, hardcoded at both construction sites, which is fine until an
 // import is larger than it — and then there was no lever at all.
@@ -175,160 +185,6 @@ func embeddingEnqueueWait() time.Duration {
 		return 5 * time.Second
 	}
 	return d
-}
-
-// QueueStats reports what the queue is holding and what it has lost.
-func (w *EmbeddingWorker) QueueStats() (size, depth int, dropped uint64, wait time.Duration) {
-	return cap(w.jobs), len(w.jobs), w.dropped.Load(), w.enqueueWait
-}
-
-// Start begins processing embedding jobs in the background.
-func (w *EmbeddingWorker) Start(workers int) {
-	for i := 0; i < workers; i++ {
-		w.wg.Add(1)
-		go w.worker(i)
-	}
-	slog.Info("embedding worker started",
-		"workers", workers, "buffer", cap(w.jobs), "chunking", w.chunkEnabled, "chunkSize", w.chunkSize)
-}
-
-// Stop gracefully stops the worker.
-func (w *EmbeddingWorker) Stop() {
-	close(w.stopCh)
-	w.wg.Wait()
-	// Parked jobs are abandoned with the worker; nothing should wake for them.
-	w.parkMu.Lock()
-	if w.parkTimer != nil {
-		w.parkTimer.Stop()
-		w.parkTimer = nil
-	}
-	w.parkMu.Unlock()
-}
-
-// Enqueue adds an embedding job to the queue, waiting for room if the queue is
-// full. Returns false only when the job was abandoned, which the caller is
-// expected to report rather than ignore (#232).
-func (w *EmbeddingWorker) Enqueue(job EmbeddingJob) bool {
-	// Counted before the send, so a worker that finishes first cannot record
-	// the end of a job the tracker has not seen start.
-	w.pending.Add(job.Collection, job.DocID)
-	// Fast path: room now, which is every write on an idle server.
-	select {
-	case w.jobs <- job:
-		return true
-	default:
-	}
-
-	if w.enqueueWait > 0 {
-		timer := time.NewTimer(w.enqueueWait)
-		defer timer.Stop()
-		select {
-		case w.jobs <- job:
-			return true
-		case <-timer.C:
-		case <-w.stopCh:
-			// Shutting down: the job is not going to be processed, and
-			// blocking here would hold up the stop.
-		}
-	}
-
-	return w.dropJob(job)
-}
-
-// dropJob records an abandoned job and always reports failure.
-func (w *EmbeddingWorker) dropJob(job EmbeddingJob) bool {
-	w.pending.Done(job.Collection, job.DocID, true)
-	w.dropped.Add(1)
-	if w.metrics != nil {
-		w.metrics.IncOp("embedding", "dropped")
-	}
-	slog.Warn("embedding queue full, dropping job — this document will have no vector until it is reindexed",
-		"collection", job.Collection, "docID", job.DocID,
-		"queueSize", cap(w.jobs), "waited", w.enqueueWait, "droppedTotal", w.dropped.Load())
-	return false
-}
-
-func (w *EmbeddingWorker) worker(id int) {
-	defer w.wg.Done()
-
-	for {
-		select {
-		case <-w.stopCh:
-			// Drain remaining jobs
-			for {
-				select {
-				case job := <-w.jobs:
-					w.run(job)
-				default:
-					return
-				}
-			}
-		case job := <-w.jobs:
-			w.run(job)
-		}
-	}
-}
-
-// run processes one job and records its end with the tracker. A parked job
-// has not ended: it stays pending until it is run again.
-//
-// A job queued by a traced request records an ingest.embed span in that
-// request's trace (OPS-024), ending after the response did.
-func (w *EmbeddingWorker) run(job EmbeddingJob) {
-	sp := w.tracer.Child(job.trace, spanIngestEmbed)
-	sp.SetString("mddb.collection", job.Collection)
-	sp.SetString("mddb.document.id", job.DocID)
-	outcome := w.processJob(job)
-	defer sp.End()
-	switch outcome {
-	case jobParked:
-		sp.SetString("mddb.embedding.outcome", "parked")
-		w.park(job)
-	case jobFailed:
-		sp.SetError(errEmbeddingJobFailed)
-		w.pending.Done(job.Collection, job.DocID, true)
-	default:
-		w.pending.Done(job.Collection, job.DocID, false)
-	}
-}
-
-// park holds a job until its collection's budget allows it, and makes sure
-// something will look at it again.
-func (w *EmbeddingWorker) park(job EmbeddingJob) {
-	w.parkMu.Lock()
-	defer w.parkMu.Unlock()
-	w.parked = append(w.parked, job)
-	if w.parkTimer == nil {
-		w.parkTimer = time.AfterFunc(w.budget.nextCheck(), w.releaseParked)
-	}
-}
-
-// releaseParked puts the parked jobs whose collections have budget again back
-// on the queue, and schedules another look for the rest: at midnight UTC, or
-// sooner, so a raised quota does not wait for it.
-func (w *EmbeddingWorker) releaseParked() {
-	w.parkMu.Lock()
-	var ready, still []EmbeddingJob
-	for _, job := range w.parked {
-		if w.budget.exhausted(job.Collection) == nil {
-			ready = append(ready, job)
-		} else {
-			still = append(still, job)
-		}
-	}
-	w.parked = still
-	w.parkTimer = nil
-	if len(still) > 0 {
-		w.parkTimer = time.AfterFunc(w.budget.nextCheck(), w.releaseParked)
-	}
-	w.parkMu.Unlock()
-	for _, job := range ready {
-		select {
-		case w.jobs <- job:
-		case <-w.stopCh:
-			return
-		}
-	}
 }
 
 // Pending is the worker's in-flight job tracker (GO-042).
