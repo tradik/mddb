@@ -292,6 +292,9 @@ func TestPlacementMapOrderAndStorage(t *testing.T) {
 	}
 	tp := startTestPlacement(t, map[string]int{"meta": 1}, "meta")
 	p := tp.nodes[0].s.placement
+	// The test writes the stored map itself; a loop round in between would
+	// rewrite it (a pin, a new version) under the assertions.
+	stopLoop(p)
 	// A stored map whose entries are null reads as empty.
 	writeStoredMap(t, p, `{"version":1,"term":1,"entries":null}`)
 	if got := p.storedMap(); got.Entries == nil {
