@@ -40,6 +40,9 @@ func (p *placementRuntime) forward(w http.ResponseWriter, r *http.Request, group
 		writeBodyError(w, err)
 		return
 	}
+	// The node that serves the request keeps its own deadline (and lifts
+	// it for the requests that may take longer); this one only relays.
+	liftWriteDeadline(w, r)
 	for attempt := 0; attempt < 2; attempt++ {
 		n, ok := p.leaderNode(group)
 		if !ok {

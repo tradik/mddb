@@ -116,6 +116,7 @@ func (s *Server) handlePlacementMove(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusAccepted, map[string]any{"move": s.placement.moves.get(m)})
 		return
 	}
+	liftWriteDeadline(w, r) // a move lasts as long as its copy
 	select {
 	case <-m.done:
 	case <-r.Context().Done():

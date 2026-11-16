@@ -156,21 +156,7 @@ func TestPlacementExportRefusalsAndFailures(t *testing.T) {
 			t.Errorf("a stream failing at message %d did not end the export", failAt)
 		}
 	}
-	// A nested bucket in a collection's file is not a key to copy.
-	db := g2.s.collectionStore().get(c)
-	if err := db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte("docs"))
-		if err == nil {
-			_, err = b.CreateBucketIfNotExists([]byte("nested"))
-		}
-		return err
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := logEntries(g2.s.DBUpdate, g2.s.Binlog, []*binlog.BinlogEntry{
-		{Type: binlog.BinlogPut, BucketName: "schemas", Key: []byte("schema|someone-else"), Value: []byte("{}")}}); err != nil {
-		t.Fatal(err)
-	}
+	addKeysNotToCopy(t, g2, c)
 	stream := &fakeServerStream[proto.ExportKeysChunk]{ctx: peerCtx(), failAt: -1}
 	if err := g2.s.placement.copyKeys(&proto.ExportKeysRequest{Collection: c}, chunkSender{stream}); err != nil {
 		t.Fatal(err)
@@ -181,6 +167,25 @@ func TestPlacementExportRefusalsAndFailures(t *testing.T) {
 	}
 	if err := g2.s.placement.tailCollection(&fakeServerStream[proto.ExportKeysChunk]{ctx: peerCtx(), failAt: 0}, c, 0); err == nil {
 		t.Fatal("a tail whose stream fails went on")
+	}
+}
+
+// addKeysNotToCopy gives c's file a nested bucket and the node another
+// collection's settings: neither is part of c's copy.
+func addKeysNotToCopy(t *testing.T, n *placementNodeT, c string) {
+	t.Helper()
+	if err := n.s.collectionStore().get(c).Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte("docs"))
+		if err == nil {
+			_, err = b.CreateBucketIfNotExists([]byte("nested"))
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := logEntries(n.s.DBUpdate, n.s.Binlog, []*binlog.BinlogEntry{
+		{Type: binlog.BinlogPut, BucketName: "schemas", Key: []byte("schema|someone-else"), Value: []byte("{}")}}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -229,23 +234,43 @@ func TestPlacementImportRefusalsAndFailures(t *testing.T) {
 	p.adopt(withEntry(p.current(), c, placementEntry{Group: "meta", MovingTo: "g2"}))
 	req := &proto.ImportCollectionRequest{Collection: c, SourceGroup: "meta"}
 	report := func(*proto.ImportProgress) error { return nil }
-	if err := p.importCollection(context.Background(), &proto.ImportCollectionRequest{Collection: c, SourceGroup: "nowhere"}, report); err == nil {
-		t.Fatal("imported from a group without a leader")
-	}
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := p.importCollection(cancelled, req, report); err == nil {
-		t.Fatal("an import whose caller left started")
+	failures := []struct {
+		name   string
+		ctx    context.Context
+		req    *proto.ImportCollectionRequest
+		report func(*proto.ImportProgress) error
+	}{
+		{"a source without a leader", context.Background(), &proto.ImportCollectionRequest{Collection: c, SourceGroup: "nowhere"}, report},
+		{"a caller that left", cancelled, req, report},
+		{"a caller that cannot be told", context.Background(), req, func(*proto.ImportProgress) error { return errors.New("gone") }},
+		// The meta group does not hold this one, and refuses it.
+		{"what the source does not hold", context.Background(), &proto.ImportCollectionRequest{Collection: nameIn(t, p, "g2"), SourceGroup: "meta"}, report},
 	}
-	if err := p.importCollection(context.Background(), req, func(*proto.ImportProgress) error { return errors.New("gone") }); err == nil {
-		t.Fatal("an import whose caller cannot be told went on")
-	}
-	// The source refuses: the meta group does not hold this one.
-	other := nameIn(t, p, "g2")
-	if err := p.importCollection(context.Background(), &proto.ImportCollectionRequest{Collection: other, SourceGroup: "meta"}, report); err == nil {
-		t.Fatal("imported what the source does not hold")
+	for _, f := range failures {
+		if err := p.importCollection(f.ctx, f.req, f.report); err == nil {
+			t.Errorf("%s: imported", f.name)
+		}
 	}
 	// The source removes a whole collection bucket while it is copied.
+	if err := importUntilBucketRemoved(p, meta, req); !errors.Is(err, errBucketDeleted) {
+		t.Fatalf("a bucket removed at the source: %v", err)
+	}
+	// A copy left here that cannot be read stops the import before it starts.
+	db, err := g2.s.collectionStore().getOrCreate(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	if err := p.importCollection(context.Background(), req, report); err == nil {
+		t.Fatal("imported over a copy that cannot be dropped")
+	}
+}
+
+// importUntilBucketRemoved imports req and, once the copy is done, has the
+// source log a whole collection bucket removed.
+func importUntilBucketRemoved(p *placementRuntime, src *placementNodeT, req *proto.ImportCollectionRequest) error {
 	copied := make(chan struct{}, 1)
 	done := make(chan error, 1)
 	go func() {
@@ -260,21 +285,10 @@ func TestPlacementImportRefusalsAndFailures(t *testing.T) {
 		})
 	}()
 	<-copied
-	if err := meta.s.Binlog.AppendBatch([]*binlog.BinlogEntry{{Type: binlog.BinlogDeleteBucket, BucketName: "docs"}}); err != nil {
-		t.Fatal(err)
+	if err := src.s.Binlog.AppendBatch([]*binlog.BinlogEntry{{Type: binlog.BinlogDeleteBucket, BucketName: "docs"}}); err != nil {
+		return err
 	}
-	if err := <-done; !errors.Is(err, errBucketDeleted) {
-		t.Fatalf("a bucket removed at the source: %v", err)
-	}
-	// A copy left here that cannot be read stops the import before it starts.
-	db, err := g2.s.collectionStore().getOrCreate(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = db.Close()
-	if err := p.importCollection(context.Background(), req, report); err == nil {
-		t.Fatal("imported over a copy that cannot be dropped")
-	}
+	return <-done
 }
 
 // withEntry is t with c placed as e.

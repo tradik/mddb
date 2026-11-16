@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"mddb/internal/binlog"
 )
 
 // GO-052: a collection moved between groups while it is written and read.
@@ -103,6 +105,12 @@ func TestPlacementMoveUnderLoadLosesNoWriteAndServesReads(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// Its settings, in the main file, move with it.
+	if err := logEntries(leader.s.DBUpdate, leader.s.Binlog, []*binlog.BinlogEntry{
+		{Type: binlog.BinlogPut, BucketName: "schemas", Key: []byte("schema|" + c), Value: []byte("{}")},
+		{Type: binlog.BinlogPut, BucketName: "synonyms", Key: []byte("syn|" + c + "|car"), Value: []byte(`["auto"]`)}}); err != nil {
+		t.Fatal(err)
+	}
 	to := otherGroup(from)
 	load := startMoveLoad(tp, c, seeded)
 	time.Sleep(100 * time.Millisecond)
@@ -140,6 +148,27 @@ func TestPlacementMoveUnderLoadLosesNoWriteAndServesReads(t *testing.T) {
 				return got == sum
 			})
 		}
+	}
+	checkSettingsMoved(t, tp, c, to)
+}
+
+// checkSettingsMoved checks that every node of group to holds c's two
+// settings, and no other node any.
+func checkSettingsMoved(t *testing.T, tp *testPlacement, c, to string) {
+	t.Helper()
+	for _, n := range tp.nodes {
+		want := 0
+		if n.group == to {
+			want = 2
+		}
+		waitE2E(t, n.id+" to hold the settings it should", func() bool {
+			got := 0
+			_ = scanBuckets(n.s.DB, settingsBucketNames(), ownedBy(c), func(string, []byte, []byte) error {
+				got++
+				return nil
+			})
+			return got == want
+		})
 	}
 }
 
