@@ -237,6 +237,7 @@ func (h *HNSWIndex) persistRestore(collection string, section any, vectors map[s
 	defer h.mu.Unlock()
 	h.graphs[collection] = g
 	h.vectors[collection] = live
+	h.chunkKeys.rebuild(collection, live)
 	h.nodeKeys[collection] = keys
 	h.deleted[collection] = len(s.keys) - len(live)
 	h.dims[collection] = s.dim

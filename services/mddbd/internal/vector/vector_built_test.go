@@ -74,7 +74,10 @@ func TestIVF_SearchWithFilterWiden(t *testing.T) {
 	query := []float32{0, 0, 1}
 	narrow := idx.SearchWithFilter("c", query, 5, -1, allowed, nil)
 	wide := idx.SearchWithFilterWiden("c", query, 5, -1, allowed, nil, 64)
-	if len(wide) != 5 || len(narrow) >= len(wide) {
+	// Since SRCH-024 the default search probes on until the clusters it
+	// probed are expected to hold enough admitted vectors, so it no longer
+	// comes back short here either; with nProbe 1 it used to find none.
+	if len(wide) != 5 || len(narrow) != 5 {
 		t.Fatalf("narrow %d, wide %d", len(narrow), len(wide))
 	}
 	var _ Widener = idx

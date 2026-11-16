@@ -2802,6 +2802,7 @@ type SearchPlan struct {
 	Collections   map[string]*SearchPlan `protobuf:"bytes,6,rep,name=collections,proto3" json:"collections,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // cross search: one plan per target collection
 	Feedback      *FeedbackApplied       `protobuf:"bytes,7,opt,name=feedback,proto3" json:"feedback,omitempty"`                                                                                 // (SRCH-015) the correction relevance feedback made
 	Decomposition *QueryDecomposition    `protobuf:"bytes,8,opt,name=decomposition,proto3" json:"decomposition,omitempty"`                                                                       // (v2.18.10, SRCH-020) set with query_decomposition "auto"
+	Strategy      string                 `protobuf:"bytes,9,opt,name=strategy,proto3" json:"strategy,omitempty"`                                                                                 // (v2.19.8, SRCH-024) filtered search: prefilter, graph+filter, ivf or scan+filter
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2890,6 +2891,13 @@ func (x *SearchPlan) GetDecomposition() *QueryDecomposition {
 		return x.Decomposition
 	}
 	return nil
+}
+
+func (x *SearchPlan) GetStrategy() string {
+	if x != nil {
+		return x.Strategy
+	}
+	return ""
 }
 
 // How query decomposition split the query, in the plan (v2.18.10, SRCH-020).
@@ -23473,7 +23481,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\flimit_capped\x18\v \x01(\bR\vlimitCapped\x12\x14\n" +
 	"\x05limit\x18\f \x01(\x05R\x05limit\x12*\n" +
 	"\x06rerank\x18\r \x01(\v2\x12.mddb.RerankReportR\x06rerank\x12%\n" +
-	"\x0ererank_skipped\x18\x0e \x01(\tR\rrerankSkipped\"\xb3\x03\n" +
+	"\x0ererank_skipped\x18\x0e \x01(\tR\rrerankSkipped\"\xcf\x03\n" +
 	"\n" +
 	"SearchPlan\x12\x1c\n" +
 	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12\x1c\n" +
@@ -23485,7 +23493,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\areasons\x18\x05 \x03(\tR\areasons\x12C\n" +
 	"\vcollections\x18\x06 \x03(\v2!.mddb.SearchPlan.CollectionsEntryR\vcollections\x121\n" +
 	"\bfeedback\x18\a \x01(\v2\x15.mddb.FeedbackAppliedR\bfeedback\x12>\n" +
-	"\rdecomposition\x18\b \x01(\v2\x18.mddb.QueryDecompositionR\rdecomposition\x1aP\n" +
+	"\rdecomposition\x18\b \x01(\v2\x18.mddb.QueryDecompositionR\rdecomposition\x12\x1a\n" +
+	"\bstrategy\x18\t \x01(\tR\bstrategy\x1aP\n" +
 	"\x10CollectionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.SearchPlanR\x05value:\x028\x01\"@\n" +

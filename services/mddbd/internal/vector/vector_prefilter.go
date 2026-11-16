@@ -17,34 +17,43 @@ import "sync"
 // Unchunked documents — the common case — need no entry: the document ID is
 // the key. Chunk numbers are not assumed to be contiguous; the list holds
 // exactly the keys stored.
+//
+// The flat index and HNSW share the scan (SRCH-024): HNSW answers a filter
+// admitting too little for its graph the same way, rather than scoring the
+// whole collection as it did until 2.19.8.
 
-// prefilterVisited, when set, is told how many vectors each filtered flat
-// search looked at. Tests use it to hold the prefilter to the admitted set.
+// prefilterVisited, when set, is told how many vectors each exact filtered
+// scan looked at. Tests use it to hold the prefilter to the admitted set.
 var prefilterVisited func(visited int)
 
-// noteKeyLocked records a key just added to a collection. Caller holds the
-// write lock and has checked the key was not there before.
-func (vi *VectorIndex) noteKeyLocked(collection, key string) {
+// chunkIndex is, per collection, the chunk keys each document holds: what
+// lets an exact filtered scan reach a chunked document's vectors without a
+// pass over the collection.
+type chunkIndex map[string]map[string][]string
+
+// note records a key just added to a collection. Caller holds the write lock
+// and has checked the key was not there before.
+func (c chunkIndex) note(collection, key string) {
 	doc := BaseDocID(key)
 	if doc == key {
 		return
 	}
-	docs := vi.chunkKeys[collection]
+	docs := c[collection]
 	if docs == nil {
 		docs = make(map[string][]string)
-		vi.chunkKeys[collection] = docs
+		c[collection] = docs
 	}
 	docs[doc] = append(docs[doc], key)
 }
 
-// forgetKeyLocked drops a key just removed from a collection. Caller holds the
-// write lock.
-func (vi *VectorIndex) forgetKeyLocked(collection, key string) {
+// forget drops a key just removed from a collection. Caller holds the write
+// lock.
+func (c chunkIndex) forget(collection, key string) {
 	doc := BaseDocID(key)
 	if doc == key {
 		return
 	}
-	docs := vi.chunkKeys[collection]
+	docs := c[collection]
 	keys := docs[doc]
 	for i, k := range keys {
 		if k == key {
@@ -60,6 +69,15 @@ func (vi *VectorIndex) forgetKeyLocked(collection, key string) {
 	docs[doc] = keys
 }
 
+// rebuild replaces a collection's entry with the chunk keys of vectors.
+// Caller holds the write lock.
+func (c chunkIndex) rebuild(collection string, vectors map[string][]float32) {
+	delete(c, collection)
+	for key := range vectors {
+		c.note(collection, key)
+	}
+}
+
 // admittedPerWorker is how many admitted documents one goroutine looks up.
 // A lookup is a few cache misses in a large map, so the scan is bound by
 // memory latency rather than arithmetic and gains from parallelism long
@@ -69,14 +87,24 @@ func (vi *VectorIndex) forgetKeyLocked(collection, key string) {
 // split 512 to a goroutine they took 0.6 and 1.3 ms.
 const admittedPerWorker = 512
 
-// searchAdmittedLocked scores every vector of the collection whose document
-// the filter admits — the document's own key and its chunk keys, each looked
-// up once — and returns the topK best. Caller holds at least the read lock,
-// for the lookups, until this returns.
-func (vi *VectorIndex) searchAdmittedLocked(collection string, coll map[string][]float32, allowed map[string]bool,
-	query []float32, topK int, threshold float64, metric SimilarityFunc) []VectorResult {
-	docs := make([]string, 0, len(allowed))
-	for doc, ok := range allowed {
+// admittedScan is an exact scan of what a filter admits: every vector of a
+// collection whose document the filter allows — the document's own key and
+// its chunk keys, each looked up once — scored against the query.
+type admittedScan struct {
+	coll      map[string][]float32
+	chunks    map[string][]string // the collection's entry of a chunkIndex
+	allowed   map[string]bool
+	query     []float32
+	topK      int
+	threshold float64
+	metric    SimilarityFunc
+}
+
+// run returns the topK best of the admitted vectors. Caller holds at least
+// the read lock of the index the maps belong to until this returns.
+func (a admittedScan) run() []VectorResult {
+	docs := make([]string, 0, len(a.allowed))
+	for doc, ok := range a.allowed {
 		if ok {
 			docs = append(docs, doc)
 		}
@@ -91,8 +119,7 @@ func (vi *VectorIndex) searchAdmittedLocked(collection string, coll map[string][
 		go func() {
 			defer wg.Done()
 			// Each worker writes only its own slots; wg.Wait orders the reads.
-			partials[w], visits[w] = vi.scoreAdmitted(collection, coll, docs[min(w*per, len(docs)):min((w+1)*per, len(docs))],
-				query, topK, threshold, metric)
+			partials[w], visits[w] = a.score(docs[min(w*per, len(docs)):min((w+1)*per, len(docs))])
 		}()
 	}
 	wg.Wait()
@@ -103,22 +130,20 @@ func (vi *VectorIndex) searchAdmittedLocked(collection string, coll map[string][
 		}
 		prefilterVisited(total)
 	}
-	return mergeTop(partials, topK)
+	return mergeTop(partials, a.topK)
 }
 
-// scoreAdmitted is one worker's share of searchAdmittedLocked: its topK best
-// and how many vectors it looked up.
-func (vi *VectorIndex) scoreAdmitted(collection string, coll map[string][]float32, docs []string,
-	query []float32, topK int, threshold float64, metric SimilarityFunc) ([]VectorResult, int) {
-	chunks := vi.chunkKeys[collection]
-	best := newTopK(topK)
+// score is one worker's share of run: its topK best and how many vectors it
+// looked up.
+func (a admittedScan) score(docs []string) ([]VectorResult, int) {
+	best := newTopK(a.topK)
 	visited := 0
 	score := func(key string, vec []float32) {
 		visited++
-		if len(vec) != len(query) {
+		if len(vec) != len(a.query) {
 			return // absent, or another embedding model's vector; see sameDimension
 		}
-		if s := metric(query, vec); float64(s) >= threshold {
+		if s := a.metric(a.query, vec); float64(s) >= a.threshold {
 			best.add(VectorResult{DocID: key, Score: s})
 		}
 	}
@@ -127,10 +152,10 @@ func (vi *VectorIndex) scoreAdmitted(collection string, coll map[string][]float3
 		// full scan alike, so an allowed ID that reads as a chunk key admits
 		// only through its parent.
 		if BaseDocID(doc) == doc {
-			score(doc, coll[doc])
+			score(doc, a.coll[doc])
 		}
-		for _, key := range chunks[doc] {
-			score(key, coll[key])
+		for _, key := range a.chunks[doc] {
+			score(key, a.coll[key])
 		}
 	}
 	return best.results(), visited

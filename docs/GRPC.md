@@ -535,7 +535,7 @@ The query planner (SRCH-013) is available over gRPC. `VectorSearch` and
 
 The responses carry `SearchPlan plan`: field 9 on `VectorSearchResponse`, 10
 on the other two. A plan has `algorithm`, `prefilter`, `candidates`,
-`iterative_scan`, `reasons` and, for cross search, one `SearchPlan` per
+`iterative_scan`, `reasons`, `strategy` (9, v2.19.8: how a filtered search ran — `prefilter`, `graph+filter`, `ivf` or `scan+filter`) and, for cross search, one `SearchPlan` per
 target in `collections`. `RetrievalProfileProto.vector_algorithm` (14) stores
 a collection's default, for example `"auto"`. The table the planner decides by
 is in [SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189).

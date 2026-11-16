@@ -25,6 +25,7 @@ func (h *HNSWIndex) DropCollection(collection string) {
 	defer h.mu.Unlock()
 	delete(h.graphs, collection)
 	delete(h.vectors, collection)
+	delete(h.chunkKeys, collection)
 	delete(h.deleted, collection)
 	delete(h.dims, collection)
 	delete(h.nodeKeys, collection)

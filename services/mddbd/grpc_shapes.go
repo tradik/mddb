@@ -64,7 +64,7 @@ func planToProto(p *SearchPlan) *proto.SearchPlan {
 		return nil
 	}
 	out := &proto.SearchPlan{Algorithm: p.Algorithm, Prefilter: p.Prefilter, Candidates: safeInt32(p.Candidates),
-		IterativeScan: p.IterativeScan, Reasons: p.Reasons}
+		IterativeScan: p.IterativeScan, Reasons: p.Reasons, Strategy: p.Strategy}
 	if len(p.Collections) > 0 {
 		out.Collections = make(map[string]*proto.SearchPlan, len(p.Collections))
 		for coll, cp := range p.Collections {

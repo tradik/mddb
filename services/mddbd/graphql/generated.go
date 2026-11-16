@@ -334,6 +334,7 @@ type ComplexityRoot struct {
 		IterativeScan func(childComplexity int) int
 		Prefilter     func(childComplexity int) int
 		Reasons       func(childComplexity int) int
+		Strategy      func(childComplexity int) int
 	}
 
 	Stats struct {
@@ -1928,6 +1929,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.SearchPlan.Reasons(childComplexity), true
+	case "SearchPlan.strategy":
+		if e.ComplexityRoot.SearchPlan.Strategy == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SearchPlan.Strategy(childComplexity), true
 
 	case "Stats.collections":
 		if e.ComplexityRoot.Stats.Collections == nil {
@@ -2868,6 +2875,8 @@ func (ec *executionContext) childFields_SearchPlan(ctx context.Context, field gr
 		return ec.fieldContext_SearchPlan_algorithm(ctx, field)
 	case "prefilter":
 		return ec.fieldContext_SearchPlan_prefilter(ctx, field)
+	case "strategy":
+		return ec.fieldContext_SearchPlan_strategy(ctx, field)
 	case "candidates":
 		return ec.fieldContext_SearchPlan_candidates(ctx, field)
 	case "iterativeScan":
@@ -10274,6 +10283,29 @@ func (ec *executionContext) fieldContext_SearchPlan_prefilter(_ context.Context,
 	return graphql.NewScalarFieldContext("SearchPlan", field, false, false, "Boolean")
 }
 
+func (ec *executionContext) _SearchPlan_strategy(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SearchPlan_strategy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Strategy, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_SearchPlan_strategy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SearchPlan", field, false, false, "String")
+}
+
 func (ec *executionContext) _SearchPlan_candidates(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -16253,6 +16285,11 @@ func (ec *executionContext) _SearchPlan(ctx context.Context, sel ast.SelectionSe
 		case "prefilter":
 			out.Values[i] = ec._SearchPlan_prefilter(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "strategy":
+			out.Values[i] = ec._SearchPlan_strategy(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		case "candidates":

@@ -686,6 +686,7 @@ message SearchPlan {
   map<string, SearchPlan> collections = 6;       // cross search: one plan per target collection
   FeedbackApplied feedback = 7;                  // (SRCH-015) the correction relevance feedback made
   QueryDecomposition decomposition = 8;          // (v2.18.10, SRCH-020) set with query_decomposition "auto"
+  string strategy = 9;                           // (v2.19.8, SRCH-024) filtered search: prefilter, graph+filter, ivf or scan+filter
 }
 
 // How query decomposition split the query, in the plan (v2.18.10, SRCH-020).

@@ -844,7 +844,7 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `filterMeta` (optional): Metadata pre-filter (same logic as `/v1/search`)
 - `includeContent` (optional): Include `contentMd` in results (default: false)
 - `algorithm` (optional): `flat` (default), `auto`, `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`. With `auto` (v2.18.9+) the query planner chooses per query; the collection profile's `retrieval.vectorAlgorithm` applies when the request names none ([SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189))
-- `explain` (optional, v2.18.9+): Add `plan` to the response — the index that answered, `prefilter`, `candidates`, `iterativeScan` and the reasons
+- `explain` (optional, v2.18.9+): Add `plan` to the response — the index that answered, `prefilter`, `strategy` (v2.19.8: `prefilter`, `graph+filter`, `ivf` or `scan+filter` for a filtered search), `candidates`, `iterativeScan` and the reasons
 - `includeImages` (optional, v2.18.9+): Attach each hit's image documents as `images` (alt text, caption, page, `url`); with a provider that embeds images also return `imageHits`, the images whose picture matches the query. Also on `/v1/fts`, `/v1/hybrid-search` and `/v1/cross-search` ([SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189))
 - `queryImage` (optional*, v2.18.9+): Search by an image instead of text — base64, a data URI or an http(s) URL (SSRF-guarded). Needs a provider that embeds images, else 400; the results are image documents, `algorithm: "image"`
 - `latencyTargetMs` (optional, v2.18.9+): Latency goal for `auto`, 0–60000; 10 or less favours a quantized index on 10,000+ vectors
@@ -902,7 +902,7 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `model`: Embedding model used
 - `dimensions`: Vector dimensionality
 - `algorithm`: The index that answered
-- `plan` (with `explain`, v2.18.9+): `{algorithm, prefilter, candidates, iterativeScan, reasons}`
+- `plan` (with `explain`, v2.18.9+): `{algorithm, prefilter, strategy, candidates, iterativeScan, reasons}`
 
 **How It Works**:
 1. When a document is added via `/v1/add`, its content is automatically embedded in the background

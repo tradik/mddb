@@ -358,7 +358,7 @@ query {
   }) {
     results { document { key } score }
     plan {
-      algorithm prefilter candidates iterativeScan reasons
+      algorithm prefilter strategy candidates iterativeScan reasons
       feedback { mode positive negative alpha beta gamma queryShift weight rescored }
     }
   }

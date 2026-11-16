@@ -15,7 +15,9 @@ import (
 type HNSWIndex struct {
 	mu      sync.RWMutex
 	graphs  map[string]*hnswGraph
-	vectors map[string]map[string][]float32 // kept for SearchWithFilter fallback
+	vectors map[string]map[string][]float32 // live vectors, for rebuilds and the exact filtered scan
+	// chunkKeys lets the exact filtered scan reach chunked documents (SRCH-024).
+	chunkKeys chunkIndex
 	// deleted counts removals per collection since the graph was last rebuilt.
 	// The graph cannot be asked how much tombstoned structure it carries, so
 	// this is the only signal available for deciding when to compact (GO-029).
@@ -85,6 +87,7 @@ func NewHNSWIndex(m, efConstruction, efSearch int) *HNSWIndex {
 	return &HNSWIndex{
 		graphs:         make(map[string]*hnswGraph),
 		vectors:        make(map[string]map[string][]float32),
+		chunkKeys:      make(chunkIndex),
 		deleted:        make(map[string]int),
 		dims:           make(map[string]int),
 		nodeKeys:       make(map[string]map[string]string),
@@ -152,6 +155,8 @@ func (h *HNSWIndex) Add(collection, docID string, vector []float32) error {
 	if exists {
 		delete(h.nodeKeys[collection], docID)
 		h.deleted[collection]++
+	} else {
+		h.chunkKeys.note(collection, docID)
 	}
 
 	key := h.nextNodeKey(docID)
@@ -175,10 +180,20 @@ func (h *HNSWIndex) nextNodeKey(docID string) string {
 // liveDocID resolves a graph node to the document it stands for, or reports
 // that the node is a tombstone. Caller must hold at least the read lock.
 func (h *HNSWIndex) liveDocID(collection, nodeKey string) (string, bool) {
-	// Every key nextNodeKey makes has the separator; a key without one would
-	// resolve to "" and still not be the live key of any document.
-	docID := nodeKey[:max(strings.LastIndexByte(nodeKey, 0), 0)]
-	return docID, h.nodeKeys[collection][docID] == nodeKey
+	return liveNode(h.nodeKeys[collection], nodeKey)
+}
+
+// liveNode is liveDocID against one collection's node keys.
+func liveNode(nodeKeys map[string]string, nodeKey string) (string, bool) {
+	docID := nodeDocID(nodeKey)
+	return docID, nodeKeys[docID] == nodeKey
+}
+
+// nodeDocID is the document a node key was made for. Every key nextNodeKey
+// makes has the separator; a key without one resolves to "", which is not
+// the live key of any document.
+func nodeDocID(nodeKey string) string {
+	return nodeKey[:max(strings.LastIndexByte(nodeKey, 0), 0)]
 }
 
 // Remove deletes a vector from the index.
@@ -190,6 +205,7 @@ func (h *HNSWIndex) Remove(collection, docID string) {
 	delete(h.nodeKeys[collection], docID)
 	if coll, ok := h.vectors[collection]; ok {
 		if _, existed := coll[docID]; existed {
+			h.chunkKeys.forget(collection, docID)
 			h.deleted[collection]++
 			h.mutations[collection]++
 		}
@@ -420,81 +436,6 @@ func (h *HNSWIndex) withTombstones(collection string, k int) int {
 		return k
 	}
 	return k*(live+dead)/live + 1
-}
-
-// HNSWFilterOversample is how many times topK a filtered HNSW search takes
-// from the graph before filtering. A filter admitting less than its inverse
-// of the collection leaves fewer than topK, and the search falls back to
-// scoring the collection — which is why the planner sends such filters to the
-// prefilter instead (SRCH-013).
-const HNSWFilterOversample = 3
-
-// SearchWithFilter performs HNSW search filtered by allowed doc IDs.
-// Strategy: oversample HNSWFilterOversample× from HNSW, then filter. If
-// insufficient results, fall back to brute-force on the allowed set.
-func (h *HNSWIndex) SearchWithFilter(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, metric SimilarityFunc) []VectorResult {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	if topK <= 0 {
-		topK = 5
-	}
-	if metric == nil {
-		metric = CosineSimilarity
-	}
-
-	g, ok := h.graphs[collection]
-	if !ok || len(query) != h.dims[collection] {
-		// The graph holds one dimension (#252); a query of another cannot be
-		// compared with anything in it.
-		return nil
-	}
-
-	// Oversample: fetch HNSWFilterOversample × topK from HNSW, then filter
-	oversample := max(topK*HNSWFilterOversample, 50)
-	neighbors := g.Search(query, oversample)
-
-	// Tombstones come back from the graph too (see Search), so the live map
-	// decides here as well.
-	results := make([]VectorResult, 0, topK)
-	for _, n := range neighbors {
-		docID, alive := h.liveDocID(collection, n.Key)
-		if !alive || !allowed[BaseDocID(docID)] {
-			continue
-		}
-		score := metric(query, n.Value)
-		if float64(score) >= threshold {
-			results = append(results, VectorResult{DocID: docID, Score: score})
-		}
-	}
-
-	// If not enough results from HNSW, fall back to brute-force on allowed set
-	if len(results) < topK {
-		coll := h.vectors[collection]
-		seen := make(map[string]bool, len(results))
-		for _, r := range results {
-			seen[r.DocID] = true
-		}
-		for docID, vec := range coll {
-			if seen[docID] || !allowed[BaseDocID(docID)] {
-				continue
-			}
-			score := metric(query, vec)
-			if float64(score) >= threshold {
-				results = append(results, VectorResult{DocID: docID, Score: score})
-			}
-		}
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Score > results[j].Score
-	})
-
-	if len(results) > topK {
-		results = results[:topK]
-	}
-
-	return results
 }
 
 // CollectionSize returns the number of vectors in a collection.

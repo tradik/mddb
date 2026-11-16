@@ -23,7 +23,7 @@ type VectorIndex struct {
 	collections map[string]map[string][]float32 // collection -> key -> vector
 	// chunkKeys: collection -> document -> its chunk keys, so the prefilter
 	// reaches a chunked document's vectors without a scan (vector_prefilter.go).
-	chunkKeys map[string]map[string][]string
+	chunkKeys chunkIndex
 	ready     atomic.Bool
 }
 
@@ -31,7 +31,7 @@ type VectorIndex struct {
 func NewVectorIndex() *VectorIndex {
 	return &VectorIndex{
 		collections: make(map[string]map[string][]float32),
-		chunkKeys:   make(map[string]map[string][]string),
+		chunkKeys:   make(chunkIndex),
 	}
 }
 
@@ -60,7 +60,7 @@ func (vi *VectorIndex) Add(collection, docID string, vector []float32) error {
 		vi.collections[collection] = make(map[string][]float32)
 	}
 	if _, exists := vi.collections[collection][docID]; !exists {
-		vi.noteKeyLocked(collection, docID)
+		vi.chunkKeys.note(collection, docID)
 	}
 	vi.collections[collection][docID] = vector
 	return nil
@@ -111,7 +111,7 @@ func (vi *VectorIndex) Remove(collection, docID string) {
 	if coll, ok := vi.collections[collection]; ok {
 		if _, exists := coll[docID]; exists {
 			delete(coll, docID)
-			vi.forgetKeyLocked(collection, docID)
+			vi.chunkKeys.forget(collection, docID)
 		}
 	}
 }
@@ -195,7 +195,8 @@ func (vi *VectorIndex) SearchWithFilter(collection string, query []float32, topK
 	// cost follows what the filter admits, not the collection (SRCH-013).
 	if len(allowedDocIDs) < len(coll) {
 		defer vi.mu.RUnlock()
-		return vi.searchAdmittedLocked(collection, coll, allowedDocIDs, query, topK, threshold, metric)
+		return admittedScan{coll: coll, chunks: vi.chunkKeys[collection], allowed: allowedDocIDs,
+			query: query, topK: topK, threshold: threshold, metric: metric}.run()
 	}
 	if prefilterVisited != nil {
 		prefilterVisited(len(coll))

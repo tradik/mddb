@@ -174,7 +174,18 @@ func TestGraphQLVectorSearch_ErrorsMatchREST(t *testing.T) {
 
 // reasons is a non-null list in the schema: a plan without one still answers [].
 func TestSearchPlanToGQL_NoReasonsIsAnEmptyList(t *testing.T) {
-	if p := searchPlanToGQL(&SearchPlan{Algorithm: "flat"}); p.Reasons == nil || len(p.Reasons) != 0 || p.Feedback != nil {
+	if p := searchPlanToGQL(&SearchPlan{Algorithm: "flat"}); p.Reasons == nil || len(p.Reasons) != 0 || p.Feedback != nil || p.Strategy != nil {
 		t.Fatalf("plan: %+v", p)
+	}
+}
+
+// SRCH-024: the filter strategy reaches GraphQL as it reaches REST and gRPC.
+func TestSearchPlanToGQL_Strategy(t *testing.T) {
+	p := searchPlanToGQL(&SearchPlan{Algorithm: "hnsw", Strategy: "graph+filter"})
+	if p.Strategy == nil || *p.Strategy != "graph+filter" {
+		t.Fatalf("plan: %+v", p)
+	}
+	if w := planToProto(&SearchPlan{Algorithm: "flat", Strategy: "prefilter"}); w.Strategy != "prefilter" {
+		t.Fatalf("proto: %+v", w)
 	}
 }

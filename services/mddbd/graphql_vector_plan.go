@@ -66,6 +66,9 @@ func searchPlanToGQL(p *SearchPlan) *gql.SearchPlan {
 	if out.Reasons == nil {
 		out.Reasons = []string{}
 	}
+	if p.Strategy != "" {
+		out.Strategy = &p.Strategy
+	}
 	if f := p.Feedback; f != nil {
 		out.Feedback = &gql.FeedbackApplied{Mode: f.Mode, Positive: f.Positive, Negative: f.Negative,
 			Alpha: f.Alpha, Beta: f.Beta, Gamma: f.Gamma, QueryShift: f.QueryShift, Weight: f.Weight, Rescored: f.Rescored}

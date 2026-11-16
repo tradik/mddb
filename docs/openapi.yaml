@@ -11452,6 +11452,17 @@ components:
         prefilter:
           type: boolean
           description: The filter was applied first and the admitted documents scanned exactly.
+        strategy:
+          type: string
+          enum: [ prefilter, "graph+filter", ivf, "scan+filter" ]
+          description: >-
+            (v2.19.8+, SRCH-024) How a filtered search ran: `prefilter` scored
+            the admitted documents exactly, `graph+filter` walked the HNSW
+            graph with the filter, `ivf` probed clusters and skipped refused
+            vectors, `scan+filter` scanned a quantized index with the filter.
+            Absent without a filter. With an explicit `hnsw`, the strategy
+            HNSW itself chose.
+          example: graph+filter
         candidates:
           type: integer
           description: Hits asked of the index, topK × oversample.

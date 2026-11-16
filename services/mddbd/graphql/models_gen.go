@@ -463,6 +463,8 @@ type SearchPlan struct {
 	Algorithm string `json:"algorithm"`
 	// The filter was applied first and the admitted documents scanned exactly.
 	Prefilter bool `json:"prefilter"`
+	// How a filtered search ran (SRCH-024): prefilter, graph+filter, ivf or scan+filter; null without a filter.
+	Strategy *string `json:"strategy,omitempty"`
 	// Hits the index was asked for: topK × oversample.
 	Candidates int `json:"candidates"`
 	// A filtered index search came back short and the scan continued further.

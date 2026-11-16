@@ -237,11 +237,22 @@ func (g *hnswGraph) Search(q []float32, k int) []hnswHit {
 		return nil
 	}
 	inv := invNormOf(q)
-	ep := cand{g.entry, g.dist(q, inv, g.entry)}
+	found := g.searchLayer(q, inv, []cand{g.descend(q, inv)}, max(g.efSearch, k), 0)
+	return g.hits(found, k)
+}
+
+// descend walks the layers above 0 greedily from the entry point and returns
+// the node layer 0's search starts from.
+func (g *hnswGraph) descend(q []float32, qInv float32) cand {
+	ep := cand{g.entry, g.dist(q, qInv, g.entry)}
 	for l := g.top; l > 0; l-- {
-		ep = g.greedy(q, inv, ep, l)
+		ep = g.greedy(q, qInv, ep, l)
 	}
-	found := g.searchLayer(q, inv, []cand{ep}, max(g.efSearch, k), 0)
+	return ep
+}
+
+// hits turns the first k of a layer search's candidates into hits.
+func (g *hnswGraph) hits(found []cand, k int) []hnswHit {
 	if len(found) > k {
 		found = found[:k]
 	}

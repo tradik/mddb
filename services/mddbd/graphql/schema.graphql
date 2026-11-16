@@ -233,6 +233,8 @@ type SearchPlan {
   algorithm: String!
   "The filter was applied first and the admitted documents scanned exactly."
   prefilter: Boolean!
+  "How a filtered search ran (SRCH-024): prefilter, graph+filter, ivf or scan+filter; null without a filter."
+  strategy: String
   "Hits the index was asked for: topK × oversample."
   candidates: Int!
   "A filtered index search came back short and the scan continued further."

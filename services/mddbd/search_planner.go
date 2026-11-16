@@ -34,11 +34,10 @@ var searchThresholds = struct {
 	// against 0.55 ms (SRCH-013). Above a million it has not been measured
 	// since the graph was replaced.
 	GraphMaxVectors int
-	// SelectiveFilter: a filter admitting less than this share of the
-	// collection is answered by an exact scan of what it admits — an index
-	// would return mostly documents the filter then throws away. See
-	// prefilterBeats for the measurements behind it.
-	SelectiveFilter float64
+	// The filter share under which an exact scan of what the filter admits
+	// beats an index is vec.HNSWFilterStrategy's (SRCH-024): the planner and
+	// HNSW decide by the same rule. See prefilterBeats.
+	//
 	// QuantizeBytes and Quantize4Bytes: float32 vectors above these sizes are
 	// worth searching in int8 (sq) and 4-bit (sq4) form.
 	QuantizeBytes  int64
@@ -52,7 +51,6 @@ var searchThresholds = struct {
 }{
 	FlatMaxVectors:  10_000,
 	GraphMaxVectors: 1_000_000,
-	SelectiveFilter: 0.05,
 	QuantizeBytes:   256 << 20,
 	Quantize4Bytes:  1 << 30,
 	TightLatencyMs:  10,
@@ -124,6 +122,12 @@ type SearchPlan struct {
 	// Prefilter: the filter was applied first and the admitted documents
 	// scanned exactly, rather than searching an index and filtering after.
 	Prefilter bool `json:"prefilter"`
+	// Strategy is how a filtered search ran (SRCH-024): "prefilter" (the
+	// admitted documents scored exactly), "graph+filter" (the HNSW graph
+	// walked with the filter), "ivf" (the clusters probed, refused vectors
+	// skipped) or "scan+filter" (a quantized index scanned with the filter).
+	// Empty without a filter.
+	Strategy string `json:"strategy,omitempty"`
 	// Candidates is how many hits the index was asked for: topK × oversample.
 	Candidates int `json:"candidates"`
 	// IterativeScan: a filtered index search came back short of topK and the
@@ -154,25 +158,40 @@ func (p *SearchPlan) reason(format string, args ...any) {
 func planVector(in PlanInput) *SearchPlan {
 	p := &SearchPlan{Candidates: in.SearchTopK}
 	if in.Quantized {
-		p.Algorithm, p.Prefilter = "quantized", in.Filtered && in.selectivity() < searchThresholds.SelectiveFilter
+		p.Algorithm = "quantized"
+		if in.Filtered {
+			p.Prefilter = prefilterBeats(in)
+			p.Strategy = filterStrategy(p.Algorithm, p.Prefilter)
+		}
 		p.reason("quantized: the collection is configured for quantized vectors, and that index is the one holding them")
 		return p
 	}
 	index := planIndex(in)
-	if in.Filtered && graphFilterShort(in, index.Algorithm) && in.Built["ivf"] {
-		index = &SearchPlan{Algorithm: "ivf", Candidates: in.SearchTopK}
-		index.reason("ivf: hnsw filters the %d× topK neighbours it finds, and a filter admitting %.1f%% would leave it short and scoring the whole collection; a trained ivf probes clusters instead",
-			vec.HNSWFilterOversample, in.selectivity()*100)
+	if !in.Filtered {
+		return index
 	}
-	if in.Filtered {
-		if why, ok := prefilterBeats(in, index.Algorithm); ok {
-			p.Algorithm, p.Prefilter = "flat", true
-			p.reason("flat with a prefilter: the filter admits %d documents of %d vectors (%.1f%%), %s",
-				in.Allowed, in.Vectors, in.selectivity()*100, why)
-			return p
+	switch filteredPath(in, index.Algorithm) {
+	case vec.FilterStrategyPrefilter:
+		p.Algorithm, p.Prefilter, p.Strategy = "flat", true, vec.FilterStrategyPrefilter
+		p.reason("flat with a prefilter: the filter admits %d documents of %d vectors (%.1f%%), and scoring exactly what it admits costs less than searching an index past what it refuses",
+			in.Allowed, in.Vectors, in.selectivity()*100)
+		return p
+	case "ivf":
+		if index.Algorithm != "ivf" {
+			index = &SearchPlan{Algorithm: "ivf", Candidates: in.SearchTopK}
+			index.reason("ivf: for a filter admitting %.1f%% of %d vectors, probing a trained ivf's clusters costs less than walking the graph past the nodes the filter refuses",
+				in.selectivity()*100, in.Vectors)
 		}
 	}
-	if in.Filtered && index.Algorithm != "flat" {
+	index.Strategy = filterStrategy(index.Algorithm, false)
+	switch index.Algorithm {
+	case "flat":
+		index.Prefilter = true
+		index.reason("prefilter: flat scores exactly the documents the filter admits")
+	case "hnsw":
+		index.reason("graph+filter: the filter admits %.1f%% of the collection; the graph is walked with the filter, through refused nodes but returning only admitted ones",
+			in.selectivity()*100)
+	default:
 		index.mayIterate = true
 		index.reason("the filter admits %.1f%% of the collection; if the index returns fewer than %d after filtering, the scan continues",
 			in.selectivity()*100, in.SearchTopK)
@@ -180,35 +199,50 @@ func planVector(in PlanInput) *SearchPlan {
 	return index
 }
 
-// graphFilterShort reports whether hnsw, filtering after its search, would
-// keep fewer than topK of the HNSWFilterOversample × topK neighbours it finds
-// — and then score the whole collection. At 200k vectors that cost 27, 36 and
-// 46 ms for filters admitting 2, 10 and 25% (docs/BENCHMARK.md).
-func graphFilterShort(in PlanInput, index string) bool {
-	return index == "hnsw" && in.selectivity()*vec.HNSWFilterOversample < 1
+// prefilterBeats reports whether scanning exactly the admitted documents is
+// cheaper than searching an index with the filter. It is HNSW's own rule
+// (vec.HNSWFilterStrategy), so auto and an explicit hnsw agree.
+func prefilterBeats(in PlanInput) bool {
+	return vec.HNSWFilterStrategy(in.Allowed, in.Vectors) == vec.FilterStrategyPrefilter
 }
 
-// prefilterBeats reports whether scanning exactly the admitted documents is
-// cheaper than searching index and filtering after, and why. The prefilter
-// costs what the filter admits (SRCH-013); an index search costs about the
-// same whatever the filter, but only if enough of its hits survive it.
-//
-// Under SelectiveFilter the prefilter is taken even over a trained ivf: at
-// 200k vectors and a 2% filter ivf was 0.2–0.4 ms faster (0.93 against
-// 1.14–1.33 ms), but at 20k it found 0.77 of the exact top 10, where the
-// prefilter is exact. From there up ivf pulls ahead (2.4 against 4.9 ms at
-// 10%, 5.2 against 9.6 ms at 25%), so a filter hnsw would come up short on
-// goes to a trained ivf first, and to the prefilter only without one.
-func prefilterBeats(in PlanInput, index string) (string, bool) {
-	switch {
-	case in.selectivity() < searchThresholds.SelectiveFilter:
-		return fmt.Sprintf("under %.0f%%, so scanning exactly what it admits beats an index search whose hits it would mostly discard",
-			searchThresholds.SelectiveFilter*100), true
-	case graphFilterShort(in, index):
-		return fmt.Sprintf("under 1 in %d: hnsw filters the %d× topK neighbours it finds, so it would come up short and score the whole collection, where the prefilter scores only what the filter admits",
-			vec.HNSWFilterOversample, vec.HNSWFilterOversample), true
+// filteredPath is the cheapest way to answer a filter when planIndex chose
+// index: "prefilter", "hnsw" or "ivf" by the cost estimates of the vector
+// package (vec.FilterCosts, measured in SRCH-024), or index itself for one
+// without an estimate. flat is already exact.
+func filteredPath(in PlanInput, index string) string {
+	switch index {
+	case "flat":
+		return index
+	case "hnsw", "ivf":
+	default:
+		if prefilterBeats(in) {
+			return vec.FilterStrategyPrefilter
+		}
+		return index
 	}
-	return "", false
+	costs := vec.FilterCosts{Vectors: in.Vectors, Admitted: in.Allowed, TopK: in.SearchTopK}
+	best, cost := vec.FilterStrategyPrefilter, costs.Prefilter()
+	if index == "hnsw" && costs.Graph() < cost {
+		best, cost = index, costs.Graph()
+	}
+	if in.Built["ivf"] && costs.IVF() < cost {
+		best = "ivf"
+	}
+	return best
+}
+
+// filterStrategy names how an index answers a filter, for explain.
+func filterStrategy(algorithm string, prefilter bool) string {
+	switch {
+	case prefilter || algorithm == "flat":
+		return vec.FilterStrategyPrefilter
+	case algorithm == "hnsw":
+		return vec.FilterStrategyGraph
+	case algorithm == "ivf":
+		return "ivf"
+	}
+	return "scan+filter"
 }
 
 // planIndex chooses the index for an unfiltered search, or the one a filtered

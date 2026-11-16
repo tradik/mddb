@@ -123,7 +123,7 @@ func newVectorSearchers(flat *vector.VectorIndex, quantized *vector.QuantizedVec
 	return map[string]vector.VectorSearcher{
 		"flat": flat,
 		"hnsw": vector.NewHNSWIndex(vector.DefaultHNSWM, vector.DefaultHNSWEfConstruction, vector.DefaultHNSWEfSearch),
-		"ivf":  vector.NewIVFIndex(10, 20),
+		"ivf":  vector.NewIVFIndex(vector.DefaultIVFNProbe, 20),
 		"pq":   vector.NewPQIndex(8, 256, 20),
 		"opq":  vector.NewOPQIndex(8, 256, 20, 5),
 		"sq":   vector.NewSQIndex(),

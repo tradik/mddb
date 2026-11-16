@@ -25,10 +25,15 @@ type ivfCollection struct {
 	trainState
 }
 
+// DefaultIVFNProbe is the number of clusters a search probes unless the index
+// is given another; the server uses it, and the planner's cost estimate
+// assumes it (FilterCosts).
+const DefaultIVFNProbe = 10
+
 // NewIVFIndex creates a new IVF index.
 func NewIVFIndex(nProbe, maxIter int) *IVFIndex {
 	if nProbe <= 0 {
-		nProbe = 10
+		nProbe = DefaultIVFNProbe
 	}
 	if maxIter <= 0 {
 		maxIter = 20
@@ -221,12 +226,38 @@ func (idx *IVFIndex) SearchWithFilterWiden(collection string, query []float32, t
 		metric = CosineSimilarity
 	}
 
-	probeIndices := nearestNCentroids(query, c.centroids, idx.nProbe*max(widen, 1))
+	probeIndices := c.filteredProbes(query, idx.nProbe*max(widen, 1), topK, len(allowed))
 
 	filter := func(docID string) bool {
 		return allowed[BaseDocID(docID)]
 	}
 	return idx.searchClusters(c, query, topK, threshold, metric, probeIndices, filter)
+}
+
+// ivfFilterDepth is how many times topK admitted vectors a filtered search
+// expects the clusters it probes to hold (SRCH-024). nProbe clusters hold
+// enough of everything for an unfiltered search, but a filter admitting 2%
+// leaves a handful in them, and the nearest admitted vectors lie further out:
+// recall@10 was 0.773 at 20k vectors. On TestIVFFilteredRecall's corpus
+// nProbe alone found 0.549 at 1% and 0.769 at 2%; probing on until the
+// clusters probed are expected to hold 3, 5 and 10 times topK admitted
+// vectors found 0.940, 0.994 and 1.000 at 2%, and 10 is kept for margin.
+const ivfFilterDepth = 10
+
+// filteredProbes is the clusters a filtered search probes, nearest first: at
+// least nProbe, then more until they are expected — at the share of the
+// collection the filter admits — to hold ivfFilterDepth × topK admitted
+// vectors, or every cluster has been taken.
+func (c *ivfCollection) filteredProbes(query []float32, nProbe, topK, admitted int) []int {
+	order := nearestNCentroids(query, c.centroids, len(c.centroids))
+	share := min(1, float64(admitted)/float64(max(len(c.allVecs), 1)))
+	want := float64(topK * ivfFilterDepth)
+	n, expected := 0, 0.0
+	for n < len(order) && (n < nProbe || expected < want) {
+		expected += float64(len(c.clusters[order[n]])) * share
+		n++
+	}
+	return order[:n]
 }
 
 // searchClusters searches probed clusters, using parallel goroutines when

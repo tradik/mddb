@@ -139,7 +139,7 @@ func TestPlanSearch_ExplicitAutoAndRefusals(t *testing.T) {
 	}
 	hnsw.ready = true
 	ps, err = s.planSearch(planRequest{Collection: "c", Algorithm: AlgorithmAuto, SearchTopK: 30, Filtered: true, Allowed: allowedN(10_000)})
-	if err != nil || ps.Algorithm != "hnsw" || !ps.Plan.mayIterate {
+	if err != nil || ps.Algorithm != "hnsw" || ps.Plan.mayIterate || ps.Plan.Strategy != vec.FilterStrategyGraph {
 		t.Fatalf("%v %+v", err, ps.Plan)
 	}
 

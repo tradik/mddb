@@ -164,6 +164,15 @@ func (s *Server) runPlanned(ps plannedSearch, q indexQuery) []vec.VectorResult {
 	if !q.Filtered {
 		return ps.Searcher.Search(q.Collection, q.Vector, q.TopK, q.Threshold, q.Metric)
 	}
+	if fs, ok := ps.Searcher.(vec.FilterSearcher); ok {
+		out := fs.FilterSearch(vec.FilterQuery{Collection: q.Collection, Query: q.Vector, TopK: q.TopK,
+			Threshold: q.Threshold, Allowed: q.Allowed, Metric: q.Metric})
+		s.noteFilterOutcome(ps.Plan, q.Collection, out)
+		return out.Results
+	}
+	if ps.Plan != nil && ps.Plan.Strategy == "" {
+		ps.Plan.Strategy = filterStrategy(ps.Algorithm, false)
+	}
 	results := ps.Searcher.SearchWithFilter(q.Collection, q.Vector, q.TopK, q.Threshold, q.Allowed, q.Metric)
 	if ps.Plan == nil || !ps.Plan.mayIterate {
 		return results
@@ -176,6 +185,24 @@ func (s *Server) runPlanned(ps plannedSearch, q indexQuery) []vec.VectorResult {
 		ps.Plan.reason("the filtered index returned %d of %d; the scan continued at %d× its default", got, want, widen)
 	}
 	return results
+}
+
+// noteFilterOutcome records how an index that reports its filter strategy
+// answered: in the plan, so explain says what ran rather than what was
+// expected, and in the metrics when the graph walk fell back to scoring the
+// admitted documents (SRCH-024) — which it should not do on a healthy graph.
+func (s *Server) noteFilterOutcome(plan *SearchPlan, collection string, out vec.FilterOutcome) {
+	if out.Fallback {
+		s.Metrics.IncOp("vector_filter_fallback", collection)
+	}
+	if plan == nil {
+		return
+	}
+	plan.Strategy = out.Strategy
+	plan.Prefilter = out.Strategy == vec.FilterStrategyPrefilter
+	if out.Fallback {
+		plan.reason("the graph walk found fewer than %d admitted vectors; the admitted documents were scored exactly", plan.Candidates)
+	}
 }
 
 // widenedSearch asks an index to look widen times further than it does by
