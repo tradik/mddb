@@ -82,6 +82,11 @@ const coverageFiles = [
   'src/lib/cluster-format.js',
   'src/components/ClusterPanel.jsx',
   'src/components/ClusterFollowers.jsx',
+  // 2.19.8: leader election in the Cluster tab (GO-051).
+  'src/lib/client/replication.js',
+  'src/components/ClusterElection.jsx',
+  'src/components/ClusterNodes.jsx',
+  'src/components/ClusterActionDialog.jsx',
   'src/components/ImagePreview.jsx',
   // 2.19.0: files touched by the panel catch-up that had no tests.
   'src/App.jsx',

@@ -5,7 +5,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 
-vi.mock('../lib/mddb-client', () => ({ default: { getReplicationStatus: vi.fn() } }));
+vi.mock('../lib/mddb-client', () => ({ default: { getReplicationStatus: vi.fn(), promoteNode: vi.fn(), demoteNode: vi.fn() } }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { default: ClusterPanel } = await import('./ClusterPanel');
@@ -85,6 +85,31 @@ describe('ClusterPanel', () => {
     expect(screen.getByText(/stream open/)).toBeTruthy();
     expect(screen.getByText('1 entry behind')).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  test('without cluster mode there is no leader election section', async () => {
+    vi.mocked(mddbClient.getReplicationStatus).mockResolvedValue({ ...leader, term: 3 });
+    render(<ClusterPanel />);
+    await screen.findByRole('status');
+    expect(screen.queryByText('Leader Election')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Step down' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Promote this node' })).toBeNull();
+  });
+
+  test('in a cluster: the election, and a promote reloads the status (GO-051)', async () => {
+    const cluster = { node_id: 'n1', state: 'follower', term: 5, leader_id: 'n2', auto_failover: true, nodes: [{ id: 'n1', self: true, reachable: true }] };
+    vi.mocked(mddbClient.getReplicationStatus).mockResolvedValue({ ...follower, term: 5, cluster });
+    vi.mocked(mddbClient.promoteNode).mockResolvedValue({ node_id: 'n1', state: 'leader', term: 6 });
+    render(<ClusterPanel />);
+    expect(await screen.findByText('Leader Election')).toBeTruthy();
+    expect(screen.getByText('(this node)')).toBeTruthy();
+    vi.mocked(mddbClient.getReplicationStatus).mockResolvedValue({ ...follower, role: 'leader', term: 6, cluster: { ...cluster, state: 'leader', term: 6, leader_id: 'n1' } });
+    const calls = vi.mocked(mddbClient.getReplicationStatus).mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Promote this node' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Promote' }));
+    expect(await screen.findByText('n1 is now leader in term 6.')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Step down' })).toBeTruthy();
+    expect(vi.mocked(mddbClient.getReplicationStatus).mock.calls.length).toBeGreaterThan(calls);
   });
 
   test('a standalone node', async () => {

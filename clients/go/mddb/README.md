@@ -64,6 +64,7 @@ func main() {
 | `WithHTTPClient(h)` | Use a custom `*http.Client`. Its own `Timeout`, if set, is a hard cap. |
 | `WithTimeout(d)` | Timeout for calls whose context has no deadline (default 30s, `0` = none). |
 | `WithVerbose(w)` | Log each request body to `w` (e.g. `os.Stderr`). |
+| `WithFollowLeader(on)` | Follow the cluster leader for writes (default off; see below). |
 
 ## Timeouts
 
@@ -82,6 +83,46 @@ res, err := c.ReindexVectors(ctx, mddb.VectorReindexRequest{Collection: "docs", 
 The default is applied through the context, not `http.Client.Timeout`, which
 would cap every call regardless of its context. If you pass your own client
 with `WithHTTPClient`, leave its `Timeout` at zero to keep this behaviour.
+
+## Clusters: following the leader
+
+In a cluster with automatic leader election (mddbd 2.19.8+) every node serves
+reads, but only the leader accepts writes. A follower answers a write with
+**421 Misdirected Request**, the leader's HTTP base URL in the
+`X-MDDB-Leader` header and a body of
+`{"error":"not the leader","leaderAddr":"...","leaderId":"n2","term":5}`.
+While an election runs and no leader is known, it answers **503** with
+`Retry-After: 1` and `{"error":"no leader: an election is in progress"}`.
+
+Off by default, the client returns both as an `*APIError`: a 421 carries
+`LeaderAddr` (header first, body as fallback), `LeaderID` and `Term`; a 503
+during an election has `NoLeader` set.
+
+```go
+_, err := c.Add(ctx, req)
+var apiErr *mddb.APIError
+if errors.As(err, &apiErr) && apiErr.LeaderAddr != "" {
+	c = mddb.New(apiErr.LeaderAddr, mddb.WithAPIKey(key)) // or follow automatically
+}
+```
+
+With `WithFollowLeader(true)`:
+
+- a write answered with 421 is sent **once** more, to the leader it names. A
+  second 421 is returned as the error; there is no redirect loop. Only an
+  absolute `http`/`https` address is followed.
+- the client remembers the leader (`c.Leader()`). A request (method and path)
+  that was redirected once is a write, so later requests of that kind go to
+  the leader directly; every other request, reads included, keeps going to
+  the configured base URL. When the remembered leader cannot be reached, it
+  is forgotten and the next write asks the configured node again.
+- a 503 "no leader" is retried up to three times, waiting as `Retry-After`
+  says (capped at three seconds), within the call's context deadline.
+- JSON bodies are buffered, so they can be sent again. `DoStream` follows a
+  421 only when its body is `nil` or an `io.Seeker` (an `*os.File` is); with
+  any other reader it remembers the leader and returns the 421, so the next
+  call goes to the leader. With the option on, `DoStream` does not close a
+  seekable body; close it yourself.
 
 ## Health and warm-up
 

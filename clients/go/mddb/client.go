@@ -16,7 +16,6 @@
 package mddb
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -39,6 +38,10 @@ type Client struct {
 	token   string
 	verbose io.Writer
 	timeout time.Duration // applied only when the call's context has no deadline
+
+	followLeader bool                                             // WithFollowLeader (GO-051)
+	leader       leaderState                                      // the learned cluster leader
+	sleep        func(ctx context.Context, d time.Duration) error // election waits; replaced in tests
 }
 
 // Option configures a Client at construction time.
@@ -79,6 +82,7 @@ func New(baseURL string, opts ...Option) *Client {
 		baseURL: strings.TrimRight(baseURL, "/"),
 		httpc:   &http.Client{},
 		timeout: DefaultTimeout,
+		sleep:   sleepCtx,
 	}
 	for _, o := range opts {
 		o(c)
@@ -90,9 +94,18 @@ func New(baseURL string, opts ...Option) *Client {
 func (c *Client) BaseURL() string { return c.baseURL }
 
 // APIError is returned for any non-2xx/3xx HTTP response.
+//
+// A cluster node that is not the leader refuses a write with 421: LeaderAddr
+// is then the leader's HTTP base URL (from the X-MDDB-Leader header, else the
+// body's leaderAddr), with LeaderID and Term from the body. A 503 sent while
+// an election is in progress has NoLeader set. WithFollowLeader acts on both.
 type APIError struct {
 	StatusCode int
 	Body       string
+	LeaderAddr string // 421: where the write belongs
+	LeaderID   string // 421: the leader's node ID
+	Term       int64  // 421 and 503 "no leader": the election term
+	NoLeader   bool   // 503: no leader is known yet
 }
 
 func (e *APIError) Error() string {
@@ -104,57 +117,50 @@ func (e *APIError) Error() string {
 // >= 400 into an *APIError. It is the low-level escape hatch behind every typed
 // method; callers needing an undocumented endpoint can use it directly.
 func (c *Client) Do(ctx context.Context, method, path string, body any) ([]byte, error) {
-	status, respBody, err := c.send(ctx, method, path, body)
+	status, header, respBody, err := c.send(ctx, method, path, body)
 	if err != nil {
 		return nil, err
 	}
 	if status >= 400 {
-		return nil, &APIError{StatusCode: status, Body: string(respBody)}
+		return nil, newAPIError(status, header, respBody)
 	}
 	return respBody, nil
 }
 
-// send issues the request and returns the status code and body without
-// judging the status, so callers such as Status can read a non-2xx body.
-func (c *Client) send(ctx context.Context, method, path string, body any) (int, []byte, error) {
+// send issues the request and returns the status code, headers and body
+// without judging the status, so callers such as Status can read a non-2xx
+// body.
+func (c *Client) send(ctx context.Context, method, path string, body any) (int, http.Header, []byte, error) {
 	if _, ok := ctx.Deadline(); !ok && c.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, c.timeout)
 		defer cancel()
 	}
 
-	var reqBody io.Reader
+	rb := &requestBody{follow: c.followLeader}
+	contentType := ""
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return 0, nil, fmt.Errorf("mddb: encode request: %w", err)
+			return 0, nil, nil, fmt.Errorf("mddb: encode request: %w", err)
 		}
-		reqBody = bytes.NewReader(data)
+		rb.buf, contentType = data, "application/json"
 		if c.verbose != nil {
 			_, _ = fmt.Fprintf(c.verbose, "Request: %s\n", data)
 		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
+	resp, err := c.exchange(ctx, method, path, contentType, rb)
 	if err != nil {
-		return 0, nil, err
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	c.authorize(req)
-
-	resp, err := c.httpc.Do(req)
-	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
-	return resp.StatusCode, respBody, nil
+	return resp.StatusCode, resp.Header, respBody, nil
 }
 
 // authorize sets the request's credentials: the API key, or else the token.
@@ -174,23 +180,20 @@ func (c *Client) authorize(req *http.Request) {
 //
 // No default timeout applies: a transfer of that size has no sensible fixed
 // bound, so the context alone limits the call.
+//
+// With WithFollowLeader a 421 is followed only when body is nil or an
+// io.Seeker (an *os.File is), since the body must be sent a second time;
+// otherwise the leader is remembered for the next call and the 421 is
+// returned as an *APIError carrying LeaderAddr.
 func (c *Client) DoStream(ctx context.Context, method, path, contentType string, body io.Reader) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
-	if err != nil {
-		return nil, err
-	}
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	c.authorize(req)
-	resp, err := c.httpc.Do(req)
+	resp, err := c.exchange(ctx, method, path, contentType, &requestBody{stream: body, follow: c.followLeader})
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
 		defer func() { _ = resp.Body.Close() }()
-		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(msg)}
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
+		return nil, newAPIError(resp.StatusCode, resp.Header, msg)
 	}
 	return resp.Body, nil
 }

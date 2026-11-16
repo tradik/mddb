@@ -15,11 +15,16 @@ from .client import (
     DEFAULT_TIMEOUT_SECONDS,
     MddbClient,
 )
+from .leader import NO_LEADER, NOT_LEADER, LeaderInfo, leader_info
 
 __all__ = [
     "MddbClient",
     "DEFAULT_ADDRESS",
     "DEFAULT_TIMEOUT_SECONDS",
+    "LeaderInfo",
+    "leader_info",
+    "NOT_LEADER",
+    "NO_LEADER",
     "mddb_pb2",
     "mddb_pb2_grpc",
 ]

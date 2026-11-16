@@ -70,6 +70,51 @@ client.Stats({}, { deadline: new Date(Date.now() + 500) }); // for this one
 unreachable server is reported as a refused connection rather than as a deadline
 on the first RPC.
 
+## Clusters: following the leader
+
+In a cluster with automatic leader election (mddbd 2.19.8+) every node serves
+reads, but only the leader accepts writes. A follower refuses a write with
+`FAILED_PRECONDITION` ("not the leader") and a `google.rpc.ErrorInfo` detail
+(reason `NOT_LEADER`) naming the leader's HTTP URL; while an election runs it
+answers `UNAVAILABLE` with reason `NO_LEADER`.
+
+Off by default (`followLeader: false`), the call rejects with the usual gRPC
+error, with `leaderAddr`, `leaderGrpc`, `leaderId`, `term` and `leaderReason`
+set on it, so
+the caller can act itself. `leaderInfo(err)` returns the same as an object (or
+`null` for any other error):
+
+```js
+const { leaderInfo } = require('@tradik/mddb-client');
+
+try {
+  await client.Add(req);
+} catch (err) {
+  if (err.leaderAddr) console.error('write belongs to', err.leaderAddr);
+  throw err;
+}
+```
+
+With `new MddbClient(address, { followLeader: true })`:
+
+- a refused write is sent **once** more, to the leader. A second refusal
+  rejects; there is no redirect loop. Only an `http`/`https` leader URL is
+  followed.
+- the leader's gRPC target is, in order: `leaderResolver(leaderAddr)` when
+  you pass `leaderResolver: (url) => 'host:port'` (returning `null` refuses
+  to follow); else the `leader_grpc` address the server sends in the
+  ErrorInfo metadata; else the host of the leader's HTTP URL with the port of
+  `address`.
+- the client remembers the leader (`client.leader`). An RPC that was
+  redirected once is a write, so later calls of it go to the leader directly;
+  every other RPC, reads included, keeps using `address`. If the remembered
+  leader becomes unreachable (`UNAVAILABLE`) it is forgotten and the next
+  write asks `address` again.
+- a `NO_LEADER` refusal is retried up to three times, one second apart. Each
+  attempt gets its own `deadlineMs`.
+- the leader's channel uses the same TLS settings and channel options as the
+  client's own, and `close()` closes it too.
+
 ## Development
 
 ```bash

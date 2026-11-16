@@ -65,7 +65,7 @@ type UpdateStatus struct {
 // and no error; any other status >= 400, including 503 "unhealthy", is an
 // *APIError, so starting can be told apart from broken.
 func (c *Client) Status(ctx context.Context) (Health, error) {
-	status, body, err := c.send(ctx, http.MethodGet, "/health", nil)
+	status, header, body, err := c.send(ctx, http.MethodGet, "/health", nil)
 	if err != nil {
 		return Health{}, err
 	}
@@ -75,7 +75,7 @@ func (c *Client) Status(ctx context.Context) (Health, error) {
 	case status == http.StatusServiceUnavailable && decodeErr == nil && h.Status == statusWarmingUp:
 		return h, nil
 	case status >= 400:
-		return Health{}, &APIError{StatusCode: status, Body: string(body)}
+		return Health{}, newAPIError(status, header, body)
 	case decodeErr != nil:
 		return Health{}, fmt.Errorf("mddb: decode response: %w", decodeErr)
 	}

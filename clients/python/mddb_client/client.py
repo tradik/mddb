@@ -13,11 +13,14 @@ the proto carries it.
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional
+import threading
+import time
+from typing import Any, Callable, Iterable, Optional
 
 import grpc
 
 from . import mddb_pb2_grpc
+from .leader import NO_LEADER, NOT_LEADER, LeaderInfo, annotate, grpc_target
 
 # Default gRPC port of a local mddbd.
 DEFAULT_ADDRESS = "localhost:11024"
@@ -26,6 +29,11 @@ DEFAULT_ADDRESS = "localhost:11024"
 # connection and then stopped answering waits forever.
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
+# GO-051: how often, and how long apart, a write refused while a cluster
+# elects its leader is tried again when follow_leader is on.
+NO_LEADER_RETRIES = 3
+NO_LEADER_WAIT_SECONDS = 1.0
+
 
 class MddbClient:
     """A thin, typed-by-protobuf wrapper over the generated MDDB stub.
@@ -33,6 +41,16 @@ class MddbClient:
     INT-011: the channel is insecure by default because the server's own
     default is a loopback port with no TLS. Anything reachable from another
     machine must pass ``secure=True``, or the API key travels in cleartext.
+
+    GO-051: in a cluster only the leader accepts writes. A write refused by a
+    follower raises the usual ``grpc.RpcError`` with ``leader_addr``,
+    ``leader_id`` and ``term`` set on it. With ``follow_leader=True`` the
+    client sends such a write once more, to the leader, and remembers it: an
+    RPC that was redirected once is a write, so later calls of it go to the
+    leader directly, while every other RPC keeps using ``address``. The
+    leader's gRPC target is ``leader_resolver(leader_addr)`` when a resolver
+    is given, else the ``leader_grpc`` address the server sent, else the host
+    of its HTTP URL with the port of ``address``.
     """
 
     def __init__(
@@ -46,9 +64,24 @@ class MddbClient:
         timeout: Optional[float] = DEFAULT_TIMEOUT_SECONDS,
         channel_options: Optional[Iterable[tuple]] = None,
         channel: Optional[grpc.Channel] = None,
+        follow_leader: bool = False,
+        leader_resolver: Optional[Callable[[str], Optional[str]]] = None,
     ) -> None:
         self.address = address
         self.timeout = timeout
+        self.follow_leader = follow_leader
+        self._leader_resolver = leader_resolver
+        self._channel_args = {
+            "secure": secure,
+            "root_certificates": root_certificates,
+            "options": list(channel_options or ()),
+        }
+        self._lock = threading.Lock()
+        self._leader: Optional[str] = None
+        self._leader_channel: Optional[grpc.Channel] = None
+        self._leader_stub: Optional[mddb_pb2_grpc.MDDBStub] = None
+        self._writes: set = set()
+        self._sleep = time.sleep
 
         metadata = []
         if api_key:
@@ -63,12 +96,7 @@ class MddbClient:
             self._channel = channel
             self._owns_channel = False
         else:
-            self._channel = _build_channel(
-                address,
-                secure=secure,
-                root_certificates=root_certificates,
-                options=list(channel_options or ()),
-            )
+            self._channel = _build_channel(address, **self._channel_args)
             self._owns_channel = True
 
         self._stub = mddb_pb2_grpc.MDDBStub(self._channel)
@@ -86,23 +114,101 @@ class MddbClient:
         if name.startswith("_"):
             raise AttributeError(name)
 
-        rpc = getattr(self._stub, name, None)
-        if rpc is None:
+        if getattr(self._stub, name, None) is None:
             raise AttributeError(
                 f"MDDB has no RPC named {name!r}; "
                 f"see mddb.proto for the service definition"
             )
 
         def call(request: Any, *, timeout: Optional[float] = None, **kwargs: Any) -> Any:
-            return rpc(
-                request,
-                timeout=timeout if timeout is not None else self.timeout,
-                metadata=self._metadata,
-                **kwargs,
-            )
+            kwargs["timeout"] = timeout if timeout is not None else self.timeout
+            return self._invoke(name, request, kwargs)
 
         call.__name__ = name
         return call
+
+    def _invoke(self, name: str, request: Any, kwargs: dict) -> Any:
+        """Calls one RPC, following the leader when ``follow_leader`` is on.
+
+        A NOT_LEADER refusal is followed at most once per call; a NO_LEADER
+        one is retried at most NO_LEADER_RETRIES times. The request is a
+        protobuf message, so it can be sent again unchanged.
+        """
+        stub = self._stub_for(name)
+        redirected, waits = False, 0
+        while True:
+            try:
+                return getattr(stub, name)(request, metadata=self._metadata, **kwargs)
+            except grpc.RpcError as err:
+                info = annotate(err)
+                if not self.follow_leader:
+                    raise
+                if info is None:
+                    self._forget_leader(stub, err)
+                    raise
+                if info.reason == NOT_LEADER and not redirected:
+                    stub, redirected = self._follow(name, info), True
+                    if stub is None:
+                        raise
+                    continue
+                if info.reason == NO_LEADER and waits < NO_LEADER_RETRIES:
+                    waits += 1
+                    self._sleep(NO_LEADER_WAIT_SECONDS)
+                    continue
+                raise
+
+    def _stub_for(self, name: str) -> mddb_pb2_grpc.MDDBStub:
+        """The leader's stub for an RPC known to be a write, else the configured one."""
+        with self._lock:
+            if self.follow_leader and self._leader_stub is not None and name in self._writes:
+                return self._leader_stub
+            return self._stub
+
+    def _follow(self, name: str, info: LeaderInfo) -> Optional[mddb_pb2_grpc.MDDBStub]:
+        """Remembers the leader a refusal named and returns its stub.
+
+        ``None`` when the address is not an http(s) URL or the resolver has no
+        target for it; the refusal is then raised to the caller.
+        """
+        target = self._leader_target(info)
+        if not target:
+            return None
+        with self._lock:
+            self._writes.add(name)
+            if target != self._leader:
+                # The old leader's channel is left to the garbage collector:
+                # another thread may still be using it.
+                self._leader = target
+                self._leader_channel = _build_channel(target, **self._channel_args)
+                self._leader_stub = mddb_pb2_grpc.MDDBStub(self._leader_channel)
+            return self._leader_stub
+
+    def _leader_target(self, info: LeaderInfo) -> Optional[str]:
+        """The gRPC target of the leader a refusal named.
+
+        A caller's ``leader_resolver`` wins; then the server's ``leader_grpc``;
+        then the HTTP URL's host with the port of ``address``.
+        """
+        if self._leader_resolver is not None:
+            return self._leader_resolver(info.leader_addr) if info.leader_addr else None
+        return info.leader_grpc or grpc_target(info.leader_addr, self.address)
+
+    def _forget_leader(self, stub: mddb_pb2_grpc.MDDBStub, err: grpc.RpcError) -> None:
+        """Drops a remembered leader that cannot be reached.
+
+        The next write then asks the configured node again, which names the
+        current leader.
+        """
+        if err.code() != grpc.StatusCode.UNAVAILABLE:
+            return
+        with self._lock:
+            if stub is self._leader_stub:
+                self._leader = self._leader_channel = self._leader_stub = None
+
+    @property
+    def leader(self) -> Optional[str]:
+        """The gRPC target of the leader this client follows, if it learned one."""
+        return self._leader
 
     @property
     def stub(self) -> mddb_pb2_grpc.MDDBStub:
@@ -126,9 +232,15 @@ class MddbClient:
         grpc.channel_ready_future(self._channel).result(timeout=timeout)
 
     def close(self) -> None:
-        """Closes the channel, unless it was supplied by the caller."""
+        """Closes the channel, unless it was supplied by the caller.
+
+        A channel opened to a followed leader is always the client's own and
+        is closed too.
+        """
         if self._owns_channel:
             self._channel.close()
+        if self._leader_channel is not None:
+            self._leader_channel.close()
 
     def __enter__(self) -> "MddbClient":
         return self

@@ -50,6 +50,9 @@ describe('schemas, keys, facets, duplicates, batches, maintenance', () => {
     ['deleteBatch sends only key and lang', (c) => c.deleteBatch({ collection: 'c', documents: [{ key: 'k', lang: 'en', meta: {} }] }), '/v1/delete-batch', POST, { collection: 'c', documents: [{ key: 'k', lang: 'en' }] }],
     ['checksum', (c) => c.checksum('my docs'), '/v1/checksum?collection=my+docs', GET],
     ['restore', (c) => c.restore('backup-1.db'), '/v1/restore', POST, { from: 'backup-1.db' }],
+    ['promoteNode defaults to no force (GO-051)', (c) => c.promoteNode(), '/v1/replication/promote', POST, { force: false }],
+    ['promoteNode forced', (c) => c.promoteNode({ force: true }), '/v1/replication/promote', POST, { force: true }],
+    ['demoteNode sends no body', (c) => c.demoteNode(), '/v1/replication/demote', POST],
   ])('%s', (_label, call, path, method, body) => expectEndpoint(client, call, path, method, body));
 });
 

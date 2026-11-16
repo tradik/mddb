@@ -74,6 +74,7 @@ const badges = {
   unhealthy: 'bg-danger-muted text-danger-strong',
   leader: 'bg-info-muted text-info-strong',
   follower: 'bg-note-muted text-note-strong',
+  candidate: 'bg-warning-muted text-warning-strong', // GO-051: an election in progress
 };
 
 /** Badge colours for a status or a role, in the theme's tokens. */

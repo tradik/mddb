@@ -17,6 +17,7 @@
 const path = require('node:path');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
+const { NOT_LEADER, NO_LEADER, annotate, grpcTarget, leaderInfo } = require('./leader');
 
 const PROTO_PATH = path.join(__dirname, 'proto', 'mddb.proto');
 
@@ -30,6 +31,13 @@ const PROTO_OPTIONS = {
 
 /** Default gRPC port of a local mddbd. */
 const DEFAULT_ADDRESS = 'localhost:11024';
+
+/**
+ * GO-051: how often, and how long apart, a write refused while a cluster
+ * elects its leader is tried again when `followLeader` is on.
+ */
+const NO_LEADER_RETRIES = 3;
+const NO_LEADER_WAIT_MS = 1000;
 
 let cachedService = null;
 
@@ -66,6 +74,12 @@ class MddbClient {
    * @param {string}  [options.token] JWT, sent as `authorization: Bearer …`.
    * @param {number}  [options.deadlineMs] per-call deadline; 0 disables it.
    * @param {object}  [options.channelOptions] passed through to grpc-js.
+   * @param {boolean} [options.followLeader] follow the cluster leader for
+   *   writes (GO-051); off by default.
+   * @param {function(string): (string|null)} [options.leaderResolver] maps
+   *   the leader's HTTP URL to a gRPC target. Without one the server's
+   *   leader_grpc address is used, else the URL's host with the port of
+   *   `address`.
    */
   constructor(address = DEFAULT_ADDRESS, options = {}) {
     const {
@@ -73,10 +87,20 @@ class MddbClient {
       token = null,
       deadlineMs = 30000,
       channelOptions = {},
+      followLeader = false,
+      leaderResolver = null,
     } = options;
 
     this.address = address;
     this.deadlineMs = deadlineMs;
+    this.followLeader = followLeader;
+    this._leaderResolver = leaderResolver;
+    this._options = options;
+    this._channelOptions = channelOptions;
+    this._leader = null;
+    this._leaderStub = null;
+    this._writes = new Set();
+    this._sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
     this._metadata = new grpc.Metadata();
     if (apiKey) this._metadata.set('x-api-key', apiKey);
@@ -110,14 +134,51 @@ class MddbClient {
     }
   }
 
-  _call(method, request, callOptions) {
+  /**
+   * Calls one RPC, following the leader when `followLeader` is on (GO-051).
+   *
+   * A refused write rejects with the gRPC error, carrying `leaderAddr`,
+   * `leaderId`, `term` and `leaderReason`. With `followLeader` a NOT_LEADER
+   * refusal is sent once more, to the leader, and a NO_LEADER one is retried
+   * at most NO_LEADER_RETRIES times. The request is a plain object, so it can
+   * be sent again unchanged.
+   */
+  async _call(method, request, callOptions) {
+    let stub = this._stubFor(method);
+    let redirected = false;
+    let waits = 0;
+    for (;;) {
+      try {
+        return await this._once(stub, method, request, callOptions);
+      } catch (err) {
+        const info = annotate(err);
+        if (!this.followLeader) throw err;
+        if (!info) {
+          this._forgetLeader(stub, err);
+          throw err;
+        }
+        if (info.reason === NOT_LEADER && !redirected) {
+          stub = this._follow(method, info);
+          redirected = true;
+          if (!stub) throw err;
+          continue;
+        }
+        if (info.reason !== NO_LEADER || waits >= NO_LEADER_RETRIES) throw err;
+        waits += 1;
+        await this._sleep(NO_LEADER_WAIT_MS);
+      }
+    }
+  }
+
+  /** One attempt of an RPC on stub; each attempt gets its own deadline. */
+  _once(stub, method, request, callOptions) {
     return new Promise((resolve, reject) => {
       const options = { ...callOptions };
       if (this.deadlineMs > 0 && options.deadline === undefined) {
         options.deadline = new Date(Date.now() + this.deadlineMs);
       }
 
-      this._stub[method](request, this._metadata, options, (err, response) => {
+      stub[method](request, this._metadata, options, (err, response) => {
         if (err) {
           reject(err);
           return;
@@ -125,6 +186,65 @@ class MddbClient {
         resolve(response);
       });
     });
+  }
+
+  /**
+   * The leader's stub for an RPC known to be a write — one that was
+   * redirected before — else the configured node's. Reads stay home.
+   */
+  _stubFor(method) {
+    if (this.followLeader && this._leaderStub && this._writes.has(method)) {
+      return this._leaderStub;
+    }
+    return this._stub;
+  }
+
+  /**
+   * Remembers the leader a refusal named and returns its stub, or null when
+   * the address is not an http(s) URL or the resolver has no target for it.
+   */
+  _follow(method, info) {
+    const target = this._leaderTarget(info);
+    if (!target) return null;
+    this._writes.add(method);
+    if (target !== this._leader) {
+      if (this._leaderStub) this._leaderStub.close();
+      this._leader = target;
+      this._leaderStub = new (loadService())(
+        target,
+        buildCredentials(this._options),
+        this._channelOptions
+      );
+    }
+    return this._leaderStub;
+  }
+
+  /**
+   * The gRPC target of the leader a refusal named: a caller's
+   * `leaderResolver` wins, then the server's leader_grpc, then the HTTP
+   * URL's host with the port of `address`.
+   */
+  _leaderTarget(info) {
+    if (this._leaderResolver) {
+      return info.leaderAddr ? this._leaderResolver(info.leaderAddr) : null;
+    }
+    return info.leaderGrpc || grpcTarget(info.leaderAddr, this.address);
+  }
+
+  /**
+   * Drops a remembered leader that cannot be reached, so the next write asks
+   * the configured node again, which names the current leader.
+   */
+  _forgetLeader(stub, err) {
+    if (err.code !== grpc.status.UNAVAILABLE || stub !== this._leaderStub) return;
+    this._leaderStub.close();
+    this._leader = null;
+    this._leaderStub = null;
+  }
+
+  /** The gRPC target of the leader this client follows, or null. */
+  get leader() {
+    return this._leader;
   }
 
   /** The generated stub, for streaming calls and anything not wrapped here. */
@@ -146,14 +266,21 @@ class MddbClient {
     });
   }
 
+  /** Closes the channel, and the followed leader's when there is one. */
   close() {
     this._stub.close();
+    if (this._leaderStub) this._leaderStub.close();
   }
 }
 
 module.exports = {
   MddbClient,
   DEFAULT_ADDRESS,
+  NO_LEADER_RETRIES,
+  NO_LEADER_WAIT_MS,
+  NOT_LEADER,
+  NO_LEADER,
+  leaderInfo,
   loadService,
   buildCredentials,
 };

@@ -38,6 +38,7 @@ describe('cluster-format', () => {
     const followers = [{ lag_ms: 5, lag_entries: 1 }, { lag_ms: 900, lag_entries: 7, lag_exact: false }, {}];
     expect(nodeLag({ role: 'leader', followers })).toEqual({ ms: 900, entries: 7, exact: false });
     expect(nodeLag({ role: 'leader', followers: [{}] })).toEqual({ ms: 0, entries: 0, exact: true });
+    expect(nodeLag({ role: 'leader', followers: [{}, { lag_ms: 5 }] })).toEqual({ ms: 5, entries: 0, exact: true });
   });
 
   test('binlog use against its limit', () => {
@@ -51,6 +52,7 @@ describe('cluster-format', () => {
   test('colours come from the theme tokens', () => {
     expect(badgeClass('healthy')).toBe('bg-success-muted text-success-strong');
     expect(badgeClass('leader')).toBe('bg-info-muted text-info-strong');
+    expect(badgeClass('candidate')).toBe('bg-warning-muted text-warning-strong');
     expect(badgeClass('disconnected')).toBe('bg-surface-subtle text-fg-soft');
     expect(dotClass('warning')).toBe('bg-warning');
     expect(dotClass('disconnected')).toBe('bg-line-strong');
