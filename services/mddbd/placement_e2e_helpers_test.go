@@ -50,10 +50,13 @@ func (sh *swapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // placementNodeT is one node of a test placement.
 type placementNodeT struct {
 	id, group, dir, grpcAddr string
-	s                        *Server
-	grpcSrv                  *grpc.Server
-	http                     *httptest.Server
-	handler                  *swapHandler
+	// lis holds the gRPC port from the moment it is picked until the node
+	// serves on it, so no other process can take it in between.
+	lis     net.Listener
+	s       *Server
+	grpcSrv *grpc.Server
+	http    *httptest.Server
+	handler *swapHandler
 }
 
 // testPlacement is a set of groups, each a cluster.
@@ -102,7 +105,7 @@ func startTestPlacementOf(t *testing.T, sizes map[string]int, meta string, setup
 				t.Fatal(err)
 			}
 			n.grpcAddr = lis.Addr().String()
-			_ = lis.Close()
+			n.lis = lis
 			n.http = httptest.NewServer(n.handler)
 			tp.nodes = append(tp.nodes, n)
 			tp.cfg.groups[g] = append(tp.cfg.groups[g], placementNode{ID: n.id, GRPC: n.grpcAddr, HTTP: n.http.URL})
@@ -117,6 +120,15 @@ func startTestPlacementOf(t *testing.T, sizes map[string]int, meta string, setup
 }
 
 // boot starts node n.
+// Calmer timings than the cluster tests use: no placement test is about
+// elections, and on a loaded CI runner under -race the cluster tests' 150 ms
+// timeout let leases lapse and set off elections in the middle of a test
+// (writes then got "no leader" 503s). Bootstrap nodes still lead at once.
+const (
+	placementHeartbeat = 50 * time.Millisecond
+	placementElection  = 2 * time.Second
+)
+
 func (tp *testPlacement) boot(n *placementNodeT) {
 	t := tp.t
 	t.Helper()
@@ -128,7 +140,7 @@ func (tp *testPlacement) boot(n *placementNodeT) {
 	}
 	cs := clusterSettings{
 		node: cluster.Config{NodeID: n.id, Peers: peers, AutoFailover: len(peers) >= 3,
-			Heartbeat: testHeartbeat, ElectionTimeout: testElection, HTTP: n.http.URL},
+			Heartbeat: placementHeartbeat, ElectionTimeout: placementElection, HTTP: n.http.URL},
 		ack: ackAsync, ackTimeout: 2 * time.Second, bootstrap: peers[0].ID == n.id,
 	}
 	if _, err := cs.node.Validate(); err != nil {
@@ -153,9 +165,13 @@ func (tp *testPlacement) boot(n *placementNodeT) {
 	}
 	n.grpcSrv = newGRPCTransport(n.s, grpc.ChainUnaryInterceptor(n.s.placementUnaryInterceptor()),
 		grpc.ChainStreamInterceptor(n.s.placementStreamInterceptor()))
-	lis, err := net.Listen("tcp", n.grpcAddr)
-	if err != nil {
-		t.Fatal(err)
+	lis := n.lis
+	n.lis = nil
+	if lis == nil { // a restart: the port was released when the node stopped
+		var err error
+		if lis, err = net.Listen("tcp", n.grpcAddr); err != nil {
+			t.Fatal(err)
+		}
 	}
 	go func() { _ = n.grpcSrv.Serve(lis) }()
 	mux := http.NewServeMux()
