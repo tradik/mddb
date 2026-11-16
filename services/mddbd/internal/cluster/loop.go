@@ -19,9 +19,13 @@ func (n *Node) Start(bootstrap bool) {
 	n.signal()
 }
 
-// Stop ends the node's timers and reconciler.
+// Stop ends the node's timers and reconciler. It also waits for a state
+// change already under way (they hold n.mu): after Stop returns the node
+// writes nothing more, since persistLocked refuses once stop is closed.
 func (n *Node) Stop() {
 	n.once.Do(func() { close(n.stop) })
+	n.mu.Lock()
+	n.mu.Unlock() //nolint:staticcheck // an intentional barrier, see above
 	n.wg.Wait()
 }
 

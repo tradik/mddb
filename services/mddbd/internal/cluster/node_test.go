@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -59,9 +60,17 @@ func TestLeaderCutOffStepsDownAndTheMajorityElects(t *testing.T) {
 		t.Fatal("the cut-off node leads")
 	}
 	g.w.setDown(oldID, false)
-	waitFor(t, "the old leader to follow", func() bool {
+	// While cut off, the old leader kept standing for election, so it may
+	// come back with a later term and force one more election, which any
+	// node with a complete log may win. What must hold is that the cluster
+	// settles on one leader and the returning node agrees with it.
+	waitFor(t, "the old leader to agree with the cluster's leader", func() bool {
+		cur := g.singleLeader()
+		if cur == nil {
+			return false
+		}
 		id, _, _ := old.Leader()
-		return id == next.cfg.NodeID && old.Term() == next.Term()
+		return id == cur.cfg.NodeID && old.Term() == cur.Term()
 	})
 }
 
@@ -348,5 +357,46 @@ func TestStoreErrors(t *testing.T) {
 		if _, err := NewStore(path).load(); err == nil {
 			t.Fatal("read an unreadable store")
 		}
+	}
+}
+
+// TestAStoppedNodeNeitherVotesNorWrites: after Stop, handlers other nodes
+// still call must not change the vote file (the test's temp dir is removed
+// right after, and a late write made that removal fail).
+func TestAStoppedNodeNeitherVotesNorWrites(t *testing.T) {
+	g := newGroup(t, []string{"a", "b"}, false)
+	a := g.start("a", false)
+	path := filepath.Join(g.dir, "a.json")
+	before, _ := os.ReadFile(path)
+	a.Stop()
+	reply := a.HandleVote(VoteRequest{Term: a.Term() + 5, Candidate: "b"})
+	if reply.Granted {
+		t.Fatal("a stopped node granted a vote")
+	}
+	after, _ := os.ReadFile(path)
+	if string(before) != string(after) {
+		t.Fatalf("a stopped node wrote its vote file: %q -> %q", before, after)
+	}
+	if err := a.persistLocked(); !errors.Is(err, errNodeStopped) {
+		t.Fatalf("persist after stop: %v", err)
+	}
+}
+
+// TestStoreSavesOneAtATime: concurrent saves to one store all land whole.
+func TestStoreSavesOneAtATime(t *testing.T) {
+	s := NewStore(filepath.Join(t.TempDir(), "v.json"))
+	var wg sync.WaitGroup
+	for i := range 32 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.save(vote{Term: uint64(i + 1)}); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if v, err := s.load(); err != nil || v.Term == 0 {
+		t.Fatalf("load after concurrent saves: %+v, %v", v, err)
 	}
 }

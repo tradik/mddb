@@ -183,12 +183,12 @@ type Server struct {
 	mcpSSE        *MCPSSETransport
 	mcpStreamable *MCPStreamableTransport
 	// Replication
-	Binlog          *binlog.Binlog     // Binary replication log
-	ReplicationRole string             // "leader", "follower", or "" (standalone)
-	NodeID          string             // Unique node identifier
-	replServer      *ReplicationServer // Leader-side gRPC replication service
-	replClient      *ReplicationClient // Follower-side replication client
-	cluster         *clusterRuntime    // the node's part in a cluster (GO-051); nil outside one
+	Binlog          *binlog.Binlog                    // Binary replication log
+	ReplicationRole string                            // "leader", "follower", or "" (standalone)
+	NodeID          string                            // Unique node identifier
+	replServer      atomic.Pointer[ReplicationServer] // Leader-side gRPC replication service; set by the gRPC listener while HTTP may already serve status
+	replClient      *ReplicationClient                // Follower-side replication client
+	cluster         *clusterRuntime                   // the node's part in a cluster (GO-051); nil outside one
 	// Readiness
 	Ready bool // Set to true after full initialization; health check returns "warming_up" until then
 }

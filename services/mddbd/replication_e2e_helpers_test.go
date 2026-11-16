@@ -62,7 +62,7 @@ func startE2ELeader(t *testing.T, o e2eLeaderOpts) *e2eLeader {
 	}
 	s.Binlog = bl
 	l := &e2eLeader{s: s, rs: NewReplicationServer(s)}
-	s.replServer = l.rs
+	s.replServer.Store(l.rs)
 	opts := []grpc.ServerOption{grpc.ChainStreamInterceptor(l.intercept)}
 	if o.tls != nil {
 		opts = append(opts, grpc.Creds(credentials.NewTLS(o.tls)))

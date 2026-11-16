@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"log/slog"
 	"math/rand/v2"
 	"sync"
@@ -81,8 +82,26 @@ func (n *Node) timeout() time.Duration {
 	return n.cfg.ElectionTimeout + time.Duration(rand.Int64N(int64(n.cfg.ElectionTimeout)))
 }
 
-// persistLocked saves the term and vote. The caller holds n.mu.
+// errNodeStopped refuses a state change on a node that has been stopped.
+var errNodeStopped = errors.New("cluster: the node is stopped")
+
+// stopped reports whether Stop has been called.
+func (n *Node) stopped() bool {
+	select {
+	case <-n.stop:
+		return true
+	default:
+		return false
+	}
+}
+
+// persistLocked saves the term and vote. The caller holds n.mu. A stopped
+// node saves nothing: other nodes may still call its handlers while it
+// shuts down, and it must neither vote nor write its file after Stop.
 func (n *Node) persistLocked() error {
+	if n.stopped() {
+		return errNodeStopped
+	}
 	return n.store.save(vote{Term: n.term, VotedFor: n.votedFor, Led: n.led})
 }
 

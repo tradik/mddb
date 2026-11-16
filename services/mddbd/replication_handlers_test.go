@@ -189,7 +189,7 @@ func TestHandleReplicationStatus_LeaderWithFollowers(t *testing.T) {
 		},
 		mu: sync.RWMutex{},
 	}
-	s.replServer = rs
+	s.replServer.Store(rs)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/replication/status", nil)
@@ -250,7 +250,7 @@ func TestHandleReplicationStatus_FollowerLagHealthy(t *testing.T) {
 		},
 		mu: sync.RWMutex{},
 	}
-	s.replServer = rs
+	s.replServer.Store(rs)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/replication/status", nil)
@@ -288,7 +288,7 @@ func TestHandleReplicationStatus_LeaderNoReplServer(t *testing.T) {
 	}
 	defer func() { _ = bl.Close() }()
 	s.Binlog = bl
-	s.replServer = nil
+	s.replServer.Store(nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/replication/status", nil)
@@ -368,7 +368,7 @@ func TestHandleReplicationStatus_MultipleFollowers(t *testing.T) {
 		},
 		mu: sync.RWMutex{},
 	}
-	s.replServer = rs
+	s.replServer.Store(rs)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/replication/status", nil)

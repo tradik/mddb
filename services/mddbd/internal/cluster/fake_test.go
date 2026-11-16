@@ -171,20 +171,29 @@ func (g *group) leader(within time.Duration) *Node {
 	g.t.Helper()
 	deadline := time.Now().Add(within)
 	for time.Now().Before(deadline) {
-		var found []*Node
-		g.w.mu.Lock()
-		for id, n := range g.w.nodes {
-			if !g.w.down[id] && n.CanWrite() == nil {
-				found = append(found, n)
-			}
-		}
-		g.w.mu.Unlock()
-		if len(found) == 1 {
-			return found[0]
+		if n := g.singleLeader(); n != nil {
+			return n
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
 	g.t.Fatal("no single leader")
+	return nil
+}
+
+// singleLeader is the one writable node among the reachable ones, or nil
+// when there is none or more than one.
+func (g *group) singleLeader() *Node {
+	var found []*Node
+	g.w.mu.Lock()
+	for id, n := range g.w.nodes {
+		if !g.w.down[id] && n.CanWrite() == nil {
+			found = append(found, n)
+		}
+	}
+	g.w.mu.Unlock()
+	if len(found) == 1 {
+		return found[0]
+	}
 	return nil
 }
 

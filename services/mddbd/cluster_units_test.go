@@ -109,7 +109,7 @@ func soloCluster(t *testing.T, ack ackMode) *testNode {
 
 func TestClusterRPCsRefuseWhatTheyMust(t *testing.T) {
 	n := soloCluster(t, ackAsync)
-	rs := n.s.replServer
+	rs := n.s.replServer.Load()
 	ctx := withReplicationSecret(context.Background())
 	inCtx := incomingSecret()
 

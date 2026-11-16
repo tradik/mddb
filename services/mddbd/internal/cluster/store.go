@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // The node's term and the vote it gave in it, on disk. A node that forgot
@@ -28,6 +29,9 @@ const voteVersion = 1
 // synced before a vote is given or a term is taken.
 type Store struct {
 	path string
+	// mu serializes saves: two saves sharing the temp file would replace
+	// each other's half-written state.
+	mu sync.Mutex
 }
 
 // NewStore is the store at path.
@@ -57,6 +61,8 @@ func (s *Store) load() (vote, error) {
 
 // save replaces the state.
 func (s *Store) save(v vote) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	v.Version = voteVersion
 	raw, _ := json.Marshal(v) // plain fields always encode
 	tmp := s.path + ".tmp"

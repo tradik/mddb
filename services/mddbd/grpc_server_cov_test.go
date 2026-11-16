@@ -239,7 +239,7 @@ func TestCovEGRPCTransportServes(t *testing.T) {
 			t.Fatalf("service %s not registered; have %v", name, info)
 		}
 	}
-	if s.replServer == nil {
+	if s.replServer.Load() == nil {
 		t.Fatal("leader has no replication server")
 	}
 

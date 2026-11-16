@@ -105,9 +105,9 @@ func (tc *testCluster) boot(i int, bootstrap bool) {
 		t.Fatal(err)
 	}
 	n.s.cluster.tr.extra = []grpc.DialOption{grpc.WithContextDialer(n.dial)}
-	n.s.replServer = NewReplicationServer(n.s)
+	n.s.replServer.Store(NewReplicationServer(n.s))
 	n.srv = grpc.NewServer()
-	proto.RegisterMDDBReplicationServer(n.srv, n.s.replServer)
+	proto.RegisterMDDBReplicationServer(n.srv, n.s.replServer.Load())
 	var lis net.Listener
 	var err error
 	for range 50 { // the port was this node's a moment ago

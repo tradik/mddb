@@ -92,8 +92,8 @@ func (s *Server) replicationStatus() ReplicationStatusResponse {
 
 	if s.Binlog != nil {
 		resp.setBinlog(s.Binlog)
-		if s.replServer != nil {
-			resp.Followers = s.replServer.followerViews()
+		if rs := s.replServer.Load(); rs != nil {
+			resp.Followers = rs.followerViews()
 		}
 	}
 	if s.replClient != nil {

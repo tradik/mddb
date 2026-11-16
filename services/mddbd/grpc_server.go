@@ -97,7 +97,7 @@ func newGRPCTransport(s *Server, opts ...grpc.ServerOption) *grpc.Server {
 	// Register replication service (available on all nodes for status queries)
 	if s.ReplicationRole == "leader" || s.ReplicationRole == "follower" || s.cluster != nil {
 		rs := NewReplicationServer(s)
-		s.replServer = rs
+		s.replServer.Store(rs)
 		proto.RegisterMDDBReplicationServer(grpcServer, rs)
 
 		// SEC-001: snapshot/binlog streams expose the entire DB (incl. auth
