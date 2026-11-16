@@ -144,30 +144,45 @@ class MddbClient {
    * be sent again unchanged.
    */
   async _call(method, request, callOptions) {
-    let stub = this._stubFor(method);
-    let redirected = false;
-    let waits = 0;
-    for (;;) {
-      try {
-        return await this._once(stub, method, request, callOptions);
-      } catch (err) {
-        const info = annotate(err);
-        if (!this.followLeader) throw err;
-        if (!info) {
-          this._forgetLeader(stub, err);
-          throw err;
-        }
-        if (info.reason === NOT_LEADER && !redirected) {
-          stub = this._follow(method, info);
-          redirected = true;
-          if (!stub) throw err;
-          continue;
-        }
-        if (info.reason !== NO_LEADER || waits >= NO_LEADER_RETRIES) throw err;
-        waits += 1;
-        await this._sleep(NO_LEADER_WAIT_MS);
-      }
+    return this._attempt(this._stubFor(method), method, request, callOptions, { redirected: false, waits: 0 });
+  }
+
+  /**
+   * Sends the RPC on stub and, when the refusal is one `followLeader` acts
+   * on, sends it again as `_retry` decides. The retries are sequential by
+   * design: each one depends on how the one before it failed. `tries` is
+   * what has been spent: the one redirect and the NO_LEADER waits.
+   */
+  async _attempt(stub, method, request, callOptions, tries) {
+    try {
+      return await this._once(stub, method, request, callOptions);
+    } catch (err) {
+      const next = await this._retry(err, stub, method, tries);
+      return this._attempt(next.stub, method, request, callOptions, next.tries);
     }
+  }
+
+  /**
+   * Decides what follows a failed attempt. It rethrows err when nothing
+   * does; otherwise it returns the stub and the tries of the next attempt —
+   * the leader's stub once for NOT_LEADER, the same stub after a wait for
+   * NO_LEADER.
+   */
+  async _retry(err, stub, method, { redirected, waits }) {
+    const info = annotate(err);
+    if (!this.followLeader) throw err;
+    if (!info) {
+      this._forgetLeader(stub, err);
+      throw err;
+    }
+    if (info.reason === NOT_LEADER && !redirected) {
+      const leaderStub = this._follow(method, info);
+      if (!leaderStub) throw err;
+      return { stub: leaderStub, tries: { redirected: true, waits } };
+    }
+    if (info.reason !== NO_LEADER || waits >= NO_LEADER_RETRIES) throw err;
+    await this._sleep(NO_LEADER_WAIT_MS);
+    return { stub, tries: { redirected, waits: waits + 1 } };
   }
 
   /** One attempt of an RPC on stub; each attempt gets its own deadline. */

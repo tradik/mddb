@@ -81,12 +81,13 @@ export default function ClusterPlacement() {
     setStarted(null);
   };
 
-  const confirm = async () => {
+  /** Starts the move the dialog shows. */
+  const confirm = async (move) => {
     setBusy(true);
     setError(null);
     try {
-      const answer = await mddbClient.moveCollection({ collection: moving.collection, group: moving.to });
-      setStarted(answer.move || { collection: moving.collection, to: moving.to });
+      const answer = await mddbClient.moveCollection({ collection: move.collection, group: move.to });
+      setStarted(answer.move || { collection: move.collection, to: move.to });
       setMoving(null);
       void load();
     } catch (err) {
@@ -122,7 +123,7 @@ export default function ClusterPlacement() {
       {moves.length > 0 && <PlacementMoves moves={moves} />}
 
       {moving && (
-        <ClusterActionDialog title={`Move ${moving.collection}`} confirmLabel="Move" busy={busy} error={error} onConfirm={confirm} onCancel={close}>
+        <ClusterActionDialog title={`Move ${moving.collection}`} confirmLabel="Move" busy={busy} error={error} onConfirm={() => confirm(moving)} onCancel={close}>
           <p>
             The collection is copied to the target group while it keeps taking writes, then fenced briefly while the last writes catch up, and served from the new group.
           </p>

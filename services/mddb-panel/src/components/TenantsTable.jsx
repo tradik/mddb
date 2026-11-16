@@ -8,7 +8,7 @@ import { refusalTotal } from '../lib/tenant-usage';
 /** "1,234 of 5,000 (25%)", or the number alone without a limit. */
 function ofLimit(used, limit, bytes = false) {
   const amount = formatAmount(used, bytes);
-  if (!(limit > 0)) return amount;
+  if (!limit || limit <= 0) return amount;
   return `${amount} of ${formatAmount(limit, bytes)} (${Math.round((used / limit) * 100)}%)`;
 }
 

@@ -49,13 +49,19 @@ class LeaderInfo:
     leader_grpc: str = ""
 
 
+# The types an error must have for leader_info to read it: the exception a
+# call raises, and the call it is, whose status and trailers hold the answer.
+_CALL_ERROR_TYPES = (grpc.RpcError, grpc.Call)
+
+
 def leader_info(error: Any) -> Optional[LeaderInfo]:
     """Returns the leader information of a refused write, or ``None``.
 
     Works on the ``grpc.RpcError`` a call raises (which is also a
     ``grpc.Call``); anything else, and any other status, gives ``None``.
     """
-    if not (isinstance(error, grpc.RpcError) and isinstance(error, grpc.Call)):
+    # The error a call raises is both: grpc's call classes subclass the two.
+    if not all(isinstance(error, cls) for cls in _CALL_ERROR_TYPES):
         return None
     info = _from_details(_trailer(error, _DETAILS_KEY))
     if info is not None:

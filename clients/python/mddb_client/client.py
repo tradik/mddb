@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional, Tuple
 
 import grpc
 
@@ -140,22 +140,33 @@ class MddbClient:
             try:
                 return getattr(stub, name)(request, metadata=self._metadata, **kwargs)
             except grpc.RpcError as err:
-                info = annotate(err)
-                if not self.follow_leader:
+                retry = self._retry(err, name, stub, redirected, waits)
+                if retry is None:
                     raise
-                if info is None:
-                    self._forget_leader(stub, err)
-                    raise
-                if info.reason == NOT_LEADER and not redirected:
-                    stub, redirected = self._follow(name, info), True
-                    if stub is None:
-                        raise
-                    continue
-                if info.reason == NO_LEADER and waits < NO_LEADER_RETRIES:
-                    waits += 1
-                    self._sleep(NO_LEADER_WAIT_SECONDS)
-                    continue
-                raise
+                stub, redirected, waits = retry
+
+    def _retry(
+        self, err: grpc.RpcError, name: str, stub: mddb_pb2_grpc.MDDBStub, redirected: bool, waits: int
+    ) -> Optional[Tuple[mddb_pb2_grpc.MDDBStub, bool, int]]:
+        """Decides what follows a failed call of ``_invoke``.
+
+        Returns the stub, ``redirected`` and ``waits`` of the next attempt —
+        the leader's stub once for NOT_LEADER, the same stub after a wait for
+        NO_LEADER — or ``None`` when the refusal is raised to the caller.
+        """
+        info = annotate(err)
+        if not self.follow_leader:
+            return None
+        if info is None:
+            self._forget_leader(stub, err)
+            return None
+        if info.reason == NOT_LEADER and not redirected:
+            leader_stub = self._follow(name, info)
+            return None if leader_stub is None else (leader_stub, True, waits)
+        if info.reason == NO_LEADER and waits < NO_LEADER_RETRIES:
+            self._sleep(NO_LEADER_WAIT_SECONDS)
+            return stub, redirected, waits + 1
+        return None
 
     def _stub_for(self, name: str) -> mddb_pb2_grpc.MDDBStub:
         """The leader's stub for an RPC known to be a write, else the configured one."""

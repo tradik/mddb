@@ -31,7 +31,9 @@ function leaderText(cluster) {
  */
 export default function ClusterElection({ cluster, term, onChanged }) {
   const id = useId();
-  const [action, setAction] = useState(null); // 'promote' | 'demote' | null
+  // The dialog that is open; the type cast keeps the checker from typing it
+  // as always null.
+  const [action, setAction] = useState(/** @type {'promote' | 'demote' | null} */ (null));
   const [force, setForce] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);

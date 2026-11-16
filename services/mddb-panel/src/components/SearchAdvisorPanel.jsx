@@ -82,6 +82,7 @@ export default function SearchAdvisorPanel() {
   }, [currentCollection]);
 
   const profile = advice?.profile;
+  const warnings = advice?.warnings ?? [];
   const measuredFromSample = isSampled(profile);
   const coverage = embeddedCoverage(profile);
 
@@ -157,12 +158,12 @@ export default function SearchAdvisorPanel() {
         </div>
       )}
 
-      {advice?.warnings?.length > 0 && (
+      {warnings.length > 0 && (
         <div
           role="alert"
           className="mb-4 rounded-lg border border-warning-line bg-warning-soft p-3"
         >
-          {advice.warnings.map((w) => (
+          {warnings.map((w) => (
             <div key={w} className="flex items-start gap-2 text-sm text-warning-strong">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <span>{w}</span>
