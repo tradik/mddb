@@ -189,7 +189,7 @@ func (s *MCPToolServer) admitTool(ctx context.Context, name string) (context.Con
 	dc, ok := s.client.(*DirectClient)
 	rule := mcpToolAccessRules[name]
 	if !ok || dc.server == nil || rule.class != accessCollection {
-		return ctx, func() {}, nil
+		return ctx, noRelease, nil
 	}
 	ctx, release, err := dc.server.admitRequest(ctx, rule.op)
 	if err != nil {

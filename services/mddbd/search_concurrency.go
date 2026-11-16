@@ -63,12 +63,19 @@ func newSearchLimiter() *SearchLimiter {
 	}
 }
 
+// noRelease is the release function handed back when nothing was taken: no
+// limiter is configured, the request was already admitted, or admission was
+// refused.
+func noRelease() {
+	// Nothing was acquired, so there is nothing to give back.
+}
+
 // Acquire takes a slot, waiting up to the configured timeout. The returned
 // release function must be called; it is safe to call on the error path too,
 // where it does nothing.
 func (l *SearchLimiter) Acquire(ctx context.Context) (release func(), err error) {
 	if l == nil {
-		return func() {}, nil
+		return noRelease, nil
 	}
 
 	timer := time.NewTimer(l.wait)
@@ -83,10 +90,10 @@ func (l *SearchLimiter) Acquire(ctx context.Context) (release func(), err error)
 		}, nil
 	case <-ctx.Done():
 		// The client gave up first; not our rejection to report.
-		return func() {}, ctx.Err()
+		return noRelease, ctx.Err()
 	case <-timer.C:
 		l.rejects.add(1)
-		return func() {}, ErrSearchBusy
+		return noRelease, ErrSearchBusy
 	}
 }
 
@@ -121,15 +128,15 @@ const searchRetryAfterSeconds = 1
 // tenant is.
 func (s *Server) searchSlot(ctx context.Context) (context.Context, func(), error) {
 	if ctx.Value(searchSlotKey{}) != nil {
-		return ctx, func() {}, nil
+		return ctx, noRelease, nil
 	}
 	releaseTenant, err := s.tenantSearchSlot(ctx)
 	if err != nil {
-		return ctx, func() {}, err
+		return ctx, noRelease, err
 	}
 	if s.SearchLimiter == nil {
 		if releaseTenant == nil {
-			return ctx, func() {}, nil
+			return ctx, noRelease, nil
 		}
 		return context.WithValue(ctx, searchSlotKey{}, true), releaseTenant, nil
 	}

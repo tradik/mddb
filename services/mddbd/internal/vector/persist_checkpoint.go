@@ -38,7 +38,7 @@ type Persistable interface {
 	// persistSnapshot captures the collection's structure under the index's
 	// read lock and returns what to write once the lock is released, or nil
 	// when there is nothing built.
-	persistSnapshot(collection string) persistSnapshot
+	persistSnapshot(collection string) snapshotEncoder
 	// persistRestore replaces the collection with a decoded section,
 	// matched against the stored vectors. It returns the stored vectors the
 	// section did not cover — the caller adds those — or why the section
@@ -46,8 +46,8 @@ type Persistable interface {
 	persistRestore(collection string, section any, vectors map[string][]float32) ([]string, error)
 }
 
-// persistSnapshot is one index's structure, captured and ready to write.
-type persistSnapshot interface {
+// snapshotEncoder is one index's structure, captured and ready to write.
+type snapshotEncoder interface {
 	encode(e *persistEncoder)
 }
 

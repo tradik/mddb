@@ -26,6 +26,10 @@ import (
 // Nothing depends on a checkpoint being recent. One that is behind costs the
 // next start the vectors written since, added the usual way.
 
+// perCollectionCheckpointSuffix ends a checkpoint file written next to a
+// collection's own file in the per-collection storage layout.
+const perCollectionCheckpointSuffix = ".db.ann"
+
 // annMinSpacing is the least time between two checkpoints of a collection
 // that are brought forward by the number of changes.
 var annMinSpacing = 10 * time.Second
@@ -220,7 +224,7 @@ func (s *Server) invalidateCheckpoints() {
 	p.writeMu.Lock()
 	defer p.writeMu.Unlock()
 	removeCheckpoints(s.Path+".ann", ".ann", nil)
-	removeCheckpoints(collectionDir(s.Path), ".db.ann", nil)
+	removeCheckpoints(collectionDir(s.Path), perCollectionCheckpointSuffix, nil)
 	p.mu.Lock()
 	p.state = nil
 	p.mu.Unlock()
@@ -240,12 +244,12 @@ func (s *Server) sweepCheckpoints(counts map[string]int) {
 		keep[filepath.Base(s.annIndexPath(c))] = true
 	}
 	if perCollectionLayout() {
-		removeCheckpoints(collectionDir(s.Path), ".db.ann", keep)
+		removeCheckpoints(collectionDir(s.Path), perCollectionCheckpointSuffix, keep)
 		removeCheckpoints(s.Path+".ann", ".ann", nil)
 		return
 	}
 	removeCheckpoints(s.Path+".ann", ".ann", keep)
-	removeCheckpoints(collectionDir(s.Path), ".db.ann", nil)
+	removeCheckpoints(collectionDir(s.Path), perCollectionCheckpointSuffix, nil)
 }
 
 // removeCheckpoints deletes the checkpoint files in dir — the names ending

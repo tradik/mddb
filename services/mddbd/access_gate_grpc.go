@@ -35,7 +35,7 @@ func (s *Server) accessUnaryInterceptor() grpc.UnaryServerInterceptor {
 func (s *Server) admitRPC(ctx context.Context, method string) (context.Context, func(), error) {
 	rule := grpcAccessRules[method]
 	if rule.class != accessCollection {
-		return ctx, func() {}, nil
+		return ctx, noRelease, nil
 	}
 	ctx, release, err := s.admitRequest(ctx, rule.op)
 	if err != nil {
@@ -60,18 +60,28 @@ func (s *Server) accessStreamInterceptor() grpc.StreamServerInterceptor {
 			return err
 		}
 		defer release()
-		return handler(srv, accessStream{ServerStream: admittedStream{ss, ctx}, s: s, method: info.FullMethod})
+		admitted := admittedStream{ServerStream: ss, admitted: isAdmitted(ctx)}
+		return handler(srv, accessStream{ServerStream: admitted, s: s, method: info.FullMethod})
 	}
 }
 
 // admittedStream is a stream whose context carries the admission (GO-054).
+// It keeps whether the call was admitted, not the admitted context: the
+// context is the stream's own, marked when admitted is set, which is all
+// admitRequest adds to it.
 type admittedStream struct {
 	grpc.ServerStream
-	ctx context.Context
+	admitted bool
 }
 
 // Context is the admitted request's context.
-func (a admittedStream) Context() context.Context { return a.ctx }
+func (a admittedStream) Context() context.Context {
+	ctx := a.ServerStream.Context()
+	if a.admitted {
+		return markAdmitted(ctx)
+	}
+	return ctx
+}
 
 // accessStream checks every request message a stream receives (Export).
 type accessStream struct {

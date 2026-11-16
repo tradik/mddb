@@ -67,7 +67,7 @@ func (h *HNSWIndex) PersistStamp(collection string) uint64 {
 func (h *HNSWIndex) persistKind() byte { return persistKindGraph }
 
 // persistSnapshot implements Persistable.
-func (h *HNSWIndex) persistSnapshot(collection string) persistSnapshot {
+func (h *HNSWIndex) persistSnapshot(collection string) snapshotEncoder {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	g, ok := h.graphs[collection]
@@ -90,7 +90,7 @@ func (h *HNSWIndex) persistSnapshot(collection string) persistSnapshot {
 	return s
 }
 
-// encode implements persistSnapshot.
+// encode implements snapshotEncoder.
 func (s *graphSnapshot) encode(e *persistEncoder) {
 	e.u32(uint32(s.m))              // #nosec G115 -- a configured small number
 	e.u32(uint32(s.efConstruction)) // #nosec G115 -- likewise

@@ -21,7 +21,7 @@ type reindexSlotKey struct{}
 // waiting. The release function must be called; on error it does nothing.
 func (s *Server) reindexSlot(ctx context.Context, collection string, onWait func()) (context.Context, func(), error) {
 	if ctx.Value(reindexSlotKey{}) != nil {
-		return ctx, func() {}, nil
+		return ctx, noRelease, nil
 	}
 	rt := s.tenantLimiter()
 	var held []chan struct{}
@@ -34,14 +34,14 @@ func (s *Server) reindexSlot(ctx context.Context, collection string, onWait func
 	if n := s.effectiveLimits(tenant).MaxConcurrentReindexes; tenant != "" && n > 0 {
 		ch := rt.slotChan("r|"+tenant, n)
 		if err := takeSlot(ctx, ch, onWait); err != nil {
-			return ctx, func() {}, err
+			return ctx, noRelease, err
 		}
 		held = append(held, ch)
 	}
 	if rt.reindexAll != nil {
 		if err := takeSlot(ctx, rt.reindexAll, onWait); err != nil {
 			release()
-			return ctx, func() {}, err
+			return ctx, noRelease, err
 		}
 		held = append(held, rt.reindexAll)
 	}

@@ -309,15 +309,15 @@ func (rc *ReplicationClient) replicate(ctx context.Context) error {
 	}
 	// The acknowledgements end with the stream, before the connection they
 	// use is closed (disconnect).
+	// Deferred calls run last-in first-out: the cancel runs first, then the
+	// wait for the loop to see it and return.
 	ackCtx, stopAcks := context.WithCancel(ctx)
 	acksDone := make(chan struct{})
+	defer func() { <-acksDone }()
+	defer stopAcks()
 	go func() {
 		defer close(acksDone)
 		rc.ackLoop(ackCtx)
-	}()
-	defer func() {
-		stopAcks()
-		<-acksDone
 	}()
 
 	// The leader answers with its headers before the first entry, or with

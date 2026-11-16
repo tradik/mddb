@@ -46,7 +46,7 @@ func (s *trainedSnapshot) add(id string, v []float32, code ...byte) {
 	s.codes = append(s.codes, code...)
 }
 
-// encode implements persistSnapshot.
+// encode implements snapshotEncoder.
 func (s *trainedSnapshot) encode(e *persistEncoder) {
 	e.u32(uint32(s.dim))           // #nosec G115 -- a vector length
 	e.u64(uint64(s.trainedOn))     // #nosec G115 -- a count
@@ -193,7 +193,7 @@ func (idx *IVFIndex) PersistStamp(collection string) uint64 {
 func (idx *IVFIndex) persistKind() byte { return persistKindTrained }
 
 // persistSnapshot implements Persistable.
-func (idx *IVFIndex) persistSnapshot(collection string) persistSnapshot {
+func (idx *IVFIndex) persistSnapshot(collection string) snapshotEncoder {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 	c, ok := idx.data[collection]
@@ -313,7 +313,7 @@ func (p *PQIndex) PersistStamp(collection string) uint64 {
 func (p *PQIndex) persistKind() byte { return persistKindTrained }
 
 // persistSnapshot implements Persistable.
-func (p *PQIndex) persistSnapshot(collection string) persistSnapshot {
+func (p *PQIndex) persistSnapshot(collection string) snapshotEncoder {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	c, ok := p.data[collection]
@@ -357,7 +357,7 @@ func (o *OPQIndex) PersistStamp(collection string) uint64 {
 func (o *OPQIndex) persistKind() byte { return persistKindTrained }
 
 // persistSnapshot implements Persistable.
-func (o *OPQIndex) persistSnapshot(collection string) persistSnapshot {
+func (o *OPQIndex) persistSnapshot(collection string) snapshotEncoder {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	c, ok := o.data[collection]
@@ -442,7 +442,7 @@ func (s *SQIndex) persistKind() byte { return persistKindTrained }
 
 // persistSnapshot implements Persistable. The matrices are the minimums,
 // the maximums and the scales.
-func (s *SQIndex) persistSnapshot(collection string) persistSnapshot {
+func (s *SQIndex) persistSnapshot(collection string) snapshotEncoder {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	c, ok := s.data[collection]
@@ -492,7 +492,7 @@ func (s *SQ4Index) persistKind() byte { return persistKindTrained }
 
 // persistSnapshot implements Persistable. The matrices are the lower bounds
 // and the scales; the levels follow from them.
-func (s *SQ4Index) persistSnapshot(collection string) persistSnapshot {
+func (s *SQ4Index) persistSnapshot(collection string) snapshotEncoder {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	c, ok := s.data[collection]

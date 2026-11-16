@@ -8,12 +8,9 @@ import (
 	"mddb/internal/spell"
 	"mddb/internal/storage"
 	"net/http"
-	"strings"
 	"time"
 
 	json "mddb/internal/jsonx"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // FTSSearchRequest is the HTTP request for full-text search.
@@ -221,7 +218,9 @@ func (s *Server) normalizeFTSRequest(req *FTSSearchRequest) error {
 // searchFTS runs a full-text search: spell correction, mode, filters, ranges,
 // boosts, facets, highlights and the context budget. It is the one
 // implementation behind POST /v1/fts and the MCP full_text_search tool; MCP
-// had a reduced copy without filters, modes or stemming control (#328).
+// had a reduced copy without filters, modes or stemming control (#328). The
+// steps are in fts_search_run.go and fts_search_results.go, in the order
+// they run here.
 func (s *Server) searchFTS(ctx context.Context, req FTSSearchRequest, start time.Time) (*FTSSearchResponse, error) {
 	if err := s.normalizeFTSRequest(&req); err != nil {
 		return nil, err
@@ -230,350 +229,31 @@ func (s *Server) searchFTS(ctx context.Context, req FTSSearchRequest, start time
 	if err := req.GroupBy.Validate(); err != nil {
 		return nil, err
 	}
-	// Spell-correct the query when enabled for this collection
-	var spellCorrected *spell.SpellCorrectionInfo
-	if s.SpellManager != nil && s.SpellManager.Ready() && s.CollectionManager != nil {
-		if cfg, ok := s.CollectionManager.Get(req.Collection); ok && cfg.SpellCorrect {
-			lang := req.Lang
-			if cfg.SpellLang != "" {
-				lang = cfg.SpellLang
-			}
-			corrected := s.SpellManager.Cleanup(req.Collection, lang, req.Query)
-			if corrected != req.Query {
-				spellCorrected = &spell.SpellCorrectionInfo{Original: req.Query, Corrected: corrected}
-				req.Query = corrected
-			}
-		}
+	spellCorrected := s.spellCorrectFTS(&req)
+	run := s.newFTSRun(&req)
+	if !run.preFilter() {
+		return run.emptyResponse(), nil
 	}
-
-	// RAG-011: model reranking reads the corrected query, and the search
-	// fetches the model's pool.
-	rr := s.newRerankRun(req.Collection, req.Query, req.Rerank, false)
-
-	// Per-query stemming/synonym control on a view of the index, never on
-	// the shared one (see FTSIndex.QueryView).
-	origStemmer := s.FTSIndex.Stemmer()
-	idx := s.FTSIndex.QueryView(req.DisableStem, req.DisableSynonyms)
-
-	// Resolve query language
-	queryLang := req.Lang
-
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "tfidf"
-	}
-	fuzzy := req.Fuzzy
-	if fuzzy < 0 {
-		fuzzy = 0
-	}
-	if fuzzy > 2 {
-		fuzzy = 2
-	}
-
-	// Determine search mode
-	mode := req.Mode
-	if mode == "" || mode == "auto" {
-		parsed := fts.ParseAdvancedQuery(req.Query)
-		if parsed.IsAdvanced() {
-			if parsed.HasPhrase && !parsed.HasBoolean && !parsed.HasWildcard && !parsed.HasProximity {
-				mode = "phrase"
-			} else if parsed.HasProximity && !parsed.HasBoolean && !parsed.HasWildcard {
-				mode = "proximity"
-			} else if parsed.HasWildcard && !parsed.HasBoolean && !parsed.HasPhrase && !parsed.HasProximity {
-				mode = "wildcard"
-			} else {
-				mode = "boolean"
-			}
-		} else {
-			mode = "simple"
-		}
-	}
-
-	// Pre-filter by metadata (in-graph filtering)
-	var allowed map[string]bool
-	// rangeMeta on metadata keys joins the index filter (SRCH-017); only
-	// timestamp ranges still need the documents.
-	filter, docRanges := rangeMetaAsFilter(req.Filter, req.RangeMeta)
-	if ids, active := s.allowedDocIDs(req.Collection, req.FilterMeta, filter); active {
-		allowed = ids
-		if len(allowed) == 0 {
-			return &FTSSearchResponse{
-				Results:   []FTSResultWithDoc{},
-				Algorithm: algo,
-				Mode:      mode,
-				Fuzzy:     fuzzy,
-			}, nil
-		}
-	}
-
-	// Tokenize query (needed for bm25f, reused below) — language-aware
-	tokens := idx.TokenizeQueryLang(req.Collection, req.Query, queryLang)
-
-	// Filters, boosts and facetScope "all" act on the whole match set, so
-	// the index must return all of it; the limit is applied once they have
-	// run. Searching only the top req.Limit first let a filter keep just the
-	// matches that happened to rank there (#311). The search functions score
-	// every match either way — the limit only truncates their sorted output.
-	searchLimit := rr.pool(req.Limit)
-	if allowed != nil || len(docRanges) > 0 || len(req.Boost) > 0 || req.FacetScope == facetScopeAll || req.GroupBy != nil {
-		searchLimit = 0
-	}
-
-	var results []fts.FTSResult
-	var err error
-
-	switch mode {
-	case "boolean":
-		parsed := fts.ParseAdvancedQuery(req.Query)
-		results, err = idx.SearchBoolean(req.Collection, parsed, searchLimit)
-
-	case "phrase":
-		// Extract phrase text (strip quotes if present)
-		phraseText := strings.Trim(req.Query, "\"")
-		results, err = idx.SearchPhrase(req.Collection, phraseText, searchLimit)
-
-	case "proximity":
-		parsed := fts.ParseAdvancedQuery(req.Query)
-		distance := req.Distance
-		if distance <= 0 {
-			distance = 5 // default proximity distance
-		}
-		// If parsed has proximity clause, use its distance
-		for _, c := range parsed.Clauses {
-			if c.Type == "proximity" {
-				distance = c.Distance
-				results, err = idx.SearchProximity(req.Collection, c.Value, distance, searchLimit)
-				break
-			}
-		}
-		if results == nil && err == nil {
-			phraseText := strings.Trim(req.Query, "\"")
-			results, err = idx.SearchProximity(req.Collection, phraseText, distance, searchLimit)
-		}
-
-	case "wildcard":
-		results, err = idx.SearchWildcard(req.Collection, req.Query, searchLimit)
-
-	case "expression":
-		var expr fts.QueryExpr
-		expr, err = fts.ParseQueryExpression(req.Query)
-		if err != nil {
-			// Includes ErrEmptyQueryExpression: a whitespace-only expression
-			// query passes the earlier non-empty check but means nothing, and
-			// used to return an empty result set as though it had been asked
-			// a real question (TEST-003).
-			return nil, err
-		}
-		results, err = idx.EvaluateExpression(req.Collection, expr, searchLimit)
-
-	default: // "simple"
-		mode = "simple"
-		switch algo {
-		case "bm25f":
-			if fuzzy > 0 {
-				results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, searchLimit, fuzzy, req.FieldWeights, req.bm25)
-			} else {
-				results, err = idx.SearchBM25F(req.Collection, tokens, searchLimit, req.FieldWeights, req.bm25)
-			}
-		case "bm25":
-			if fuzzy > 0 {
-				results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, searchLimit, fuzzy, req.bm25)
-			} else {
-				results, err = idx.SearchBM25(req.Collection, req.Query, searchLimit, req.bm25)
-			}
-		case "tfidf":
-			if fuzzy > 0 {
-				results, err = idx.SearchFuzzy(req.Collection, req.Query, searchLimit, fuzzy)
-			} else {
-				results, err = idx.Search(req.Collection, req.Query, searchLimit)
-			}
-		case "pmisparse":
-			if fuzzy > 0 {
-				results, err = idx.SearchPMISparseFuzzy(req.Collection, req.Query, searchLimit, fuzzy)
-			} else {
-				results, err = idx.SearchPMISparse(req.Collection, req.Query, searchLimit)
-			}
-		default:
-			return nil, fmt.Errorf("unknown algorithm: %s, available: tfidf, bm25, bm25f, pmisparse", algo)
-		}
-	}
+	results, err := run.search()
 	if err != nil {
 		return nil, err
 	}
+	run.countSearch()
+	if results, err = run.postFilter(results); err != nil {
+		return nil, err
+	}
+	allFacets, matched := run.facetsOverAll(results)
 
-	// Track FTS search operation
-	if s.Metrics != nil {
-		s.Metrics.IncOp("fts_search", mode+"/"+algo)
-	}
-	// AGT-004: a caller that finishes the response itself counts it too.
-	if !req.skipContextBudget {
-		s.Gain.Search(gainKind{Type: SearchTypeFTS, Algorithm: algo})
-	}
-
-	// Apply metadata filter to results
-	if allowed != nil {
-		filtered := results[:0]
-		for _, r := range results {
-			if allowed[r.DocID] {
-				filtered = append(filtered, r)
-			}
-		}
-		results = filtered
-	}
-
-	// Apply range filters
-	if len(docRanges) > 0 && len(results) > 0 {
-		results, err = s.FilterByRange(req.Collection, results, docRanges)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Apply per-query boosts/demotions (metadata-based score multipliers).
-	results = s.applyBoostFTS(req.Collection, results, req.Boost)
-
-	// facetScope "all": count over every match, before pagination (#311).
-	var allFacets FacetResult
-	var matched int
-	if req.FacetScope == facetScopeAll {
-		ids := make(map[string]bool, len(results))
-		for _, r := range results {
-			ids[r.DocID] = true
-		}
-		matched = len(ids)
-		allFacets = s.computeFacetsOverMatches(req.Collection, ids, req.FacetBy, req.FacetMaxValues)
-	}
-
-	// Load only the page, unless curation may hide some of it: then load all
-	// and let the truncation after curation pick the page.
-	window := rr.pool(req.Limit)
-	if req.GroupBy != nil || (s.CurationManager != nil && len(s.CurationManager.MatchingRules(req.Collection, req.Query)) > 0) {
-		window = 0
-	}
-
-	// Load full documents
-	var resp FTSSearchResponse
-	resp.Algorithm = algo
-	resp.Mode = mode
-	resp.Fuzzy = fuzzy
-	resp.Lang = queryLang
-	resp.StemmingActive = origStemmer != nil && !req.DisableStem
-	resp.SynonymsActive = s.FTSIndex.SynonymManager() != nil && !req.DisableSynonyms
-	if algo == "bm25f" {
-		resp.FieldWeights = req.FieldWeights
-	}
-	resp.Results = make([]FTSResultWithDoc, 0, len(results))
-	hlOpts := fts.HighlightOptions{
-		OpenTag:      req.HighlightTag,
-		MaxFragments: req.MaxHighlights,
-		FragmentSize: req.FragmentSize,
-	}
-	_ = s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		for _, res := range results {
-			if window > 0 && len(resp.Results) >= window {
-				break
-			}
-			v := bDocs.Get(storage.DocKey(req.Collection, res.DocID))
-			if v == nil {
-				continue
-			}
-			docPtr, err := loadResultDoc(v)
-			if err != nil {
-				continue
-			}
-			// Skip expired docs
-			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < currentUnix() {
-				continue
-			}
-			item := FTSResultWithDoc{
-				Document:     *docPtr,
-				Score:        res.Score,
-				MatchedTerms: res.MatchedTerms,
-			}
-			if req.Highlight {
-				item.Highlights = fts.ExtractHighlights(docPtr.ContentMD, res.MatchedTerms, hlOpts)
-			}
-			resp.Results = append(resp.Results, item)
-		}
-		return nil
-	})
-	// Curation: pin/hide must run AFTER filtering and range/boost but BEFORE
-	// facets so facet counts reflect what the client actually sees.
-	resp.Results = s.rerankFTSResults(ctx, rr, req.Collection, resp.Results)
-	req.Limit = rr.cut(req.Limit)
-	resp.Results = s.applyCurationFTS(req.Collection, req.Query, resp.Results)
-	resp.Results = groupTop(resp.Results, req.GroupBy,
-		func(r FTSResultWithDoc) string { return r.Document.ID },
-		func(r FTSResultWithDoc) string {
-			return req.GroupBy.label(req.Collection, r.Document.ID, r.Document.Meta)
-		},
-		func(r *FTSResultWithDoc, t groupTag) { r.Group, r.GroupRank = t.Group, t.Rank })
-	if req.Limit > 0 && len(resp.Results) > req.Limit {
-		resp.Results = resp.Results[:req.Limit]
-	}
-
-	// RAG-001: cap the total context this collection hands back. Applied
-	// before Total and facets so both describe what the caller actually
-	// receives — a count that includes dropped results is worse than no count.
-	// With passages the budget counts the passages, which is what is sent.
-	if !req.skipContextBudget && !req.wantsPassages() {
-		var contextTruncated bool
-		resp.Results, contextTruncated = applyContextBudget(s, req.Collection, resp.Results,
-			func(r FTSResultWithDoc) int { return approxTokens(r.Document.ContentMD) })
-		resp.ContextTruncated = contextTruncated
-		countHits(s, resp.Results, func(r FTSResultWithDoc) gainSize { return wholeDoc(r.Document.ContentMD) })
-	}
-
+	resp := run.newResponse()
+	resp.Results = run.finishResults(ctx, run.loadResults(results))
+	run.applyBudget(&resp)
 	resp.Total = len(resp.Results)
-
-	if req.FacetScope == facetScopeAll {
-		resp.Facets = allFacets
-		resp.Matched = matched
-	} else if len(req.FacetBy) > 0 && len(resp.Results) > 0 {
-		docs := make([]storage.Doc, len(resp.Results))
-		for i, it := range resp.Results {
-			docs[i] = it.Document
-		}
-		resp.Facets = computeFacets(docs, req.FacetBy, req.FacetMaxValues)
-	}
-
-	if searchStatsEnabled() {
-		terms := make([]string, 0, len(tokens))
-		for t := range tokens {
-			terms = append(terms, t)
-		}
-		resp.Stats = &SearchStats{
-			DurationMs:  float64(time.Since(start).Microseconds()) / 1000.0,
-			QueryTerms:  terms,
-			IndexSize:   resp.Total,
-			TotalTokens: len(terms),
-		}
-	}
-
+	run.setFacets(&resp, allFacets, matched)
+	resp.Stats = run.stats(start, resp.Total)
 	resp.SpellCorrected = spellCorrected
 	resp.LimitReport = req.limitReport
-	resp.RerankResult = rr.Result()
-
-	if req.wantsPassages() {
-		hits := make([]passageSource, 0, len(resp.Results))
-		for _, r := range resp.Results {
-			hits = append(hits, passageSource{doc: r.Document, score: r.Score, bestChunk: -1,
-				highlights: r.Highlights, terms: r.MatchedTerms})
-		}
-		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "fts"), nil)
-		if req.IncludeImages {
-			s.attachPassageImages(&p) // RAG-010
-		}
-		p.LimitReport = req.limitReport
-		p.RerankResult = resp.RerankResult
-		resp.passages = &p
-	} else if req.IncludeImages {
-		// RAG-010: each hit's images, by alt text and caption found or not.
-		attachImages(s, resp.Results, func(it *FTSResultWithDoc) imageOwner { return docImages(req.Collection, &it.Document) },
-			func(it *FTSResultWithDoc, refs []ImageRef) { it.Images = refs })
-	}
-
+	resp.RerankResult = run.rr.Result()
+	run.attachExtras(&resp)
 	return &resp, nil
 }
 

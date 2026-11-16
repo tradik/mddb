@@ -30,23 +30,15 @@ import (
 func (rs *ReplicationServer) authorizeReplication(ctx context.Context) error {
 	// 1) Dedicated replication secret (best for cross-host links without full auth).
 	if want := os.Getenv("MDDB_REPLICATION_SECRET"); want != "" {
-		got := ""
-		if md, ok := metadata.FromIncomingContext(ctx); ok {
-			if v := md.Get("x-mddb-replication-secret"); len(v) > 0 {
-				got = v[0]
-			}
-		}
-		if subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1 {
+		if subtle.ConstantTimeCompare([]byte(replicationSecretOf(ctx)), []byte(want)) == 1 {
 			return nil
 		}
 		return status.Error(codes.PermissionDenied, "invalid replication secret")
 	}
 
 	// 2) A verified mTLS client certificate authenticates the peer.
-	if p, ok := peer.FromContext(ctx); ok && p.AuthInfo != nil {
-		if tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo); ok && len(tlsInfo.State.VerifiedChains) > 0 {
-			return nil
-		}
+	if hasVerifiedClientCert(ctx) {
+		return nil
 	}
 
 	// 3) Main auth enabled: require admin (claims injected by the stream interceptor).
@@ -60,6 +52,28 @@ func (rs *ReplicationServer) authorizeReplication(ctx context.Context) error {
 	// 4) Nothing configured — refuse rather than expose the whole database.
 	return status.Error(codes.PermissionDenied,
 		"replication is unauthenticated: set MDDB_REPLICATION_SECRET, enable MDDB_AUTH_ENABLED, or use mTLS")
+}
+
+// replicationSecretOf is the replication secret the caller sent in the
+// x-mddb-replication-secret metadata, or "" when it sent none.
+func replicationSecretOf(ctx context.Context) string {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if v := md.Get("x-mddb-replication-secret"); len(v) > 0 {
+			return v[0]
+		}
+	}
+	return ""
+}
+
+// hasVerifiedClientCert reports whether the peer presented an mTLS client
+// certificate that verified against the server's client CAs.
+func hasVerifiedClientCert(ctx context.Context) bool {
+	p, ok := peer.FromContext(ctx)
+	if !ok || p.AuthInfo == nil {
+		return false
+	}
+	tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo)
+	return ok && len(tlsInfo.State.VerifiedChains) > 0
 }
 
 // replicationProtocol is the version of the replication messages this build

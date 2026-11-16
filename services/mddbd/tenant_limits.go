@@ -108,8 +108,8 @@ func (s *Server) effectiveLimits(tenant string) TenantLimits {
 // when the request ends; the returned context marks the request admitted.
 func (s *Server) admitRequest(ctx context.Context, op PermissionType) (context.Context, func(), error) {
 	claims, ok := GetClaimsFromContext(ctx)
-	if !ok || ctx.Value(admittedKey{}) != nil {
-		return ctx, func() {}, nil
+	if !ok || isAdmitted(ctx) {
+		return ctx, noRelease, nil
 	}
 	rt := s.tenantLimiter()
 	tenant := claims.Tenant
@@ -120,19 +120,29 @@ func (s *Server) admitRequest(ctx context.Context, op PermissionType) (context.C
 		tenantRate, keyRate, kind = lim.WritePerSecond, lim.KeyWritePerSecond, limitWriteRate
 	}
 	if tenant != "" && !rt.allow("t|"+kind+"|"+tenant, tenantRate) {
-		return ctx, func() {}, s.refuse(&TenantLimitError{Tenant: tenant, Scope: "tenant", Kind: kind, Limit: tenantRate, RetryAfter: time.Second})
+		return ctx, noRelease, s.refuse(&TenantLimitError{Tenant: tenant, Scope: "tenant", Kind: kind, Limit: tenantRate, RetryAfter: time.Second})
 	}
 	if !rt.allow("k|"+kind+"|"+credentialOf(ctx, claims), keyRate) {
-		return ctx, func() {}, s.refuse(&TenantLimitError{Tenant: tenant, Scope: "key", Kind: kind, Limit: keyRate, RetryAfter: time.Second})
+		return ctx, noRelease, s.refuse(&TenantLimitError{Tenant: tenant, Scope: "key", Kind: kind, Limit: keyRate, RetryAfter: time.Second})
 	}
-	release := func() {}
+	release := noRelease
 	if write && tenant != "" && lim.MaxConcurrentWrites > 0 {
 		var err error
 		if release, err = rt.acquire(ctx, "w|"+tenant, lim.MaxConcurrentWrites); err != nil {
-			return ctx, func() {}, s.slotRefusal(err, tenant, limitWriteConcurrency, lim.MaxConcurrentWrites)
+			return ctx, noRelease, s.slotRefusal(err, tenant, limitWriteConcurrency, lim.MaxConcurrentWrites)
 		}
 	}
-	return context.WithValue(ctx, admittedKey{}, true), release, nil
+	return markAdmitted(ctx), release, nil
+}
+
+// markAdmitted returns ctx marked as having passed admitRequest.
+func markAdmitted(ctx context.Context) context.Context {
+	return context.WithValue(ctx, admittedKey{}, true)
+}
+
+// isAdmitted reports whether ctx already passed admitRequest.
+func isAdmitted(ctx context.Context) bool {
+	return ctx.Value(admittedKey{}) != nil
 }
 
 // tenantSearchSlot takes one of the tenant's search slots, when it has a
