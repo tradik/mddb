@@ -152,9 +152,10 @@ func rerankItems[T any](ctx context.Context, s *Server, r *rerankRun, items []T,
 	if n == 0 {
 		return items
 	}
-	texts := make([]string, n)
+	// Sized by the candidates in hand, not by the requested pool size.
+	texts := make([]string, 0, min(len(items), rerank.MaxCandidatesCeiling))
 	for i := range cands {
-		texts[i] = acc.text(&cands[i])
+		texts = append(texts, acc.text(&cands[i]))
 	}
 	usage := &rerank.Usage{}
 	start := time.Now()
@@ -273,7 +274,8 @@ func rerankPoolSize(available, requested int) int {
 func reorder[T any](items []T, n int, scored []rerank.Scored) []T {
 	n = rerankPoolSize(len(items), n)
 	out := make([]T, 0, len(items))
-	placed := make([]bool, n)
+	// One flag per result in hand; only the first n are consulted.
+	placed := make([]bool, len(items))
 	for _, sc := range scored {
 		placed[sc.Index] = true
 		out = append(out, items[sc.Index])
