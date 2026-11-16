@@ -5,7 +5,11 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 
-vi.mock('../lib/mddb-client', () => ({ default: { getReplicationStatus: vi.fn(), promoteNode: vi.fn(), demoteNode: vi.fn() } }));
+vi.mock('../lib/mddb-client', () => ({
+  default: {
+    getReplicationStatus: vi.fn(), promoteNode: vi.fn(), demoteNode: vi.fn(), getPlacement: vi.fn(async () => ({ enabled: false })),
+  },
+}));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { default: ClusterPanel } = await import('./ClusterPanel');
@@ -44,6 +48,7 @@ const follower = {
 
 beforeEach(() => {
   vi.mocked(mddbClient.getReplicationStatus).mockReset();
+  vi.mocked(mddbClient.getPlacement).mockResolvedValue({ enabled: false });
 });
 afterEach(() => {
   cleanup();
@@ -118,6 +123,7 @@ describe('ClusterPanel', () => {
     expect(await screen.findByText('Standalone Mode')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toBe('standalone');
     expect(screen.getByText('-', { selector: 'div.text-2xl' })).toBeTruthy();
+    expect(await screen.findByText(/Collection placement is not configured/)).toBeTruthy(); // GO-052
   });
 
   test('a failure to load, retried, and one after a status was shown', async () => {

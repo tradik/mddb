@@ -87,6 +87,12 @@ const coverageFiles = [
   'src/components/ClusterElection.jsx',
   'src/components/ClusterNodes.jsx',
   'src/components/ClusterActionDialog.jsx',
+  // 2.19.8: collection placement and moves in the Cluster tab (GO-052).
+  'src/lib/client/placement.js',
+  'src/lib/client/index.js',
+  'src/lib/placement-format.js',
+  'src/components/ClusterPlacement.jsx',
+  'src/components/ClusterPlacementTables.jsx',
   'src/components/ImagePreview.jsx',
   // 2.19.0: files touched by the panel catch-up that had no tests.
   'src/App.jsx',

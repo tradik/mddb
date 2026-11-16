@@ -53,6 +53,8 @@ describe('schemas, keys, facets, duplicates, batches, maintenance', () => {
     ['promoteNode defaults to no force (GO-051)', (c) => c.promoteNode(), '/v1/replication/promote', POST, { force: false }],
     ['promoteNode forced', (c) => c.promoteNode({ force: true }), '/v1/replication/promote', POST, { force: true }],
     ['demoteNode sends no body', (c) => c.demoteNode(), '/v1/replication/demote', POST],
+    ['getPlacement (GO-052)', (c) => c.getPlacement(), '/v1/placement', GET],
+    ['moveCollection', (c) => c.moveCollection({ collection: 'blog', group: 'g3' }), '/v1/placement/move', POST, { collection: 'blog', group: 'g3' }],
   ])('%s', (_label, call, path, method, body) => expectEndpoint(client, call, path, method, body));
 });
 

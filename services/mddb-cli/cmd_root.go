@@ -56,7 +56,7 @@ It provides an interface similar to mysql-client for managing markdown documents
 		newAddCmd(), newGetCmd(), newImportURLCmd(), newSetTTLCmd(),
 		newSearchCmd(), newFTSCmd(), newVectorSearchCmd(), newAutoindexCmd(), newReferenceCmd(), newEvalCmd(), newGainCmd(), newAliasCmd(), newReindexSwapCmd(),
 		newVectorReindexCmd(), newVectorStatsCmd(),
-		newExportCmd(), newBackupCmd(), newRestoreCmd(), newTruncateCmd(), newStatsCmd(), newReplicationCmd(),
+		newExportCmd(), newBackupCmd(), newRestoreCmd(), newTruncateCmd(), newStatsCmd(), newReplicationCmd(), newPlacementCmd(),
 		newWebhookCmd(), newSyncCmd(), newSchemaCmd(), newValidateCmd(),
 		newLoginCmd(), newAPIKeyCmd(),
 		newGraphQLCmd(), newPlaygroundCmd(), newCorpusCmd(),

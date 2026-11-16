@@ -864,6 +864,50 @@ mddb-cli -s http://n2:11023 replication promote
 mddb-cli -s http://n1:11023 replication demote
 .fi
 .RE
+.SS placement [status] | placement move
+Collection placement across node groups (v2.19.8+, servers with
+MDDB_PLACEMENT_GROUPS). Each whole collection lives in one group of nodes;
+each group is a cluster with a leader and followers.
+.PP
+.B mddb-cli placement
+[status]
+.br
+.B mddb-cli placement move
+.I collection group
+[\-\-wait] [\-\-timeout \fIDURATION\fR]
+.PP
+.B placement
+(or
+.BR "placement status" )
+shows the node, its group, the meta group, the placement version and term,
+how requests for other groups are routed, every group (meta marker, leader,
+collection count, nodes), which group holds each collection (with
+"\(-> \fIgroup\fR" while it moves) and the recent moves (phase, keys copied,
+applied/source LSN, duration or error). On a server without placement it
+prints one line saying so and exits 0.
+.B \-\-json
+prints the server's answer as it is.
+.PP
+.B move
+(admin) moves a collection to another group. The move goes through the
+phases copying, catching-up and fenced, and ends done or failed. Without
+.B \-\-wait
+the command returns once the move has started and prints its phase; with
+.B \-\-wait
+it returns when the move ends (bounded by
+.BR \-\-timeout ,
+default 1h), prints the final phase, keys copied and duration, and exits
+non-zero with the server's error when the move failed. A move into the group
+the collection is already in, or of a collection already moving, is refused.
+.PP
+Examples:
+.RS
+.nf
+mddb-cli placement
+mddb-cli placement move blog g3
+mddb-cli placement move blog g3 \-\-wait
+.fi
+.RE
 .SS diagnose
 Save a diagnose bundle to attach to an issue (v2.18.10+). The server builds a
 tar.gz describing itself \(em build, configuration through an allowlist, stats,

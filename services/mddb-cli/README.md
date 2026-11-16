@@ -368,6 +368,22 @@ mddb-cli replication demote            # admin: step the leader down
 
 See [CLUSTER.md](../../docs/CLUSTER.md).
 
+#### placement - Collections across node groups (v2.19.8+)
+
+On a server with `MDDB_PLACEMENT_GROUPS`, each whole collection lives in one
+group of nodes (each group a cluster: leader and followers).
+
+```bash
+mddb-cli placement                      # node, groups, collection -> group, recent moves
+mddb-cli placement status --json        # the server's answer as it is
+mddb-cli placement move blog g3         # admin: start moving blog to group g3
+mddb-cli placement move blog g3 --wait  # admin: wait for the end; non-zero exit when it failed
+```
+
+A move goes through `copying`, `catching-up` and `fenced`, and ends `done` or
+`failed`. `--wait` is bounded by `--timeout` (default `1h`). Without placement
+configured, `placement` prints one line saying so and exits 0.
+
 #### stats - Show server statistics
 
 ```bash

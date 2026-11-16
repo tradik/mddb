@@ -16,6 +16,7 @@ import { maintenanceMethods } from './maintenance';
 import { featureMethods } from './features'; // GO-049
 import { tenantMethods } from './tenants'; // GO-054
 import { replicationMethods } from './replication'; // GO-051
+import { placementMethods } from './placement'; // GO-052
 
 export const adminMethods = {
   ...memoryMethods,
@@ -30,4 +31,5 @@ export const adminMethods = {
   ...featureMethods,
   ...tenantMethods,
   ...replicationMethods,
+  ...placementMethods,
 };

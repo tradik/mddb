@@ -6,13 +6,15 @@ import {
 } from '../lib/cluster-format';
 import { FollowersTable, LagHistory } from './ClusterFollowers';
 import ClusterElection from './ClusterElection';
+import ClusterPlacement from './ClusterPlacement';
 
 const POLL_INTERVAL = 5000; // 5 seconds
 
 // The Cluster tab: this node's replication state as GET /v1/replication/status
 // reports it (GO-050) — role, health and why not, position, binlog, lag, and
 // on a leader the followers it knows. In a cluster (GO-051) it adds the
-// leader election: term, leader, nodes, and promote / step down.
+// leader election: term, leader, nodes, and promote / step down. With
+// placement groups (GO-052) it shows which group holds each collection.
 export default function ClusterPanel() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -141,6 +143,7 @@ export default function ClusterPanel() {
       </div>
 
       {status.cluster && <ClusterElection cluster={status.cluster} term={status.term} onChanged={loadStatus} />}
+      <ClusterPlacement />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-surface rounded-xl border border-line p-5">
