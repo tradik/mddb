@@ -334,7 +334,10 @@ request reached:
 - A request naming collections goes to the group holding them. A read is
   served by any node of that group (the receiving node, when it is in it; a
   request for another group goes to that group's leader). A write is served
-  by the group's leader; a follower sends a write to its own leader.
+  by the group's leader; a follower sends a write to its own leader. A
+  leader that has briefly lost its lease (a heartbeat answered late under
+  load) holds the write until it has the lease again, at most
+  `MDDB_PLACEMENT_FENCE_TIMEOUT`, rather than refusing it.
 - A write to a global setting, and everything under `/v1/placement`, goes to
   the meta group's leader.
 - A node forwards only to the addresses in `MDDB_PLACEMENT_GROUPS`; the
@@ -425,7 +428,9 @@ The meta leader runs a move:
    and then the source's log refuses every write to it. The source reports
    the LSN through which its writes are logged.
 4. Once the target has applied that LSN, the map names the target. The
-   target's leader learns it first, then the source's; the held writes go
+   target's leader learns it first — the meta leader adopts the new map
+   only once the target has it (or after `MDDB_PLACEMENT_FENCE_TIMEOUT` if
+   the target cannot be reached) — then the source's; the held writes go
    to the target.
 5. The source group drops its copy after `MDDB_PLACEMENT_DROP_GRACE`,
    through its log so its followers drop it too, and removes the file.
@@ -443,8 +448,14 @@ Measured: an in-process move of a collection with 200 documents, while three
 writers and one reader sent requests through every node, took 50–110 ms,
 with no failed request and no lost acknowledged write.
 
-<!-- GO-052 measurement -->
-Measured: …
+Measured at the benchmark profile's corpus size (TEST-005 small: 20,000
+documents, each with a 128-number vector — about 382,000 keys), from a group
+of one node to a group of two, in-process on one desktop machine: the move
+took 8.2–9.0 s in six runs, while three writers and one reader sent requests
+through every node (about 13,000 writes and 22,000 reads per run), with no
+failed request and no lost acknowledged write. Run it with
+`MDDB_PLACEMENT_MEASURE=20000 go test -run TestPlacementMeasureMove -v .` in
+`services/mddbd`.
 
 ### Limits
 
