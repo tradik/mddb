@@ -85,6 +85,13 @@ func TestFilterStrategyNames(t *testing.T) {
 	}
 }
 
+// An empty collection admits nothing of nothing: a share of 0, not NaN.
+func TestPlanInput_SelectivityOfAnEmptyCollection(t *testing.T) {
+	if s := (PlanInput{Allowed: 5}).selectivity(); s != 0 {
+		t.Fatalf("selectivity = %v", s)
+	}
+}
+
 // The planner and HNSW decide by one rule: the crossover the planner reports
 // is where HNSW itself changes strategy.
 func TestPlanVector_FilterStrategyFollowsTheCrossover(t *testing.T) {
