@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 
 	"mddb/internal/binlog"
 	proto "mddb/proto"
@@ -113,9 +112,9 @@ func (p *placementRuntime) rebuildGeo(c string) {
 	}
 	s.GeoIndex.Clear(c)
 	s.GeoHashIndex.Clear(c)
-	if _, err := s.GeoStore.Rebuild(s.GeoIndex, c); err != nil {
-		slog.Warn("placement: rebuilding a collection's geo index failed", "collection", c, "err", err)
-	}
+	// A read that fails leaves the index without the points, as a failed
+	// rebuild at startup does; the points are in the file either way.
+	_, _ = s.GeoStore.Rebuild(s.GeoIndex, c)
 	_, _ = s.GeoStore.RebuildHash(s.GeoHashIndex, c)
 }
 
@@ -136,10 +135,10 @@ func (p *placementRuntime) applyCopied(c string, in []*proto.BinlogEntryProto) e
 	}
 	if len(file) > 0 {
 		db, err := p.s.collectionStore().getOrCreate(c)
-		if err != nil {
-			return err
+		if err == nil {
+			err = logEntries(db.Update, p.s.Binlog, file)
 		}
-		if err := logEntries(db.Update, p.s.Binlog, file); err != nil {
+		if err != nil {
 			return err
 		}
 	}

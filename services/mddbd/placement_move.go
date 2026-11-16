@@ -41,10 +41,13 @@ var (
 
 // Bounds of the steps of a move.
 const (
-	catchUpRounds  = 3
-	catchUpQuick   = 250 * time.Millisecond // a round this short means close behind
-	catchUpTimeout = 2 * time.Minute
+	catchUpRounds = 3
+	catchUpQuick  = 250 * time.Millisecond // a round this short means close behind
 )
+
+// catchUpTimeout bounds each wait for the target; a variable so a test can
+// shorten it.
+var catchUpTimeout = 2 * time.Minute
 
 // startMove begins moving c to group to and returns the move.
 func (p *placementRuntime) startMove(c, to string) (*move, error) {

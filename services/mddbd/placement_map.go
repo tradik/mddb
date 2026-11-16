@@ -70,19 +70,26 @@ func tableFromProto(m *proto.PlacementMap) *placementTable {
 // storedMap is the map in this node's main file; an empty map when none was
 // written yet.
 func (p *placementRuntime) storedMap() *placementTable {
-	t := &placementTable{Entries: map[string]placementEntry{}}
+	var t *placementTable
 	_ = p.s.DBView(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(bucketPlacement); b != nil {
-			if raw := b.Get(keyPlacementMap); raw != nil {
-				_ = json.Unmarshal(raw, t)
-			}
-		}
+		t, _ = readMap(tx.Bucket(bucketPlacement))
 		return nil
 	})
-	if t.Entries == nil {
-		t.Entries = map[string]placementEntry{}
-	}
 	return t
+}
+
+// readMap is the map stored in b (nil: no bucket yet), with its entries
+// never nil; an empty map when none is stored or it cannot be read, with
+// the error.
+func readMap(b *bolt.Bucket) (*placementTable, error) {
+	t := &placementTable{}
+	var err error
+	if b != nil {
+		if raw := b.Get(keyPlacementMap); raw != nil {
+			err = json.Unmarshal(raw, t)
+		}
+	}
+	return t.clone(), err
 }
 
 // changeMap writes a new version of the map on the meta leader: change
@@ -92,19 +99,14 @@ func (p *placementRuntime) changeMap(change func(*placementTable) (bool, error))
 	var next *placementTable
 	err := binlog.Logged(p.s.DBUpdate, p.s.Binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b, err := tx.CreateBucketIfNotExists(bucketPlacement)
+		var cur *placementTable
+		if err == nil {
+			cur, err = readMap(b)
+		}
 		if err != nil {
 			return err
 		}
-		cur := &placementTable{Entries: map[string]placementEntry{}}
-		if raw := b.Get(keyPlacementMap); raw != nil {
-			if err := json.Unmarshal(raw, cur); err != nil {
-				return err
-			}
-		}
 		next = cur.clone()
-		if next.Entries == nil {
-			next.Entries = map[string]placementEntry{}
-		}
 		write, err := change(next)
 		if err != nil || !write {
 			next = cur

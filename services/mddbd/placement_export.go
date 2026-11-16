@@ -111,7 +111,7 @@ func (p *placementRuntime) copyKeys(req *proto.ExportKeysRequest, out chunkSende
 func (p *placementRuntime) copyCollection(c string, emit func(string, []byte, []byte) error) error {
 	if cf := p.s.collectionStore(); cf != nil {
 		if db := cf.get(c); db != nil {
-			if err := scanBuckets(db, bucketNames(db), keepAll, emit); err != nil {
+			if err := scanFile(db, emit); err != nil {
 				return err
 			}
 		}
@@ -119,16 +119,19 @@ func (p *placementRuntime) copyCollection(c string, emit func(string, []byte, []
 	return scanBuckets(p.s.DB, settingsBucketNames(), ownedBy(c), emit)
 }
 
-// bucketNames is every top-level bucket of db.
-func bucketNames(db *bolt.DB) []string {
-	var out []string
-	_ = db.View(func(tx *bolt.Tx) error {
+// scanFile emits every key of every top-level bucket of db.
+func scanFile(db *bolt.DB, emit func(string, []byte, []byte) error) error {
+	var names []string
+	err := db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
-			out = append(out, string(name))
+			names = append(names, string(name))
 			return nil
 		})
 	})
-	return out
+	if err != nil {
+		return err
+	}
+	return scanBuckets(db, names, keepAll, emit)
 }
 
 // scanBuckets emits each key of buckets in db that keep admits.

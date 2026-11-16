@@ -29,12 +29,14 @@ func (p *placementRuntime) dropCopy(c string) error {
 	}
 	cf := p.s.collectionStore()
 	db := cf.get(c)
+	var err error
 	if db != nil {
-		if err := scanBuckets(db, bucketNames(db), keepAll, collect(&file)); err != nil {
-			return err
-		}
+		err = scanFile(db, collect(&file))
 	}
-	if err := scanBuckets(p.s.DB, settingsBucketNames(), ownedBy(c), collect(&main)); err != nil {
+	if err == nil {
+		err = scanBuckets(p.s.DB, settingsBucketNames(), ownedBy(c), collect(&main))
+	}
+	if err != nil {
 		return err
 	}
 	if db == nil && len(main) == 0 {
