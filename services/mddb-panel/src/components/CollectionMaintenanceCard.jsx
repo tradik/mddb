@@ -9,7 +9,7 @@ import CollectionPicker from './CollectionPicker';
 import ConfirmDialog from './ConfirmDialog';
 
 /**
- * CollectionMaintenanceCard works on one collection: its CRC32 checksum
+ * CollectionMaintenanceCard works on one collection: its checksum
  * (/v1/checksum — compare it on each replica), an export as NDJSON or a ZIP
  * of Markdown files (/v1/export) and truncating its revision history
  * (/v1/truncate, after a confirmation naming the collection).

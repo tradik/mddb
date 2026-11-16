@@ -30,7 +30,7 @@ func TestHandleChecksum(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatal(err)
 		}
-		if resp.Checksum != "00000000" {
+		if resp.Checksum != emptyChecksum {
 			t.Fatalf("expected zero checksum, got %s", resp.Checksum)
 		}
 		if resp.DocumentCount != 0 {
@@ -54,7 +54,7 @@ func TestHandleChecksum(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatal(err)
 		}
-		if resp.Checksum == "00000000" {
+		if resp.Checksum == emptyChecksum {
 			t.Fatal("checksum should not be zero after adding a doc")
 		}
 		if resp.DocumentCount != 1 {
@@ -99,7 +99,7 @@ func TestHandleChecksum(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatal(err)
 		}
-		if resp.Checksum != "00000000" {
+		if resp.Checksum != emptyChecksum {
 			t.Fatalf("other collection should have zero checksum, got %s", resp.Checksum)
 		}
 	})
@@ -141,7 +141,7 @@ func TestHandleChecksum(t *testing.T) {
 		for _, c := range resp.Collections {
 			if c.Name == "blog" {
 				found = true
-				if c.Checksum == "" || c.Checksum == "00000000" {
+				if c.Checksum == "" || c.Checksum == emptyChecksum {
 					t.Fatalf("blog collection should have non-zero checksum in stats, got %s", c.Checksum)
 				}
 			}

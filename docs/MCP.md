@@ -701,7 +701,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `update_where` | (v2.18.8) Merge `meta` into every document a filter matches; content is untouched. |
 | `set_ttl_where` | (v2.18.8) Set the time to live (`ttl` seconds, 0 removes it) of every document a filter matches. |
 | `get_meta_keys` | List all unique metadata keys and their values for a collection. |
-| `get_checksum` | Get a CRC32 checksum for a collection that changes when documents are modified. |
+| `get_checksum` | Get a collection's checksum (16 hex digits): equal on two nodes that hold the same documents, changed by any document added, removed or modified. |
 | `ingest_documents` | Bulk ingest documents with URL-based key derivation, YAML frontmatter extraction, content deduplication, and automatic metadata injection. Since v2.18.9 a document may carry a file (`format`, `content_base64`) that the server converts, and options take `text_only`; options `extract_images` / `fetch_remote_images` and a document's `images` (`[{path, content_base64}]`) store its images as image documents ([images](SEARCH.md#images--alt-text-captions-and-pictures-v2189)). |
 | `upload_file` | Upload a file and convert it to markdown. Since v2.18.9: `text_only`; xlsx, ods, csv, tsv, pptx, odp, epub, eml and mbox; the result carries `conversionConfidence`, `conversionWarnings` and `parts` (the keys of an email's attachments or a mailbox's messages, stored with `meta.parent`); `extract_images`, `fetch_remote_images` and `images` store a Markdown file's or PDF's images as image documents, listed in `parts`. |
 

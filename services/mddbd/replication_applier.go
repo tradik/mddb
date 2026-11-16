@@ -38,33 +38,21 @@ func (ra *ReplicationApplier) Apply(entry *binlog.BinlogEntry) error {
 	return ra.ApplyBatch([]*binlog.BinlogEntry{entry})
 }
 
-// ApplyBatch applies entries in as few BoltDB transactions as their files
-// allow: all in one in the single-file layout, one per run of entries for
-// the same collection file in the per-collection layout (#336), in order.
+// ApplyBatch applies entries in one BoltDB transaction per database file
+// they touch (replication_apply_plan.go), each carrying the position, and
+// updates the in-memory state after each.
 func (ra *ReplicationApplier) ApplyBatch(entries []*binlog.BinlogEntry) error {
-	if len(entries) == 0 {
-		return nil
-	}
-	for start := 0; start < len(entries); {
-		target, everywhere := ra.target(entries[start])
-		end := start + 1
-		for !everywhere && end < len(entries) {
-			t, all := ra.target(entries[end])
-			if all || t != target {
-				break
-			}
-			end++
-		}
+	for _, g := range ra.plan(entries) {
 		// What is already in the files stays applied when a later group
 		// fails: the position follows the files, never the batch.
-		if err := ra.applyGroup(target, everywhere, entries[start:end]); err != nil {
-			return fmt.Errorf("applying LSN %d (%s %s): %w", entries[start].LSN, entries[start].Type, entries[start].BucketName, err)
+		if err := ra.applyGroup(g); err != nil {
+			first := g.entries[0]
+			return fmt.Errorf("applying LSN %d (%s %s): %w", first.LSN, first.Type, first.BucketName, err)
 		}
-		for _, entry := range entries[start:end] {
+		for _, entry := range g.entries {
 			ra.updateInMemoryState(entry)
 		}
-		ra.lastApplied.Store(entries[end-1].LSN)
-		start = end
+		ra.lastApplied.Store(g.through)
 	}
 	return nil
 }
@@ -83,10 +71,10 @@ func (ra *ReplicationApplier) target(entry *binlog.BinlogEntry) (string, bool) {
 	return c, false
 }
 
-func (ra *ReplicationApplier) applyGroup(target string, everywhere bool, group []*binlog.BinlogEntry) error {
-	pos := replPosition{LSN: group[len(group)-1].LSN, LogID: ra.logID.Load()}
+func (ra *ReplicationApplier) applyGroup(g applyGroup) error {
+	pos := replPosition{LSN: g.through, LogID: ra.logID.Load()}
 	apply := func(tx *bolt.Tx) error {
-		for _, entry := range group {
+		for _, entry := range g.entries {
 			if err := applyEntry(tx, entry); err != nil {
 				return err
 			}
@@ -100,7 +88,7 @@ func (ra *ReplicationApplier) applyGroup(target string, everywhere bool, group [
 		}
 		return stampApplied(tx, pos)
 	}
-	if everywhere {
+	if g.everywhere {
 		// One transaction per file cannot carry one position: a crash
 		// half-way would leave it on the files already done and the entry
 		// missing from the rest. It is recorded once, in the main file,
@@ -113,8 +101,8 @@ func (ra *ReplicationApplier) applyGroup(target string, everywhere bool, group [
 		}
 		return ra.server.saveReplicationPosition(pos)
 	}
-	if target != "" {
-		return ra.server.DBUpdateC(target, applyAndStamp)
+	if g.target != "" {
+		return ra.server.DBUpdateC(g.target, applyAndStamp)
 	}
 	return ra.server.DBUpdate(applyAndStamp)
 }

@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
-	"hash/crc32"
 	"log/slog"
 	"sort"
 	"sync"
@@ -42,7 +40,7 @@ type collectionCounts struct {
 	Embeddings  int
 	Chunks      int
 	Checksum    string
-	checksum    uint32
+	checksum    docSetSum
 }
 
 // dbStatsSnapshot is one walk's result.
@@ -185,11 +183,8 @@ func (s *Server) walkStats() (*dbStatsSnapshot, error) {
 		if name, ok := statsCollection(k); ok {
 			cc := get(name)
 			cc.Documents++
-			// The checksum the separate pass used to compute: key and the
-			// first 64 bytes of the value, XORed.
-			h := crc32.ChecksumIEEE(k)
-			h ^= crc32.ChecksumIEEE(v[:min(len(v), 64)])
-			cc.checksum ^= h
+			// The same checksum as /v1/checksum (doc_checksum.go).
+			cc.checksum.add(k, v)
 		}
 		return true
 	})
@@ -210,23 +205,29 @@ func (s *Server) walkStats() (*dbStatsSnapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.VectorStore != nil {
-		if counts, cerr := s.VectorStore.CountByCollection(); cerr == nil {
-			for name, n := range counts {
-				get([]byte(name)).Embeddings = n
-			}
-		}
-		if counts, cerr := s.VectorStore.CountChunksByCollection(); cerr == nil {
-			for name, n := range counts {
-				get([]byte(name)).Chunks = n
-			}
-		}
-	}
+	s.addVectorCounts(get)
 	for _, cc := range snap.Collections {
-		cc.Checksum = fmt.Sprintf("%08x", cc.checksum)
+		cc.Checksum = cc.checksum.String()
 	}
 	snap.ComputedAt, snap.Took = time.Now(), time.Since(start)
 	return snap, nil
+}
+
+// addVectorCounts adds every collection's embeddings and chunks through get.
+func (s *Server) addVectorCounts(get func([]byte) *collectionCounts) {
+	if s.VectorStore == nil {
+		return
+	}
+	if counts, err := s.VectorStore.CountByCollection(); err == nil {
+		for name, n := range counts {
+			get([]byte(name)).Embeddings = n
+		}
+	}
+	if counts, err := s.VectorStore.CountChunksByCollection(); err == nil {
+		for name, n := range counts {
+			get([]byte(name)).Chunks = n
+		}
+	}
 }
 
 // statsCollection is the collection segment of "<tag>|<collection>|...",

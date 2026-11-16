@@ -4904,7 +4904,22 @@ curl "http://localhost:11023/v1/meta-keys?collection=blog"
 
 ### GET /v1/checksum
 
-Get CRC32 checksum of a collection for integrity verification.
+Get a checksum of a collection's documents, to compare replicas or to see
+whether anything changed.
+
+Every document contributes a 64-bit value derived from its whole key
+(collection, key, language) and its whole stored value (content, metadata,
+revision and timestamps as stored); the contributions are mixed and added, so
+the order documents are read in does not matter. Two nodes holding the same
+documents byte for byte report the same checksum; a document added, removed
+or changed on one of them changes it (except with a chance of about one in
+2^64). It is not a cryptographic digest. The same figure is the `checksum`
+of each collection in `/v1/stats`.
+
+Since 2.19.8 the checksum is 16 hex digits. Before, it was 8 digits from an
+XOR of CRC32 values over each key and the first 64 bytes of each value, which
+cancelled out: a follower missing 1,000 documents whose keys differed only in
+a counter reported the leader's checksum.
 
 **Query Parameters:**
 | Parameter | Required | Description |
@@ -4920,7 +4935,7 @@ curl "http://localhost:11023/v1/checksum?collection=blog"
 ```json
 {
   "collection": "blog",
-  "checksum": "a1b2c3d4",
+  "checksum": "6f1d0c9a3be27c45",
   "documentCount": 42
 }
 ```

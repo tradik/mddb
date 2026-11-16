@@ -259,7 +259,7 @@ func TestCovGHTTPHealthWriteFailureAndCompliance(t *testing.T) {
 func TestCovGHTTPChecksum(t *testing.T) {
 	s := covGServer(t)
 	addTestDoc(t, s, "blog", "a", "en", "Quartz jumbles vex fickle gnomes; sphinx of black onyx, judge my vow. Pack five dozen liquor jugs, then whiz by quick daft zebras.", nil)
-	covGPutRaw(t, s, "blog", "short", []byte("tiny")) // a value under 64 bytes is hashed whole
+	covGPutRaw(t, s, "blog", "short", []byte("tiny")) // a short value
 
 	rec := covGRaw(s.handleChecksum, http.MethodGet, "/?collection=blog", "")
 	covGWantCode(t, rec, http.StatusOK)
@@ -268,7 +268,7 @@ func TestCovGHTTPChecksum(t *testing.T) {
 		DocumentCount int
 	}
 	covGDecode(t, rec, &out)
-	if out.DocumentCount != 2 || len(out.Checksum) != 8 {
+	if out.DocumentCount != 2 || len(out.Checksum) != 16 {
 		t.Errorf("checksum = %+v", out)
 	}
 
@@ -276,7 +276,7 @@ func TestCovGHTTPChecksum(t *testing.T) {
 	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
 		t.Fatal(err)
 	}
-	if sum, n := s.collectionChecksum("blog"); n != 0 || sum != "00000000" {
+	if sum, n := s.collectionChecksum("blog"); n != 0 || sum != emptyChecksum {
 		t.Errorf("no bucket: %s %d", sum, n)
 	}
 }

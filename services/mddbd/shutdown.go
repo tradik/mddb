@@ -48,6 +48,10 @@ func (s *Server) shutdownSteps() []shutdownStep {
 	// 1. Stop accepting new work.
 	add("http3", s.HTTP3 != nil, func() { _ = s.HTTP3.Close() })
 	add("cron", s.CronScheduler != nil, func() { s.CronScheduler.Stop() })
+	//    A follower stops applying the leader's entries before its files
+	//    close: it used to be stopped after them, and the entry in hand
+	//    failed with "database not open" (GO-050).
+	add("replication-client", s.replClient != nil, func() { s.replClient.Stop() })
 
 	// 2. Drain the queues, so what was accepted is finished or recorded.
 	add("bulk-ingest", s.BulkIngest != nil, func() { s.BulkIngest.Stop() })

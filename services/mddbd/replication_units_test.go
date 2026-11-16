@@ -238,7 +238,7 @@ func TestTheFollowersLog(t *testing.T) {
 		t.Fatalf("the copy starts as log %x at %d; the database is at 5 of log 9", log.LogID(), log.CurrentLSN())
 	}
 	rc.applier.SetPosition(replPosition{LSN: 7, LogID: 9})
-	rc.appendLog(&binlog.BinlogEntry{LSN: 7, Type: binlog.BinlogPut}) // 6 is missing
+	rc.appendLog([]*binlog.BinlogEntry{{LSN: 7, Type: binlog.BinlogPut}}) // 6 is missing
 	if log.CurrentLSN() != 7 || log.BaseLSN() != 7 {
 		t.Errorf("after a gap the copy is at %d from %d; want an empty copy at 7", log.CurrentLSN(), log.BaseLSN())
 	}
@@ -250,7 +250,7 @@ func TestTheFollowersLog(t *testing.T) {
 	rc.rebaseLog(replPosition{LSN: 8})
 
 	none := &ReplicationClient{server: s, applier: NewReplicationApplier(s)}
-	none.appendLog(&binlog.BinlogEntry{LSN: 1})
+	none.appendLog([]*binlog.BinlogEntry{{LSN: 1}})
 	none.rebaseLog(replPosition{})
 
 	bad := NewReplicationClient(s, ReplicationClientConfig{Log: &binlog.BinlogConfig{Path: filepath.Join(dir, "missing", "f.binlog")}})

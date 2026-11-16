@@ -1,6 +1,6 @@
 /**
  * Collection and database maintenance the client did not cover yet: a
- * collection's CRC32 checksum (compare it across replicas) and restoring the
+ * collection's checksum (compare it across replicas) and restoring the
  * database from a backup file. Backup, export and revision truncation are
  * the client's existing `backup`, `export` and `truncate`.
  */

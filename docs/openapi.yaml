@@ -4562,10 +4562,15 @@ paths:
         - Collections
       summary: Get collection checksum
       operationId: getChecksum
-      description: Returns a CRC32-based checksum for a collection that changes
-        whenever documents are added, updated, or deleted. Useful for cache
-        invalidation - clients can poll this lightweight endpoint to detect
-        changes without downloading all documents.
+      description: >
+        Returns a checksum of the collection's documents: a 64-bit value per
+        document from its whole key (collection, key, language) and its whole
+        stored value, mixed and added, so read order does not matter. Equal on
+        two nodes holding the same documents byte for byte; any document
+        added, updated or deleted changes it. Use it to compare replicas or
+        to detect changes without downloading the documents. Since 2.19.8 it
+        is 16 hex digits; the 8-digit CRC32 XOR before it could miss
+        documents.
       parameters:
         - name: collection
           in: query
@@ -4585,12 +4590,12 @@ paths:
                     type: string
                   checksum:
                     type: string
-                    description: 8-character hex CRC32 checksum
+                    description: 16 hex digits
                   documentCount:
                     type: integer
                 example:
                   collection: "blog"
-                  checksum: "a1b2c3d4"
+                  checksum: "6f1d0c9a3be27c45"
                   documentCount: 42
         "400":
           description: Missing collection parameter

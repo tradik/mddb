@@ -843,7 +843,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 		},
 		{
 			Name:        "get_checksum",
-			Description: "Get a CRC32 checksum for a collection that changes when documents are modified. Useful for cache invalidation.",
+			Description: "Get a collection's checksum (16 hex digits): equal on two nodes holding the same documents, changed by any document added, removed or modified. Useful for comparing replicas and for cache invalidation.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{

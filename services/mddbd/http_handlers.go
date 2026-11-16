@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"hash/crc32"
 	"io"
 	"log/slog"
 	"mddb/internal/binlog"
@@ -491,7 +490,7 @@ func (s *Server) handleComplianceStatus(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) collectionChecksum(collection string) (string, int) {
-	var checksum uint32
+	var sum docSetSum
 	var count int
 
 	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
@@ -503,19 +502,12 @@ func (s *Server) collectionChecksum(collection string) (string, int) {
 		c := bDocs.Cursor()
 		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 			count++
-			// Hash key + first 64 bytes of value (contains updatedAt in serialized form)
-			h := crc32.ChecksumIEEE(k)
-			if len(v) > 64 {
-				h ^= crc32.ChecksumIEEE(v[:64])
-			} else {
-				h ^= crc32.ChecksumIEEE(v)
-			}
-			checksum ^= h
+			sum.add(k, v) // doc_checksum.go
 		}
 		return nil
 	})
 
-	return fmt.Sprintf("%08x", checksum), count
+	return sum.String(), count
 }
 
 func (s *Server) handleChecksum(w http.ResponseWriter, r *http.Request) {

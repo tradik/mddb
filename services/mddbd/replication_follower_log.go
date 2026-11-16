@@ -38,14 +38,14 @@ func (rc *ReplicationClient) resume() {
 	}
 }
 
-// appendLog adds an applied entry to the follower's log. An entry that does
-// not continue the log starts it again at the applied position.
-func (rc *ReplicationClient) appendLog(entry *binlog.BinlogEntry) {
+// appendLog adds applied entries to the follower's log. Entries that do
+// not continue the log start it again at the applied position.
+func (rc *ReplicationClient) appendLog(entries []*binlog.BinlogEntry) {
 	log := rc.log.Load()
 	if log == nil {
 		return
 	}
-	if err := log.AppendReplicated([]*binlog.BinlogEntry{entry}); err != nil {
+	if err := log.AppendReplicated(entries); err != nil {
 		slog.Warn("replication: this follower's log does not continue; starting it again at the applied position", "err", err)
 		rc.rebaseLog(rc.applier.Position())
 	}

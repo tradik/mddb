@@ -115,6 +115,14 @@ The leader sends every LSN after the follower's position, once and in order:
 
 #### What a follower guarantees (v2.19.8)
 
+- **It applies what has arrived in one go.** Entries are received on their
+  own and applied in batches of whatever came in while the last batch was
+  being written (up to 1,024 entries), in one transaction per database file,
+  with the position recorded in that same transaction. A document write is
+  many entries (the document, its key and metadata index, its revision, its
+  full-text terms), and a follower that committed — and synced to disk — once
+  per entry kept up only on a RAM disk.
+
 - **Its position survives a restart.** The last LSN applied, and the log it
   belongs to, are written by the same transaction that applies the entry
   (bucket `replmeta`, never replicated). A restarted follower asks for the

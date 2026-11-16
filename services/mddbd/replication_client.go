@@ -301,15 +301,9 @@ func (rc *ReplicationClient) replicate(ctx context.Context) error {
 		rc.adoptLeaderLog(header)
 	}
 
-	for {
-		entry, err := stream.Recv()
-		if err != nil {
-			return rc.streamEnded(err)
-		}
-		if err := rc.applyEntry(protoToEntry(entry)); err != nil {
-			return err
-		}
-	}
+	in := make(chan received, applyBatchMax)
+	go receiveEntries(ctx, stream, in)
+	return rc.applyStream(ctx, in) // replication_batch.go
 }
 
 // adoptLeaderLog takes the log ID from a leader's stream headers. Reaching
@@ -355,27 +349,6 @@ func (rc *ReplicationClient) streamEnded(err error) error {
 		return fmt.Errorf("stream recv error: %w", err)
 	}
 	return nil // stopped
-}
-
-// applyEntry applies one entry from the stream and adds it to the follower's
-// log. An entry that does not follow the last one applied, or cannot be
-// applied, ends replication from the log: the follower's data is no longer
-// known to be the leader's, and only a snapshot makes it so again.
-func (rc *ReplicationClient) applyEntry(entry *binlog.BinlogEntry) error {
-	err := error(nil)
-	if want := rc.applier.LastAppliedLSN() + 1; entry.LSN != want {
-		err = fmt.Errorf("the leader sent LSN %d where %d was due", entry.LSN, want)
-	} else {
-		err = rc.applier.Apply(entry)
-	}
-	if err != nil {
-		rc.needSnapshot.Store(true)
-		return fmt.Errorf("replication stopped, resynchronising from a snapshot: %w", err)
-	}
-	rc.appendLog(entry)
-	rc.connected.Store(true)
-	rc.lastAppliedAt.Store(time.Now().Unix())
-	return nil
 }
 
 // ackLoop periodically sends LSN acknowledgments to the leader
