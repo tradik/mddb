@@ -164,6 +164,69 @@ here differed by up to 30% on single scenarios, recall by 0.003 — so a gate
 that fails on p95 alone measures the search scenarios again and fails only
 if they fail twice.
 
+### 2.19.8, small profile
+
+Same machine and corpus as the 2.19.7 run below. Restart to every index
+answering went from 316 s to 0.23 s (index checkpoints), filtered HNSW p95
+dropped by 1.3–4.0× (filter-aware walk), and the follower now stays in sync
+(batched applies).
+
+<!-- bench-profile:2.19.8-small:begin -->
+MDDB 2.19.8 (`e54e6de0`), profile `small`, seed 1, recorded 2026-11-16 on AMD Ryzen 9 7950X 16-Core Processor — 32 cores, 30.9 GB, linux/amd64, kernel 6.18.58.1-microsoft-standard-WSL2, go1.27.4. Calibration 5.005 ms.
+
+Search — 20000 vectors × 128 dims in 100 topics; 1000 timed queries × 5 sequential rounds for latency, 4 clients for QPS.
+
+| Scenario | Answered by | p50 ms | p95 ms | p99 ms | QPS | recall@10 |
+|---|---|---:|---:|---:|---:|---:|
+| `fts-bm25` | bm25 | 0.379 | 0.473 | 0.685 | 9921 | — |
+| `vector-flat` | flat | 0.854 | 1.095 | 3.323 | 3399 | 1.000 |
+| `vector-hnsw` | hnsw | 0.403 | 0.471 | 0.582 | 10062 | 1.000 |
+| `vector-ivf` | ivf | 0.491 | 0.582 | 0.770 | 8669 | 1.000 |
+| `vector-pq` | pq | 2.901 | 3.253 | 5.303 | 1301 | 0.827 |
+| `vector-opq` | opq | 2.923 | 3.270 | 5.360 | 1301 | 0.798 |
+| `vector-sq` | sq | 4.495 | 5.113 | 6.614 | 854 | 1.000 |
+| `vector-sq4` | sq4 | 5.512 | 7.049 | 7.839 | 748 | 1.000 |
+| `vector-bq` | bq | 1.658 | 2.026 | 4.153 | 2247 | 1.000 |
+| `vector-auto` | hnsw | 0.407 | 0.471 | 0.597 | 10393 | 1.000 |
+| `hybrid-rrf-hnsw` | — | 0.534 | 0.624 | 1.005 | 7140 | — |
+| `hybrid-rrf-flat` | — | 1.020 | 1.279 | 3.970 | 2959 | — |
+| `filtered-hnsw-1pct` | hnsw+prefilter | 0.357 | 0.422 | 0.566 | 11451 | 1.000 |
+| `filtered-hnsw-2pct` | hnsw+prefilter | 0.432 | 0.512 | 0.718 | 9471 | 1.000 |
+| `filtered-hnsw-10pct` | hnsw+prefilter | 0.701 | 0.870 | 1.337 | 4976 | 1.000 |
+| `filtered-hnsw-25pct` | hnsw | 0.859 | 1.089 | 1.744 | 4111 | 1.000 |
+| `filtered-hnsw-50pct` | hnsw | 1.225 | 1.642 | 2.529 | 2755 | 1.000 |
+| `filtered-auto-1pct` | flat+prefilter | 0.369 | 0.445 | 0.596 | 11024 | 1.000 |
+| `filtered-auto-2pct` | flat+prefilter | 0.438 | 0.512 | 0.740 | 9456 | 1.000 |
+| `filtered-auto-10pct` | flat+prefilter | 0.715 | 0.903 | 1.402 | 5082 | 1.000 |
+| `filtered-auto-25pct` | ivf | 0.860 | 1.166 | 1.865 | 4007 | 1.000 |
+| `filtered-auto-50pct` | hnsw | 1.252 | 1.671 | 2.544 | 2548 | 1.000 |
+
+| Ingest | Documents | Batch | Embedding | docs/s | request p50 ms | p95 ms | p99 ms |
+|---|---:|---:|---|---:|---:|---:|---:|
+| `single-none` | 1000 | 1 | none | 222 | 4.534 | 5.820 | 6.405 |
+| `batch-none` | 10000 | 1000 | none | 6027 | 644.441 | 666.423 | 666.423 |
+| `single-lexical` | 1000 | 1 | lexical | 194 | 5.115 | 6.333 | 7.008 |
+| `batch-lexical` | 10000 | 1000 | lexical | 723 | 5524.253 | 6367.046 | 6367.046 |
+
+| Mixed load, start-up and recovery | Value |
+|---|---:|
+| Mixed (4 readers, 1 writer, 10 s): search p50 / p95 / p99 | 0.427 / 0.733 / 1.003 ms |
+| Mixed: searches per second | 8682 |
+| Mixed: write p50 / p95 / p99 | 7.728 / 9.676 / 10.753 ms |
+| Mixed: writes per second | 127 |
+| Clean restart of the search node: process start to healthy | 0.100 s |
+| Clean restart of the search node: process start to every vector index answering | 0.231 s |
+| Clean restart: process start to each index's first answer | flat 0.2 s, hnsw 0.2 s, ivf 0.2 s, pq 0.2 s, opq 0.2 s, sq 0.2 s, sq4 0.2 s, bq 0.2 s |
+| Peak resident memory of the search node | 448.8 MiB |
+| kill -9 under write: acknowledged writes / lost after restart | 768 / 0 |
+| kill -9 under write: process start to ready | 0.071 s |
+| Same node, clean restart: process start to ready | 0.071 s |
+| Replication lag, 50 probes under 20 writes/s: p50 / p95 / p99 | 0.342 / 0.610 / 293.897 ms |
+| Replication: probes not on the follower within 30 s | 0 of 50 |
+| Follower catch-up after missing 5000 documents: process start to in sync | 1.782 s |
+| Follower checksum and document count equal the leader's | true |
+<!-- bench-profile:2.19.8-small:end -->
+
 ### 2.19.7, small profile
 
 <!-- bench-profile:2.19.7-small:begin -->
