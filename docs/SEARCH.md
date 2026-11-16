@@ -803,11 +803,20 @@ a time.
 
 **What it costs.** Each index is captured under its own read lock — searches
 go on, writes to that index wait for the capture, which copies slice headers
-and per-node flags (about 50–70 bytes per vector, roughly 20 ms for 200,000
-vectors) — and is then written with no lock held. The memory held is one
-index's capture plus a 1 MiB frame buffer. The file is about the size of the
-HNSW links plus 10 bytes per vector per trained index; tombstones carry their
-full vector, since the graph routes through them.
+and per-node flags (about 50–70 bytes per vector; measured at 200,000
+vectors of 128 dimensions: 26 ms for the HNSW graph, 16 ms for IVF) — and is
+then written with no lock held. The memory held is one index's capture plus
+a 1 MiB frame buffer. The file is about the size of the HNSW links plus 10
+bytes per vector per trained index, and the codebooks; tombstones carry their
+full vector, since the graph routes through them. For the 200,000-vector
+collection above the file of all six indexes was 58 MB, written in under a
+second.
+
+Measured on that collection (128 dimensions, default index settings, one
+machine): a start without a checkpoint answered on HNSW after 117 s and on
+IVF, PQ, OPQ, SQ and SQ4 after 56 minutes of training; a start from the
+checkpoint answered on every algorithm after 4–10 s, with the same results
+as before the restart.
 
 **Crash safety.** The file is written to `<name>.tmp`, synced, and renamed
 over the previous one, then the directory is synced: a crash or `kill -9`

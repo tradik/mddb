@@ -1070,7 +1070,7 @@ removed or overwritten nodes `POST /v1/vector-compact` would clear. See
   "indexes": {"hnsw": "disk", "ivf": "disk", "opq": "disk", "pq": "disk", "sq": "disk", "sq4": "disk"},
   "loadMs": 1840,
   "caughtUp": 0,
-  "checkpoint": {"at": "2026-11-16T08:00:00Z", "bytes": 95420311, "durationMs": 2100,
+  "checkpoint": {"at": "2026-11-16T08:00:00Z", "bytes": 57784097, "durationMs": 947,
                  "indexes": ["hnsw", "ivf", "opq", "pq", "sq", "sq4"]}
 }
 ```

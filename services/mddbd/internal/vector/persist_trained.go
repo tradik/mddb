@@ -48,8 +48,8 @@ func (s *trainedSnapshot) add(id string, v []float32, code ...byte) {
 
 // encode implements persistSnapshot.
 func (s *trainedSnapshot) encode(e *persistEncoder) {
-	e.u32(uint32(s.dim))       // #nosec G115 -- a vector length
-	e.u64(uint64(s.trainedOn)) // #nosec G115 -- a count
+	e.u32(uint32(s.dim))           // #nosec G115 -- a vector length
+	e.u64(uint64(s.trainedOn))     // #nosec G115 -- a count
 	e.u32(uint32(len(s.matrices))) // #nosec G115 -- one per subspace and a rotation at most
 	for _, m := range s.matrices {
 		e.u32(uint32(len(m)))    // #nosec G115 -- rows of a trained structure
