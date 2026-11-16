@@ -72,27 +72,7 @@ func (s *Server) crossSearchItems(ctx context.Context, p crossSearchParams) []Cr
 func (s *Server) crossCandidates(p crossSearchParams) []CrossSearchResultItem {
 	var cands []crossCandidate
 	for _, coll := range p.Targets {
-		allowedIDs, active := s.allowedDocIDs(coll, p.FilterMeta, p.Filter)
-		if active && len(allowedIDs) == 0 {
-			continue
-		}
-		ps := plannedSearch{Searcher: p.Searcher}
-		if p.Plan != nil && p.Plan.Algorithm == AlgorithmAuto {
-			// A target the planner cannot serve yet keeps the fallback.
-			if planned, err := s.planSearch(planRequest{Collection: coll, Algorithm: AlgorithmAuto, Filtered: active,
-				Allowed: allowedIDs, SearchTopK: p.SearchTopK, Dimensions: len(p.QueryVector),
-				LatencyTargetMs: p.LatencyTargetMs}); err == nil {
-				ps = planned
-				p.Plan.Collections[coll] = planned.Plan
-			}
-		}
-		results := s.runPlanned(ps, indexQuery{Collection: coll, Vector: p.QueryVector, TopK: p.SearchTopK,
-			Threshold: p.Threshold, Allowed: allowedIDs, Filtered: active, Metric: p.Metric})
-		results = s.rescoreFeedback(p.Feedback, coll, results, p.Metric)
-		results, summaryPlan := s.crossSummaries(p, coll, ps.Plan, results, allowedIDs, active)
-		for _, vr := range vec.DeduplicateChunkResults(results) {
-			cands = append(cands, crossCandidate{collection: coll, result: vr, chunks: summaryPlan.expandedChunks(vr.DocID)})
-		}
+		cands = append(cands, s.crossTargetHits(p, coll)...)
 	}
 	sort.SliceStable(cands, func(i, j int) bool { return cands[i].result.Score > cands[j].result.Score })
 	// Grouping removes results, so it needs the whole candidate list.
@@ -100,8 +80,39 @@ func (s *Server) crossCandidates(p crossSearchParams) []CrossSearchResultItem {
 	if pool := p.Rerank.pool(p.TopK); p.GroupBy == nil && len(cands) > pool {
 		cands = cands[:pool]
 	}
+	return s.loadCrossItems(p, cands)
+}
 
-	// #336: documents of several collections, each read from its own file.
+// crossTargetHits searches one target collection.
+func (s *Server) crossTargetHits(p crossSearchParams, coll string) []crossCandidate {
+	allowedIDs, active := s.allowedDocIDs(coll, p.FilterMeta, p.Filter)
+	if active && len(allowedIDs) == 0 {
+		return nil
+	}
+	ps := plannedSearch{Searcher: p.Searcher}
+	if p.Plan != nil && p.Plan.Algorithm == AlgorithmAuto {
+		// A target the planner cannot serve yet keeps the fallback.
+		if planned, err := s.planSearch(planRequest{Collection: coll, Algorithm: AlgorithmAuto, Filtered: active,
+			Allowed: allowedIDs, SearchTopK: p.SearchTopK, Dimensions: len(p.QueryVector),
+			LatencyTargetMs: p.LatencyTargetMs}); err == nil {
+			ps = planned
+			p.Plan.Collections[coll] = planned.Plan
+		}
+	}
+	results := s.runPlanned(ps, indexQuery{Collection: coll, Vector: p.QueryVector, TopK: p.SearchTopK,
+		Threshold: p.Threshold, Allowed: allowedIDs, Filtered: active, Metric: p.Metric})
+	results = s.rescoreFeedback(p.Feedback, coll, results, p.Metric)
+	results, summaryPlan := s.crossSummaries(p, coll, ps.Plan, results, allowedIDs, active)
+	var out []crossCandidate
+	for _, vr := range vec.DeduplicateChunkResults(results) {
+		out = append(out, crossCandidate{collection: coll, result: vr, chunks: summaryPlan.expandedChunks(vr.DocID)})
+	}
+	return out
+}
+
+// loadCrossItems reads the candidates' documents (#336: each from its own
+// collection's file).
+func (s *Server) loadCrossItems(p crossSearchParams, cands []crossCandidate) []CrossSearchResultItem {
 	items := make([]CrossSearchResultItem, 0, len(cands))
 	for _, c := range cands {
 		docPtr, err := loadResultDoc(s.docBytes(c.collection, c.result.DocID))

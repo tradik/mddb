@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"net"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 )
@@ -68,6 +68,7 @@ func (p *placementRuntime) forward(w http.ResponseWriter, r *http.Request, group
 
 // send makes r's request to base with body.
 func (p *placementRuntime) send(r *http.Request, base string, body []byte, hops int) (*http.Response, error) {
+	// #nosec G704 -- base is a configured node's URL (MDDB_PLACEMENT_GROUPS), never taken from the request
 	out, err := http.NewRequestWithContext(r.Context(), r.Method, base+r.URL.RequestURI(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func (p *placementRuntime) send(r *http.Request, base string, body []byte, hops 
 		out.Header.Del(h)
 	}
 	out.Header.Set(hdrPlacementHops, strconv.Itoa(hops))
-	return p.client.Do(out) // #nosec G704 -- base is a configured node's URL (MDDB_PLACEMENT_GROUPS), never the request's
+	return p.client.Do(out) // #nosec G704 -- a configured node, as above
 }
 
 // notSent reports an error from before the request was sent — no

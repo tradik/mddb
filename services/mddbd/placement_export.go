@@ -197,5 +197,5 @@ func (e *exportSink) Send(entry *proto.BinlogEntryProto) error {
 // deletesCollectionBucket reports an entry removing a whole collection
 // bucket: it touches every collection.
 func deletesCollectionBucket(e *proto.BinlogEntryProto) bool {
-	return binlog.BinlogEntryType(e.Type) == binlog.BinlogDeleteBucket && isCollectionBucket([]byte(e.BucketName))
+	return e.Type == uint32(binlog.BinlogDeleteBucket) && isCollectionBucket([]byte(e.BucketName))
 }

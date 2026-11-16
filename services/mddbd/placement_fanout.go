@@ -113,6 +113,12 @@ func (p *placementRuntime) fanoutStats(w http.ResponseWriter, r *http.Request, n
 	}
 	sort.Slice(collections, func(i, j int) bool { return statName(collections[i]) < statName(collections[j]) })
 	out["collections"], out["groups"] = collections, groups
+	sumStats(out, collections)
+	writeJSONStatus(w, http.StatusOK, out)
+}
+
+// sumStats sets the totals of a merged /v1/stats over its collections.
+func sumStats(out map[string]any, collections []any) {
 	totals := map[string]string{"totalDocuments": "documentCount", "totalRevisions": "revisionCount", "totalMetaIndices": "metaIndexCount"}
 	for total, field := range totals {
 		sum := 0.0
@@ -122,7 +128,6 @@ func (p *placementRuntime) fanoutStats(w http.ResponseWriter, r *http.Request, n
 		}
 		out[total] = sum
 	}
-	writeJSONStatus(w, http.StatusOK, out)
 }
 
 // ownStats keeps the collections of a group's stats that the map places in

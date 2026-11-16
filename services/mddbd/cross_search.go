@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"mddb/internal/embedding"
 	"mddb/internal/storage"
 	"mddb/internal/vector"
 	"net/http"
@@ -99,71 +98,93 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	if s.partialTargets(w, r, &req) {
 		return
 	}
-	if len(req.TargetCollections) == 0 {
-		bad(w, errors.New("no collection matches targetCollections"))
+	if code, err := checkCrossRequest(&req); err != nil {
+		writeCrossError(w, code, err)
 		return
 	}
-	if err := validCrossSearchType(req.SearchType); err != nil {
-		unprocessable(w, err)
+	if !s.crossPermitted(r.Context(), req) {
+		http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
 		return
 	}
-	textSearch := req.SearchType == CrossSearchFTS || req.SearchType == CrossSearchHybrid
-	if textSearch && req.Query == "" {
-		bad(w, errors.New("searchType "+req.SearchType+" needs a query"))
-		return
-	}
-	// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
-	// number is the problem.
-	if err := ValidateOversample(req.Oversample); err != nil {
-		unprocessable(w, err)
-		return
-	}
-	if err := req.GroupBy.Validate(); err != nil {
-		unprocessable(w, err)
-		return
-	}
-	if err := req.ValidateIndexWait(); err != nil {
-		unprocessable(w, err)
-		return
-	}
-	if err := req.ValidatePassageOptions(); err != nil {
-		unprocessable(w, err)
-		return
-	}
-	if err := req.ValidatePlanOptions(); err != nil {
-		unprocessable(w, err)
-		return
-	}
-	if err := validateAll(req.ValidateFeedback, req.ValidateRerank); err != nil {
-		unprocessable(w, err)
-		return
-	}
-	if req.Query == "" && len(req.QueryVector) == 0 && req.SourceDocID == "" {
-		bad(w, errors.New("one of query, queryVector, or sourceDocID is required"))
-		return
-	}
-
-	// Check read permission on each target collection
-	if s.AuthManager != nil {
-		for _, coll := range req.TargetCollections {
-			if err := s.AuthManager.CheckPermission(r.Context(), coll, PermRead); err != nil {
-				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
-				return
-			}
-		}
-		if req.SourceCollection != "" {
-			if err := s.AuthManager.CheckPermission(r.Context(), req.SourceCollection, PermRead); err != nil {
-				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
-				return
-			}
-		}
-	}
-
-	if textSearch {
+	if req.SearchType == CrossSearchFTS || req.SearchType == CrossSearchHybrid {
 		s.respondCrossText(w, r, req)
 		return
 	}
+	s.respondCrossVector(w, r, req, start)
+}
 
+// checkCrossRequest validates a cross-search: the status and the error of
+// the first check it fails.
+func checkCrossRequest(req *CrossSearchRequest) (int, error) {
+	textSearch := req.SearchType == CrossSearchFTS || req.SearchType == CrossSearchHybrid
+	checks := []struct {
+		code  int
+		check func() error
+	}{
+		{http.StatusBadRequest, func() error {
+			if len(req.TargetCollections) == 0 {
+				return errors.New("no collection matches targetCollections")
+			}
+			return nil
+		}},
+		{http.StatusUnprocessableEntity, func() error { return validCrossSearchType(req.SearchType) }},
+		{http.StatusBadRequest, func() error {
+			if textSearch && req.Query == "" {
+				return errors.New("searchType " + req.SearchType + " needs a query")
+			}
+			return nil
+		}},
+		// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
+		// number is the problem.
+		{http.StatusUnprocessableEntity, func() error { return ValidateOversample(req.Oversample) }},
+		{http.StatusUnprocessableEntity, func() error {
+			return validateAll(req.GroupBy.Validate, req.ValidateIndexWait, req.ValidatePassageOptions,
+				req.ValidatePlanOptions, req.ValidateFeedback, req.ValidateRerank)
+		}},
+		{http.StatusBadRequest, func() error {
+			if req.Query == "" && len(req.QueryVector) == 0 && req.SourceDocID == "" {
+				return errors.New("one of query, queryVector, or sourceDocID is required")
+			}
+			return nil
+		}},
+	}
+	for _, c := range checks {
+		if err := c.check(); err != nil {
+			return c.code, err
+		}
+	}
+	return 0, nil
+}
+
+// writeCrossError answers err with code, as bad and unprocessable do.
+func writeCrossError(w http.ResponseWriter, code int, err error) {
+	if code == http.StatusUnprocessableEntity {
+		unprocessable(w, err)
+		return
+	}
+	bad(w, err)
+}
+
+// crossPermitted reports whether the caller may read every target and the
+// source collection.
+func (s *Server) crossPermitted(ctx context.Context, req CrossSearchRequest) bool {
+	if s.AuthManager == nil {
+		return true
+	}
+	names := req.TargetCollections
+	if req.SourceCollection != "" {
+		names = append(append([]string(nil), names...), req.SourceCollection)
+	}
+	for _, coll := range names {
+		if s.AuthManager.CheckPermission(ctx, coll, PermRead) != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// respondCrossVector answers a vector cross-search.
+func (s *Server) respondCrossVector(w http.ResponseWriter, r *http.Request, req CrossSearchRequest, start time.Time) {
 	topK, limitReport := s.crossTopK(req.TargetCollections, req.TopK) // #368
 	// Oversample per collection for better merging (SRCH-005). Resolved
 	// against no collection: a cross-collection search has no single profile
@@ -177,34 +198,10 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		s.writeVectorUnavailable(w, err, "auto, flat, hnsw, ivf, pq, quantized")
 		return
 	}
-
-	// Resolve query vector from one of 3 sources
-	var queryVector []float32
-
-	if len(req.QueryVector) > 0 {
-		queryVector = req.QueryVector
-	} else if req.SourceDocID != "" {
-		if req.SourceCollection == "" {
-			bad(w, errors.New("sourceCollection required when using sourceDocID"))
-			return
-		}
-		rec, err := s.VectorStore.Get(req.SourceCollection, req.SourceDocID)
-		if err != nil || rec == nil {
-			bad(w, errors.New("source document has no embedding: "+req.SourceCollection+"/"+req.SourceDocID))
-			return
-		}
-		queryVector = rec.Vector
-	} else if s.Embedding != nil {
-		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-		defer cancel()
-		var err error
-		queryVector, err = s.Embedding.Embed(ctx, req.Query, embedding.RoleQuery)
-		if err != nil {
-			bad(w, errors.New("failed to embed query: "+err.Error()))
-			return
-		}
-	} else {
-		bad(w, errors.New("no embedding provider configured and no queryVector/sourceDocID provided"))
+	queryVector, err := s.crossQueryVector(r.Context(), &MCPCrossSearchRequest{SourceCollection: req.SourceCollection,
+		SourceDocID: req.SourceDocID, Query: req.Query, QueryVector: req.QueryVector})
+	if err != nil {
+		bad(w, err)
 		return
 	}
 	// SRCH-015: the examples as vectors; query mode corrects the query here.
@@ -214,17 +211,11 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric := vector.ResolveSimilarity(req.DistanceMetric)
-	metricName := req.DistanceMetric
-	if metricName == "" {
-		metricName = "cosine"
-	}
-
 	waited := s.waitForIndexAll(r.Context(), req.TargetCollections, req.IndexWait)
 	rr := s.newRerankRun("", req.Query, req.Rerank, req.Explain) // RAG-011
 	params := crossSearchParams{
 		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
-		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
+		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: vector.ResolveSimilarity(req.DistanceMetric),
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
 		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs, Feedback: fb, Rerank: rr,
@@ -251,6 +242,10 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	s.crossImages(items, req.IncludeImages) // RAG-010
 
+	metricName := req.DistanceMetric
+	if metricName == "" {
+		metricName = "cosine"
+	}
 	resp := CrossSearchResponse{
 		Results:           items,
 		Total:             len(items),
