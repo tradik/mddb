@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // Collection placement across groups of nodes (GO-052, stage 1).
@@ -40,7 +39,7 @@ type placementRuntime struct {
 	ring  *ConsistentHash
 	table atomic.Pointer[placementTable]
 
-	changedMu sync.Mutex
+	changedMu sync.Mutex    // serialises adopting maps
 	changed   chan struct{} // closed and replaced when a newer map is adopted
 
 	leaders leaderCache
@@ -123,19 +122,14 @@ func (p *placementRuntime) owner(c string) (string, bool) {
 // adopt takes t if it is newer than the map the node holds, and wakes what
 // waits for a change. It reports whether it took it.
 func (p *placementRuntime) adopt(t *placementTable) bool {
-	for {
-		old := p.table.Load()
-		if t == nil || (old != nil && !t.newerThan(old)) {
-			return false
-		}
-		if p.table.CompareAndSwap(old, t) {
-			break
-		}
-	}
 	p.changedMu.Lock()
+	defer p.changedMu.Unlock()
+	if old := p.table.Load(); t == nil || (old != nil && !t.newerThan(old)) {
+		return false
+	}
+	p.table.Store(t)
 	close(p.changed)
 	p.changed = make(chan struct{})
-	p.changedMu.Unlock()
 	return true
 }
 
@@ -151,13 +145,3 @@ func (p *placementRuntime) leads() bool { return p.s.cluster.node.CanWrite() == 
 
 // leadsMeta reports whether this node leads the meta group.
 func (p *placementRuntime) leadsMeta() bool { return p.cfg.self == p.cfg.meta && p.leads() }
-
-// waitTimeout is a bounded wait for a change of the map.
-func (p *placementRuntime) waitChange(d time.Duration) {
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-p.changes():
-	case <-t.C:
-	}
-}

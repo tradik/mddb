@@ -69,12 +69,6 @@ func (p *placementRuntime) leaderNode(group string) (placementNode, bool) {
 	return n, ok && g == group
 }
 
-// leaderHTTP is the REST address of group's leader, "" when unknown.
-func (p *placementRuntime) leaderHTTP(group string) string {
-	n, _ := p.leaderNode(group)
-	return n.HTTP
-}
-
 // knownLeaderHTTP is the REST address of group's leader as far as it is
 // known, without asking anyone: for answers given under a lock.
 func (p *placementRuntime) knownLeaderHTTP(group string) string {
