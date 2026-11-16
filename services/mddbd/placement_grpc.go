@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	protov2 "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 // Routing gRPC calls across groups (GO-052). A unary call for collections
@@ -158,11 +160,8 @@ func responseFor(method string) (protov2.Message, error) {
 	if !ok {
 		return nil, status.Error(codes.Unimplemented, "not a method: "+method)
 	}
-	mt, err := protoregistry.GlobalTypes.FindMessageByName(md.Output().FullName())
-	if err != nil {
-		return nil, status.Error(codes.Unimplemented, err.Error())
-	}
-	return mt.New().Interface(), nil
+	// The answer is passed on as it came: its wire form is all that matters.
+	return dynamicpb.NewMessage(md.Output()), nil
 }
 
 // hops is how often the call was sent on before it came here.
@@ -178,10 +177,9 @@ func hops(ctx context.Context) int {
 // elsewhere is the error naming where group's leader is.
 func (p *placementRuntime) elsewhere(group string) error {
 	n, _ := p.leaderNode(group)
-	st := status.New(codes.FailedPrecondition, (&collectionElsewhereError{Group: group, LeaderHTTP: n.HTTP}).Error())
-	if withInfo, err := st.WithDetails(&errdetails.ErrorInfo{Reason: "COLLECTION_ELSEWHERE", Domain: "mddb",
-		Metadata: map[string]string{"group": group, "leader_id": n.ID, "leader_addr": n.HTTP, "leader_grpc": n.GRPC}}); err == nil {
-		st = withInfo
-	}
+	msg := fmt.Sprintf("the collection is held by node group %q, whose leader is %q (REST %s, gRPC %s)", group, n.ID, n.HTTP, n.GRPC)
+	// A non-OK status takes a well-formed detail without fail.
+	st, _ := status.New(codes.FailedPrecondition, msg).WithDetails(&errdetails.ErrorInfo{Reason: "COLLECTION_ELSEWHERE",
+		Domain: "mddb", Metadata: map[string]string{"group": group, "leader_id": n.ID, "leader_addr": n.HTTP, "leader_grpc": n.GRPC}})
 	return st.Err()
 }

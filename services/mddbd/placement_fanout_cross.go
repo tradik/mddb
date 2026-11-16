@@ -161,7 +161,8 @@ func (p *placementRuntime) gatherCross(r *http.Request, req CrossSearchRequest, 
 		sub.SourceCollection, sub.SourceDocID = "", ""
 		go func() {
 			defer func() { done <- i }()
-			raw, err := p.askPart(r, g, sub, next)
+			body, _ := json.Marshal(sub) // decoded from JSON, it encodes again
+			raw, err := p.askPart(r, g, body, next)
 			if err == nil {
 				err = json.Unmarshal(raw, &answers[i].part)
 			}

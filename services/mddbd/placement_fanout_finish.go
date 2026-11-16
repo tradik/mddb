@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"sort"
+	"strings"
 )
 
 // Finishing a cross-search fan-out (GO-052): the parts merged into one list
@@ -60,9 +61,13 @@ func mergedLimit(n int, parts []crossPart) (int, LimitReport) {
 // mergeParts is every part's hits in one list, by score, ties in the order
 // the request names the targets.
 func mergeParts(targets []string, parts []crossPart) []CrossSearchResultItem {
-	order := map[string]int{}
+	// A collection a role target stands for ranks where the first role
+	// target stands, by name among its kind, as one node expands it there.
+	order, roleRank := map[string]int{}, len(targets)
 	for i, t := range targets {
-		if _, seen := order[t]; !seen {
+		if strings.HasPrefix(t, rolePrefix) {
+			roleRank = min(roleRank, i)
+		} else if _, seen := order[t]; !seen {
 			order[t] = i
 		}
 	}
@@ -77,7 +82,7 @@ func mergeParts(targets []string, parts []crossPart) []CrossSearchResultItem {
 		if i, ok := order[c]; ok {
 			return i
 		}
-		return len(targets) // expanded from a role: after the named targets
+		return roleRank
 	}
 	sort.SliceStable(all, func(i, j int) bool {
 		if all[i].Score != all[j].Score {
@@ -87,7 +92,7 @@ func mergeParts(targets []string, parts []crossPart) []CrossSearchResultItem {
 		if ri != rj {
 			return ri < rj
 		}
-		return ri == len(targets) && all[i].Collection < all[j].Collection
+		return ri == roleRank && all[i].Collection < all[j].Collection
 	})
 	return all
 }

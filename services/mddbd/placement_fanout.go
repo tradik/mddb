@@ -15,19 +15,11 @@ import (
 // only. Each part is a group leader's answer; a leader answers its own
 // group's part here, by the handler itself.
 
-// askPart sends a part of r to group and returns the answer's body; payload
-// replaces the body when not nil.
-func (p *placementRuntime) askPart(r *http.Request, group string, payload any, next http.Handler) ([]byte, error) {
-	body, err := readBody(r)
-	if err != nil {
-		return nil, err
-	}
-	if payload != nil {
-		if body, err = json.Marshal(payload); err != nil {
-			return nil, err
-		}
-	}
+// askPart sends group its part of r — r with body — and returns the
+// answer's body. Parts are asked at once, so none of them reads r's body.
+func (p *placementRuntime) askPart(r *http.Request, group string, body []byte, next http.Handler) ([]byte, error) {
 	var resp *http.Response
+	var err error
 	if group == p.cfg.self && p.leads() { // a group's part is its leader's answer
 		resp = p.serveHere(r, body, next)
 	} else {
@@ -78,7 +70,8 @@ type statsGroup struct {
 }
 
 // fanoutStats answers /v1/stats for every group: each group's collections —
-// only those the map places in it — and the totals over all of them.
+// only those the map places in it — and the totals over all of them. The
+// request has no body.
 func (p *placementRuntime) fanoutStats(w http.ResponseWriter, r *http.Request, next http.Handler) {
 	answers := make([]map[string]any, len(p.cfg.names))
 	errs := make([]error, len(p.cfg.names))

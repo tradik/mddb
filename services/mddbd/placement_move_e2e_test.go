@@ -122,23 +122,7 @@ func TestPlacementMoveUnderLoadLosesNoWriteAndServesReads(t *testing.T) {
 	if got := mustOwner(t, tp, c); got != to {
 		t.Fatalf("the map places %s in %s, want %s", c, got, to)
 	}
-	want := seeded + len(load.acked)
-	sum, count := tp.leader(to).s.collectionChecksum(c)
-	if count != want {
-		t.Fatalf("the new group holds %d documents, want %d (%d seeded + %d acknowledged)", count, want, seeded, len(load.acked))
-	}
-	for _, n := range tp.nodes {
-		var got struct {
-			Checksum      string `json:"checksum"`
-			DocumentCount int    `json:"documentCount"`
-		}
-		if _, err := n.call(http.MethodGet, "/v1/checksum?collection="+c, nil, &got); err != nil {
-			t.Fatal(err)
-		}
-		if n.group != to && (got.Checksum != sum || got.DocumentCount != want) {
-			t.Fatalf("through %s: %+v, want %s/%d", n.id, got, sum, want)
-		}
-	}
+	sum := checkMovedCollection(t, tp, c, to, seeded+len(load.acked))
 	// The old group drops its copy after the grace; the new group's
 	// followers hold it.
 	waitE2E(t, "the old group to drop its copy", func() bool {
@@ -157,4 +141,21 @@ func TestPlacementMoveUnderLoadLosesNoWriteAndServesReads(t *testing.T) {
 			})
 		}
 	}
+}
+
+// checkMovedCollection checks that group to holds all want documents of c
+// and that every node outside it answers with that checksum, which it
+// returns.
+func checkMovedCollection(t *testing.T, tp *testPlacement, c, to string, want int) string {
+	t.Helper()
+	sum, count := tp.leader(to).s.collectionChecksum(c)
+	if count != want {
+		t.Fatalf("the new group holds %d documents, want %d (seeded and acknowledged)", count, want)
+	}
+	for _, n := range tp.nodes {
+		if got := nodeChecksum(t, n, c); n.group != to && (got.Checksum != sum || got.DocumentCount != want) {
+			t.Fatalf("through %s: %+v, want %s/%d", n.id, got, sum, want)
+		}
+	}
+	return sum
 }

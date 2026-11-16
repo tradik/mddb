@@ -63,22 +63,7 @@ func TestPlacementCrossSearchAnswersAsOneNodeWould(t *testing.T) {
 	for i := range 9 {
 		c := fmt.Sprintf("cs-%d", i)
 		targets = append(targets, c)
-		owner := tp.leader(mustOwner(t, tp, c)).s
-		for d := range 6 {
-			key, text := fmt.Sprintf("k%d", d), fmt.Sprintf("beta %s gamma%d", strings.Repeat("alpha ", d+1), d)
-			for _, s := range []*Server{owner, one} {
-				saved, _, err := s.addDocument(c, key, "en", nil, text, 0, true)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := s.VectorStore.Put(c, saved.ID, testVec(c, d), "test", ""); err != nil {
-					t.Fatal(err)
-				}
-				if err := (serverIndexes{s}).IndexChunk(c, saved.ID, testVec(c, d)); err != nil {
-					t.Fatal(err)
-				}
-			}
-		}
+		seedCrossCollection(t, c, tp.leader(mustOwner(t, tp, c)).s, one)
 	}
 	one.VectorIndex.SetReady()
 	oneMux := http.NewServeMux()
@@ -90,13 +75,7 @@ func TestPlacementCrossSearchAnswersAsOneNodeWould(t *testing.T) {
 			"groupBy": map[string]any{"key": "collection", "perGroup": 1}},
 	}
 	for i, body := range bodies {
-		raw, _ := json.Marshal(body)
-		rec := httptest.NewRecorder()
-		oneMux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/cross-search", strings.NewReader(string(raw))))
-		want := placedHits(t, rec.Body.Bytes())
-		if len(want) == 0 {
-			t.Fatalf("case %d: one node found nothing: %s", i, rec.Body.String())
-		}
+		want := oneNodeHits(t, oneMux, body)
 		for _, n := range []*placementNodeT{tp.nodes[0], tp.nodes[len(tp.nodes)-1]} {
 			var got json.RawMessage
 			if _, err := n.call(http.MethodPost, "/v1/cross-search", body, &got); err != nil {
@@ -113,6 +92,40 @@ func TestPlacementCrossSearchAnswersAsOneNodeWould(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "422") {
 		t.Fatalf("feedback over groups: %v", err)
 	}
+}
+
+// seedCrossCollection writes the same six documents, with vectors, to c on
+// every server.
+func seedCrossCollection(t *testing.T, c string, servers ...*Server) {
+	t.Helper()
+	for d := range 6 {
+		key, text := fmt.Sprintf("k%d", d), fmt.Sprintf("beta %s gamma%d", strings.Repeat("alpha ", d+1), d)
+		for _, s := range servers {
+			saved, _, err := s.addDocument(c, key, "en", nil, text, 0, true)
+			if err == nil {
+				err = s.VectorStore.Put(c, saved.ID, testVec(c, d), "test", "")
+			}
+			if err == nil {
+				err = (serverIndexes{s}).IndexChunk(c, saved.ID, testVec(c, d))
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// oneNodeHits is what the node holding every target answers to body.
+func oneNodeHits(t *testing.T, mux http.Handler, body map[string]any) []placedHit {
+	t.Helper()
+	raw, _ := json.Marshal(body)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/cross-search", strings.NewReader(string(raw))))
+	want := placedHits(t, rec.Body.Bytes())
+	if len(want) == 0 {
+		t.Fatalf("one node found nothing: %s", rec.Body.String())
+	}
+	return want
 }
 
 func TestPlacementStatsCountEveryGroupOnce(t *testing.T) {

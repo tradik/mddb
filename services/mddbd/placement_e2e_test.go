@@ -41,33 +41,47 @@ func TestPlacementRoutesEveryRequestToTheGroupHoldingTheCollection(t *testing.T)
 	for _, c := range names {
 		owner, _ := tp.nodes[0].s.placement.owner(c)
 		perGroup[owner]++
-		leader := tp.leader(owner)
-		want, count := leader.s.collectionChecksum(c)
-		if count != 3 {
-			t.Fatalf("%s: the leader of %s holds %d documents, want 3", c, owner, count)
-		}
-		for _, n := range tp.nodes {
-			if n.group != owner && n.holds(c) {
-				t.Fatalf("%s is held by %s of group %s, not only by %s", c, n.id, n.group, owner)
-			}
-			// Every node answers for it, with the owner's checksum.
-			var got struct {
-				Checksum      string `json:"checksum"`
-				DocumentCount int    `json:"documentCount"`
-			}
-			if _, err := n.call(http.MethodGet, "/v1/checksum?collection="+c, nil, &got); err != nil {
-				t.Fatal(err)
-			}
-			if n.group == owner && n != leader {
-				continue // a follower answers from its own copy, which may lag
-			}
-			if got.Checksum != want || got.DocumentCount != 3 {
-				t.Fatalf("%s through %s: %+v, want %s/3", c, n.id, got, want)
-			}
-		}
+		checkHeldOnlyBy(t, tp, c, owner, 3)
 	}
 	if len(perGroup) != 3 {
 		t.Fatalf("30 collections landed in %d groups: %v", len(perGroup), perGroup)
 	}
 	t.Logf("collections per group: %v", perGroup)
+}
+
+// checkHeldOnlyBy checks that collection c, of docs documents, is held by
+// group owner alone, and that every node answers for it with its leader's
+// checksum (a follower of the owner from its own copy, which may lag).
+func checkHeldOnlyBy(t *testing.T, tp *testPlacement, c, owner string, docs int) {
+	t.Helper()
+	leader := tp.leader(owner)
+	want, count := leader.s.collectionChecksum(c)
+	if count != docs {
+		t.Fatalf("%s: the leader of %s holds %d documents, want %d", c, owner, count, docs)
+	}
+	for _, n := range tp.nodes {
+		if n.group != owner && n.holds(c) {
+			t.Fatalf("%s is held by %s of group %s, not only by %s", c, n.id, n.group, owner)
+		}
+		got := nodeChecksum(t, n, c)
+		if (n.group != owner || n == leader) && (got.Checksum != want || got.DocumentCount != docs) {
+			t.Fatalf("%s through %s: %+v, want %s/%d", c, n.id, got, want, docs)
+		}
+	}
+}
+
+// checksumAnswer is the body of /v1/checksum.
+type checksumAnswer struct {
+	Checksum      string `json:"checksum"`
+	DocumentCount int    `json:"documentCount"`
+}
+
+// nodeChecksum is /v1/checksum of c through node n.
+func nodeChecksum(t *testing.T, n *placementNodeT, c string) checksumAnswer {
+	t.Helper()
+	var got checksumAnswer
+	if _, err := n.call(http.MethodGet, "/v1/checksum?collection="+c, nil, &got); err != nil {
+		t.Fatal(err)
+	}
+	return got
 }
