@@ -190,11 +190,11 @@ quiet tenant's p95 rose 1.5 to 3.4 times while a neighbour bulk-loaded.
 `MDDB_SEARCH_MAX_CONCURRENT` used to cover some REST routes and nothing else.
 It now covers every search on REST, gRPC, GraphQL and MCP.
 
-We also corrected two claims in our own docs. The comparison page listed
-horizontal sharding, and a feature page promised sub-100 ms replication lag.
-Nothing called the sharding code, and nobody had measured the lag. Both claims
-are gone, and a test now fails if a sharding claim comes back without code
-behind it.
+We also corrected two claims in our own docs. The comparison page said MDDB
+could spread one database across nodes by hashing, and a feature page promised
+sub-100 ms replication lag. No code path used that hashing, and nobody had
+measured the lag. Both claims are gone, and a doc test now fails if the first
+one comes back without code behind it.
 
 ## Before you upgrade
 
