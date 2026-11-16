@@ -568,7 +568,14 @@ The admin panel includes a **Cluster** tab (under Administration) that shows:
 
 ## What Gets Replicated
 
-Everything written through a path that records binlog entries:
+Everything written through a path that records binlog entries. Every such
+path records them inside the write's own transaction (2.19.8), so the log
+holds the writes in the order the database committed them. The extreme-mode
+batch path — on whenever HTTP/3 is enabled (`MDDB_HTTP3_ENABLED`, or the
+legacy `MDDB_EXTREME`) — used to write documents without any log entries, so
+batches sent to such a leader never reached its followers; it records them
+now. Each manager whose bucket a batch touches is
+reloaded once per batch, not once per entry.
 
 | Subsystem | Replicated | Notes |
 |-----------|:----------:|-------|
@@ -577,7 +584,9 @@ Everything written through a path that records binlog entries:
 | Metadata indices | Yes | `idxmeta`, `bykey` buckets |
 | Vector embeddings | Yes | `vectors` bucket; the follower adds them to its in-memory indexes |
 | Full-text index | Yes | FTS tokens in BoltDB |
-| Webhooks, schemas, automations, aliases, collection configs | Yes | Config in BoltDB; the follower reloads its in-memory copy |
+| Geo points | Yes | `geo` bucket; the follower adds them to its in-memory geo indexes (2.19.8; before, only at its next start or `POST /v1/geo-reindex`) |
+| Webhooks, schemas, automations, aliases, collection configs, module switches, chat scenarios and skills | Yes | Config in BoltDB; the follower reloads its in-memory copy |
+| Tenant quotas and limits, curation rules, synonyms, stop words | Yes | Config in BoltDB; the follower reloads its in-memory copy as it applies the batch (2.19.8; before, only at its next start) |
 | Auth (users, API keys) | Snapshot only | In the files a snapshot carries; later changes on the leader are not streamed |
 
 ## Limitations

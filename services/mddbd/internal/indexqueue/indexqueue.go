@@ -3,7 +3,6 @@ package indexqueue
 import (
 	"context"
 	"errors"
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/fairq"
@@ -11,6 +10,8 @@ import (
 	"mddb/internal/storage"
 	"sync"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // ErrQueueClosed is returned by Enqueue when the queue is shutting down.
@@ -171,10 +172,11 @@ func (iq *IndexQueue) worker(id int) {
 	}
 }
 
-// processJob processes a single indexing job
+// processJob processes a single indexing job. The index entries reach the
+// binlog inside the transaction that writes them, in commit order (GO-051).
 func (iq *IndexQueue) processJob(job *IndexJob) error {
-	var bo binlog.BinlogOps
-	err := iq.store.DBUpdate(job.Collection, func(tx *bolt.Tx) error {
+	update := func(fn func(*bolt.Tx) error) error { return iq.store.DBUpdate(job.Collection, fn) }
+	return binlog.Logged(update, iq.store.Binlog(), func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		bIdx := tx.Bucket(iq.store.IdxMetaBucket())
 		// Delete old indices, then add the new ones.
 		for _, key := range metaKeys(job, job.OldMeta) {
@@ -189,10 +191,6 @@ func (iq *IndexQueue) processJob(job *IndexJob) error {
 		}
 		return nil
 	})
-	if err == nil {
-		bo.FlushTo(iq.store.Binlog())
-	}
-	return err
 }
 
 // metaKeys is the metadata-index key of every value of meta for the job's

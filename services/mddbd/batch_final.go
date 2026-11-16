@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"mddb/internal/binlog"
 	"mddb/internal/cache"
 	"mddb/internal/storage"
 	proto "mddb/proto"
@@ -199,149 +198,23 @@ func (fbp *FinalBatchProcessor) processDocumentFast(collection string, batchDoc 
 	return result
 }
 
-// commitBatch commits with optimized key building. Its error is a quota
-// refusal of the whole batch (GO-043), as in BatchProcessor.commitBatch.
+// commitBatch commits the batch the way the standard path does — the same
+// document, key-index, metadata-index and revision writes, recorded in the
+// binlog inside the transaction (GO-051) — and then warms the cache with
+// what committed. It used to write the same keys itself without any log
+// entries: a batch on the extreme path never reached a follower, and on a
+// node that did not lead it committed with nothing logged. Its error is a
+// quota refusal of the whole batch (GO-043).
 func (fbp *FinalBatchProcessor) commitBatch(collection string, processed []*ProcessedDoc, now int64) (*proto.AddBatchResponse, []*ProcessedDoc, error) {
-	resp := &proto.AddBatchResponse{}
-	committed := make([]*ProcessedDoc, 0, len(processed))
-
-	// bo records ops for trimRevisions; the extreme path does not flush a
-	// binlog, but the trim deletes are durable in-transaction regardless.
-	// GO-021: payloads reach an external backend before the transaction that
-	// indexes them opens.
-	pushBatchPayloads(fbp.server, collection, processed)
-
-	var bo binlog.BinlogOps
-
-	err := fbp.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
-		if err := fbp.server.checkWriteQuota(tx, collection, docQuotaWrites(collection, processed)); err != nil {
-			return err
+	bp := &BatchProcessor{server: fbp.server, maxWorkers: fbp.maxWorkers}
+	resp, committed, err := bp.commitBatch(collection, processed, now)
+	for _, p := range committed {
+		cacheKey := cache.BuildCacheKey(collection, p.Doc.Key, p.Doc.Lang)
+		if fbp.server.UseExtreme && fbp.server.LockFreeCache != nil {
+			fbp.server.LockFreeCache.Set(cacheKey, p.Buf)
+		} else {
+			fbp.server.Cache.Set(cacheKey, p.Buf)
 		}
-		bDocs := tx.Bucket(fbp.server.BucketNames.Docs)
-		bIdx := tx.Bucket(fbp.server.BucketNames.IdxMeta)
-		bRev := tx.Bucket(fbp.server.BucketNames.Rev)
-		bByK := tx.Bucket(fbp.server.BucketNames.ByKey)
-
-		// Pre-allocate reusable buffers
-		docKeyBuf := make([]byte, 0, 256)
-		byKeyBuf := make([]byte, 0, 256)
-		metaKeyBuf := make([]byte, 0, 256)
-		revKeyBuf := make([]byte, 0, 256)
-
-		for _, p := range processed {
-			if p.Error != nil {
-				resp.Failed++
-				resp.Errors = append(resp.Errors, fmt.Sprintf("%s: %v", p.Doc.Key, p.Error))
-				continue
-			}
-
-			// Build doc key
-			docKeyBuf = docKeyBuf[:0]
-			docKeyBuf = append(docKeyBuf, "doc|"...)
-			docKeyBuf = append(docKeyBuf, collection...)
-			docKeyBuf = append(docKeyBuf, '|')
-			docKeyBuf = append(docKeyBuf, p.DocID...)
-
-			if err := bDocs.Put(docKeyBuf, p.Buf); err != nil {
-				resp.Failed++
-				continue
-			}
-
-			// Build bykey index
-			byKeyBuf = storage.AppendByKeyKey(byKeyBuf[:0], collection, p.Doc.Key, p.Doc.Lang)
-
-			if err := bByK.Put(byKeyBuf, []byte(p.DocID)); err != nil {
-				resp.Failed++
-				continue
-			}
-
-			// Metadata indexing
-			if metadataChanged(p.Existing.Meta, p.Doc.Meta) {
-				// Delete old indices
-				if p.Existing.ID != "" && p.Existing.Meta != nil {
-					for mk, vals := range p.Existing.Meta {
-						for _, mv := range vals {
-							metaKeyBuf = metaKeyBuf[:0]
-							metaKeyBuf = append(metaKeyBuf, "meta|"...)
-							metaKeyBuf = append(metaKeyBuf, collection...)
-							metaKeyBuf = append(metaKeyBuf, '|')
-							metaKeyBuf = append(metaKeyBuf, mk...)
-							metaKeyBuf = append(metaKeyBuf, '|')
-							metaKeyBuf = append(metaKeyBuf, mv...)
-							metaKeyBuf = append(metaKeyBuf, '|')
-							metaKeyBuf = append(metaKeyBuf, p.Existing.ID...)
-							_ = bIdx.Delete(metaKeyBuf)
-						}
-					}
-				}
-
-				// Add new indices
-				for mk, vals := range p.Doc.Meta {
-					for _, mv := range vals {
-						metaKeyBuf = metaKeyBuf[:0]
-						metaKeyBuf = append(metaKeyBuf, "meta|"...)
-						metaKeyBuf = append(metaKeyBuf, collection...)
-						metaKeyBuf = append(metaKeyBuf, '|')
-						metaKeyBuf = append(metaKeyBuf, mk...)
-						metaKeyBuf = append(metaKeyBuf, '|')
-						metaKeyBuf = append(metaKeyBuf, mv...)
-						metaKeyBuf = append(metaKeyBuf, '|')
-						metaKeyBuf = append(metaKeyBuf, p.Doc.ID...)
-						_ = bIdx.Put(metaKeyBuf, []byte("1"))
-					}
-				}
-			}
-
-			// Revision
-			if p.SaveRevision {
-				revKeyBuf = revKeyBuf[:0]
-				revKeyBuf = append(revKeyBuf, "rev|"...)
-				revKeyBuf = append(revKeyBuf, collection...)
-				revKeyBuf = append(revKeyBuf, '|')
-				revKeyBuf = append(revKeyBuf, p.Doc.ID...)
-				revKeyBuf = append(revKeyBuf, '|')
-
-				// Format timestamp efficiently
-				ts := FormatTimestamp(now, make([]byte, 20))
-				revKeyBuf = append(revKeyBuf, ts...)
-
-				_ = bRev.Put(revKeyBuf, p.Buf)
-
-				// Enforce per-collection MaxRevisions (GO-001 parity).
-				if fbp.server.CollectionManager != nil {
-					if cfg, found := fbp.server.CollectionManager.Get(collection); found && cfg.MaxRevisions > 0 {
-						_ = trimRevisions(tx, &bo, collection, p.Doc.ID, cfg.MaxRevisions)
-					}
-				}
-			}
-
-			// Update cache
-			cacheKey := cache.BuildCacheKey(collection, p.Doc.Key, p.Doc.Lang)
-			if fbp.server.UseExtreme && fbp.server.LockFreeCache != nil {
-				fbp.server.LockFreeCache.Set(cacheKey, p.Buf)
-			} else {
-				fbp.server.Cache.Set(cacheKey, p.Buf)
-			}
-
-			if p.IsUpdate {
-				resp.Updated++
-			} else {
-				resp.Added++
-			}
-			committed = append(committed, p)
-		}
-
-		return nil
-	})
-
-	if qe := wholeBatchRefusal(err); qe != nil { // GO-043, AGT-005
-		return nil, nil, qe
 	}
-	if err != nil {
-		resp.Failed = safeInt32(len(processed))
-		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
-		return resp, nil, nil
-	}
-
-	return resp, committed, nil
+	return resp, committed, err
 }

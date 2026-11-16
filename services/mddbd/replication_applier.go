@@ -49,9 +49,7 @@ func (ra *ReplicationApplier) ApplyBatch(entries []*binlog.BinlogEntry) error {
 			first := g.entries[0]
 			return fmt.Errorf("applying LSN %d (%s %s): %w", first.LSN, first.Type, first.BucketName, err)
 		}
-		for _, entry := range g.entries {
-			ra.updateInMemoryState(entry)
-		}
+		ra.refresh(g.entries)
 		ra.lastApplied.Store(g.through)
 	}
 	return nil
@@ -166,49 +164,10 @@ func (ra *ReplicationApplier) SetPosition(pos replPosition) {
 	ra.logID.Store(pos.LogID)
 }
 
-// updateInMemoryState updates in-memory caches and indices based on the replicated bucket
+// updateInMemoryState updates in-memory caches and indices for one
+// replicated entry (replication_reload.go).
 func (ra *ReplicationApplier) updateInMemoryState(entry *binlog.BinlogEntry) {
-	switch entry.BucketName {
-	case "vectors":
-		ra.applyVector(entry)
-	case "docs":
-		ra.invalidateDocCache(entry)
-	case "webhooks":
-		// Reload all webhooks from DB (simple approach)
-		if ra.server.WebhookManager != nil {
-			_ = ra.server.WebhookManager.LoadAll()
-		}
-	case "schemas":
-		// Reload all schemas from DB
-		if ra.server.SchemaManager != nil {
-			_ = ra.server.SchemaManager.LoadAll()
-		}
-	case "automation":
-		// Reload all automation rules from DB
-		if ra.server.AutomationManager != nil {
-			_ = ra.server.AutomationManager.LoadAll()
-		}
-		if ra.server.CronScheduler != nil {
-			ra.server.CronScheduler.Reload()
-		}
-	case "aliases":
-		if ra.server.Aliases != nil {
-			_ = ra.server.Aliases.LoadAll()
-		}
-	case "features": // GO-049
-		if ra.server.Features != nil {
-			_ = ra.server.Features.LoadAll()
-		}
-	case "chat_scenarios", "chat_skills", "chat_mcp_secrets": // one manager holds them (#403, #404, MCP-005)
-		if ra.server.ChatScenarios != nil {
-			_ = ra.server.ChatScenarios.LoadAll()
-		}
-	case "colmeta":
-		// Reload all collection configs from DB
-		if ra.server.CollectionManager != nil {
-			_ = ra.server.CollectionManager.LoadAll()
-		}
-	}
+	ra.refresh([]*binlog.BinlogEntry{entry})
 }
 
 // applyVector updates the in-memory vector index

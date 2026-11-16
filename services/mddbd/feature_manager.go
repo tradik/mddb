@@ -137,11 +137,13 @@ func (f *FeatureManager) Set(name string, enabled bool, by string) error {
 	val, _ := json.Marshal(s) // a struct of plain fields always encodes
 	next := make([]byte, 8)
 	binary.BigEndian.PutUint64(next, f.version+1)
-	if err := f.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(f.handle().Update, f.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(bucketFeatures)
 		if b == nil {
 			return errFeatureUnavailable
 		}
+		bo.Put(string(bucketFeatures), []byte(name), val)
+		bo.Put(string(bucketFeatures), featureVersionKey, next)
 		err := b.Put([]byte(name), val)
 		if err == nil {
 			err = b.Put(featureVersionKey, next)
@@ -149,10 +151,6 @@ func (f *FeatureManager) Set(name string, enabled bool, by string) error {
 		return err
 	}); err != nil {
 		return err
-	}
-	if f.binlog != nil {
-		_ = f.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: string(bucketFeatures), Key: []byte(name), Value: val})
-		_ = f.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: string(bucketFeatures), Key: featureVersionKey, Value: next})
 	}
 	f.m[name] = s
 	f.version++

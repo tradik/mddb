@@ -215,17 +215,9 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 			if p.Error == nil {
 				p.Error = bp.server.writeBatchDoc(tx, &bo, collection, p, now)
 			}
-			if p.Error != nil {
-				resp.Failed++
-				resp.Errors = append(resp.Errors, fmt.Sprintf("%s: %v", p.Doc.Key, p.Error))
-				continue
+			if countBatchDoc(resp, p) {
+				committed = append(committed, p)
 			}
-			if p.IsUpdate {
-				resp.Updated++
-			} else {
-				resp.Added++
-			}
-			committed = append(committed, p)
 		}
 		return nil
 	}))
@@ -235,13 +227,31 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 		return nil, nil, qe
 	}
 	if err != nil {
+		// The transaction rolled back — nothing was actually committed, so
+		// nothing counts as added or updated either.
+		resp.Added, resp.Updated = 0, 0
 		resp.Failed = safeInt32(len(processed))
 		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
-		// The transaction rolled back — nothing was actually committed.
 		return resp, nil, nil
 	}
 
 	return resp, committed, nil
+}
+
+// countBatchDoc counts one document of a batch in resp — failed, updated or
+// added — and reports whether it was written.
+func countBatchDoc(resp *proto.AddBatchResponse, p *ProcessedDoc) bool {
+	switch {
+	case p.Error != nil:
+		resp.Failed++
+		resp.Errors = append(resp.Errors, fmt.Sprintf("%s: %v", p.Doc.Key, p.Error))
+		return false
+	case p.IsUpdate:
+		resp.Updated++
+	default:
+		resp.Added++
+	}
+	return true
 }
 
 // writeBatchDoc stores one prepared document inside the batch transaction: the

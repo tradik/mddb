@@ -168,12 +168,12 @@ func (c *ChatScenarioManager) Delete(name string) error {
 }
 
 // write applies one change to bucket — the scenarios', the skills' or the
-// MCP secrets' — and the version bump in a single transaction, then records
-// both in the binlog. Called under the lock.
+// MCP secrets' — and the version bump in a single transaction, which records
+// both in the binlog as its last step (GO-051). Called under the lock.
 func (c *ChatScenarioManager) write(bucket []byte, change func(*bolt.Bucket) error, entry *binlog.BinlogEntry) error {
 	next := make([]byte, 8)
 	binary.BigEndian.PutUint64(next, c.version+1)
-	if err := c.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(c.handle().Update, c.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b, versions := tx.Bucket(bucket), tx.Bucket(bucketChatScenarios)
 		if b == nil || versions == nil {
 			return errors.New("chat scenarios are not loaded")
@@ -181,15 +181,21 @@ func (c *ChatScenarioManager) write(bucket []byte, change func(*bolt.Bucket) err
 		if err := change(b); err != nil {
 			return err
 		}
+		logEntry(bo, entry)
+		bo.Put(string(bucketChatScenarios), chatScenarioVersionKey, next)
 		return versions.Put(chatScenarioVersionKey, next)
 	}); err != nil {
 		return err
 	}
-	if c.binlog != nil {
-		_ = c.binlog.Append(entry)
-		_ = c.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: string(bucketChatScenarios),
-			Key: chatScenarioVersionKey, Value: next})
-	}
 	c.version++
 	return nil
+}
+
+// logEntry records entry, a put or a delete, in bo.
+func logEntry(bo *binlog.BinlogOps, entry *binlog.BinlogEntry) {
+	if entry.Type == binlog.BinlogDelete {
+		bo.Delete(entry.BucketName, entry.Key)
+		return
+	}
+	bo.Put(entry.BucketName, entry.Key, entry.Value)
 }

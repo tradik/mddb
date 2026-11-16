@@ -150,14 +150,11 @@ func (a *AliasManager) set(alias, collection string, exists func(string) bool) e
 	if _, isAlias := a.m[alias]; !isAlias && exists(alias) {
 		return fmt.Errorf("%q is a collection; an alias cannot take its name", alias)
 	}
-	if err := a.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(a.handle().Update, a.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Put(string(bucketAliases), []byte(alias), []byte(collection))
 		return tx.Bucket(bucketAliases).Put([]byte(alias), []byte(collection))
 	}); err != nil {
 		return err
-	}
-	if a.binlog != nil {
-		_ = a.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: string(bucketAliases),
-			Key: []byte(alias), Value: []byte(collection)})
 	}
 	a.m[alias] = collection
 	return nil
@@ -170,13 +167,11 @@ func (a *AliasManager) remove(alias string) error {
 	if _, ok := a.m[alias]; !ok {
 		return errAliasNotFound
 	}
-	if err := a.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(a.handle().Update, a.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Delete(string(bucketAliases), []byte(alias))
 		return tx.Bucket(bucketAliases).Delete([]byte(alias))
 	}); err != nil {
 		return err
-	}
-	if a.binlog != nil {
-		_ = a.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: string(bucketAliases), Key: []byte(alias)})
 	}
 	delete(a.m, alias)
 	return nil

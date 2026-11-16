@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"mddb/internal/binlog"
@@ -93,19 +94,52 @@ func (vs *VectorStore) PutQuantized(collection, docID string, vector []float32, 
 		CreatedAt:   time.Now().Unix(),
 		ContentHash: contentHash,
 	}
-	data := marshalEmbeddingRecordQuantized(rec, qt)
+	return vs.putRecord(collection, key, marshalEmbeddingRecordQuantized(rec, qt))
+}
 
-	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
+// errNoVectorsBucket is a write before EnsureBucket.
+var errNoVectorsBucket = errors.New("vectors bucket not found")
+
+// update runs a write transaction on collection's file and records what fn
+// collects in the binlog as the transaction's last step, so the log holds
+// the vectors in the order the database committed them (GO-051). On a node
+// that does not lead the log refuses the entries and the write fails with
+// them: nothing commits that the log does not hold.
+func (vs *VectorStore) update(collection string, fn func(*bolt.Tx, *binlog.BinlogOps) error) error {
+	route := func(f func(*bolt.Tx) error) error { return boltx.Update(vs.rt(), collection, f) }
+	return binlog.Logged(route, vs.binlog, fn)
+}
+
+// putRecord stores one encoded record under key.
+func (vs *VectorStore) putRecord(collection string, key, data []byte) error {
+	return vs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
-			return fmt.Errorf("vectors bucket not found")
+			return errNoVectorsBucket
 		}
+		bo.Put("vectors", key, data)
 		return b.Put(key, data)
 	})
-	if err == nil && vs.binlog != nil {
-		_ = vs.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "vectors", Key: bytes.Clone(key), Value: bytes.Clone(data)})
-	}
-	return err
+}
+
+// putChunkRecords stores each chunk's record, encoded by encode, in one
+// transaction.
+func (vs *VectorStore) putChunkRecords(collection, docID string, chunks []ChunkEmbedding, encode func(ChunkEmbedding) []byte) error {
+	return vs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		b := tx.Bucket(vs.bucketName)
+		if b == nil {
+			return errNoVectorsBucket
+		}
+		for _, chunk := range chunks {
+			chunkKey := buildChunkKey(collection, docID, chunk.ChunkIndex)
+			data := encode(chunk)
+			if err := b.Put(chunkKey, data); err != nil {
+				return err
+			}
+			bo.Put("vectors", chunkKey, data)
+		}
+		return nil
+	})
 }
 
 // PutChunksQuantized stores multiple chunk embeddings with optional quantization.
@@ -114,35 +148,16 @@ func (vs *VectorStore) PutChunksQuantized(collection, docID string, chunks []Chu
 		return vs.PutChunks(collection, docID, chunks, model, contentHash)
 	}
 	now := time.Now().Unix()
-
-	return boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
-		b := tx.Bucket(vs.bucketName)
-		if b == nil {
-			return fmt.Errorf("vectors bucket not found")
-		}
-
-		for _, chunk := range chunks {
-			chunkKey := buildChunkKey(collection, docID, chunk.ChunkIndex)
-			rec := &EmbeddingRecord{
-				DocID:       docID,
-				Vector:      chunk.Vector,
-				Model:       model,
-				Dimensions:  len(chunk.Vector),
-				CreatedAt:   now,
-				ContentHash: contentHash,
-				ChunkHash:   chunk.ChunkHash,
-			}
-			data := marshalEmbeddingRecordQuantized(rec, qt)
-
-			if err := b.Put(chunkKey, data); err != nil {
-				return err
-			}
-
-			if vs.binlog != nil {
-				_ = vs.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "vectors", Key: bytes.Clone(chunkKey), Value: bytes.Clone(data)})
-			}
-		}
-		return nil
+	return vs.putChunkRecords(collection, docID, chunks, func(chunk ChunkEmbedding) []byte {
+		return marshalEmbeddingRecordQuantized(&EmbeddingRecord{
+			DocID:       docID,
+			Vector:      chunk.Vector,
+			Model:       model,
+			Dimensions:  len(chunk.Vector),
+			CreatedAt:   now,
+			ContentHash: contentHash,
+			ChunkHash:   chunk.ChunkHash,
+		}, qt)
 	})
 }
 
@@ -157,53 +172,23 @@ func (vs *VectorStore) Put(collection, docID string, vector []float32, model str
 		CreatedAt:   time.Now().Unix(),
 		ContentHash: contentHash,
 	})
-
-	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
-		b := tx.Bucket(vs.bucketName)
-		if b == nil {
-			return fmt.Errorf("vectors bucket not found")
-		}
-		return b.Put(key, data)
-	})
-	if err == nil && vs.binlog != nil {
-		_ = vs.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "vectors", Key: bytes.Clone(key), Value: bytes.Clone(data)})
-	}
-	return err
+	return vs.putRecord(collection, key, data)
 }
 
 // PutChunks stores multiple chunk embeddings for a document.
 // Keys: vec|collection|docID#0, vec|collection|docID#1, etc.
 func (vs *VectorStore) PutChunks(collection, docID string, chunks []ChunkEmbedding, model string, contentHash string) error {
 	now := time.Now().Unix()
-
-	return boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
-		b := tx.Bucket(vs.bucketName)
-		if b == nil {
-			return fmt.Errorf("vectors bucket not found")
-		}
-
-		for _, chunk := range chunks {
-			chunkKey := buildChunkKey(collection, docID, chunk.ChunkIndex)
-			data := MarshalEmbeddingRecord(&EmbeddingRecord{
-				DocID:       docID,
-				Vector:      chunk.Vector,
-				Model:       model,
-				Dimensions:  len(chunk.Vector),
-				CreatedAt:   now,
-				ContentHash: contentHash,
-				ChunkHash:   chunk.ChunkHash,
-			})
-
-			if err := b.Put(chunkKey, data); err != nil {
-				return err
-			}
-
-			if vs.binlog != nil {
-				_ = vs.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "vectors", Key: bytes.Clone(chunkKey), Value: bytes.Clone(data)})
-			}
-		}
-
-		return nil
+	return vs.putChunkRecords(collection, docID, chunks, func(chunk ChunkEmbedding) []byte {
+		return MarshalEmbeddingRecord(&EmbeddingRecord{
+			DocID:       docID,
+			Vector:      chunk.Vector,
+			Model:       model,
+			Dimensions:  len(chunk.Vector),
+			CreatedAt:   now,
+			ContentHash: contentHash,
+			ChunkHash:   chunk.ChunkHash,
+		})
 	})
 }
 
@@ -220,15 +205,52 @@ type ChunkRemover interface {
 }
 
 func (vs *VectorStore) CleanStaleChunks(collection, docID string, currentChunkCount int, index ChunkRemover) {
-	prefix := []byte("vec|" + collection + "|" + docID + "#")
-
-	// Find what is stale in a read transaction first. Every embedded document
-	// passes through here and almost none shrank, so committing unconditionally
-	// cost two empty write transactions — two fsyncs — per document (#306).
-	type staleKey struct {
-		key   []byte
-		index string // the key the in-memory indexes know it by
+	stale := vs.staleChunks(collection, docID, currentChunkCount)
+	if len(stale) == 0 {
+		return
 	}
+	keys := make([][]byte, len(stale))
+	for i, s := range stale {
+		keys[i] = s.key
+	}
+	if err := vs.deleteKeys(collection, keys); err != nil || index == nil {
+		return
+	}
+	for _, s := range stale {
+		index.Remove(collection, s.index)
+	}
+}
+
+// deleteKeys removes keys from the vectors bucket of collection's file, in
+// one logged transaction.
+func (vs *VectorStore) deleteKeys(collection string, keys [][]byte) error {
+	return vs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		b := tx.Bucket(vs.bucketName)
+		if b == nil {
+			return nil
+		}
+		for _, k := range keys {
+			if err := b.Delete(k); err != nil {
+				return err
+			}
+			bo.Delete("vectors", k)
+		}
+		return nil
+	})
+}
+
+// staleKey is a stored chunk record a document no longer has.
+type staleKey struct {
+	key   []byte
+	index string // the key the in-memory indexes know it by
+}
+
+// staleChunks finds what is stale in a read transaction. Every embedded
+// document passes through CleanStaleChunks and almost none shrank, so
+// committing unconditionally cost two empty write transactions — two
+// fsyncs — per document (#306).
+func (vs *VectorStore) staleChunks(collection, docID string, currentChunkCount int) []staleKey {
+	prefix := []byte("vec|" + collection + "|" + docID + "#")
 	var stale []staleKey
 	_ = boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
@@ -251,33 +273,7 @@ func (vs *VectorStore) CleanStaleChunks(collection, docID string, currentChunkCo
 		}
 		return nil
 	})
-	if len(stale) == 0 {
-		return
-	}
-
-	var bo binlog.BinlogOps
-	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
-		b := tx.Bucket(vs.bucketName)
-		if b == nil {
-			return nil
-		}
-		for _, s := range stale {
-			if err := b.Delete(s.key); err != nil {
-				return err
-			}
-			bo.Delete("vectors", s.key)
-		}
-		return nil
-	})
-	if err != nil {
-		return
-	}
-	bo.FlushTo(vs.binlog)
-	if index != nil {
-		for _, s := range stale {
-			index.Remove(collection, s.index)
-		}
-	}
+	return stale
 }
 
 // Get retrieves the first embedding record for a document (chunk 0 or legacy single record).
@@ -315,8 +311,7 @@ func (vs *VectorStore) Delete(collection, docID string) error {
 	legacyKey := buildVecKey(collection, docID)
 	prefix := []byte("vec|" + collection + "|" + docID + "#")
 
-	var bo binlog.BinlogOps
-	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
+	return vs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -335,10 +330,6 @@ func (vs *VectorStore) Delete(collection, docID string) error {
 		}
 		return nil
 	})
-	if err == nil {
-		bo.FlushTo(vs.binlog)
-	}
-	return err
 }
 
 // LoadCollection loads all embedding records for a collection.

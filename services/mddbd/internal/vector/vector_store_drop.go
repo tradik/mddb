@@ -2,7 +2,6 @@ package vector
 
 import (
 	"bytes"
-	"mddb/internal/boltx"
 
 	"mddb/internal/binlog"
 
@@ -16,9 +15,8 @@ import (
 // how many records it removed.
 func (vs *VectorStore) DeleteCollection(collection string) (int, error) {
 	prefixes := [][]byte{[]byte("vec|" + collection + "|"), SummaryKey(collection, ""), ImageKey(collection, "")}
-	var bo binlog.BinlogOps
 	removed := 0
-	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
+	err := vs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -43,6 +41,5 @@ func (vs *VectorStore) DeleteCollection(collection string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	bo.FlushTo(vs.binlog)
 	return removed, nil
 }

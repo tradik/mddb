@@ -2,7 +2,6 @@ package vector
 
 import (
 	"bytes"
-	"fmt"
 	"mddb/internal/binlog"
 	"mddb/internal/boltx"
 	"time"
@@ -69,17 +68,7 @@ func (vs *VectorStore) putDocVector(key []byte, collection, docID string, vector
 		DocID: docID, Vector: vector, Model: model, Dimensions: len(vector),
 		CreatedAt: time.Now().Unix(), ContentHash: hash,
 	})
-	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
-		b := tx.Bucket(vs.bucketName)
-		if b == nil {
-			return fmt.Errorf("vectors bucket not found")
-		}
-		return b.Put(key, data)
-	})
-	if err == nil && vs.binlog != nil {
-		_ = vs.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "vectors", Key: bytes.Clone(key), Value: bytes.Clone(data)})
-	}
-	return err
+	return vs.putRecord(collection, key, data)
 }
 
 // getDocVector returns the record under key, nil when there is none.
@@ -98,19 +87,14 @@ func (vs *VectorStore) getDocVector(collection string, key []byte) *EmbeddingRec
 
 // deleteDocVector removes the record under key, if there is one.
 func (vs *VectorStore) deleteDocVector(collection string, key []byte) error {
-	removed := false
-	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
+	return vs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil || b.Get(key) == nil {
 			return nil
 		}
-		removed = true
+		bo.Delete("vectors", key)
 		return b.Delete(key)
 	})
-	if err == nil && removed && vs.binlog != nil {
-		_ = vs.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: "vectors", Key: bytes.Clone(key)})
-	}
-	return err
 }
 
 // loadDocVectors returns the vectors under prefix keyed by document ID.

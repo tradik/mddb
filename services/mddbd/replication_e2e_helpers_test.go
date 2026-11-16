@@ -136,6 +136,7 @@ type e2eFollowerOpts struct {
 	leader string
 	tls    *tls.Config
 	maxLag time.Duration
+	setup  func(*Server) // runs before the follower starts replicating
 }
 
 func startE2EFollower(t *testing.T, o e2eFollowerOpts) *e2eFollower {
@@ -157,6 +158,9 @@ func startE2EFollower(t *testing.T, o e2eFollowerOpts) *e2eFollower {
 		Log:           &binlog.BinlogConfig{RetentionInterval: -1},
 	})
 	s.replClient = rc
+	if o.setup != nil {
+		o.setup(s)
+	}
 	rc.Start()
 	return &e2eFollower{s: s, rc: rc}
 }

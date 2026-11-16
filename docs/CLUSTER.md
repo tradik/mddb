@@ -126,7 +126,11 @@ served by every node.
 
 Inside the server the binlog is the last line: on a node that does not lead
 it refuses every write's entries inside the write's transaction, so a write
-that slipped past the guards rolls back instead of diverging.
+that slipped past the guards rolls back instead of diverging. Since 2.19.8
+that holds for every write path — documents, vectors, the metadata index
+queue, tenant configurations, aliases, module switches, chat scenarios,
+skills and MCP secrets, and the extreme-mode batch path — none appends after
+its commit any more.
 
 ## Promotion and demotion
 
@@ -214,4 +218,6 @@ demotion and forced promotion of two nodes. `cluster_process_test.go`
 (`go test -tags clusterprocess`) does the same with three `mddbd` processes
 and `kill -9`, with the default timings: on a desktop machine a new leader
 took writes 2.6–3.7 s after the kill (four runs), and the old leader, started
-again on its files, held the new leader's data by `/v1/checksum`.
+again on its files, held the new leader's data by `/v1/checksum`. CI runs it
+(`.github/workflows/cluster-process.yml`) only on pull requests that touch
+`replication_*`, `cluster_*`, `internal/cluster/` or `internal/binlog/`.

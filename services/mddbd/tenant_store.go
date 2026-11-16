@@ -21,6 +21,9 @@ type TenantManager struct {
 	binlog *binlog.Binlog
 	mu     sync.RWMutex
 	cache  map[string]TenantConfig
+	// writeMu orders writes: held across the commit and the cache update, so
+	// the cache ends where the database and the log do.
+	writeMu sync.Mutex
 }
 
 // bucketTenants holds one JSON TenantConfig per tenant name.
@@ -58,6 +61,13 @@ func (tm *TenantManager) FollowDB(src func() *bolt.DB) { tm.follow = src }
 func (tm *TenantManager) SetBinlog(bl *binlog.Binlog) { tm.binlog = bl }
 
 func (tm *TenantManager) handle() *bolt.DB { return boltx.Current(tm.db, tm.follow) }
+
+// update runs a write transaction that records what fn collects in the
+// binlog as its last step, in commit order; on a node that does not lead
+// the write fails and nothing commits (GO-051).
+func (tm *TenantManager) update(fn func(*bolt.Tx, *binlog.BinlogOps) error) error {
+	return binlog.Logged(tm.handle().Update, tm.binlog, fn)
+}
 
 // LoadAll creates the bucket when missing and reads every configuration. A
 // corrupt entry is skipped: its tenant has no limits.
@@ -114,17 +124,17 @@ func (tm *TenantManager) Set(tenant string, cfg TenantConfig) error {
 	}
 	val, _ := json.Marshal(cfg) // plain fields always encode
 	key := []byte(tenant)
-	if err := tm.handle().Update(func(tx *bolt.Tx) error {
+	tm.writeMu.Lock()
+	defer tm.writeMu.Unlock()
+	if err := tm.update(func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(bucketTenants)
 		if b == nil {
 			return errTenantsNotLoaded
 		}
+		bo.Put(string(bucketTenants), key, val)
 		return b.Put(key, val)
 	}); err != nil {
 		return err
-	}
-	if tm.binlog != nil {
-		_ = tm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: string(bucketTenants), Key: CopyBytes(key), Value: CopyBytes(val)})
 	}
 	tm.mu.Lock()
 	tm.cache[tenant] = cfg
@@ -135,16 +145,17 @@ func (tm *TenantManager) Set(tenant string, cfg TenantConfig) error {
 // Delete removes a tenant's configuration: no limits of its own any more.
 func (tm *TenantManager) Delete(tenant string) error {
 	key := []byte(tenant)
-	if err := tm.handle().Update(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(bucketTenants); b != nil {
-			return b.Delete(key)
+	tm.writeMu.Lock()
+	defer tm.writeMu.Unlock()
+	if err := tm.update(func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		b := tx.Bucket(bucketTenants)
+		if b == nil {
+			return nil
 		}
-		return nil
+		bo.Delete(string(bucketTenants), key)
+		return b.Delete(key)
 	}); err != nil {
 		return err
-	}
-	if tm.binlog != nil {
-		_ = tm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: string(bucketTenants), Key: CopyBytes(key)})
 	}
 	tm.mu.Lock()
 	delete(tm.cache, tenant)

@@ -327,8 +327,10 @@ curl http://localhost:11023/v1/tenants/acme/usage -H "Authorization: Bearer $TOK
 Configurations are stored in the main database (bucket `tenants`), so backups
 carry them and a restore brings them back. Counters (queue waits, refusals,
 embedding spend) live in memory and start again after a restart. A
-replication follower receives the configuration through the binlog but reads
-it only at its next start.
+replication follower receives the configuration through the binlog and
+reloads it as it applies the entry, so a quota or limit set on the leader is
+enforced by the followers at once (2.19.8; before, only after their next
+start).
 
 ## Chat conversations
 
