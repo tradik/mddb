@@ -64,9 +64,14 @@ func (s *Server) startVectorTraining(n int) *vectorTrainer {
 	return t
 }
 
-// trainCollection trains every trainable index on one collection's vectors.
+// trainCollection trains every trainable index on one collection's vectors,
+// except the ones the load read from the collection's checkpoint (SRCH-023):
+// those hold what a training would produce.
 func (s *Server) trainCollection(collection string, vectors map[string][]float32) {
-	for _, searcher := range s.VectorSearchers {
+	for name, searcher := range s.VectorSearchers {
+		if s.vectorLoad.persist.fromDisk(collection, name) {
+			continue
+		}
 		if trainer, ok := searcher.(vec.Trainable); ok {
 			vec.TrainSafely(trainer, collection, vectors)
 		}
@@ -199,7 +204,9 @@ func (s *Server) vectorTraining(collection string, searcher vec.VectorSearcher) 
 		return false
 	}
 	t := s.vectorTrain.Load()
-	return t != nil && t.training(collection)
+	// SRCH-023: an index read from the collection's checkpoint is trained,
+	// whatever the others are still waiting for.
+	return t != nil && t.training(collection) && !s.vectorLoad.persist.fromDisk(collection, searcher.Name())
 }
 
 // trainingCollections is what the trainer has not trained yet: every

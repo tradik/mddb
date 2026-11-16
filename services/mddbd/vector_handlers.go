@@ -148,7 +148,11 @@ func (s *Server) loadVectorIndex() {
 		load.begin(collection)
 		if vectors, loaded := s.loadCollectionVectors(collection, load); loaded {
 			totalLoaded += counts[collection]
-			train.enqueue(collection, vectors) // before it is searchable: ivf must not answer untrained
+			// SRCH-023: nothing to train when every trainable index was
+			// read from the collection's checkpoint.
+			if s.needsTraining(collection) {
+				train.enqueue(collection, vectors) // before it is searchable: ivf must not answer untrained
+			}
 		}
 		load.finishCollection(collection) // searchable, with what it has
 	}
@@ -160,6 +164,9 @@ func (s *Server) loadVectorIndex() {
 	slog.Info("vector index loaded",
 		"documents", totalLoaded, "collections", len(counts), "elapsed", time.Since(start),
 		"algorithms", "flat, hnsw, ivf, pq")
+	// SRCH-023: checkpoints of collections that are gone, then the writer.
+	s.sweepCheckpoints(counts)
+	s.startCheckpoints()
 }
 
 // loadCollectionVectors puts one collection's stored vectors into every
@@ -183,10 +190,21 @@ func (s *Server) loadCollectionVectors(collection string, load *vectorLoadState)
 
 	// Collect vectors for trainable indexes
 	collVecs := make(map[string][]float32, len(records))
+	for docID, rec := range records {
+		collVecs[docID] = rec.Vector
+	}
 
 	// Disk-only collections keep RAM quantized-only: full-precision
 	// vectors are never loaded into the float32 searchers.
 	diskOnly := s.collectionDiskOnly(collection)
+
+	// SRCH-023: the graph and the trained structures come from the
+	// collection's checkpoint when it has one that matches these vectors;
+	// pending is what each index read that way still has to be given.
+	var pending annPending
+	if !diskOnly {
+		pending = s.restoreIndexes(collection, collVecs)
+	}
 
 	refused, sinceReport := 0, 0
 	for docID, rec := range records {
@@ -195,16 +213,15 @@ func (s *Server) loadCollectionVectors(collection string, load *vectorLoadState)
 			sinceReport = 0
 		}
 		// docID may be "id" or "id#0", "id#1", etc.
-		if err := s.indexChunk(collection, docID, rec.Vector, diskOnly); err != nil {
+		if err := s.indexChunkWhere(collection, docID, rec.Vector, diskOnly, pending); err != nil {
 			// A store written by 2.15.0 or earlier can hold vectors a
 			// provider returned empty (#252). Loading one used to poison
 			// the whole graph — and map order is random, so whether it did
 			// changed from one restart to the next. Refused now, and
 			// counted so the operator is told to reindex.
 			refused++
-			continue
+			delete(collVecs, docID)
 		}
-		collVecs[docID] = rec.Vector
 	}
 	if refused > 0 {
 		slog.Warn("stored vectors the index cannot hold were skipped; reindex the collection to replace them",
@@ -661,10 +678,12 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 				collInfo["quantization"] = "float32"
 			}
 		}
+		s.addPersistenceStats(coll, collInfo) // SRCH-023
 		collections[coll] = collInfo
 	}
 
 	resp["collections"] = collections
+	resp["indexPersistence"] = s.annSummary() // SRCH-023
 	resp["index_ready"] = s.VectorIndex.IsReady()
 	// #346: while loading, how far it is and which collections already answer.
 	if l := s.vectorLoad.Load(); l != nil {

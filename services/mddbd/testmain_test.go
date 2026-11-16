@@ -23,5 +23,11 @@ func TestMain(m *testing.M) {
 	if os.Getenv("MDDB_OUTBOUND_ALLOW_PRIVATE") == "" {
 		_ = os.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "true")
 	}
+	// Index checkpoints (SRCH-023) start a background writer and leave files
+	// next to the database, which the suite's thousands of throwaway servers
+	// never stop or clean up. Off unless a test turns them on for itself.
+	if os.Getenv("MDDB_VECTOR_INDEX_PERSIST") == "" {
+		_ = os.Setenv("MDDB_VECTOR_INDEX_PERSIST", "false")
+	}
 	os.Exit(m.Run())
 }

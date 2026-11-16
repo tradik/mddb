@@ -722,12 +722,14 @@ cache for the whole server whatever requests ask for; see
 
 ### Loading the index at startup
 
-Vectors are stored on disk and the indexes are rebuilt in memory at every
-start. Each stored vector goes into every algorithm's index (flat, HNSW, IVF,
-PQ, OPQ, SQ, SQ4, BQ), and IVF, PQ and OPQ train with k-means on each
-collection, so the load time grows with the number of vectors, not of
-documents, and HNSW insertion and the training dominate it. Collections with
-vectors enabled but none stored cost nothing. A disk-only collection loads its
+Vectors are stored on disk. Before v2.19.8 every index was built again in
+memory at every start: each stored vector went into every algorithm's index
+(flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ), and IVF, PQ and OPQ trained with
+k-means on each collection, so the load time grew with the number of
+vectors, and HNSW insertion and the training dominated it. Since v2.19.8 the
+built structures are also kept on disk and read back at start — see
+[Index checkpoints](#index-checkpoints-v2198) below. Collections with vectors
+enabled but none stored cost nothing. A disk-only collection loads its
 quantized vectors only.
 
 Since v2.18.4 collections load smallest first, and each one is searchable as
@@ -753,6 +755,91 @@ collection`). `/v1/vector-stats` shows the queue as `indexTraining`
 (`current`, `pending`, `indexes`), and `/v1/indexing-status` as
 `trainingCollections`. On shutdown the training stops after the collection it
 is on. Disk-only collections have nothing to train and are not queued.
+
+### Index checkpoints (v2.19.8)
+
+Each collection's HNSW graph (nodes, layers, neighbours, tombstones), IVF
+centroids and cluster assignments, PQ and OPQ codebooks (and the OPQ
+rotation) with every vector's code, and the SQ and SQ4 per-dimension
+parameters, with each index's train state, are written to a checkpoint file
+and read back at the next start. A collection whose checkpoint matches skips
+the HNSW inserts and the k-means training: it answers on every algorithm as
+soon as its vectors are read. Flat and BQ have nothing to train and are
+filled from the stored vectors as before; so is a disk-only collection.
+
+**The store stays the truth.** The checkpoint is never trusted because of
+when it was written. It records, for every vector a structure was built
+from, a 64-bit fingerprint of the vector, and at load each structure is
+matched against the stored vectors one by one:
+
+- vectors stored after the checkpoint are added to the loaded structures the
+  usual way (`caughtUp` in the stats);
+- IVF, PQ and OPQ file a vector whose stored value changed again; SQ and SQ4
+  re-encode every vector from their parameters, which costs one multiply per
+  dimension;
+- the HNSW graph is used only if every live node still finds its vector, so
+  a document removed or re-embedded after the checkpoint means the graph is
+  built again;
+- a trained structure that covers fewer than half of the stored vectors
+  describes another corpus and is trained again.
+
+Anything that cannot be verified is built exactly as before, and never stops
+the start: a missing, truncated or damaged file (any failed checksum),
+another format version, another embedding model or variant (the collection's
+recorded provenance), another dimension, or other HNSW `m` /
+`efConstruction` or PQ / OPQ subspace settings. Indexes are decided one by
+one, so a start can read some and build others (`source: "partial"`).
+
+**When it is written.** A background writer checks every two seconds. A
+collection is written when its indexes changed and either
+`MDDB_VECTOR_INDEX_CHECKPOINT_INTERVAL_SEC` (300) has passed, or
+`MDDB_VECTOR_INDEX_CHECKPOINT_CHANGES` (50,000) vector writes have
+accumulated and the last checkpoint is at least 10 seconds and twenty times
+its own duration old — so a collection under constant writes spends at most
+a twentieth of the time being written out. A clean shutdown writes every
+collection that changed, after the embedding queue has drained. Collections
+still training wait for it, except at shutdown. One checkpoint is written at
+a time.
+
+**What it costs.** Each index is captured under its own read lock — searches
+go on, writes to that index wait for the capture, which copies slice headers
+and per-node flags (about 50–70 bytes per vector, roughly 20 ms for 200,000
+vectors) — and is then written with no lock held. The memory held is one
+index's capture plus a 1 MiB frame buffer. The file is about the size of the
+HNSW links plus 10 bytes per vector per trained index; tombstones carry their
+full vector, since the graph routes through them.
+
+**Crash safety.** The file is written to `<name>.tmp`, synced, and renamed
+over the previous one, then the directory is synced: a crash or `kill -9`
+leaves either the old checkpoint or the new one, never part of one, and the
+leftover `.tmp` is removed at the next start. A checkpoint that is behind
+only costs the next start the vectors written since.
+
+**Status.** `/v1/vector-stats` has `indexPersistence` (the settings in force:
+`enabled`, `formatVersion`, `checkpointIntervalSeconds`, `checkpointChanges`)
+and, per collection, `indexPersistence` (`source`: `disk`, `rebuilt` or
+`partial`; `indexes`, the same per index; `reason`, why something was
+rebuilt; `loadMs`; `caughtUp`; `checkpoint`: `at`, `bytes`, `durationMs`,
+`indexes`, `error`) and `hnswTombstones`. `/health` has
+`vectorIndexCheckpoints` (`fromDisk`, `rebuilt`, `partial` collection
+counts). The metrics are `mddb_vector_index_checkpoint_load_seconds`,
+`mddb_vector_index_checkpoint_write_seconds` and
+`mddb_vector_index_checkpoint_bytes`.
+
+**HNSW compaction.** A removed or overwritten document stays in the graph as
+a tombstone that searches skip, until half the graph is tombstones and it is
+rebuilt on its own. `POST /v1/vector-compact` with `{"collection": "..."}`
+rebuilds it now; the new graph is built beside the one in use, so searches
+and writes go on, and what was written meanwhile is applied when it takes
+over. The next checkpoint no longer carries the tombstones.
+
+**Turning it off.** `MDDB_VECTOR_INDEX_PERSIST=false` is the behaviour before
+v2.19.8: nothing is read and nothing is written. Checkpoint files an earlier
+run left are neither read nor removed; delete them by hand if you want the
+space back. Backups and replication snapshots do not
+contain checkpoints; a restore or a snapshot install removes them, and the
+indexes are built from the restored database. Where the files are:
+[STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#index-checkpoints).
 
 Vector search embeds the query text into a high-dimensional vector and finds documents with the most similar embeddings using cosine similarity. Similarity computation is hardware-accelerated on ARM64 via NEON (all ARM64) and SME (Apple M4+) SIMD instructions, with automatic runtime detection and fallback to scalar Go on other platforms. Search is parallelized across multiple goroutines for collections above 2048 vectors (~2.5x speedup on 50K collections).
 

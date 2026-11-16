@@ -28,6 +28,7 @@ func (h *HNSWIndex) DropCollection(collection string) {
 	delete(h.deleted, collection)
 	delete(h.dims, collection)
 	delete(h.nodeKeys, collection)
+	delete(h.mutations, collection)
 }
 
 // DropCollection removes a collection and its trained clusters.

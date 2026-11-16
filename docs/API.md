@@ -23,6 +23,7 @@ status: publish
   - [POST /v1/vector-search](#post-v1vector-search)
   - [POST /v1/vector-reindex](#post-v1vector-reindex)
   - [GET /v1/vector-stats](#get-v1vector-stats)
+  - [POST /v1/vector-compact](#post-v1vector-compact)
   - [POST /v1/vector-projection](#post-v1vector-projection)
   - [POST /v1/classify](#post-v1classify)
   - [PATCH /v1/update](#patch-v1update)
@@ -1053,9 +1054,58 @@ training order, and `indexes`, the ones that refuse those collections. Such a
 refusal is a `503` with `Retry-After` and `"training": true`.
 See [SEARCH.md](SEARCH.md#loading-the-index-at-startup).
 
+Since v2.19.8 the top-level `indexPersistence` gives the checkpoint
+settings in force (`enabled`, `formatVersion`, `checkpointIntervalSeconds`,
+`checkpointChanges`), and each collection has `indexPersistence` — where its
+indexes came from at the last load (`source`: `disk`, `rebuilt` or
+`partial`; `indexes`, per index; `reason`; `loadMs`; `caughtUp`, vectors
+stored after the checkpoint) and its last checkpoint write (`checkpoint`:
+`at`, `bytes`, `durationMs`, `indexes`, `error`) — and `hnswTombstones`, the
+removed or overwritten nodes `POST /v1/vector-compact` would clear. See
+[SEARCH.md](SEARCH.md#index-checkpoints-v2198).
+
+```json
+"indexPersistence": {
+  "source": "disk",
+  "indexes": {"hnsw": "disk", "ivf": "disk", "opq": "disk", "pq": "disk", "sq": "disk", "sq4": "disk"},
+  "loadMs": 1840,
+  "caughtUp": 0,
+  "checkpoint": {"at": "2026-11-16T08:00:00Z", "bytes": 95420311, "durationMs": 2100,
+                 "indexes": ["hnsw", "ivf", "opq", "pq", "sq", "sq4"]}
+}
+```
+
 **cURL Example**:
 ```bash
 curl http://localhost:11023/v1/vector-stats
+```
+
+---
+
+### POST /v1/vector-compact
+
+Rebuild a collection's HNSW graph without its tombstones (v2.19.8). A
+removed or overwritten document stays in the graph as a node searches skip
+until half of the graph is such nodes; this rebuilds it now. The new graph is
+built beside the one in use: searches and writes go on, and what was written
+meanwhile is applied when it takes over.
+
+**Permission:** with auth on, `write` on `collection`.
+
+**Request body:** `{"collection": "docs"}`
+
+**Response** `200`:
+
+```json
+{"collection": "docs", "vectors": 199870, "tombstonesBefore": 130, "tombstonesAfter": 0, "elapsedMs": 61234}
+```
+
+`tombstonesAfter` is above zero only when documents were removed or
+overwritten while the graph was rebuilt. `404` when the collection has no
+HNSW graph, `400` without `collection`, `405` for any method but `POST`.
+
+```bash
+curl -X POST http://localhost:11023/v1/vector-compact -d '{"collection":"docs"}'
 ```
 
 ---
@@ -5094,6 +5144,12 @@ a write growing the file waits for long reads to end, and no read can begin
 meanwhile — the answer is `200` with `"status": "busy"` and
 `databaseWaitSeconds`; after `MDDB_HEALTH_STALL_LIMIT` seconds (300) it is
 `503` with `"status": "stalled"`. See [HEALTHCHECK.md](HEALTHCHECK.md).
+
+Since v2.19.8 `vectorIndexCheckpoints` (`fromDisk`, `rebuilt`, `partial`)
+counts the collections whose vector indexes were read from their checkpoint
+at the last load, built from the stored vectors, or partly both; absent when
+checkpoints are off or nothing was loaded yet
+([SEARCH.md](SEARCH.md#index-checkpoints-v2198)).
 
 ---
 

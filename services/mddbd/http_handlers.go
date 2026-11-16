@@ -432,6 +432,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			body["vectorIndex"] = map[string]any{"ready": false, "progress": p}
 		}
 	}
+	if c := s.annHealth(); c != nil { // SRCH-023: read from disk or built, at the last load
+		body["vectorIndexCheckpoints"] = c
+	}
 	code := 200
 	if stalled > 0 { // #350: a read transaction has been waiting this long
 		body["status"] = "busy"

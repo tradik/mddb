@@ -161,6 +161,14 @@ release that wrote it. A database migrated by 2.18.9 is not fully readable by
 2.18.8 (keys written with upper-case letters are found only by their
 lower-case spelling): to go back, restore a backup taken before the upgrade.
 
+The vector index checkpoints (v2.19.8, `mddb.db.ann/` or `*.db.ann` in
+the per-collection directory) are not part of a backup: they are derived from
+the stored vectors. A restore removes them, so the indexes of the restored
+database are built from its own vectors, as at a start without checkpoints,
+and checkpointed again afterwards
+([SEARCH.md](SEARCH.md#index-checkpoints-v2198)). A file-level copy of a
+stopped server may leave them out too.
+
 Before 2.15.4 the check was only a read-only open. That open skips the
 freelist walk, which is where a damaged file fails, so a damaged backup passed
 it. The failure came later, after the live database had been moved aside, and

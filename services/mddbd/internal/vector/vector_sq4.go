@@ -164,13 +164,7 @@ func (s *SQ4Index) Train(collection string, vectors map[string][]float32) {
 			c.scales[d] = 0
 		}
 
-		for level := 0; level < sq4Levels; level++ {
-			if c.scales[d] == 0 {
-				c.levels[d][level] = low
-				continue
-			}
-			c.levels[d][level] = low + float32(level)/c.scales[d]
-		}
+		c.levels[d] = sq4LevelsOf(low, c.scales[d])
 	}
 
 	// A fresh map: codes from an earlier training of another dimension are
@@ -189,6 +183,19 @@ func (s *SQ4Index) Train(collection string, vectors map[string][]float32) {
 	}
 	c.markTrained(len(c.origVecs))
 	s.ready.Store(true)
+}
+
+// sq4LevelsOf is the value each code of a dimension decodes to, given the
+// dimension's lower bound and scale. A checkpoint stores those two and gets
+// the levels back from here (SRCH-023).
+func sq4LevelsOf(low, scale float32) (levels [16]float32) {
+	for level := range levels {
+		levels[level] = low
+		if scale != 0 {
+			levels[level] = low + float32(level)/scale
+		}
+	}
+	return levels
 }
 
 // clipRange returns the percentile bounds of a sorted column.

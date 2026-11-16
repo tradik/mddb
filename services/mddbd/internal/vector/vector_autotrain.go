@@ -31,6 +31,9 @@ type trainState struct {
 	trained    bool
 	trainedOn  int  // vectors the collection held when training finished
 	retraining bool // a background retrain is running; do not start another
+	// trainings counts finished trainings, so a checkpoint written before
+	// the latest one can be told from a current one (SRCH-023).
+	trainings uint64
 }
 
 // markTrained records a finished training over n vectors.
@@ -38,6 +41,7 @@ func (t *trainState) markTrained(n int) {
 	t.trained = true
 	t.trainedOn = n
 	t.retraining = false
+	t.trainings++
 }
 
 // due reports whether a collection holding n vectors should be trained, and

@@ -53,6 +53,10 @@ func (s *Server) shutdownSteps() []shutdownStep {
 	add("bulk-ingest", s.BulkIngest != nil, func() { s.BulkIngest.Stop() })
 	add("index-queue", s.IndexQueue != nil, func() { s.IndexQueue.Shutdown() })
 	add("embedding-worker", s.EmbeddingWorker != nil, func() { s.EmbeddingWorker.Stop() })
+	//    The index checkpoints (SRCH-023), once the last embedding is in the
+	//    indexes and while the database can still say which model made them:
+	//    what is written here, the next start does not rebuild.
+	add("vector-checkpoints", s.checkpointsRunning(), s.stopCheckpoints)
 	//    The spans those queues ended go out before anything else stops
 	//    (OPS-024).
 	add("tracing", s.Tracer != nil, s.shutdownTracing)

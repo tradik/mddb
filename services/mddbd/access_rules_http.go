@@ -94,6 +94,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/schema/delete":     ruleWrite,
 	"/v1/schema/get":        ruleRead,
 	"/v1/vector-reindex":    ruleWrite,
+	"/v1/vector-compact":    ruleWrite,
 	"/v1/fts-reindex":       ruleWrite,
 
 	// Every collection at once.

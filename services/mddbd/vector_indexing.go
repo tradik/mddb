@@ -24,6 +24,14 @@ import (
 // gets back, because a chunk missing from the index it was asked for is a
 // failed chunk whatever the others did.
 func (s *Server) indexChunk(collection, chunkKey string, vec []float32, diskOnly bool) error {
+	return s.indexChunkWhere(collection, chunkKey, vec, diskOnly, nil)
+}
+
+// indexChunkWhere is indexChunk for the load at startup (SRCH-023): an index
+// that was read from the collection's checkpoint already holds the chunk,
+// unless pending names it as one the checkpoint did not cover. A nil pending
+// adds to every index.
+func (s *Server) indexChunkWhere(collection, chunkKey string, vec []float32, diskOnly bool, pending annPending) error {
 	var first error
 	keep := func(err error) {
 		if err != nil && first == nil {
@@ -33,8 +41,8 @@ func (s *Server) indexChunk(collection, chunkKey string, vec []float32, diskOnly
 
 	if !diskOnly {
 		for name, searcher := range s.VectorSearchers {
-			if name == "quantized" {
-				continue // populated below, for disk-only collections too
+			if name == "quantized" || !pending.needs(name, chunkKey) {
+				continue // quantized: populated below, for disk-only collections too
 			}
 			keep(searcher.Add(collection, chunkKey, vec))
 		}

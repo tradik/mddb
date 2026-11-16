@@ -153,8 +153,13 @@ func (v *vectorLoadState) progressLocked(now time.Time) vectorLoadProgress {
 	return p
 }
 
-// vectorLoad is the server's current index load; nil before the first one.
-type vectorLoadRef = atomic.Pointer[vectorLoadState]
+// vectorLoadRef is the server's current index load — nil before the first
+// one — and what the server knows about the index checkpoints the loads read
+// and the background writes (SRCH-023).
+type vectorLoadRef struct {
+	atomic.Pointer[vectorLoadState]
+	persist annPersistence
+}
 
 // errUnknownAlgorithm and vectorLoadingError are readySearcher's refusals.
 var errUnknownAlgorithm = errors.New("unknown algorithm")

@@ -530,6 +530,9 @@ unless the collection's own evaluation set measures hybrid better. The gRPC
 | `MDDB_VECTOR_BQ_RERANK_FACTOR` | `10` | int | Binary quantization rerank factor |
 | `MDDB_VECTOR_PARALLEL_WORKERS` | `NumCPU` (max 16) | int | Number of goroutines for parallel vector scoring |
 | `MDDB_VECTOR_PARALLEL_MIN_SIZE` | `2048` | int | Minimum collection size to enable parallel search |
+| `MDDB_VECTOR_INDEX_PERSIST` | `true` | bool | v2.19.8+: keep each collection's built HNSW graph and IVF / PQ / OPQ / SQ / SQ4 structures in a checkpoint file and read it back at start instead of rebuilding and retraining; anything that cannot be verified is rebuilt as before. `false` = the behaviour before v2.19.8: nothing read, nothing written. See [SEARCH.md](SEARCH.md#index-checkpoints-v2198) |
+| `MDDB_VECTOR_INDEX_CHECKPOINT_INTERVAL_SEC` | `300` | int | v2.19.8+: longest time a collection whose indexes changed waits for its next checkpoint (minimum 1) |
+| `MDDB_VECTOR_INDEX_CHECKPOINT_CHANGES` | `50000` | int | v2.19.8+: vector writes that bring a collection's checkpoint forward, if the last one is at least 10 s and twenty times its own duration old (minimum 1) |
 
 ---
 

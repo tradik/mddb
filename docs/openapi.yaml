@@ -238,6 +238,17 @@ paths:
                     example: wr
                   persistence:
                     $ref: "#/components/schemas/PersistenceStatus"
+                  vectorIndexCheckpoints:
+                    type: object
+                    description: >-
+                      (v2.19.8+, SRCH-023) How many collections had their vector
+                      indexes read from their checkpoint at the last load, built
+                      from the stored vectors, or partly both. Absent when
+                      checkpoints are off or nothing was loaded yet.
+                    properties:
+                      fromDisk: {type: integer}
+                      rebuilt: {type: integer}
+                      partial: {type: integer}
                   durable:
                     type: boolean
                     description: >-
@@ -1639,6 +1650,43 @@ paths:
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "429": {$ref: "#/components/responses/RateLimited"}
+
+  /v1/vector-compact:
+    post:
+      tags:
+        - Vector Search
+      summary: (v2.19.8+) Rebuild a collection's HNSW graph without its tombstones
+      description: |
+        A removed or overwritten document stays in the HNSW graph as a node
+        searches skip, until half of the graph is such nodes. This rebuilds the
+        graph now. The new graph is built beside the one in use, so searches and
+        writes go on; what was written meanwhile is applied when it takes over
+        (SRCH-023).
+      operationId: vectorCompact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ collection ]
+              properties:
+                collection: {type: string}
+      responses:
+        "200":
+          description: The graph was rebuilt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VectorCompactResponse"
+        "400":
+          description: Invalid JSON or no collection
+        "404":
+          description: The collection has no HNSW graph
+        "405":
+          description: Any method but POST
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
 
   /v1/geo-search:
     post:
@@ -11467,6 +11515,14 @@ components:
               chunkMode:
                 type: string
                 description: (v2.18.1+) The collection's chunk mode; absent when it has none
+              indexPersistence:
+                $ref: "#/components/schemas/VectorIndexPersistence"
+              hnswTombstones:
+                type: integer
+                description: >-
+                  (v2.19.8+, SRCH-023) Removed or overwritten nodes the HNSW
+                  graph still carries, which POST /v1/vector-compact clears.
+                  Absent when the server runs no HNSW index.
           description: Per-collection embedding statistics
           example:
             blog:
@@ -11512,6 +11568,57 @@ components:
               description: Maximum characters per chunk
               example: 1500
           description: Chunking configuration
+        indexPersistence:
+          type: object
+          description: (v2.19.8+, SRCH-023) The index checkpoint settings in force.
+          properties:
+            enabled: {type: boolean, description: "MDDB_VECTOR_INDEX_PERSIST, and the database is a file"}
+            formatVersion: {type: integer, description: The checkpoint format this build writes and reads, example: 1}
+            checkpointIntervalSeconds: {type: integer, description: MDDB_VECTOR_INDEX_CHECKPOINT_INTERVAL_SEC, example: 300}
+            checkpointChanges: {type: integer, description: MDDB_VECTOR_INDEX_CHECKPOINT_CHANGES, example: 50000}
+
+    VectorIndexPersistence:
+      type: object
+      description: >-
+        (v2.19.8+, SRCH-023) Where a collection's vector indexes came from at
+        the last load, and its last checkpoint write. Absent when checkpoints
+        are off or the collection was not loaded.
+      properties:
+        source:
+          type: string
+          enum: [ disk, rebuilt, partial ]
+          description: disk — every checkpointed index was read from the file; rebuilt — none was; partial — some were.
+        indexes:
+          type: object
+          additionalProperties: {type: string, enum: [ disk, rebuilt ]}
+          description: The same per index (hnsw, ivf, pq, opq, sq, sq4).
+        reason:
+          type: string
+          description: Why something was rebuilt (no checkpoint, a failed checksum, another format version, another embedding model, stale vectors).
+        loadMs:
+          type: integer
+          description: Time spent reading and matching the checkpoint.
+        caughtUp:
+          type: integer
+          description: Vectors stored after the checkpoint, added to what was read.
+        checkpoint:
+          type: object
+          description: The last checkpoint write; absent until one was attempted.
+          properties:
+            at: {type: string, format: date-time}
+            bytes: {type: integer, format: int64}
+            durationMs: {type: integer, format: int64}
+            indexes: {type: array, items: {type: string}}
+            error: {type: string, description: Present when the write failed; the previous file is kept.}
+
+    VectorCompactResponse:
+      type: object
+      properties:
+        collection: {type: string}
+        vectors: {type: integer, description: Live vectors the rebuilt graph holds}
+        tombstonesBefore: {type: integer}
+        tombstonesAfter: {type: integer, description: Above zero only when documents were removed or overwritten during the rebuild}
+        elapsedMs: {type: integer, format: int64}
 
     FTSSearchRequest:
       type: object

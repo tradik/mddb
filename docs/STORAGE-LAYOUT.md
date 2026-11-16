@@ -72,6 +72,28 @@ Windows do not tell `Blog` from `blog`, and Windows' reserved names (`CON`,
 takes tens of kilobytes (64 KB measured after the first document) and grows
 as it needs to.
 
+## Index checkpoints
+
+Since v2.19.8 the built vector indexes (HNSW graph, IVF, PQ, OPQ, SQ, SQ4)
+of each collection are kept in a checkpoint file, so a start reads them
+instead of building them ([SEARCH.md](SEARCH.md#index-checkpoints-v2198)).
+It is a separate file, not a bbolt bucket: it is large, written as a whole
+and read sequentially.
+
+| Layout | Checkpoint of collection `Blog` |
+|---|---|
+| single | `mddb.db.ann/%42log.ann` |
+| per-collection | `mddb.db.d/%42log.db.ann`, next to `%42log.db` |
+
+The name is the collection file name above. The server never opens a
+`.ann` file as a database, and a file ending in `.ann` is not a collection
+file. A checkpoint is written to `<name>.tmp` and renamed over the old one;
+at start the server removes leftover `.tmp` files, the checkpoints of
+collections that have no vectors any more, and the ones the other layout
+left behind, so switching layouts costs one rebuild. Files are created
+`0600`, the directory `0750`. `MDDB_VECTOR_INDEX_PERSIST=false` neither
+reads, writes nor removes them.
+
 ## Backup and restore
 
 `GET /v1/backup?to=nightly.db` writes `nightly.db` and `nightly.db.d/`.
@@ -86,6 +108,11 @@ older release is migrated as it is installed ([Schema version](#schema-version))
 the backup itself is copied, never changed. A backup taken in
 the single-file layout has no `.d` directory and is refused in the
 per-collection layout: restore it with the single layout, then split.
+
+Backups do not contain the [index checkpoints](#index-checkpoints). A
+restore, and a replication snapshot installed on a follower, removes every
+checkpoint before the indexes are loaded from the new database, which then
+builds them as a start without checkpoints does and writes new ones.
 
 `-verify-db`, `-repair-db` and `-compact-db` take one file. Every file in
 `mddb.db.d/` is an ordinary bbolt file and can be checked, repaired or

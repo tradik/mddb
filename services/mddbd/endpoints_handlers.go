@@ -285,6 +285,7 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 		{Method: "POST", Path: "/v1/vector-search", Description: "Semantic search using embeddings", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/vector-reindex", Description: "Re-embed collection documents", RequiresAuth: authEnabled},
 		{Method: "GET", Path: "/v1/vector-stats", Description: "Vector/embedding statistics", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/vector-compact", Description: "Rebuild a collection's HNSW graph without its tombstones", RequiresAuth: authEnabled},
 
 		// Geo search
 		{Method: "POST", Path: "/v1/geo-search", Description: "Radius search (R-tree or geohash)", RequiresAuth: authEnabled},

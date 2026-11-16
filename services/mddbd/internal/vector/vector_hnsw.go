@@ -2,6 +2,7 @@ package vector
 
 import (
 	"log/slog"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,8 +29,13 @@ type HNSWIndex struct {
 	// superseded by a node under a new key, and a node whose key is not the
 	// current one for its document is a tombstone that searches skip and the
 	// next compaction drops. gen makes the keys unique.
-	nodeKeys       map[string]map[string]string
-	gen            uint64
+	nodeKeys map[string]map[string]string
+	gen      uint64
+	// mutations counts the adds and removes of each collection: what a
+	// checkpoint compares to know whether it is still current (SRCH-023).
+	mutations map[string]uint64
+	// compactMu lets one Compact run at a time; it is taken before mu.
+	compactMu      sync.Mutex
 	ready          atomic.Bool
 	m              int // links per node above layer 0; 2m on layer 0
 	efConstruction int // candidates considered when a node is linked
@@ -82,6 +88,7 @@ func NewHNSWIndex(m, efConstruction, efSearch int) *HNSWIndex {
 		deleted:        make(map[string]int),
 		dims:           make(map[string]int),
 		nodeKeys:       make(map[string]map[string]string),
+		mutations:      make(map[string]uint64),
 		m:              m,
 		efConstruction: efConstruction,
 		efSearch:       efSearch,
@@ -150,6 +157,7 @@ func (h *HNSWIndex) Add(collection, docID string, vector []float32) error {
 	key := h.nextNodeKey(docID)
 	g.Add(key, vector)
 	h.nodeKeys[collection][docID] = key
+	h.mutations[collection]++
 
 	if h.shouldCompactLocked(collection) {
 		h.compactLocked(collection)
@@ -183,6 +191,7 @@ func (h *HNSWIndex) Remove(collection, docID string) {
 	if coll, ok := h.vectors[collection]; ok {
 		if _, existed := coll[docID]; existed {
 			h.deleted[collection]++
+			h.mutations[collection]++
 		}
 		delete(coll, docID)
 	}
@@ -218,7 +227,26 @@ func (h *HNSWIndex) compactLocked(collection string) {
 		h.deleted[collection] = 0
 		return
 	}
+	g, keys := h.buildGraph(collection, live, h.dims[collection], h.reserveKeys(len(live)))
+	h.graphs[collection] = g
+	h.nodeKeys[collection] = keys
+	h.deleted[collection] = 0
+	slog.Debug("HNSW graph compacted", "collection", collection, "vectors", len(live))
+}
 
+// reserveKeys sets aside n node keys and returns the generation before the
+// first, so a graph can be built with them while the lock is not held.
+// Caller must hold the write lock.
+func (h *HNSWIndex) reserveKeys(n int) uint64 {
+	base := h.gen
+	h.gen += uint64(n) // #nosec G115 -- a count of vectors
+	return base
+}
+
+// buildGraph builds a graph of the given vectors, keyed from the generation
+// after base, and returns it with the key of each document's node. It reads
+// nothing of the index that changes, so it needs no lock.
+func (h *HNSWIndex) buildGraph(collection string, live map[string][]float32, dim int, base uint64) (*hnswGraph, map[string]string) {
 	// Sorted, so a rebuild of the same vectors is the same graph: recall must
 	// not change with Go's map iteration order (SRCH-013).
 	docIDs := make([]string, 0, len(live))
@@ -230,16 +258,16 @@ func (h *HNSWIndex) compactLocked(collection string) {
 	g := h.newGraph()
 	keys := make(map[string]string, len(live))
 	skipped := 0
-	for _, docID := range docIDs {
+	for i, docID := range docIDs {
 		vec := live[docID]
 		// A rebuild must not be aborted by one unusable vector. Add refuses
 		// these now, but a process that has been running since before it did
 		// may still hold one (#252).
-		if err := CheckVector(vec, h.dims[collection]); err != nil {
+		if err := CheckVector(vec, dim); err != nil {
 			skipped++
 			continue
 		}
-		key := h.nextNodeKey(docID)
+		key := docID + "\x00" + strconv.FormatUint(base+uint64(i)+1, 36) // #nosec G115 -- an index into docIDs
 		g.Add(key, vec)
 		keys[docID] = key
 	}
@@ -247,20 +275,88 @@ func (h *HNSWIndex) compactLocked(collection string) {
 		slog.Warn("HNSW compaction skipped vectors the graph cannot hold",
 			"collection", collection, "skipped", skipped, "vectors", len(live))
 	}
-
-	h.graphs[collection] = g
-	h.nodeKeys[collection] = keys
-	h.deleted[collection] = 0
-	slog.Debug("HNSW graph compacted", "collection", collection, "vectors", len(live))
+	return g, keys
 }
 
 // Compact rebuilds a collection's graph from its live vectors regardless of
 // how much has been deleted, so an operator can reclaim a degraded graph on
 // demand.
+//
+// The new graph is built without the index's lock (SRCH-023): searches and
+// writes of every collection go on against the old graph, which a rebuild of
+// 200,000 vectors would otherwise stop for about a minute. What was written
+// to the collection meanwhile is applied when the new graph takes over, under
+// the lock, and that part is as short as the writes were few.
 func (h *HNSWIndex) Compact(collection string) {
+	h.compactMu.Lock()
+	defer h.compactMu.Unlock()
+
+	h.mu.Lock()
+	if len(h.vectors[collection]) == 0 {
+		h.compactLocked(collection) // nothing alive: nothing to build
+		h.mu.Unlock()
+		return
+	}
+	old := h.graphs[collection]
+	live := maps.Clone(h.vectors[collection])
+	before := maps.Clone(h.nodeKeys[collection])
+	dim := h.dims[collection]
+	base := h.reserveKeys(len(live))
+	h.mu.Unlock()
+
+	g, keys := h.buildGraph(collection, live, dim, base)
+	if hnswCompactBuilt != nil {
+		hnswCompactBuilt()
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.compactLocked(collection)
+	if len(h.vectors[collection]) == 0 {
+		h.compactLocked(collection) // emptied or dropped meanwhile: no graph to keep
+		return
+	}
+	if h.graphs[collection] != old {
+		return // rebuilt by the writes that came meanwhile; that graph is newer
+	}
+	h.deleted[collection] = h.catchUpLocked(collection, g, keys, before)
+	h.graphs[collection] = g
+	h.nodeKeys[collection] = keys
+	h.mutations[collection]++
+	slog.Debug("HNSW graph compacted", "collection", collection, "vectors", len(keys))
+}
+
+// hnswCompactBuilt, when set by a test, runs between Compact's build and its
+// takeover: the moment at which concurrent writes have to be caught up.
+var hnswCompactBuilt func()
+
+// catchUpLocked brings a graph built from an earlier copy of a collection up
+// to date: a document removed or overwritten since is no longer the built
+// node — that one becomes a tombstone — and a document added or overwritten
+// since gets a node for the vector it has now. before is the node keys the
+// copy was taken with. It returns the tombstones the graph now carries.
+// Caller must hold the write lock.
+func (h *HNSWIndex) catchUpLocked(collection string, g *hnswGraph, keys, before map[string]string) int {
+	current := h.nodeKeys[collection]
+	dead := 0
+	for docID := range keys {
+		if current[docID] != before[docID] {
+			delete(keys, docID)
+			dead++
+		}
+	}
+	var late []string
+	for docID := range current {
+		if _, built := keys[docID]; !built && CheckVector(h.vectors[collection][docID], h.dims[collection]) == nil {
+			late = append(late, docID)
+		}
+	}
+	sort.Strings(late)
+	for _, docID := range late {
+		key := h.nextNodeKey(docID)
+		g.Add(key, h.vectors[collection][docID])
+		keys[docID] = key
+	}
+	return dead
 }
 
 // DeletedSince reports how many vectors have been removed from a collection

@@ -159,6 +159,9 @@ func (s *Server) rebuildInMemoryState() {
 	if s.VectorIndex != nil && s.VectorStore != nil {
 		s.VectorStore = vector.NewVectorStore(s.DB)
 		s.VectorStore.SetRouter(s.router()) // #336
+		// SRCH-023: the index checkpoints describe the database that was
+		// just replaced; the reload must not find them.
+		s.invalidateCheckpoints()
 		go s.loadVectorIndex()
 	}
 
