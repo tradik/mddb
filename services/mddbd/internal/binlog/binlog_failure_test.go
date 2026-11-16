@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -207,9 +208,13 @@ func TestARewriteOfAClosedLogIsRefused(t *testing.T) {
 func TestRotateFailures(t *testing.T) {
 	bl := openIn(t, t.TempDir(), BinlogConfig{})
 	appendN(t, bl, 3)
-	_ = os.Remove(bl.path)
-	if err := bl.Rotate(2); err == nil {
-		t.Error("Rotate of a log whose file is gone reported success")
+	// Windows refuses to remove a file that is open, so the log cannot lose
+	// its file there; the case is checked where it can happen.
+	if runtime.GOOS != "windows" {
+		_ = os.Remove(bl.path)
+		if err := bl.Rotate(2); err == nil {
+			t.Error("Rotate of a log whose file is gone reported success")
+		}
 	}
 	bl.mu.Lock()
 	bl.failed = errInjected

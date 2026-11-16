@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -344,19 +345,24 @@ func TestStoreErrors(t *testing.T) {
 	if NewStore(path).Path() != path {
 		t.Fatal("path")
 	}
-	if err := os.Chmod(dir, 0o500); err != nil { // #nosec G302 -- a read-only directory makes the save fail on purpose
+	// A directory where the temporary file belongs makes the save fail on
+	// every system, for root too.
+	if err := os.Mkdir(path+".tmp", 0o700); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = os.Chmod(dir, 0o700) }() // #nosec G302 -- restores the test directory so t.TempDir can remove it
-	if os.Geteuid() != 0 {
-		if err := NewStore(path).save(vote{Term: 1}); err == nil {
-			t.Fatal("saved into a read-only directory")
-		}
+	if err := NewStore(path).save(vote{Term: 1}); err == nil {
+		t.Fatal("saved over a directory")
 	}
-	if err := os.Chmod(path, 0); err == nil && os.Geteuid() != 0 {
-		if _, err := NewStore(path).load(); err == nil {
-			t.Fatal("read an unreadable store")
-		}
+	// Permission bits do not stop a read on Windows, nor for root.
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		return
+	}
+	if err := os.Chmod(path, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(path, 0o600) }() // #nosec G302 -- lets t.TempDir remove the file
+	if _, err := NewStore(path).load(); err == nil {
+		t.Fatal("read an unreadable store")
 	}
 }
 
