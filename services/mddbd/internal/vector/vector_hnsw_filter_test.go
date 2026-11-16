@@ -38,7 +38,7 @@ func TestHNSWFilterStrategy(t *testing.T) {
 		admitted, vectors int
 		want              string
 	}{
-		{0, 0, FilterStrategyGraph}, // nothing to scan either way
+		{0, 0, FilterStrategyPrefilter}, // nothing to scan
 		{10, 1_000, FilterStrategyPrefilter},
 		{20_000, 200_000, FilterStrategyGraph},
 		{19_999, 200_000, FilterStrategyPrefilter},
@@ -49,7 +49,7 @@ func TestHNSWFilterStrategy(t *testing.T) {
 			t.Errorf("HNSWFilterStrategy(%d, %d) = %s, want %s", c.admitted, c.vectors, got, c.want)
 		}
 	}
-	if HNSWFilterMinShare(0) != 1 || HNSWFilterMinShare(100) != 1 {
+	if HNSWFilterMinShare(0) != 1 || HNSWFilterMinShare(10) != 1 {
 		t.Error("a collection too small for the walk to pay must report a share of 1")
 	}
 	if got := HNSWFilterMinShare(200_000); math.Abs(got-0.1) > 0.001 {
@@ -59,8 +59,8 @@ func TestHNSWFilterStrategy(t *testing.T) {
 
 // The planner's estimates order the three ways the measurements did.
 func TestFilterCosts(t *testing.T) {
-	small := FilterCosts{Vectors: 20_000, Admitted: 5_000, TopK: 30} // 25% of 20k: ivf, then the scan
-	if !(small.IVF() < small.Prefilter() && small.Prefilter() < small.Graph()) {
+	small := FilterCosts{Vectors: 20_000, Admitted: 5_000, TopK: 30} // 25% of 20k: ivf, then the walk
+	if !(small.IVF() < small.Graph() && small.Graph() < small.Prefilter()) {
 		t.Errorf("20k at 25%%: ivf %.0f, graph %.0f, prefilter %.0f", small.IVF(), small.Graph(), small.Prefilter())
 	}
 	tenth := FilterCosts{Vectors: 200_000, Admitted: 20_000, TopK: 30} // 10% of 200k: ivf

@@ -120,13 +120,7 @@ func (idx *IVFIndex) Train(collection string, vectors map[string][]float32) {
 	vectors, _ = sameDimension(vectors)
 
 	// Determine number of clusters: sqrt(N), min 1, max 256
-	nClusters := int(math.Sqrt(float64(len(vectors))))
-	if nClusters < 1 {
-		nClusters = 1
-	}
-	if nClusters > 256 {
-		nClusters = 256
-	}
+	nClusters := ivfClusters(len(vectors))
 
 	// Collect all vectors into a slice
 	vecs := make([][]float32, 0, len(vectors))
@@ -232,6 +226,12 @@ func (idx *IVFIndex) SearchWithFilterWiden(collection string, query []float32, t
 		return allowed[BaseDocID(docID)]
 	}
 	return idx.searchClusters(c, query, topK, threshold, metric, probeIndices, filter)
+}
+
+// ivfClusters is how many clusters Train makes of n vectors: √n, from 1 to
+// 256. The planner's cost estimate sizes them the same way (FilterCosts).
+func ivfClusters(n int) int {
+	return min(max(int(math.Sqrt(float64(n))), 1), 256)
 }
 
 // ivfFilterDepth is how many times topK admitted vectors a filtered search

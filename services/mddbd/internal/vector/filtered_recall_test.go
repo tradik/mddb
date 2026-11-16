@@ -78,7 +78,7 @@ func (f filteredGate) fill(t *testing.T, idx VectorSearcher) {
 }
 
 // The graph walk itself, whatever strategy FilterSearch would pick for a
-// corpus this size: at 4,000 vectors it scores every filter under 71%
+// corpus this size: at 4,000 vectors it scores every filter under a third
 // exactly, so the walk is called directly. Measured: 1.000 at every
 // selectivity.
 func TestHNSWFilteredWalkRecall(t *testing.T) {

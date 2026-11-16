@@ -1068,8 +1068,8 @@ collection the filter admits, and the request:
 | 10,000 to 1,000,000 vectors | `hnsw` |
 | More than 1,000,000 vectors | `ivf` |
 | Vectors over 256 MB / 1 GB at float32 | `sq` / `sq4`, then `bq`, if built |
-| A filter admitting under √(800 / vectors) of the collection — 20% at 20k vectors, 6.3% at 200k, 2% at 2M (v2.19.8) | `flat` over the admitted documents only (`prefilter: true`, `strategy: "prefilter"`) |
-| A broader filter, where `hnsw` would answer (v2.19.8) | `hnsw`, walking the graph with the filter (`strategy: "graph+filter"`) |
+| A filter for which scoring the admitted documents exactly is cheapest — under about 20% of 20k vectors, 10% of 200k, 5% of 2M (v2.19.8) | `flat` over the admitted documents only (`prefilter: true`, `strategy: "prefilter"`) |
+| A broader filter, where `hnsw` would answer (v2.19.8) | `hnsw` walking the graph with the filter (`strategy: "graph+filter"`), or a trained `ivf` when probing its clusters is estimated cheaper |
 | Collection configured for quantization or disk-only vectors | its `quantized` index |
 | `latencyTargetMs` of 10 or less on 10,000+ vectors | `bq`, `sq4` or `sq`, if built |
 
@@ -1120,7 +1120,7 @@ curl -X POST http://localhost:11023/v1/vector-search \
   "strategy": "prefilter",
   "candidates": 15,
   "reasons": [
-    "flat with a prefilter: the filter admits 312 documents of 48210 vectors (0.6%); under 12.9% of a collection this size, scoring exactly what it admits is cheaper than walking an index past what it refuses"
+    "flat with a prefilter: the filter admits 312 documents of 48210 vectors (0.6%), and scoring exactly what it admits costs less than searching an index past what it refuses"
   ]
 }
 ```
@@ -1154,70 +1154,75 @@ filter admits. How that is done depends on how much it admits.
 
 **HNSW walks its graph with the filter.** Until v2.19.8 HNSW asked its graph
 for 3× topK neighbours (at least 50), dropped what the filter refused, and
-when fewer than topK were left scored the whole collection: 27, 36 and 46 ms
-at 200k vectors for filters admitting 2, 10 and 25%. Now the filter is part of
-the walk. A node the filter refuses is still used to move through the graph,
-because the admitted nodes may only be reachable through it, but it is never
-returned, and the walk ends once it holds the 64 nearest admitted nodes it can
-find (efSearch, counted over admitted nodes only). Each node is asked about
-once, when the walk first reaches it.
+when fewer than topK were left scored the whole collection. Now the filter is
+part of the walk. A node the filter refuses is still used to move through the
+graph, because the admitted nodes may only be reachable through it, but it is
+never returned. The beam counts admitted nodes only: `efSearch × √share`,
+never under topK. Each node is asked about once, when the walk first reaches
+it.
 
 **A selective filter is scored exactly.** The walk passes about 1/share nodes
-for every admitted one it keeps, so its cost grows as the filter narrows; the
-exact scan of what the filter admits costs one lookup and one comparison per
-admitted document and shrinks with it. HNSW scores the admitted documents
-exactly when `admitted² < 800 × vectors` — under 20% of 20k vectors, 6.3% of
-200k, 2% of 2M — and walks the graph otherwise. `auto` and an explicit
-`"algorithm": "hnsw"` decide by the same rule; `explain` shows which ran as
-`strategy`. The whole-collection fallback is gone: if a walk ever comes back
+for every admitted one it keeps, so it slows as the filter narrows; the exact
+scan costs one lookup and one comparison per admitted document and speeds up.
+HNSW estimates both — the scan at one unit per admitted document, the walk at
+`2000 × (vectors ÷ 200k)^0.4 ÷ share` — and takes the cheaper: the scan under
+about 20% of 20k vectors, 10% of 200k and 5% of 2M, the walk otherwise.
+An explicit `"algorithm": "hnsw"` follows this rule, and `explain` shows what
+ran as `strategy`. The whole-collection fallback is gone: if a walk comes back
 with fewer than topK (the filter admits documents that have no vector yet,
 or the graph is in pieces), the admitted documents are scored exactly and
 `mddb_operations_total{operation="vector_filter_fallback"}` counts it.
 
-The constant comes from measuring both on 128-dimension clustered corpora
-in-process (`go test`, `topK` 10, efSearch 64):
+Measured in-process at 200k vectors on the benchmark harness's corpus (128
+dimensions, topics of 200 documents, topK 30 as the server asks for 10),
+200 queries, p50 / p95 in ms:
 
-| Vectors | Filter | Exact scan | Graph walk | Recall@10 (walk) |
-|---|---|---|---|---|
-| 20k | 10% | 0.16 ms | 0.53 ms | 1.000 |
-| 20k | 20% | 0.24 ms | 0.30 ms | 1.000 |
-| 20k | 25% | 0.27 ms | 0.21 ms | 1.000 |
-| 20k | 50% | 0.47 ms | 0.13 ms | 1.000 |
-| 200k | 2% | 1.20 ms | 4.49 ms | 1.000 |
-| 200k | 5% | 0.55 ms | 0.63 ms | 1.000 |
-| 200k | 7% | 0.67 ms | 0.49 ms | 1.000 |
-| 200k | 10% | 1.22 ms | 0.42 ms | 0.999 |
-| 200k | 25% | 2.77 ms | 0.28 ms | 1.000 |
-| 200k | 50% | 4.70 ms | 0.25 ms | 0.990 |
+| Filter | 2.19.7 HNSW | Exact scan | Walk | IVF | 2.19.8 HNSW runs |
+|---|---|---|---|---|---|
+| 1% | 9.6 / 15.8 | 0.22 / 0.48 | 12.6 / 16.4 | 0.44 / 0.70 (recall 0.65) | scan |
+| 2% | 15.6 / 19.0 | 0.31 / 0.41 | 5.9 / 8.0 | 0.36 / 0.50 (recall 0.67) | scan |
+| 10% | 23.6 / 29.7 | 1.02 / 1.54 | 1.03 / 1.31 | 0.44 / 0.58 | walk |
+| 15% | 29.2 / 36.1 | 1.89 / 2.45 | 0.70 / 1.02 | 0.59 / 0.77 | walk |
+| 25% | 36.8 / 43.6 | 2.39 / 2.97 | 0.46 / 0.64 | 0.70 / 0.96 | walk |
+| 50% | 0.33 / 0.45 | 4.73 / 5.96 | 0.34 / 0.47 | 1.10 / 1.51 | walk |
 
-The walk overtakes the scan between 20 and 25% at 20k and between 5 and 7% at
-200k; `800` puts the switch at 20% and 6.3%.
+Recall@10 was 1.000 for the exact scan and 0.98–1.000 for the walk. The
+walk overtook the scan at about 10% here, and between 10 and 15% at 20k
+vectors; on a corpus with topics of 2,000 documents it did so at 6% of 200k.
+The estimate puts the switch at 10% of 200k and errs towards the scan, which is
+exact.
 
-Two variants the ticket proposed were measured and left out. Also visiting
-the neighbours of a refused neighbour (two hops) made the walk 2–9× slower
-from 2% to 50% at 20k vectors and gained nothing at 1%. Skipping refused
-nodes and moving only through two-hop admitted ones lost recall (0.89 at 20k
-and 0.94 at 200k vectors for a 1% filter) and stayed 7–30× slower than the
-exact scan. An allow-list built as a bitmap before the walk costs one lookup
-per admitted document — the exact scan's cost before any walk — where asking
-per node touched costs only for the nodes the walk reaches.
+The beam: with a fixed beam of 64 admitted nodes, topK 10, the walk took
+2.77, 1.02 and 0.56 ms at 10, 25 and 50%; with `64 × √share` 0.75, 0.47 and
+0.42 ms, both at recall@10 1.000. A beam of topK alone fell to 0.972 at 50%.
+
+Two variants were measured and left out. Also visiting the neighbours of a
+refused neighbour (two hops) made the walk 2–9× slower from 2 to 50% at 20k
+vectors and gained nothing at 1%. Moving only through admitted nodes, one
+or two hops away, lost recall (0.89 at 20k and 0.94 at 200k vectors for a
+1% filter) and stayed 7–30× slower than the exact scan. An allow-list built
+as a bitmap over node ids before the walk costs one lookup per admitted
+document — the exact scan's cost before any walk — where asking per node
+costs only for the nodes the walk reaches.
 
 **`auto` compares three costs.** For a filter on a collection HNSW would
-answer, the planner estimates the exact scan (admitted documents), the walk
-(800 ÷ share) and, when IVF is trained, IVF (2 × the vectors in the clusters
-it would probe) and takes the cheapest. At 20k vectors and 25% that is IVF
-(0.84 ms through the server where the walk took 1.30); at 200k and 10% it is
-the walk. The other indexes (`sq`, `sq4`, `bq`, `pq`, `opq`) filter what they
-scan and keep the iterative scan.
+answer, the planner estimates the exact scan (one unit per admitted
+document), the walk (above) and, when IVF is trained, IVF (1.4 per
+vector in the clusters it would probe) and takes the cheapest. At 200k
+vectors that is the scan under 5.5%, IVF from there to about 18%, and the walk above;
+at 20k, IVF from about 10 to 40% and the walk above.
+The other indexes (`sq`, `sq4`, `bq`, `pq`, `opq`) filter what they scan and
+keep the iterative scan.
 
 **IVF probes until the filter is satisfied.** IVF probed its 10 nearest
-clusters whatever the filter. Behind a filter admitting 2% those hold a
-handful of admitted vectors, and recall@10 was 0.77. A filtered IVF search
-now probes at least 10 clusters, and more, nearest first, until the probed
-clusters are expected to hold 10 × topK admitted vectors: recall@10 1.000 at
-1, 2, 10, 25 and 50% on the recall gate's corpus
-(`TestIVFFilteredRecall`), where 10 clusters alone found 0.55 and 0.77 at
-1 and 2%.
+clusters whatever the filter; behind a 2% filter those hold a handful of
+admitted vectors, and recall@10 was 0.77. A filtered IVF search now probes at
+least 10 clusters, and more, nearest first, until the probed clusters are
+expected to hold 10 × topK admitted vectors: recall@10 1.000 at 1, 2, 10, 25
+and 50% on the recall gate's corpus (`TestIVFFilteredRecall`), where 10
+clusters alone found 0.55 and 0.77 at 1 and 2%. On the harness's corpus at
+200k, where a 1% filter leaves two documents per topic, IVF still finds
+0.65 — `auto` scores such filters exactly.
 
 ### API Examples
 

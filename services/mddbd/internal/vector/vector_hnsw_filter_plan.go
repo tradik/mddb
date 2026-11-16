@@ -16,31 +16,38 @@ const (
 	FilterStrategyPrefilter = "prefilter"
 )
 
-// HNSWFilterCrossover decides between the two. The exact scan costs one
-// lookup and one comparison per admitted document, so it grows with
-// share × vectors; the walk passes about 1/share nodes per admitted one it
-// keeps, so it grows as the share narrows, and only slowly with the
-// collection. They cross about where share² × vectors equals a constant,
-// and this is it, measured on the benchmark harness's corpus (TEST-005: 128
-// dimensions, topics of 200 documents, topK 30 as the server asks for 10):
-// the walk overtook the scan between 10 and 15% at 20k vectors and at about
-// 10% at 200k. 2000 puts the switch at 32% of 20k (where the scan is within
-// 0.1 ms of the walk), 10% of 200k and 3.2% of 2M. On corpora whose topics
-// are larger the walk pays earlier — 6% of 200k with topics of 2,000 — so the
-// constant errs towards the scan, which is exact and costs what the filter
-// admits. docs/SEARCH.md, "Filtered search", has the measurements.
-const HNSWFilterCrossover = 2000
+// What each way of answering a filter costs, in units of one admitted
+// document scored by the exact scan (SRCH-024). Measured on the benchmark
+// harness's corpus (TEST-005: 128 dimensions, topics of 200 documents, topK
+// 30 as the server asks for 10); docs/SEARCH.md, "Filtered search", has the
+// tables.
+//
+//   - The exact scan costs one unit per admitted document: 60–62 ns.
+//   - The walk passes about 1/share nodes per admitted one it keeps, so it
+//     costs walkCost(vectors) / share. The constant grows with the graph's
+//     depth and spread: about 800 at 20k vectors (0.10 ms at 50%) and 2000
+//     at 200k (1.03 ms at 10%, 0.46 ms at 25%). walkCost interpolates it as
+//     2000 × (vectors / 200k)^0.4.
+//   - IVF pays 1.4 units per vector in the clusters it probes: 97 ns a vector
+//     at 20k and 74 ns at 200k in-process, and through the server at 20k and
+//     10% it answered in 0.59 ms where the exact scan took 0.72.
+//
+// The walk and the scan then cross at 20% of 20k vectors, 10% of 200k and
+// 5% of 2M. On corpora with larger topics the walk pays earlier (6% of 200k
+// with topics of 2,000), so the estimate errs towards the scan, which is
+// exact.
+const (
+	walkCostAt200k = 2000
+	ivfScanCost    = 1.4
+)
 
-// ivfScanCost is what IVF pays per vector it probes, against one admitted
-// vector scored by the exact scan: it walks cluster maps and asks the filter
-// about every vector. Measured on the harness's corpus: 97 ns a probed
-// vector at 20k and 74 ns at 200k, against 62 and 60 ns per admitted
-// document for the exact scan.
-const ivfScanCost = 1.5
+// walkCost is the constant of the walk's cost for a graph of n vectors.
+func walkCost(n int) float64 {
+	return walkCostAt200k * math.Pow(float64(max(n, 1))/200_000, 0.4)
+}
 
-// FilterCosts estimates what each way of answering a filter costs, in units
-// of one admitted vector scored by the exact scan, for the planner to
-// compare (SRCH-024). TopK is the number of candidates asked for.
+// FilterCosts estimates what each way of answering a filter costs, for the
+// planner to compare. TopK is the number of candidates asked for.
 type FilterCosts struct {
 	Vectors, Admitted, TopK int
 }
@@ -56,11 +63,10 @@ func (c FilterCosts) share() float64 {
 // Prefilter is the exact scan: one unit per admitted document.
 func (c FilterCosts) Prefilter() float64 { return float64(c.Admitted) }
 
-// Graph is the filtered walk: it passes about 1/share nodes per admitted
-// one it keeps; HNSWFilterCrossover is the constant in front.
+// Graph is the filtered walk.
 func (c FilterCosts) Graph() float64 {
 	if s := c.share(); s > 0 {
-		return HNSWFilterCrossover / s
+		return walkCost(c.Vectors) / s
 	}
 	return math.Inf(1)
 }
@@ -72,8 +78,7 @@ func (c FilterCosts) IVF() float64 {
 	if s <= 0 {
 		return math.Inf(1)
 	}
-	clusters := min(max(int(math.Sqrt(float64(c.Vectors))), 1), 256) // as Train sizes them
-	probed := max(float64(DefaultIVFNProbe*c.Vectors/clusters), float64(ivfFilterDepth*c.TopK)/s)
+	probed := max(float64(DefaultIVFNProbe*c.Vectors/ivfClusters(c.Vectors)), float64(ivfFilterDepth*c.TopK)/s)
 	return ivfScanCost * min(probed, float64(c.Vectors))
 }
 
@@ -103,22 +108,24 @@ type FilterSearcher interface {
 }
 
 // HNSWFilterStrategy is the strategy HNSW takes for a filter admitting
-// admitted documents of a collection of vectors.
+// admitted documents of a collection of vectors: the walk unless the exact
+// scan is estimated cheaper.
 func HNSWFilterStrategy(admitted, vectors int) string {
-	if float64(admitted)*float64(admitted) < HNSWFilterCrossover*float64(vectors) {
+	c := FilterCosts{Vectors: vectors, Admitted: admitted}
+	if c.Prefilter() < c.Graph() {
 		return FilterStrategyPrefilter
 	}
 	return FilterStrategyGraph
 }
 
 // HNSWFilterMinShare is the smallest share of a collection of vectors a
-// filter must admit for HNSW to walk its graph: where HNSWFilterStrategy
-// changes, for explain.
+// filter must admit for HNSW to walk its graph, where HNSWFilterStrategy
+// changes: √(walkCost / vectors).
 func HNSWFilterMinShare(vectors int) float64 {
 	if vectors <= 0 {
 		return 1
 	}
-	return min(1, math.Sqrt(HNSWFilterCrossover/float64(vectors)))
+	return min(1, math.Sqrt(walkCost(vectors)/float64(vectors)))
 }
 
 // SearchWithFilter implements VectorSearcher; see FilterSearch.

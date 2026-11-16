@@ -24,7 +24,7 @@ package vector
 //     walk 2–9× slower at 20k vectors from 2 to 50% and gained nothing at 1%;
 //     skipping refused nodes altogether in favour of two hops lost recall
 //     (0.89 at 20k and 0.94 at 200k vectors for a 1% filter) while staying
-//     10–20× slower than the exact scan the planner uses there. The walk
+//     7–30× slower than the exact scan the planner uses there. The walk
 //     does not get stuck without two hops: it never stops at a refused node;
 //   - an allow-list built before the walk, a bitmap over node ids, costs one
 //     lookup per admitted document: what the exact scan costs, before any walk.
