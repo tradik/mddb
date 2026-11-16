@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,9 +16,12 @@ import (
 // moveLoad writes and reads a collection through every node until finish,
 // and keeps the keys whose writes were acknowledged and every error seen.
 type moveLoad struct {
-	mu      sync.Mutex
-	acked   []string
-	errs    []string
+	mu    sync.Mutex
+	acked []string
+	errs  []string
+	// refused counts writes held past the fence timeout and refused with
+	// errFenceHeld: not written, to be retried by a client (docs/CLUSTER.md).
+	refused int
 	reads   int
 	writes  int
 	stop    chan struct{}
@@ -49,9 +53,12 @@ func (l *moveLoad) write(tp *testPlacement, c string, w int) {
 		err := node.add(c, key, "written during the move "+key)
 		l.mu.Lock()
 		l.writes++
-		if err != nil {
+		switch {
+		case err != nil && strings.Contains(err.Error(), errFenceHeld.Error()):
+			l.refused++
+		case err != nil:
 			l.errs = append(l.errs, "write "+key+" via "+node.id+": "+err.Error())
-		} else {
+		default:
 			l.acked = append(l.acked, key)
 		}
 		l.mu.Unlock()
@@ -118,7 +125,7 @@ func TestPlacementMoveUnderLoadLosesNoWriteAndServesReads(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond)
 	load.finish()
-	t.Logf("move %s→%s: %+v; %d writes, %d reads during it", from, to, moved.Move, load.writes, load.reads)
+	t.Logf("move %s→%s: %+v; %d writes (%d refused while held past the fence timeout), %d reads during it", from, to, moved.Move, load.writes, load.refused, load.reads)
 	if len(load.errs) > 0 {
 		t.Fatalf("%d of %d requests failed, first: %s", len(load.errs), load.writes+load.reads, load.errs[0])
 	}

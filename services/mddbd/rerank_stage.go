@@ -143,8 +143,7 @@ func rerankItems[T any](ctx context.Context, s *Server, r *rerankRun, items []T,
 	if r == nil {
 		return items
 	}
-	// The pool never exceeds the configured ceiling, whatever a request asks.
-	n := min(len(items), r.candidates, rerank.MaxCandidatesCeiling)
+	n := rerankPoolSize(len(items), r.candidates)
 	cands := items[:n]
 	if reason := rerankPrecheck(s, r, cands, acc); reason != "" {
 		r.skip(s, reason)
@@ -251,11 +250,28 @@ func rerankMoves[T any](r *rerankRun, cands []T, acc rerankAccess[T], scored []r
 	return moves
 }
 
+// rerankPoolSize is how many of available items go to the model: the
+// requested number, never more than there are and never more than the
+// configured ceiling, whatever a request asks.
+func rerankPoolSize(available, requested int) int {
+	n := requested
+	if n > available {
+		n = available
+	}
+	if n > rerank.MaxCandidatesCeiling {
+		n = rerank.MaxCandidatesCeiling
+	}
+	if n < 0 {
+		n = 0
+	}
+	return n
+}
+
 // reorder puts the scored candidates first, best first, then candidates the
 // model did not score in their old order, then the items beyond the pool.
 // Indexes come from a validated answer: in range, each once.
 func reorder[T any](items []T, n int, scored []rerank.Scored) []T {
-	n = min(n, len(items), rerank.MaxCandidatesCeiling)
+	n = rerankPoolSize(len(items), n)
 	out := make([]T, 0, len(items))
 	placed := make([]bool, n)
 	for _, sc := range scored {

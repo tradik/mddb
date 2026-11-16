@@ -437,7 +437,11 @@ The meta leader runs a move:
    Document bodies kept in an external storage backend are not deleted.
 
 No acknowledged write is lost: every write the source took is in the copy,
-and it takes none after the fence. Reads are served throughout, by the
+and it takes none after the fence. A write held longer than
+`MDDB_PLACEMENT_FENCE_TIMEOUT` (a slow switch, on a loaded machine) is
+refused with `503` and `{"error":"the collection is being moved to another
+node group; retry shortly"}` (gRPC `UNAVAILABLE`); it was not written, and a
+client should retry it. Reads are served throughout, by the
 source until the switch and by the target after it. A failure before the
 switch gives the move up: the map clears the mark, the fence lifts, the
 collection stays where it was, and the target drops what it copied (after

@@ -133,7 +133,10 @@ The pull-request gate in CI compares against `docs/benchmarks/ci/`, results
 recorded by the `bench-profile` workflow on a hosted runner, not against the
 desktop results the tables below show: the two machines differ in how fast
 memory-bound scans run next to graph searches, so a desktop baseline would
-fail sound changes. To refresh it, run the workflow by hand and commit its
+fail sound changes. Hosted runners also vary in processor; when the runner's
+processor differs from the baseline's, a p95 difference is reported as a
+warning and only recall, lost writes and replication can fail the job. To
+refresh it, run the workflow by hand and commit its
 `bench-run/result.json` artifact as `docs/benchmarks/ci/<version>-small.json`.
 
 The harness builds `mddbd` from the tree and starts its own servers on free

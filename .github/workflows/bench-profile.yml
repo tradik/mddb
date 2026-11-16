@@ -118,6 +118,18 @@ jobs:
             run -only search -out bench-run/confirm.json
             rc=$?
           fi
+          # Hosted runners come with different processors, and a graph walk
+          # and a memory scan do not slow down alike on another one: p95
+          # shares hold only against a baseline from the same processor.
+          # Recall, lost writes and replication are compared everywhere.
+          if [ "${rc}" -eq 3 ] && [ -n "${BASELINE}" ]; then
+            want=$(jq -r '.environment.cpu // ""' "${BASELINE}")
+            got=$(jq -r '.environment.cpu // ""' bench-run/result.json)
+            if [ "${want}" != "${got}" ]; then
+              echo "::warning::p95 differs from a baseline recorded on another processor (${want} vs ${got}); not failing on latency"
+              rc=0
+            fi
+          fi
           exit "${rc}"
 
       - name: Upload the result
