@@ -167,6 +167,14 @@ func (tp *testPlacement) boot(n *placementNodeT) {
 	n.s.placement.start()
 }
 
+// stopLoop stops p's placement loop for the rest of the test. A test that
+// fences a collection itself needs it: the loop lifts every fence no move
+// in the map is switching, and would lift the test's at its next round.
+func stopLoop(p *placementRuntime) {
+	p.shutdown()
+	p.stop = nil // stopAll's shutdown has nothing left to stop
+}
+
 func (tp *testPlacement) stopAll() {
 	for _, n := range tp.nodes {
 		n.http.Close()

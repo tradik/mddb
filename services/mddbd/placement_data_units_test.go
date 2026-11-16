@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -306,16 +307,24 @@ func TestPlacementApplyCopiedRefusals(t *testing.T) {
 	put := func(bucket, key string) *proto.BinlogEntryProto {
 		return &proto.BinlogEntryProto{Type: uint32(binlog.BinlogPut), BucketName: bucket, Key: []byte(key), Value: []byte("v")}
 	}
-	cases := map[string][]*proto.BinlogEntryProto{
-		"a bucket removed":      {{Type: uint32(binlog.BinlogDeleteBucket), BucketName: "docs"}},
-		"another group's file":  {put("docs", "doc|"+theirs+"|k")},
-		"another group's":       {put("colmeta", theirs)},
-		"an unknown entry type": {{Type: 99, BucketName: "colmeta", Key: []byte(theirs)}},
+	cases := []struct {
+		name    string
+		entries []*proto.BinlogEntryProto
+	}{
+		{"a bucket removed", []*proto.BinlogEntryProto{{Type: uint32(binlog.BinlogDeleteBucket), BucketName: "docs"}}},
+		{"another group's file", []*proto.BinlogEntryProto{put("docs", "doc|"+theirs+"|k")}},
+		{"another group's", []*proto.BinlogEntryProto{put("colmeta", theirs)}},
+		{"an unknown entry type", []*proto.BinlogEntryProto{{Type: 99, BucketName: "colmeta", Key: []byte(theirs)}}},
 	}
-	for name, entries := range cases {
-		if err := p.applyCopied(theirs, entries); err == nil {
-			t.Errorf("%s: applied", name)
+	for _, c := range cases {
+		if err := p.applyCopied(theirs, c.entries); err == nil {
+			t.Errorf("%s: applied", c.name)
 		}
+	}
+	// A refused copy leaves no file: the placement loop would record one
+	// as this group's, and the group would then take the collection's writes.
+	if slices.Contains(p.s.collectionStore().names(), theirs) {
+		t.Errorf("a refused copy left a file of %s", theirs)
 	}
 	// Geo points are loaded into the in-memory indexes when the import ends.
 	s := p.s

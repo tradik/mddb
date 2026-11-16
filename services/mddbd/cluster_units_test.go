@@ -259,24 +259,28 @@ func TestInitClusterFailures(t *testing.T) {
 	}
 	defer func() { _ = s.Binlog.Close() }()
 	// Taking over fails when the log's sidecar cannot be written.
-	if os.Geteuid() == 0 {
-		t.Skip("root writes into a read-only directory")
-	}
 	// A write refused after its commit makes the log dirty: taking over
 	// moves it ahead first, which fails here too.
 	s.Binlog.SetWriteGate(func() error { return errors.New("no") })
 	_ = s.Binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "b", Key: []byte("k")})
 	s.Binlog.SetWriteGate(nil)
-	logDir := filepath.Dir(s.Binlog.Stats().Path)
-	if err := os.Chmod(logDir, 0o500); err != nil { // #nosec G302 -- a read-only directory makes the save fail on purpose
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chmod(logDir, 0o700) }() // #nosec G302 -- restores the test directory so t.TempDir can remove it
+	blockLogSidecar(t, s.Binlog)
 	if err := s.cluster.lead(1); err == nil {
 		t.Fatal("led with a dirty log that cannot move ahead")
 	}
 	if err := s.cluster.lead(1); err == nil {
 		t.Fatal("led with a log that cannot record the term")
+	}
+}
+
+// blockLogSidecar makes every save of bl's sidecar fail: a directory stands
+// where the save writes its temporary file (the sidecar is the log's path
+// plus ".meta", written as ".meta.tmp" and renamed). Unlike a read-only
+// directory, this stops the save on Windows and for root as well.
+func blockLogSidecar(t *testing.T, bl *binlog.Binlog) {
+	t.Helper()
+	if err := os.Mkdir(bl.Stats().Path+".meta.tmp", 0o700); err != nil {
+		t.Fatal(err)
 	}
 }
 

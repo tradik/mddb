@@ -134,7 +134,14 @@ func (p *placementRuntime) applyCopied(c string, in []*proto.BinlogEntryProto) e
 		}
 	}
 	if len(file) > 0 {
-		db, err := p.s.collectionStore().getOrCreate(c)
+		// The entry gate would refuse these writes too, but only after the
+		// file was created: an empty file of a collection this group may
+		// not write, which pinLocal would then record as this group's.
+		err := p.admitsWrite(c)
+		var db *bolt.DB
+		if err == nil {
+			db, err = p.s.collectionStore().getOrCreate(c)
+		}
 		if err == nil {
 			err = logEntries(db.Update, p.s.Binlog, file)
 		}

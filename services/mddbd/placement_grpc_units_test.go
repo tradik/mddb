@@ -41,6 +41,7 @@ func TestPlacementUnaryInterceptorBranches(t *testing.T) {
 		t.Fatalf("a read here: %v %v", got, err)
 	}
 	// A write to a fenced collection waits, then is refused.
+	stopLoop(p)
 	timeout := p.cfg.fenceTimeout
 	p.cfg.fenceTimeout = 20 * time.Millisecond
 	defer func() { p.cfg.fenceTimeout = timeout }()

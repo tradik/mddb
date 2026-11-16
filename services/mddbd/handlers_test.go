@@ -48,8 +48,10 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 }
 
 // newHandlerTestServerAt is newHandlerTestServer on the database at path,
-// which it opens or creates and leaves for the caller to close — a test
-// that restarts a node opens the same files again (GO-050).
+// which it opens or creates. A test that restarts a node closes it and
+// opens the same files again (GO-050); whatever is still open when the test
+// ends is closed by closeTestServer, registered here so it runs before the
+// removal of a t.TempDir made for path.
 func newHandlerTestServerAt(t testing.TB, path string) *Server {
 	t.Helper()
 	db, err := bolt.Open(path, 0600, nil)
@@ -146,7 +148,22 @@ func newHandlerTestServerAt(t testing.TB, path string) *Server {
 	// Metrics (disabled in tests — avoids goroutines)
 	s.Metrics = metrics.NewMetrics(false, &serverMetricsStats{s: s})
 
+	t.Cleanup(func() { closeTestServer(s) })
 	return s
+}
+
+// closeTestServer closes the files a test server holds open: its log, its
+// collection files and its main file. Windows does not delete an open file,
+// so t.TempDir could not remove them. Each close is a no-op for a file the
+// test closed already.
+func closeTestServer(s *Server) {
+	if s.Binlog != nil {
+		_ = s.Binlog.Close()
+	}
+	s.closeCollectionFiles()
+	if s.DB != nil {
+		_ = s.DB.Close()
+	}
 }
 
 // addTestDoc is a convenience helper that creates a document via the internal

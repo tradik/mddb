@@ -40,8 +40,15 @@ func TestPlacementConfigFromEnv(t *testing.T) {
 	if pc, _, err := placementConfigFromEnv(); err != nil || len(pc.groups) != 2 {
 		t.Fatalf("file: %+v %v", pc, err)
 	}
+	// A missing file is matched as os.ErrNotExist: its message is the OS's
+	// own ("no such file" on Unix, "cannot find the file" on Windows).
+	t.Run("MDDB_PLACEMENT_GROUPS=@missing", func(t *testing.T) {
+		t.Setenv("MDDB_PLACEMENT_GROUPS", "@"+file+".missing")
+		if _, _, err := placementConfigFromEnv(); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("got %v, want a missing file", err)
+		}
+	})
 	for _, c := range []struct{ env, value, want string }{
-		{"MDDB_PLACEMENT_GROUPS", "@" + file + ".missing", "no such file"},
 		{"MDDB_PLACEMENT_GROUPS", "{not json", "MDDB_PLACEMENT_GROUPS"},
 		{"MDDB_PLACEMENT_ROUTE", "sideways", "use forward or redirect"},
 		{"MDDB_PLACEMENT_FENCE_TIMEOUT", "-1s", "positive duration"},
@@ -202,6 +209,7 @@ func TestPlacementEntryGate(t *testing.T) {
 		t.Fatalf("an import: %v", err)
 	}
 	p.local.mark(p.local.importing, theirs, false)
+	stopLoop(p)
 	if err := p.local.fence(mine, time.Second); err != nil {
 		t.Fatal(err)
 	}

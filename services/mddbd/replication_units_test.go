@@ -243,11 +243,11 @@ func TestTheFollowersLog(t *testing.T) {
 		t.Errorf("after a gap the copy is at %d from %d; want an empty copy at 7", log.CurrentLSN(), log.BaseLSN())
 	}
 	// A copy that cannot be restarted is reported and kept.
-	_ = os.Remove(log.Stats().Path)
-	if err := os.Mkdir(log.Stats().Path, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	blockLogSidecar(t, log)
 	rc.rebaseLog(replPosition{LSN: 8})
+	if rc.log.Load() != log {
+		t.Error("a copy that could not be restarted was replaced")
+	}
 
 	none := &ReplicationClient{server: s, applier: NewReplicationApplier(s)}
 	_ = none.appendLog([]*binlog.BinlogEntry{{LSN: 1}})
