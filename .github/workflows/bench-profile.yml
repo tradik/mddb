@@ -81,11 +81,16 @@ jobs:
             services/mddbd/go.sum
             tools/bench/go.sum
 
-      # The newest committed result of this profile is the baseline.
+      # The baseline is the newest result recorded on a hosted runner
+      # (docs/benchmarks/ci/, the artifact of a run of this workflow): a
+      # desktop result has other proportions between memory-bound and
+      # compute-bound scenarios, so its shares would fail a sound change.
+      # Without one, the newest result in docs/benchmarks is used.
       - name: Find the baseline
         id: baseline
         run: |
-          file=$(ls docs/benchmarks/*-"${PROFILE}".json 2>/dev/null | sort -V | tail -1)
+          file=$(ls docs/benchmarks/ci/*-"${PROFILE}".json 2>/dev/null | sort -V | tail -1)
+          [ -n "${file}" ] || file=$(ls docs/benchmarks/*-"${PROFILE}".json 2>/dev/null | sort -V | tail -1)
           echo "file=${file}" >> "$GITHUB_OUTPUT"
           echo "baseline: ${file:-none}"
 

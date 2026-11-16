@@ -129,6 +129,13 @@ make bench-profile BENCH_BASELINE=docs/benchmarks/2.19.7-small.json   # also gat
 make bench-profile-docs             # rewrite the tables below from the JSON files
 ```
 
+The pull-request gate in CI compares against `docs/benchmarks/ci/`, results
+recorded by the `bench-profile` workflow on a hosted runner, not against the
+desktop results the tables below show: the two machines differ in how fast
+memory-bound scans run next to graph searches, so a desktop baseline would
+fail sound changes. To refresh it, run the workflow by hand and commit its
+`bench-run/result.json` artifact as `docs/benchmarks/ci/<version>-small.json`.
+
 The harness builds `mddbd` from the tree and starts its own servers on free
 loopback ports, with no network: search embeddings come from a local endpoint
 that returns the seeded corpus vectors (so recall is scored against the exact
