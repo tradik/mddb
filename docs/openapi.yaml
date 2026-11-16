@@ -1290,7 +1290,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
+                anyOf:
                   - $ref: "#/components/schemas/ErrorResponse"
                   - $ref: "#/components/schemas/SearchBusy"
 
@@ -9714,9 +9714,9 @@ components:
         A zero or absent field is no limit.
       properties:
         maxDocuments: { type: integer, format: int64 }
-        maxBytes: { type: integer, format: int64, description: Stored bytes, counted as a collection quota's maxBytes }
+        maxBytes: { type: integer, format: int64, description: "Stored bytes, counted as a collection quota's maxBytes" }
         maxVectors: { type: integer, format: int64 }
-        maxCollections: { type: integer, format: int64, description: Collections holding documents (or configured); a document for a further, empty collection is refused }
+        maxCollections: { type: integer, format: int64, description: "Collections holding documents (or configured); a document for a further, empty collection is refused" }
         embeddingCallsPerDay: { type: integer, format: int64 }
         embeddingTokensPerDay: { type: integer, format: int64 }
         vectorRamShare: { type: number, format: double, minimum: 0, maximum: 1, description: "Share of MDDB_VECTOR_RAM_LIMIT_BYTES; 0 uses MDDB_TENANT_VECTOR_RAM_SHARE" }
@@ -9771,7 +9771,7 @@ components:
             vectors: { type: integer, format: int64 }
             collections: { type: integer, format: int64 }
             vectorRamBytes: { type: integer, format: int64, description: "Estimate: the tenant's share of the vectors times the index's size" }
-            embeddingCalls: { type: integer, format: int64, description: Today (UTC), counted while the tenant has an embedding budget }
+            embeddingCalls: { type: integer, format: int64, description: "Today (UTC), counted while the tenant has an embedding budget" }
             embeddingTokens: { type: integer, format: int64 }
         collectionNames: { type: array, items: { type: string } }
         queues:
@@ -16353,7 +16353,10 @@ components:
           schema: {type: integer, format: int64}
       content:
         application/json:
-          schema: {$ref: "#/components/schemas/RateLimitError"}
+          schema:
+            anyOf:
+              - $ref: "#/components/schemas/RateLimitError"
+              - $ref: "#/components/schemas/TenantLimit"
     ServiceUnavailable:
       description: >
         Not now: the search concurrency limit is reached, the subsystem is
