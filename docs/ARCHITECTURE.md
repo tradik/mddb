@@ -254,8 +254,10 @@ MDDB exposes three layered extension mechanisms — each documented in its own f
 ### Horizontal Scaling
 - Run multiple read-only instances
 - Single write instance
-- File-based replication
-- Consider sharding by collection
+- Leader-follower replication: the leader streams its binlog to followers over gRPC ([REPLICATION.md](REPLICATION.md))
+- No sharding: a node holds the whole database. To split data today, run separate instances, each with its own
+  database file and collections, and send each request to the instance that holds the collection — the server does
+  no routing, rebalancing or cross-instance search
 
 ### Database Size
 - Suitable for: 10K - 1M documents

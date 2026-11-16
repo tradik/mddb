@@ -639,12 +639,14 @@ curl -X POST http://localhost:11023/v1/truncate \
 - Optimize OS settings
 
 ### Horizontal Scaling
-- Read replicas (file-based replication)
+- Read replicas: leader-follower replication, a binlog stream over gRPC ([REPLICATION.md](REPLICATION.md))
 - Load balancer for reads
 - Single write instance
-- Consider sharding by collection
+- No sharding: a node holds the whole database. To split data today, run separate instances, each with its own
+  database file and collections, and route each request to the instance that holds the collection yourself — the
+  server does no routing, rebalancing or cross-instance search
 
-### Read Replicas
+### Read Replicas (scheduled backup copy)
 
 ```bash
 # On primary server
@@ -659,3 +661,9 @@ Run replicas in read-only mode:
 ```bash
 MDDB_MODE="read" MDDB_ADDR=":11024" ./mddbd
 ```
+
+This recipe copies a backup file on a schedule; it is not replication. A replica
+is as old as the last copy, and a running `mddbd` keeps serving the file it
+opened, so restart it to pick up a new copy. For followers that receive every
+write as the leader commits it, use leader-follower replication
+(`MDDB_REPLICATION_ROLE`, [REPLICATION.md](REPLICATION.md)).

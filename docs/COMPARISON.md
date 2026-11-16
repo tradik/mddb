@@ -161,7 +161,7 @@ shard across a cluster; MDDB is built to be one file you can copy.
 
 | | MDDB | MongoDB | CouchDB |
 |---|---|---|---|
-| Horizontal sharding | consistent-hash ring, manual | automatic, mature | clustered |
+| Horizontal sharding | none — one node holds the whole database; split by hand into separate instances | automatic, mature | clustered |
 | Protocols | HTTP, gRPC, GraphQL, MCP | wire protocol | HTTP |
 | Change feed | webhooks, binlog replication | change streams | `_changes` |
 | Markdown-aware | yes | no | no |

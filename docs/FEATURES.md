@@ -323,7 +323,7 @@ Complete list of MDDB features organized by category.
 ### Leader-Follower Replication
 - **Single-leader Replication** - One write node, multiple read-only followers
 - **Binary Replication Log** - Compact binlog with LSN-based change tracking
-- **Real-time Streaming** - gRPC-based binlog streaming with sub-100ms lag
+- **Real-time Streaming** - gRPC-based binlog streaming; followers report their position as an LSN (no lag figure is measured or guaranteed)
 - **Full Snapshot Sync** - Automatic snapshot transfer for new followers
 - **Automatic Reconnection** - Followers reconnect and catch up after disconnects
 - **Subsystem Replication** - Documents, vectors, FTS, webhooks, schemas, auth all replicated

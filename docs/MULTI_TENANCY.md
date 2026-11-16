@@ -100,9 +100,17 @@ never leak across tenants.
 
 ## Quotas (v2.18.9+)
 
-Isolation keeps tenants out of each other's data; quotas keep one tenant — or
-one agent writing in a loop — from filling the disk, exhausting RAM with
-vector indexes, or running up the embedding provider's bill for everyone.
+Isolation keeps tenants out of each other's data; quotas keep one collection —
+a tenant's, or one an agent writes to in a loop — from filling the disk,
+exhausting RAM with vector indexes, or running up the embedding provider's
+bill for everyone.
+
+**Quotas are per collection, not per tenant.** There is no limit on a tenant's
+total documents, bytes, vectors or embedding calls, and none on how many
+collections a tenant creates: a tenant with ten collections capped at 10,000
+documents each may store 100,000, and a collection without a quota has no
+limit of its own (the server-wide reserves below still apply). To bound a
+tenant, a global admin sets a quota on each of its collections.
 
 A collection's config may carry a `quota`. Every field is optional and `0`
 means no limit; a collection without a quota behaves exactly as before.
@@ -122,8 +130,8 @@ curl -X PUT http://localhost:11023/v1/collection-config \
   -d '{"collection":"acme/notes","quota":{"maxDocuments":10000,"maxBytes":52428800,"embeddingCallsPerDay":2000}}'
 ```
 
-**Who may set it.** A quota is a limit on the tenant, so with authentication
-on only a **global admin** may change one (`403` / `PERMISSION_DENIED`
+**Who may set it.** A quota limits what a tenant may store in the
+collection, so with authentication on only a **global admin** may change one (`403` / `PERMISSION_DENIED`
 otherwise). A tenant can still write the rest of its collection config: a
 write that omits `quota`, or sends the stored one unchanged, leaves it alone.
 `"quota": {}` removes it. The same applies over gRPC (`SetCollectionConfig.quota`)
@@ -174,8 +182,9 @@ namespace: a tenant user's conversations are stored in
 host API takes no collection — the server derives it from the caller — so a
 tenant's chat host needs `read` and `write` on `acme/chat_conversations`
 (or the tenant's `*`), reaches only that tenant's conversations, and the
-same `sub` in two tenants is two unrelated users. Quotas on the tenant count
-the conversations like any other collection of the namespace.
+same `sub` in two tenants is two unrelated users. A quota set on
+`<tenant>/chat_conversations` limits the conversations like any other
+collection; there is no quota on a tenant as a whole.
 
 ## Design notes
 

@@ -430,8 +430,8 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 
 **[Full compliance map, threat model, operational checklist](docs/SECURITY.md)**
 
-### Replication & High Availability
-- ✅ **Leader-Follower Replication** - Binlog streaming for read scaling
+### Replication
+- ✅ **Leader-Follower Replication** - Binlog streaming over gRPC for read scaling; no automatic failover (promoting a follower is a manual step) and no sharding
 - ✅ **Automatic Catch-up** - Followers pull missing transactions
 - ✅ **Zero-Downtime Snapshots** - Full sync for new followers
 - ✅ **Cluster Monitoring** - Web panel with health and lag metrics
