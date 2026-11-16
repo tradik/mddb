@@ -161,9 +161,9 @@ func TestPersistCraftedPayloadsAreRefused(t *testing.T) {
 			e.str(key)
 			e.u8(1)
 			e.u64(7)
-			e.u8(uint8(len(layers)))
+			e.u8(uint8(len(layers))) // #nosec G115 -- test graphs have a handful of layers
 			for _, l := range layers {
-				e.u16(uint16(len(l)))
+				e.u16(uint16(len(l))) // #nosec G115 -- test layers have a handful of neighbours
 				e.i32s(l)
 			}
 		}

@@ -36,7 +36,7 @@ func TestE2ELeaderKilledUnderLoad(t *testing.T) {
 	useSecret(t)
 	dir := t.TempDir()
 	addr := freeTCPAddr(t)
-	child := exec.Command(os.Args[0], "-test.run=^TestE2ELeaderChildProcess$") // #nosec G204 -- this test binary
+	child := exec.Command(os.Args[0], "-test.run=^TestE2ELeaderChildProcess$") // #nosec G204 G702 -- this test binary
 	child.Env = append(os.Environ(), envChildDir+"="+dir, envChildAddr+"="+addr)
 	if err := child.Start(); err != nil {
 		t.Fatal(err)

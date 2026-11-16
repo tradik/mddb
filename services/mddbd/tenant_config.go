@@ -67,10 +67,6 @@ type TenantConfig struct {
 	Limits *TenantLimits `json:"limits,omitempty"`
 }
 
-// errTenantAdminOnly refuses a tenant configuration change by anyone but a
-// global admin.
-var errTenantAdminOnly = errors.New("forbidden: only a global admin may change a tenant's quota or limits")
-
 // TenantOfCollection is the tenant whose namespace holds collection, or "".
 func TenantOfCollection(collection string) string { return fairq.TenantOf(collection) }
 

@@ -24,7 +24,7 @@ func TestPlacementMeasureMove(t *testing.T) {
 	const c = "measured"
 	from := mustOwner(t, tp, c)
 	src := tp.leader(from).s
-	rng := rand.New(rand.NewPCG(1, 2))
+	rng := rand.New(rand.NewPCG(1, 2)) // #nosec G404 -- a seeded, reproducible test corpus, not a secret
 	seeded := time.Now()
 	for i := range docs {
 		saved, _, err := src.addDocument(c, fmt.Sprintf("doc-%04d", i), "en", nil,

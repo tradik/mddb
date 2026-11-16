@@ -27,7 +27,7 @@ func legacyLog(t *testing.T, dir string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "mddb.binlog"), raw, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "mddb.binlog"), raw, 0o600); err != nil { // #nosec G703 -- t.TempDir() path
 		t.Fatal(err)
 	}
 	return raw
@@ -67,7 +67,7 @@ func TestA2197LogOpensAsItIsAndStaysReadable(t *testing.T) {
 	}
 	// The file is still nothing but entries in the old layout: a release
 	// before 2.19.8 reads it as it wrote it.
-	got, _ := os.ReadFile(filepath.Join(dir, "mddb.binlog"))
+	got, _ := os.ReadFile(filepath.Join(dir, "mddb.binlog")) // #nosec G304 -- t.TempDir() path
 	if !bytes.Equal(got, raw) {
 		t.Error("opening and closing the log changed its file")
 	}

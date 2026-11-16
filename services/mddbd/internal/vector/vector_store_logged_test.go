@@ -64,7 +64,7 @@ func TestVectorWritesAreLoggedInTheirTransaction(t *testing.T) {
 			t.Fatalf("write %d: %v", i, err)
 		}
 	}
-	if got, want := bl.CurrentLSN(), uint64(stored(t, db)); got != want {
+	if got, want := bl.CurrentLSN(), uint64(stored(t, db)); got != want { // #nosec G115 -- a document count is never negative
 		t.Fatalf("logged %d entries for %d records", got, want)
 	}
 

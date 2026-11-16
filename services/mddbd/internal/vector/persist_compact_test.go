@@ -113,7 +113,7 @@ func persistDocID(i int) string { return "d" + itoa(i) }
 // itoa formats a small non-negative int.
 func itoa(i int) string {
 	if i < 10 {
-		return string(rune('0' + i))
+		return string(rune('0' + i)) // #nosec G115 -- i is a small non-negative test index
 	}
 	return itoa(i/10) + string(rune('0'+i%10))
 }

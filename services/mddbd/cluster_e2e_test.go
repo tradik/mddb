@@ -125,7 +125,7 @@ func TestClusterPartitionedLeaderStopsAndItsWritesAreSetAside(t *testing.T) {
 // rejectedFileHolds reports whether a line of the file names key.
 func rejectedFileHolds(t *testing.T, path, key string) bool {
 	t.Helper()
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- path under t.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}

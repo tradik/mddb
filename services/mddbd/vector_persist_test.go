@@ -176,7 +176,7 @@ func rewriteCheckpoint(t *testing.T, s *Server, from, to string, change func([]b
 		t.Fatal(err)
 	}
 	change(b)
-	if err := os.WriteFile(s.annIndexPath(to), b, 0o600); err != nil {
+	if err := os.WriteFile(s.annIndexPath(to), b, 0o600); err != nil { // #nosec G703 -- path under the test server's t.TempDir()
 		t.Fatal(err)
 	}
 }

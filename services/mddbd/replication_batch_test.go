@@ -34,7 +34,7 @@ func (r *sliceReceiver) Recv() (*proto.BinlogEntryProto, error) {
 func protoEntries(from, to uint64) []*proto.BinlogEntryProto {
 	var out []*proto.BinlogEntryProto
 	for lsn := from; lsn <= to; lsn++ {
-		out = append(out, &proto.BinlogEntryProto{Lsn: lsn, Type: uint32(binlog.BinlogPut), BucketName: "custom", Key: []byte{byte(lsn)}, Value: []byte("v")})
+		out = append(out, &proto.BinlogEntryProto{Lsn: lsn, Type: uint32(binlog.BinlogPut), BucketName: "custom", Key: []byte{byte(lsn)}, Value: []byte("v")}) // #nosec G115 -- a test key byte; wrapping is fine
 	}
 	return out
 }
@@ -119,7 +119,7 @@ func TestABatchIsOneTransactionPerFile(t *testing.T) {
 		return &binlog.BinlogEntry{LSN: lsn, Type: binlog.BinlogPut, BucketName: "docs", Key: []byte("doc|" + c + "|" + c + "|k|en"), Value: []byte("v")}
 	}
 	fts := func(lsn uint64) *binlog.BinlogEntry {
-		return &binlog.BinlogEntry{LSN: lsn, Type: binlog.BinlogPut, BucketName: "custom", Key: []byte{byte(lsn)}, Value: []byte("t")}
+		return &binlog.BinlogEntry{LSN: lsn, Type: binlog.BinlogPut, BucketName: "custom", Key: []byte{byte(lsn)}, Value: []byte("t")} // #nosec G115 -- a test key byte; wrapping is fine
 	}
 	batch := []*binlog.BinlogEntry{
 		doc(1, "blog"), fts(2), doc(3, "blog"), fts(4),

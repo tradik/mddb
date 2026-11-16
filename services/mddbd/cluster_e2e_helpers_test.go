@@ -159,7 +159,7 @@ var errCut = errors.New("network cut")
 
 func (c *cutConn) Read(p []byte) (int, error) {
 	if c.node.cut.Load() {
-		_ = c.Conn.Close()
+		_ = c.Close()
 		return 0, errCut
 	}
 	return c.Conn.Read(p)
@@ -167,7 +167,7 @@ func (c *cutConn) Read(p []byte) (int, error) {
 
 func (c *cutConn) Write(p []byte) (int, error) {
 	if c.node.cut.Load() {
-		_ = c.Conn.Close()
+		_ = c.Close()
 		return 0, errCut
 	}
 	return c.Conn.Write(p)
@@ -195,7 +195,7 @@ func (tc *testCluster) halt(n *testNode, clean bool) {
 // markLogOpen rewrites the sidecar as a process that died leaves it.
 func markLogOpen(t *testing.T, path string) {
 	t.Helper()
-	raw, err := os.ReadFile(path + ".meta")
+	raw, err := os.ReadFile(path + ".meta") // #nosec G304 -- path under the test node's t.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}

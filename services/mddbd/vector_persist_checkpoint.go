@@ -140,7 +140,7 @@ func (s *Server) checkpointCollection(collection string, final bool) {
 	}
 	st := p.entry(collection)
 	p.mu.Lock()
-	write := !(st.current && st.stamp == stamp) && (final || st.due(stamp, time.Now()))
+	write := (!st.current || st.stamp != stamp) && (final || st.due(stamp, time.Now()))
 	p.mu.Unlock()
 	if write {
 		s.writeCheckpoint(collection, st, stamp)

@@ -22,7 +22,7 @@ import (
 // real servers on real files, talking gRPC over a TCP port. They replace
 // test_replication.sh, which started two binaries by hand.
 
-const e2eSecret = "e2e-replication-secret"
+const e2eSecret = "e2e-replication-secret" // #nosec G101 -- a fixed secret for loopback test servers
 
 // useSecret makes the leader and followers of a test authenticate with a
 // replication secret; without it they need mTLS.

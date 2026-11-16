@@ -344,10 +344,10 @@ func TestStoreErrors(t *testing.T) {
 	if NewStore(path).Path() != path {
 		t.Fatal("path")
 	}
-	if err := os.Chmod(dir, 0o500); err != nil {
+	if err := os.Chmod(dir, 0o500); err != nil { // #nosec G302 -- a read-only directory makes the save fail on purpose
 		t.Fatal(err)
 	}
-	defer func() { _ = os.Chmod(dir, 0o700) }()
+	defer func() { _ = os.Chmod(dir, 0o700) }() // #nosec G302 -- restores the test directory so t.TempDir can remove it
 	if os.Geteuid() != 0 {
 		if err := NewStore(path).save(vote{Term: 1}); err == nil {
 			t.Fatal("saved into a read-only directory")
@@ -367,13 +367,13 @@ func TestAStoppedNodeNeitherVotesNorWrites(t *testing.T) {
 	g := newGroup(t, []string{"a", "b"}, false)
 	a := g.start("a", false)
 	path := filepath.Join(g.dir, "a.json")
-	before, _ := os.ReadFile(path)
+	before, _ := os.ReadFile(path) // #nosec G304 -- t.TempDir() path
 	a.Stop()
 	reply := a.HandleVote(VoteRequest{Term: a.Term() + 5, Candidate: "b"})
 	if reply.Granted {
 		t.Fatal("a stopped node granted a vote")
 	}
-	after, _ := os.ReadFile(path)
+	after, _ := os.ReadFile(path) // #nosec G304 -- t.TempDir() path
 	if string(before) != string(after) {
 		t.Fatalf("a stopped node wrote its vote file: %q -> %q", before, after)
 	}
@@ -390,7 +390,7 @@ func TestStoreSavesOneAtATime(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := s.save(vote{Term: uint64(i + 1)}); err != nil {
+			if err := s.save(vote{Term: uint64(i + 1)}); err != nil { // #nosec G115 -- i is a small non-negative loop index
 				t.Error(err)
 			}
 		}()

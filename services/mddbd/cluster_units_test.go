@@ -268,10 +268,10 @@ func TestInitClusterFailures(t *testing.T) {
 	_ = s.Binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "b", Key: []byte("k")})
 	s.Binlog.SetWriteGate(nil)
 	logDir := filepath.Dir(s.Binlog.Stats().Path)
-	if err := os.Chmod(logDir, 0o500); err != nil {
+	if err := os.Chmod(logDir, 0o500); err != nil { // #nosec G302 -- a read-only directory makes the save fail on purpose
 		t.Fatal(err)
 	}
-	defer func() { _ = os.Chmod(logDir, 0o700) }()
+	defer func() { _ = os.Chmod(logDir, 0o700) }() // #nosec G302 -- restores the test directory so t.TempDir can remove it
 	if err := s.cluster.lead(1); err == nil {
 		t.Fatal("led with a dirty log that cannot move ahead")
 	}
