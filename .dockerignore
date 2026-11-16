@@ -119,3 +119,6 @@ glama.json
 
 # ssg build cache
 .ssg-cache/
+
+# TEST-005: benchmark profile scratch data
+.bench-profile-work/

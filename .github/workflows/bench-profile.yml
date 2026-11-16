@@ -1,0 +1,103 @@
+name: Benchmark profile
+
+# TEST-005. The reproducible performance, recall and recovery harness
+# (tools/bench/profile) against the committed baseline in docs/benchmarks.
+#
+# Runner minutes are paid for, so this is not a check every change pays:
+#   - pull_request: the small profile (20k vectors), only when the change
+#     touches what the numbers measure — the vector indexes, the search
+#     paths, the binlog and replication — or the harness itself;
+#   - workflow_dispatch: either profile, by hand (full before a minor
+#     release). Never on push.
+#
+# The gate (tools/bench/profile/compare.go):
+#   - recall@10 of every scenario may fall by at most 0.02 against the
+#     baseline. Recall does not depend on the machine, so it is compared raw.
+#   - p95 may grow by at most 15%. The baseline was not recorded on a hosted
+#     runner, and a runner is neither the same machine nor a quiet one, so a
+#     raw p95 is not compared. Each scenario's p95 is divided by the geometric
+#     mean p95 of all scenarios of its run, and that share may grow by 15%:
+#     a slower or busier runner moves every scenario and leaves the shares
+#     alone, a change that slows one index or one path moves its share.
+#     A growth under 0.25 ms never counts (scheduling, not a regression), and
+#     a raw p95 more than 3× the baseline's — scaled by how much slower this
+#     runner calibrates — fails whatever the shares say.
+#   - no write acknowledged before kill -9 may be missing after the restart,
+#     and the follower must reach the leader's checksum after its downtime.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/mddbd/internal/vector/**'
+      - 'services/mddbd/search_*'
+      - 'services/mddbd/internal/binlog/**'
+      - 'services/mddbd/replication_*'
+      - 'tools/bench/**'
+      - 'docs/benchmarks/**'
+      - '.github/workflows/bench-profile.yml'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'small (20k vectors) or full (200k)'
+        required: true
+        default: 'full'
+        type: choice
+        options: [small, full]
+
+# A newer push to the same pull request makes the older run worthless.
+concurrency:
+  group: bench-profile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GO_VERSION: "1.27.4"
+  GOWORK: "off"
+
+jobs:
+  profile:
+    name: Benchmark profile (${{ inputs.profile || 'small' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ (inputs.profile || 'small') == 'full' && 360 || 60 }}
+    env:
+      PROFILE: ${{ inputs.profile || 'small' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            services/mddbd/go.sum
+            tools/bench/go.sum
+
+      # The newest committed result of this profile is the baseline.
+      - name: Find the baseline
+        id: baseline
+        run: |
+          file=$(ls docs/benchmarks/*-"${PROFILE}".json 2>/dev/null | sort -V | tail -1)
+          echo "file=${file}" >> "$GITHUB_OUTPUT"
+          echo "baseline: ${file:-none}"
+
+      - name: Run the profile
+        run: |
+          make bench-profile PROFILE="${PROFILE}" BENCH_OUT=bench-run/result.json \
+            BENCH_WORK_DIR="${RUNNER_TEMP}/bench-profile" \
+            BENCH_BASELINE="${{ steps.baseline.outputs.file }}" BENCH_ARGS=-keep
+
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: bench-profile-${{ env.PROFILE }}
+          path: |
+            bench-run/
+            ${{ runner.temp }}/bench-profile/**/server.log
+          if-no-files-found: ignore
+          retention-days: 30

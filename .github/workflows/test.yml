@@ -16,6 +16,9 @@ on:
       - 'buf.gen.yaml'
       - 'go.work'
       - 'tools/bench/**'
+      # TEST-005: the bench job's doc guard checks these two against each other.
+      - 'docs/BENCHMARK.md'
+      - 'docs/benchmarks/**'
       - 'test/**'
       - 'test/upgrade-fixtures/**'
       - 'scripts/check-go-version.sh'
@@ -52,6 +55,9 @@ on:
       - 'buf.gen.yaml'
       - 'go.work'
       - 'tools/bench/**'
+      # TEST-005: the bench job's doc guard checks these two against each other.
+      - 'docs/BENCHMARK.md'
+      - 'docs/benchmarks/**'
       - 'test/**'
       - 'test/upgrade-fixtures/**'
       - 'scripts/check-go-version.sh'

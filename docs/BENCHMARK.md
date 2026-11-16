@@ -112,6 +112,129 @@ Shows how many documents each algorithm returns (limit=10) to verify they all fi
 - **fuzzy**: Adds Levenshtein distance computation. Expected ~2-3x slower than exact matching.
 - All benchmarks run on a warm server with FTS indices already built during document insertion.
 
+## Reproducible profile: latency, recall, ingest and recovery (TEST-005)
+
+One harness, [`tools/bench/profile`](../tools/bench/profile/main.go), measures
+search, ingest, start-up and recovery on a corpus drawn from a seed, and
+writes everything it measured — with the machine, the Go version and the
+commit — to one JSON file in [`docs/benchmarks/`](benchmarks/). The tables
+below are rendered from those files; a test
+(`TestBenchmarkDocInSyncWithResultFiles` in `tools/bench/profile`) fails when a
+table and its file disagree, so every number here has a file behind it.
+
+```bash
+make bench-profile PROFILE=small    # 20,000 vectors × 128 dims → docs/benchmarks/<version>-small.json
+make bench-profile PROFILE=full     # 200,000 vectors; BENCH_ARGS="-vectors 2000000" for 2M
+make bench-profile BENCH_BASELINE=docs/benchmarks/2.19.7-small.json   # also gate against a baseline
+make bench-profile-docs             # rewrite the tables below from the JSON files
+```
+
+The harness builds `mddbd` from the tree and starts its own servers on free
+loopback ports, with no network: search embeddings come from a local endpoint
+that returns the seeded corpus vectors (so recall is scored against the exact
+answer), ingest embeds with the built-in `lexical` provider. What it measures:
+
+- **Search** — full text (BM25), every vector algorithm by name and `auto`
+  (the planner), hybrid (RRF), and vector search behind a metadata filter
+  admitting 1, 2, 10, 25 and 50% of the corpus. Latency is client-side over
+  sequential requests (the median of 5 rounds of 1,000 queries), QPS over a pass with several
+  clients, recall@10 against brute-force cosine.
+- **Ingest** — single documents and batches of 1,000, without embedding and
+  with the lexical provider (a document counts once its vector is indexed).
+- **Mixed** — four clients searching HNSW while one writes.
+- **Start-up** — a clean restart of the loaded node: process start to
+  healthy, and to each vector algorithm's first answer. The trainable
+  indexes (IVF, PQ, OPQ, SQ, SQ4, BQ) train before they answer, which is
+  most of that time.
+- **Recovery** — `kill -9` under four writers, restart, time to ready and
+  every acknowledged write read back; a clean restart of the same node; a
+  leader and a follower: lag from the leader's acknowledgement to the
+  document being readable on the follower under write load, then the
+  follower stopped, documents written, and the time from its restart to an
+  equal checksum.
+
+The pull-request gate (`.github/workflows/bench-profile.yml`, only for
+changes to the vector indexes, the search paths, the binlog, replication or
+the harness) runs the small profile and fails on a recall@10 drop of more
+than 0.02, a p95 growth of more than 15% (compared as each scenario's share
+of the run's geometric-mean p95, so a slower runner does not fail it), a lost
+acknowledged write, or a follower that does not catch up.
+
+### 2.19.7, small profile
+
+<!-- bench-profile:2.19.7-small:begin -->
+MDDB 2.19.7 (`96a2b023`), profile `small`, seed 1, recorded 2026-11-16 on AMD Ryzen 9 7950X 16-Core Processor — 32 cores, 30.9 GB, linux/amd64, kernel 6.18.58.1-microsoft-standard-WSL2, go1.27.4. Calibration 9.768 ms.
+
+Search — 20000 vectors × 128 dims in 100 topics; 1000 timed queries × 5 sequential rounds for latency, 4 clients for QPS.
+
+| Scenario | Answered by | p50 ms | p95 ms | p99 ms | QPS | recall@10 |
+|---|---|---:|---:|---:|---:|---:|
+| `fts-bm25` | bm25 | 0.408 | 0.532 | 0.712 | 8103 | — |
+| `vector-flat` | flat | 0.973 | 1.245 | 3.527 | 3014 | 1.000 |
+| `vector-hnsw` | hnsw | 0.438 | 0.560 | 0.665 | 8591 | 1.000 |
+| `vector-ivf` | ivf | 0.786 | 1.112 | 1.401 | 4933 | 1.000 |
+| `vector-pq` | pq | 3.078 | 3.540 | 5.513 | 1168 | 0.829 |
+| `vector-opq` | opq | 3.033 | 3.500 | 5.430 | 1204 | 0.803 |
+| `vector-sq` | sq | 4.818 | 6.218 | 7.454 | 817 | 1.000 |
+| `vector-sq4` | sq4 | 5.574 | 6.860 | 7.857 | 730 | 1.000 |
+| `vector-bq` | bq | 1.711 | 2.398 | 4.153 | 2191 | 1.000 |
+| `vector-auto` | hnsw | 0.447 | 0.564 | 0.704 | 9203 | 1.000 |
+| `hybrid-rrf-hnsw` | — | 0.581 | 0.747 | 1.104 | 6044 | — |
+| `hybrid-rrf-flat` | — | 1.211 | 1.773 | 4.112 | 2499 | — |
+| `filtered-hnsw-1pct` | hnsw | 1.232 | 1.674 | 2.326 | 3264 | 1.000 |
+| `filtered-hnsw-2pct` | hnsw | 1.321 | 2.003 | 2.718 | 3253 | 1.000 |
+| `filtered-hnsw-10pct` | hnsw | 1.746 | 2.968 | 4.241 | 2423 | 1.000 |
+| `filtered-hnsw-25pct` | hnsw | 2.869 | 4.067 | 5.327 | 1449 | 1.000 |
+| `filtered-hnsw-50pct` | hnsw | 1.352 | 2.071 | 2.942 | 2455 | 1.000 |
+| `filtered-auto-1pct` | flat+prefilter | 0.395 | 0.512 | 0.715 | 9846 | 1.000 |
+| `filtered-auto-2pct` | flat+prefilter | 0.482 | 0.636 | 0.839 | 8420 | 1.000 |
+| `filtered-auto-10pct` | ivf | 0.645 | 0.889 | 1.291 | 6146 | 1.000 |
+| `filtered-auto-25pct` | ivf | 0.942 | 1.270 | 2.012 | 3863 | 1.000 |
+| `filtered-auto-50pct` | hnsw | 1.298 | 1.785 | 2.723 | 2541 | 1.000 |
+
+| Ingest | Documents | Batch | Embedding | docs/s | request p50 ms | p95 ms | p99 ms |
+|---|---:|---:|---|---:|---:|---:|---:|
+| `single-none` | 1000 | 1 | none | 229 | 4.322 | 5.601 | 6.343 |
+| `batch-none` | 10000 | 1000 | none | 6183 | 630.716 | 646.566 | 646.566 |
+| `single-lexical` | 1000 | 1 | lexical | 185 | 5.307 | 6.814 | 7.667 |
+| `batch-lexical` | 10000 | 1000 | lexical | 692 | 5917.554 | 6106.052 | 6106.052 |
+
+| Mixed load, start-up and recovery | Value |
+|---|---:|
+| Mixed (4 readers, 1 writer, 10 s): search p50 / p95 / p99 | 0.436 / 0.718 / 0.988 ms |
+| Mixed: searches per second | 8557 |
+| Mixed: write p50 / p95 / p99 | 7.619 / 9.540 / 11.156 ms |
+| Mixed: writes per second | 128 |
+| Clean restart of the search node: process start to healthy | 0.089 s |
+| Clean restart of the search node: process start to every vector index answering | 316.156 s |
+| Clean restart: process start to each index's first answer | flat 3.2 s, hnsw 3.2 s, ivf 316.1 s, pq 316.1 s, opq 316.1 s, sq 316.1 s, sq4 316.2 s, bq 316.2 s |
+| Peak resident memory of the search node | 419.1 MiB |
+| kill -9 under write: acknowledged writes / lost after restart | 773 / 0 |
+| kill -9 under write: process start to ready | 0.076 s |
+| Same node, clean restart: process start to ready | 0.070 s |
+| Replication lag, 50 probes under 20 writes/s: p50 / p95 / p99 | — (no probe arrived) |
+| Replication: probes not on the follower within 30 s | 50 of 50 |
+| Follower catch-up after missing 5000 documents: process start to in sync | not in sync after 180 s |
+| Follower checksum and document count equal the leader's | false |
+| Follower out of sync | catching up after its downtime: follower has 5601 documents (checksum 21b4cfbf), leader 6601 (checksum 21b4cfbf) after 3m0s |
+<!-- bench-profile:2.19.7-small:end -->
+
+What this baseline shows, before the 2.19.8 index and replication work:
+
+- **Start-up is training.** A restart is healthy in under 0.1 s and flat and
+  HNSW answer about 3 s later, but the trainable indexes train again from
+  scratch before their first answer — over five minutes here, almost all of
+  it OPQ, which trains on one core.
+- **PQ and OPQ lose neighbours at 20k vectors** (recall@10 0.83 and 0.80,
+  OPQ below PQ); every other algorithm finds the exact top 10.
+- **The follower does not keep up on disk.** Under 20 single-document writes
+  a second none of the 50 lag probes reached the follower within 30 s, and
+  three minutes after a restart it still lacked 1,000 of the 5,000 documents
+  written while it was down — while `/v1/checksum` returned the same checksum
+  on both sides.
+- **kill -9 lost nothing**: every acknowledged write was there after the
+  restart.
+
 ## Retrieval quality on the MDDB docs (v2.18.8)
 
 The latency tables above say how fast each algorithm is. This section says how

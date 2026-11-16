@@ -4,7 +4,7 @@
 # through two releases.
 MDDB_VERSION := $(shell sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' services/mddbd/main.go | head -1)
 
-.PHONY: build build-windows soak check-source-encoding test-source-encoding test-shard test-test-shards check-sonar-exclusions sonar-local test-sonar test-es-compat brand-icons test-export-brand docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog test-load-md-folder docs-metadata docs-dev docs-build openapi-lint airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+.PHONY: build build-windows soak bench-profile bench-profile-docs check-source-encoding test-source-encoding test-shard test-test-shards check-sonar-exclusions sonar-local test-sonar test-es-compat brand-icons test-export-brand docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog test-load-md-folder docs-metadata docs-dev docs-build openapi-lint airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -278,6 +278,25 @@ bench-comparison: ## Measure the numbers docs/COMPARISON.md publishes (DOC-013)
 
 bench-comparison-all: ## Full cross-database comparison (needs Docker)
 	@cd test && bash compare-all-databases.sh
+
+# TEST-005: the reproducible performance, recall and recovery harness. It
+# builds mddbd from this tree, starts its own servers on free loopback ports
+# under BENCH_WORK_DIR (on disk: a tmpfs /tmp would hide what fsync costs),
+# and writes docs/benchmarks/<version>-<profile>.json. BENCH_BASELINE=<file>
+# also gates the run against an earlier result; BENCH_ARGS passes flags
+# through (-only search,recovery, -vectors 2000000, -seed 2, -keep).
+PROFILE ?= small
+BENCH_WORK_DIR ?= $(CURDIR)/.bench-profile-work
+BENCH_OUT ?= docs/benchmarks/$(MDDB_VERSION)-$(PROFILE).json
+bench-profile: ## Run the benchmark profile PROFILE=small|full into docs/benchmarks (TEST-005)
+	@mkdir -p $(BENCH_WORK_DIR)
+	cd services/mddbd && go build -trimpath -o $(BENCH_WORK_DIR)/mddbd .
+	cd tools/bench && go run ./profile -profile $(PROFILE) -mddbd $(BENCH_WORK_DIR)/mddbd \
+		-work-dir $(BENCH_WORK_DIR) -commit $$(git rev-parse --short=8 HEAD) -out $(CURDIR)/$(BENCH_OUT) \
+		$(if $(BENCH_BASELINE),-baseline $(CURDIR)/$(BENCH_BASELINE)) $(BENCH_ARGS)
+
+bench-profile-docs: ## Rewrite the docs/BENCHMARK.md blocks from docs/benchmarks/*.json (TEST-005)
+	cd tools/bench && go run ./profile -sync-docs $(CURDIR)/docs/BENCHMARK.md -results $(CURDIR)/docs/benchmarks
 
 check-repo-links: ## Verify every relative Markdown link resolves (DOC-013)
 	@bash scripts/check-repo-links.sh

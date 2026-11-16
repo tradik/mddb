@@ -685,7 +685,7 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 - **[Corpus Packs](docs/CORPUS-PACKS.md)** - Portable read-only collections: `mddb-cli corpus build` / `install` / `list` / `remove`
 - **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics (with query-shape counters), Grafana, OpenTelemetry traces over OTLP (`MDDB_OTEL_ENDPOINT`), and the diagnose bundle without user data (`mddb-cli diagnose`) to attach to an issue
 - **[Health Checks](docs/HEALTHCHECK.md)** - Docker & Kubernetes
-- **[Benchmarks](docs/BENCHMARK.md)** - FTS algorithm comparison, measured
+- **[Benchmarks](docs/BENCHMARK.md)** - FTS algorithm comparison, measured; `make bench-profile PROFILE=small|full` measures search latency and recall@10 per vector algorithm, ingest, start-up, kill -9 recovery and follower catch-up into [docs/benchmarks/](docs/benchmarks/) (TEST-005)
 - **[Architecture](docs/ARCHITECTURE.md)** - System design
 
 ### Development

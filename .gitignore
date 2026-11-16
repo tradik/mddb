@@ -197,3 +197,8 @@ clients/nodejs/lcov.info
 services/mddb-panel/coverage/
 .scannerwork/
 sonar-reports/
+
+# TEST-005: the benchmark profile's scratch servers and the mddbd it builds
+# (make bench-profile). Results go to docs/benchmarks/, which is tracked.
+/.bench-profile-work/
+tools/bench/profile/profile
