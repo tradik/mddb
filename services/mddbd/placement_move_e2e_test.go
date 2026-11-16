@@ -105,12 +105,7 @@ func TestPlacementMoveUnderLoadLosesNoWriteAndServesReads(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Its settings, in the main file, move with it.
-	if err := logEntries(leader.s.DBUpdate, leader.s.Binlog, []*binlog.BinlogEntry{
-		{Type: binlog.BinlogPut, BucketName: "schemas", Key: []byte("schema|" + c), Value: []byte("{}")},
-		{Type: binlog.BinlogPut, BucketName: "synonyms", Key: []byte("syn|" + c + "|car"), Value: []byte(`["auto"]`)}}); err != nil {
-		t.Fatal(err)
-	}
+	seedSettings(t, leader, c) // they move with it
 	to := otherGroup(from)
 	load := startMoveLoad(tp, c, seeded)
 	time.Sleep(100 * time.Millisecond)
@@ -150,6 +145,16 @@ func TestPlacementMoveUnderLoadLosesNoWriteAndServesReads(t *testing.T) {
 		}
 	}
 	checkSettingsMoved(t, tp, c, to)
+}
+
+// seedSettings gives c two settings in n's main file.
+func seedSettings(t *testing.T, n *placementNodeT, c string) {
+	t.Helper()
+	if err := logEntries(n.s.DBUpdate, n.s.Binlog, []*binlog.BinlogEntry{
+		{Type: binlog.BinlogPut, BucketName: "schemas", Key: []byte("schema|" + c), Value: []byte("{}")},
+		{Type: binlog.BinlogPut, BucketName: "synonyms", Key: []byte("syn|" + c + "|car"), Value: []byte(`["auto"]`)}}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // checkSettingsMoved checks that every node of group to holds c's two
