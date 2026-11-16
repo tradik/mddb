@@ -260,6 +260,11 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 	}
 	req.FeedbackOptions = feedbackOpts
 	req.DecompositionOptions = mcpGetDecomposition(args) // SRCH-020
+	rerankReq, rerankErr := mcpGetRerank(args)           // RAG-011
+	if rerankErr != nil {
+		return "", rerankErr
+	}
+	req.RerankRequest = rerankReq
 	resp, err := s.client.VectorSearch(ctx, req)
 	if err != nil {
 		return "", err
@@ -385,6 +390,11 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 	req.GroupBy = groupBy
 
 	req.PassageOptions = mcpGetPassageOptions(args)
+	rerankReq, rerankErr := mcpGetRerank(args) // RAG-011
+	if rerankErr != nil {
+		return "", rerankErr
+	}
+	req.RerankRequest = rerankReq
 	resp, err := s.client.FTSSearch(ctx, req)
 	if err != nil {
 		return "", err
@@ -468,6 +478,11 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 	}
 	req.FeedbackOptions = feedbackOpts
 	req.DecompositionOptions = mcpGetDecomposition(args) // SRCH-020
+	rerankReq, rerankErr := mcpGetRerank(args)           // RAG-011
+	if rerankErr != nil {
+		return "", rerankErr
+	}
+	req.RerankRequest = rerankReq
 	resp, err := s.client.HybridSearch(ctx, req)
 	if err != nil {
 		return "", err

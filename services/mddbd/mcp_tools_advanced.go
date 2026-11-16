@@ -164,6 +164,11 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 		return "", feedbackErr
 	}
 	req.FeedbackOptions = feedbackOpts
+	rerankReq, rerankErr := mcpGetRerank(args) // RAG-011
+	if rerankErr != nil {
+		return "", rerankErr
+	}
+	req.RerankRequest = rerankReq
 	resp, err := s.client.CrossSearch(ctx, req)
 	if err != nil {
 		return "", err

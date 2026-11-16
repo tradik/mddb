@@ -3,8 +3,9 @@ import { QUOTA_FIELDS } from '../lib/collection-config';
 
 // Collection settings added in 2.18.9 and 2.18.10, edited in the collection
 // settings dialog: the retrieval profile's vector index (SRCH-013), summary
-// mode and weight (RAG-009) and result cap (#368), meta keys kept out of
-// full-text search (#367), and the collection's quota (GO-043).
+// mode and weight (RAG-009), result cap (#368) and model reranking (RAG-011,
+// 2.19.8), meta keys kept out of full-text search (#367), and the
+// collection's quota (GO-043).
 
 const input = 'w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus';
 const small = 'block text-xs text-fg-subtle mb-0.5';
@@ -43,6 +44,33 @@ export default function CollectionAdvancedSettings({ value, onChange }) {
           <input id="cc-summary-weight" type="number" min="0" step="0.1" value={value.summaryWeight} onChange={set('summaryWeight')} placeholder="2.0" className={input} />
         </div>
       </div>
+
+      <fieldset>
+        <legend className="block text-sm font-medium text-fg-muted mb-1">Model reranking</legend>
+        <p className="text-xs text-fg-subtle mb-2">
+          A reranking model orders each search&apos;s best candidates by reading the query and each passage together.
+          Needs a reranking provider on the server (MDDB_RERANK_* or a stored rerank configuration). A search&apos;s
+          own rerank block wins; if the model times out or fails, the search keeps its own order.
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label htmlFor="cc-rerank-enabled" className={small}>Default</label>
+            <select id="cc-rerank-enabled" value={value.rerankEnabled} onChange={set('rerankEnabled')} className={input}>
+              <option value="">MDDB default (off)</option>
+              <option value="on">On for every search</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="cc-rerank-candidates" className={small}>Candidates</label>
+            <input id="cc-rerank-candidates" type="number" min="0" max="200" value={value.rerankCandidates} onChange={set('rerankCandidates')} placeholder="50" className={input} />
+          </div>
+          <div>
+            <label htmlFor="cc-rerank-top-n" className={small}>Keep (topN)</label>
+            <input id="cc-rerank-top-n" type="number" min="0" value={value.rerankTopN} onChange={set('rerankTopN')} placeholder="topK" className={input} />
+          </div>
+        </div>
+      </fieldset>
 
       <div>
         <label htmlFor="cc-exclude-meta" className="block text-sm font-medium text-fg-muted mb-1">Meta keys kept out of full-text search</label>

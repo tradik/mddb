@@ -32,6 +32,7 @@ const (
 	spanSearchVector      = "search.vector"       // the vector index search, planner included
 	spanSearchFuse        = "search.fuse"         // merging the halves: alpha, rrf, weighted
 	spanSearchLoadContent = "search.load_content" // reading the hit documents
+	spanSearchRerank      = "search.rerank"       // the reranking model (RAG-011)
 	spanIngestConvert     = "ingest.convert"      // keys, frontmatter, metadata, dedup
 	spanIngestIndex       = "ingest.index"        // the batch write and its indexes
 	spanIngestEmbed       = "ingest.embed"        // one document's embedding, on the worker

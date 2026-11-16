@@ -141,6 +141,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		BM25K1:            req.BM25K1,
 		BM25B:             req.BM25B,
 		ImageOptions:      req.ImageOptions,
+		RerankRequest:     req.RerankRequest,
 		skipContextBudget: true,
 	}, time.Now())
 	if err != nil {
@@ -149,7 +150,8 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 
 	c.server.Gain.Search(gainKind{Type: SearchTypeFTS, Algorithm: full.Algorithm}) // AGT-004
 	if full.passages != nil {
-		return &MCPFTSSearchResponse{Passages: full.passages, Algorithm: full.Algorithm, LimitReport: full.LimitReport}, nil
+		return &MCPFTSSearchResponse{Passages: full.passages, Algorithm: full.Algorithm, LimitReport: full.LimitReport,
+			RerankResult: full.RerankResult}, nil
 	}
 
 	resp := &MCPFTSSearchResponse{
@@ -160,6 +162,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		Facets:         full.Facets,
 		ResponsePrompt: c.server.ResponsePrompt(req.Collection, req.Query),
 		LimitReport:    full.LimitReport,
+		RerankResult:   full.RerankResult,
 	}
 	for _, r := range full.Results {
 		doc := r.Document
@@ -261,6 +264,9 @@ func (c *DirectClient) hybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if err := req.ValidateDecomposition(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateRerank(); err != nil {
+		return nil, err
+	}
 	waited := c.server.waitForIndex(ctx, req.Collection, req.IndexWait)
 
 	httpReq := HybridSearchRequest{
@@ -290,6 +296,7 @@ func (c *DirectClient) hybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		FeedbackOptions:      req.FeedbackOptions,
 		DecompositionOptions: req.DecompositionOptions,
 		ImageOptions:         req.ImageOptions,
+		RerankRequest:        req.RerankRequest,
 	}
 
 	items, httpReq, err := c.server.hybridItems(ctx, httpReq)
@@ -305,7 +312,9 @@ func (c *DirectClient) hybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, httpReq.plan)
 		c.server.passageImages(&p, httpReq.IncludeImages, imageHits)
 		p.LimitReport = httpReq.limitReport
-		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy, LimitReport: httpReq.limitReport}, nil
+		p.RerankResult = httpReq.rerankRun.Result()
+		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy, LimitReport: httpReq.limitReport,
+			RerankResult: p.RerankResult}, nil
 	}
 
 	distMetric := httpReq.DistanceMetric
@@ -323,6 +332,7 @@ func (c *DirectClient) hybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		Plan:            req.explained(httpReq.plan),
 		ImageHits:       imageHits,
 		LimitReport:     httpReq.limitReport,
+		RerankResult:    httpReq.rerankRun.Result(),
 	}
 	for _, item := range items {
 		resp.Results = append(resp.Results, MCPHybridSearchResult{
@@ -394,6 +404,7 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 	if httpReq.TopK > 0 {
 		httpReq.TopK, httpReq.limitReport = s.ResolveTopK(httpReq.Collection, httpReq.TopK, 0)
 	}
+	finalTopK := s.widenHybridForRerank(&httpReq, 10) // RAG-011: the model's candidate pool
 	// Run FTS
 	ftsResults, err := s.tracedFTS(ctx, httpReq)
 	if err != nil {
@@ -450,6 +461,8 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 	fuse.End()
 
 	items := s.tracedLoadHybridDocs(ctx, httpReq.Collection, merged, true)
+	items = s.rerankHybrid(ctx, &httpReq, items, true) // RAG-011
+	httpReq.TopK = httpReq.rerankRun.restore(httpReq.TopK, finalTopK)
 	// Curation rules (pin and hide) apply to every hybrid search, as they do
 	// over REST; the MCP and gRPC paths used to differ here.
 	items = s.applyCurationHybrid(httpReq.Collection, httpReq.Query, items)
@@ -457,5 +470,5 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 		items = items[:mergeTopK]
 	}
 	items = groupHybridItems(httpReq.Collection, items, httpReq.GroupBy, httpReq.TopK)
-	return items, httpReq, nil
+	return rerankTrim(httpReq.rerankRun, items, httpReq.TopK), httpReq, nil
 }

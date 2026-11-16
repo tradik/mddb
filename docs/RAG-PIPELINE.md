@@ -600,6 +600,42 @@ def hybrid_search(query: str, top_k: int = 5) -> list:
     return merged[:top_k]
 ```
 
+## Reranking the Retrieved Passages (v2.19.8)
+
+The stage between retrieval and the prompt: a reranking model reads the query
+and each candidate passage together and puts the best first, so the few
+passages that fit in the context are the right ones. In MDDB it is an option
+of the search itself, not a step the client runs:
+
+```
+query ─► vector / hybrid / fts / cross search ─► best `candidates` passages
+      ─► reranking model (POST {url}/rerank) ─► topK (or topN) ─► prompt
+```
+
+```python
+resp = requests.post(f"{MDDB}/v1/hybrid-search", json={
+    "collection": "blog", "query": question, "topK": 5, "format": "passages",
+    "rerank": {"enabled": True, "candidates": 30},
+}).json()
+if resp.get("rerankSkipped"):
+    log.info("rerank skipped: %s", resp["rerankSkipped"])  # still a usable answer
+passages = resp["passages"]
+```
+
+- **Configure** a provider with `MDDB_RERANK_PROVIDER=http` and
+  `MDDB_RERANK_API_URL` (or a stored configuration of kind `rerank`); see
+  [config.md](config.md#model-reranking-v2198-rag-011). Nothing configured,
+  nothing changes.
+- **Passages, not documents**: the model reads the chunk or the window where
+  the query meets the document, at most 2048 characters each.
+- **Never a failed search**: a timeout, an error, an unusable answer or a
+  spent budget returns the search's own order with `rerankSkipped`.
+- **Default per collection**: `retrieval.rerank` in the collection config.
+- **Measure first**: `/v1/eval` compares a configuration with and without
+  `rerank` (nDCG@k, p50/p95), and the Search Advisor recommends it only when
+  the collection's evaluation set says it helps. See
+  [SEARCH.md](SEARCH.md#model-reranking-v2198).
+
 ## Summaries for General Questions (v2.18.9+)
 
 Chunks answer specific questions. Questions like "what is this document

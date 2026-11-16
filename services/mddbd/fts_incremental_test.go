@@ -195,7 +195,7 @@ func assertContentReindexed(t *testing.T, s *Server) {
 	if ftsHits(t, s, "c", "wombat") != 1 || ftsHits(t, s, "c", "quokka") != 0 {
 		t.Error("a content change did not re-index the content")
 	}
-	res, err := s.searchFTS(FTSSearchRequest{Collection: "c", Query: `"wombat digs"`, Algorithm: "bm25"}, time.Now())
+	res, err := s.searchFTS(context.Background(), FTSSearchRequest{Collection: "c", Query: `"wombat digs"`, Algorithm: "bm25"}, time.Now())
 	if err != nil || res.Total != 1 {
 		t.Errorf("phrase search after a content change: %+v %v", res, err)
 	}
@@ -309,8 +309,8 @@ func assertEqualsFreshBuild(t *testing.T, s *Server, docs map[string]ftsVersion,
 	}
 	for _, q := range []string{"alpha", "zenith aurora", "running"} {
 		for _, algo := range []string{"bm25", "bm25f", "tfidf"} {
-			a, err1 := s.searchFTS(FTSSearchRequest{Collection: "c", Query: q, Algorithm: algo}, time.Now())
-			b, err2 := fresh.searchFTS(FTSSearchRequest{Collection: "c", Query: q, Algorithm: algo}, time.Now())
+			a, err1 := s.searchFTS(context.Background(), FTSSearchRequest{Collection: "c", Query: q, Algorithm: algo}, time.Now())
+			b, err2 := fresh.searchFTS(context.Background(), FTSSearchRequest{Collection: "c", Query: q, Algorithm: algo}, time.Now())
 			if err1 != nil || err2 != nil || rankedIDs(a) != rankedIDs(b) {
 				t.Fatalf("seed %d %s %q: %s vs %s", seed, algo, q, rankedIDs(a), rankedIDs(b))
 			}
@@ -350,7 +350,7 @@ func TestExcludeMetaKeys(t *testing.T) {
 		t.Errorf("changing excluded keys wrote %d full-text keys", n)
 	}
 
-	res, err := s.searchFTS(FTSSearchRequest{Collection: "c", Query: "ports", Algorithm: "bm25",
+	res, err := s.searchFTS(context.Background(), FTSSearchRequest{Collection: "c", Query: "ports", Algorithm: "bm25",
 		FilterMeta: map[string][]string{"license": {"BSD"}}, FacetBy: []string{"url"}}, time.Now())
 	if err != nil || res.Total != 1 || len(res.Facets["url"]) != 1 {
 		t.Fatalf("filterMeta and facets on an excluded key: %+v %v", res, err)

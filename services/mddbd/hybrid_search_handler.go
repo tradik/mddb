@@ -32,6 +32,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	waited := s.waitForIndex(r.Context(), req.Collection, req.IndexWait)
 	alpha := s.applyHybridDefaults(&req)
+	finalTopK := s.widenHybridForRerank(&req, 10) // RAG-011: the model's candidate pool
 	if err := checkHybridStrategy(req.Strategy); err != nil {
 		bad(w, err)
 		return
@@ -76,8 +77,12 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	merged = area.restrict(merged, &req)
 
 	// ---- Step 4: Load full documents ----
-	items := s.tracedLoadHybridDocs(r.Context(), req.Collection, merged, req.IncludeContent || req.wantsPassages())
+	keepContent := req.IncludeContent || req.wantsPassages()
+	items := s.tracedLoadHybridDocs(r.Context(), req.Collection, merged, keepContent || req.rerankRun.active())
 	area.attachDistances(items) // loadHybridDocs may drop DistanceMeters
+	// ---- Step 5: Rerank with the model (RAG-011), then back to topK ----
+	items = s.rerankHybrid(r.Context(), &req, items, keepContent)
+	req.TopK = req.rerankRun.restore(req.TopK, finalTopK)
 	items = s.finishHybridItems(&req, items)
 	req.plan = plan
 	s.recordSearch(r.Context(), vectorShape(vectorShapeInput{Mode: metrics.ModeHybrid, Collection: req.Collection,
@@ -89,6 +94,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		p := s.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, plan)
 		s.passageImages(&p, req.IncludeImages, imageHits)
 		p.LimitReport = req.limitReport
+		p.RerankResult = req.rerankRun.Result()
 		ok(w, p)
 		return
 	}
@@ -103,6 +109,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	resp.Indexing = waited
 	resp.ImageHits = imageHits
 	resp.ContextTruncated = contextTruncated
+	resp.RerankResult = req.rerankRun.Result()
 	s.decorateHybridResponse(&resp, &req, start)
 	ok(w, resp)
 }
@@ -127,7 +134,7 @@ func (s *Server) checkHybridRequest(req *HybridSearchRequest) (func(http.Respons
 	}
 	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
 	for _, validate := range []func() error{req.ValidatePassageOptions, req.ValidatePlanOptions,
-		req.ValidateFeedback, req.ValidateDecomposition} {
+		req.ValidateFeedback, req.ValidateDecomposition, req.ValidateRerank} {
 		if err := validate(); err != nil {
 			return unprocessable, err
 		}

@@ -327,14 +327,14 @@ func TestQueryDecomposition_Eval(t *testing.T) {
 	ctx := context.Background()
 	for _, typ := range []string{SearchTypeVector, SearchTypeHybrid} {
 		c := EvalConfig{SearchType: typ, QueryDecomposition: QueryDecompositionAuto}
-		if keys, _, err := s.evalSearch(ctx, "gold", 3, c, decompositionGoldenQuery); err != nil || len(keys) == 0 {
-			t.Fatalf("%s: %v %v", typ, err, keys)
+		if a, err := s.evalSearch(ctx, evalQuery{collection: "gold", k: 3, c: c, query: decompositionGoldenQuery}); err != nil || len(a.keys) == 0 {
+			t.Fatalf("%s: %v %v", typ, err, a.keys)
 		}
 		if !strings.HasSuffix(c.label(), " decomposition=auto") {
 			t.Errorf("label %q", c.label())
 		}
 		c.QueryDecomposition = "on"
-		if _, _, err := s.evalSearch(ctx, "gold", 3, c, "x"); err == nil {
+		if _, err := s.evalSearch(ctx, evalQuery{collection: "gold", k: 3, c: c, query: "x"}); err == nil {
 			t.Fatalf("%s: bad mode accepted", typ)
 		}
 	}

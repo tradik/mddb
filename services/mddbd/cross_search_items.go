@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"sort"
 
 	vec "mddb/internal/vector"
@@ -28,6 +29,9 @@ type crossSearchParams struct {
 	// Feedback rescores each target's candidates in rescore mode (SRCH-015);
 	// query mode has already corrected QueryVector.
 	Feedback *feedback
+	// Rerank orders the merged candidates with the reranking model (RAG-011);
+	// nil when off.
+	Rerank *rerankRun
 }
 
 // crossSearcher resolves a cross search's searcher and plan (SRCH-013): the
@@ -58,7 +62,7 @@ type crossCandidate struct {
 
 // crossSearchItems searches every target collection, merges the hits by
 // score, applies groupBy (SRCH-016) and loads the top results.
-func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
+func (s *Server) crossSearchItems(ctx context.Context, p crossSearchParams) []CrossSearchResultItem {
 	var cands []crossCandidate
 	for _, coll := range p.Targets {
 		allowedIDs, active := s.allowedDocIDs(coll, p.FilterMeta, p.Filter)
@@ -85,8 +89,9 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 	}
 	sort.SliceStable(cands, func(i, j int) bool { return cands[i].result.Score > cands[j].result.Score })
 	// Grouping removes results, so it needs the whole candidate list.
-	if p.GroupBy == nil && len(cands) > p.TopK {
-		cands = cands[:p.TopK]
+	// RAG-011: the reranking model's pool when it runs.
+	if pool := p.Rerank.pool(p.TopK); p.GroupBy == nil && len(cands) > pool {
+		cands = cands[:pool]
 	}
 
 	// #336: documents of several collections, each read from its own file.
@@ -96,12 +101,15 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 		if err != nil || docPtr == nil {
 			continue
 		}
+		text := p.Rerank.textFor(c.collection, docPtr, "", nil)
 		doc := *docPtr
 		if !p.IncludeContent {
 			doc.ContentMD = ""
 		}
-		items = append(items, CrossSearchResultItem{Collection: c.collection, Document: doc, Score: c.result.Score, chunks: c.chunks})
+		items = append(items, CrossSearchResultItem{Collection: c.collection, Document: doc, Score: c.result.Score,
+			chunks: c.chunks, rerankText: text})
 	}
+	items = s.rerankCross(ctx, p.Rerank, items)
 	if p.GroupBy != nil {
 		items = groupTop(items, p.GroupBy,
 			func(it CrossSearchResultItem) string { return it.Document.ID },
@@ -113,6 +121,7 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 			items = items[:p.TopK]
 		}
 	}
+	items = rerankTrim(p.Rerank, items, p.TopK)
 	for i := range items {
 		items[i].Rank = i + 1
 	}

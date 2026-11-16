@@ -66,7 +66,7 @@ const (
 var configKeys = map[string]configClass{
 	// Secrets: whether set, never what.
 	"MDDB_AUTH_ADMIN_PASSWORD": cfgSecret, "MDDB_AUTH_ADMIN_USERNAME": cfgSecret, "MDDB_AUTH_JWT_SECRET": cfgSecret,
-	"MDDB_EMBEDDING_API_KEY": cfgSecret, "MDDB_ENCRYPTION_KEY": cfgSecret, "MDDB_ENCRYPTION_KEYS_PREVIOUS": cfgSecret,
+	"MDDB_EMBEDDING_API_KEY": cfgSecret, "MDDB_RERANK_API_KEY": cfgSecret, "MDDB_ENCRYPTION_KEY": cfgSecret, "MDDB_ENCRYPTION_KEYS_PREVIOUS": cfgSecret,
 	"MDDB_ENCRYPTION_KEY_ID": cfgSecret, "MDDB_MCP_API_KEYS": cfgSecret, "MDDB_MCP_OAUTH_SECRET": cfgSecret,
 	"MDDB_REPLICATION_SECRET": cfgSecret, "MDDB_OTEL_HEADERS": cfgSecret, "MDDB_AUDIT_EXPORT_WEBHOOK_HEADER": cfgSecret,
 
@@ -109,6 +109,8 @@ var configKeys = map[string]configClass{
 	"MDDB_COMPRESSION_SMALL_THRESHOLD": cfgPublic, "MDDB_CORPUS_MAX_BYTES": cfgPublic, "MDDB_CRONS": cfgPublic,
 	"MDDB_DISK_MIN_FREE": cfgPublic, "MDDB_DISK_RESERVE_BYTES": cfgPublic, "MDDB_EMBEDDING_AUTODETECT": cfgPublic,
 	"MDDB_EMBEDDING_CACHE_SIZE": cfgPublic, "MDDB_EMBEDDING_CACHE_TTL": cfgPublic,
+	"MDDB_RERANK_PROVIDER": cfgPublic, "MDDB_RERANK_API_URL": cfgPublic, "MDDB_RERANK_MODEL": cfgPublic,
+	"MDDB_RERANK_TIMEOUT_MS": cfgPublic, "MDDB_RERANK_MAX_CANDIDATES": cfgPublic, "MDDB_RERANK_CACHE_SIZE": cfgPublic,
 	"MDDB_EMBEDDING_CHUNK_ENABLED": cfgPublic, "MDDB_EMBEDDING_CHUNK_MODE": cfgPublic,
 	"MDDB_EMBEDDING_CHUNK_SIZE": cfgPublic, "MDDB_EMBEDDING_DIMENSIONS": cfgPublic,
 	"MDDB_EMBEDDING_IMAGE_MODEL": cfgPublic, "MDDB_EMBEDDING_MODEL": cfgPublic, "MDDB_EMBEDDING_PROVIDER": cfgPublic,

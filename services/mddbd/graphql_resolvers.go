@@ -352,16 +352,18 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		DecompositionOptions: DecompositionOptions{QueryDecomposition: derefString(input.QueryDecomposition)},
 		ImageOptions:         ImageOptions{IncludeImages: derefBool(input.IncludeImages, false)}, // RAG-010
 		QueryImage:           derefString(input.QueryImage),
+		RerankRequest:        rerankFromGQL(input.Rerank), // RAG-011
 	}
 	resp, err := a.mcp.VectorSearch(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	capped, limit := limitToGQL(resp.LimitReport)
+	rerank, rerankSkipped := rerankToGQL(resp.RerankResult)
 	if resp.Passages != nil {
 		return &gql.VectorSearchResponse{Results: []*gql.VectorSearchResult{}, Total: resp.Passages.Total,
 			Passages: passagesToGQL(resp.Passages.Passages), ImageHits: imageRefsToGQL(resp.Passages.ImageHits),
-			LimitCapped: capped, Limit: limit}, nil
+			LimitCapped: capped, Limit: limit, Rerank: rerank, RerankSkipped: rerankSkipped}, nil
 	}
 	results := make([]*gql.VectorSearchResult, 0, len(resp.Results))
 	for i := range resp.Results {
@@ -381,14 +383,16 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 	model := resp.Model
 	dims := resp.Dimensions
 	return &gql.VectorSearchResponse{
-		Results:     results,
-		Total:       resp.Total,
-		Model:       &model,
-		Dimensions:  &dims,
-		Plan:        searchPlanToGQL(resp.Plan),
-		ImageHits:   imageRefsToGQL(resp.ImageHits),
-		LimitCapped: capped,
-		Limit:       limit,
+		Results:       results,
+		Total:         resp.Total,
+		Model:         &model,
+		Dimensions:    &dims,
+		Plan:          searchPlanToGQL(resp.Plan),
+		ImageHits:     imageRefsToGQL(resp.ImageHits),
+		LimitCapped:   capped,
+		Limit:         limit,
+		Rerank:        rerank,
+		RerankSkipped: rerankSkipped,
 	}, nil
 }
 
@@ -437,14 +441,16 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 		IncludeContent: true,
 		PassageOptions: passageOptionsFromGQL(input.Format, input.PassageLines),
 		ImageOptions:   ImageOptions{IncludeImages: derefBool(input.IncludeImages, false)}, // RAG-010
+		RerankRequest:  rerankFromGQL(input.Rerank),                                        // RAG-011
 	})
 	if err != nil {
 		return nil, err
 	}
 	capped, limit := limitToGQL(resp.LimitReport)
+	rerank, rerankSkipped := rerankToGQL(resp.RerankResult)
 	if resp.Passages != nil {
 		return &gql.FTSResponse{Results: []*gql.FTSResult{}, Total: resp.Passages.Total, Passages: passagesToGQL(resp.Passages.Passages),
-			LimitCapped: capped, Limit: limit}, nil
+			LimitCapped: capped, Limit: limit, Rerank: rerank, RerankSkipped: rerankSkipped}, nil
 	}
 	out := make([]*gql.FTSResult, 0, len(resp.Results))
 	for i := range resp.Results {
@@ -456,7 +462,8 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 			Images:       imageRefsToGQL(r.Images),
 		})
 	}
-	return &gql.FTSResponse{Results: out, Total: resp.Total, LimitCapped: capped, Limit: limit}, nil
+	return &gql.FTSResponse{Results: out, Total: resp.Total, LimitCapped: capped, Limit: limit, Rerank: rerank,
+		RerankSkipped: rerankSkipped}, nil
 }
 
 // groupByFromGQL converts the GraphQL groupBy input (SRCH-016).

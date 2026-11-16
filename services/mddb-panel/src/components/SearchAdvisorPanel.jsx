@@ -39,6 +39,14 @@ function Setting({ label, value }) {
   );
 }
 
+// RAG-011: the reranking model as the advice states it — on when the
+// collection's evaluation set measured it better, off when it did not, and
+// nothing when the server has no model.
+export function rerankSetting(advice) {
+  if (!advice?.rerankModel) return '';
+  return advice.rerank?.enabled ? 'on' : 'off';
+}
+
 export default function SearchAdvisorPanel() {
   const { currentCollection } = useStore();
   const [collection, setCollection] = useState(currentCollection || '');
@@ -233,6 +241,8 @@ export default function SearchAdvisorPanel() {
               <Setting label="Retrieval mode" value={advice.retrievalMode} />
               <Setting label="Top K" value={advice.topK} />
               <Setting label="Summary mode" value={advice.summaryMode} />
+              <Setting label="Reranking model" value={advice.rerankModel} />
+              <Setting label="Model reranking" value={rerankSetting(advice)} />
               {advice.signals?.diversity ? (
                 <Setting label="Diversity signal" value={advice.signals.diversity} />
               ) : null}

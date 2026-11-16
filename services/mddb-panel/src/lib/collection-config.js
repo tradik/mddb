@@ -13,7 +13,7 @@
 /** Retrieval keys the dialog edits; every other stored key is kept. */
 export const EDITED_RETRIEVAL_KEYS = [
   'defaultSearchType', 'topK', 'retrievalMode', 'hybridStrategy', 'hybridAlpha', 'hybridAlphaSet',
-  'contextTokenBudget', 'vectorAlgorithm', 'summaryMode', 'summaryWeight', 'maxTopK',
+  'contextTokenBudget', 'vectorAlgorithm', 'summaryMode', 'summaryWeight', 'maxTopK', 'rerank',
 ];
 
 /** GO-043 quota limits, in the order the dialog shows them. */
@@ -56,9 +56,35 @@ export function advancedFromConfig(cfg = {}) {
     summaryMode: r.summaryMode || '',
     summaryWeight: r.summaryWeight != null ? String(r.summaryWeight) : '',
     maxTopK: r.maxTopK ? String(r.maxTopK) : '',
+    ...rerankFromProfile(r.rerank),
     excludeMetaKeys: (cfg.fts?.excludeMetaKeys || []).join(', '),
     quota: Object.fromEntries(QUOTA_FIELDS.map(({ key }) => [key, q[key] ? String(q[key]) : ''])),
   };
+}
+
+/**
+ * RAG-011: the dialog's state for the profile's model reranking. `rerankEnabled`
+ * is '' (not set: off), 'on' or 'off'.
+ */
+export function rerankFromProfile(rerank) {
+  const r = rerank || {};
+  let enabled = '';
+  if (r.enabled === true) enabled = 'on';
+  if (r.enabled === false) enabled = 'off';
+  return {
+    rerankEnabled: enabled,
+    rerankCandidates: r.candidates ? String(r.candidates) : '',
+    rerankTopN: r.topN ? String(r.topN) : '',
+  };
+}
+
+/** The profile's rerank block the dialog's fields describe, or null when nothing is set. */
+export function buildRerank(advanced) {
+  const out = {};
+  if (advanced.rerankEnabled) out.enabled = advanced.rerankEnabled === 'on';
+  if (Number(advanced.rerankCandidates) > 0) out.candidates = Number(advanced.rerankCandidates);
+  if (Number(advanced.rerankTopN) > 0) out.topN = Number(advanced.rerankTopN);
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 /** The quota the dialog's fields describe: only the limits that are set. */
@@ -78,7 +104,8 @@ function sameQuota(a, b) {
 
 /**
  * Adds the 2.18.9/2.18.10 settings to a payload: the retrieval profile's
- * vector index, summary mode and weight and result cap, full-text excluded
+ * vector index, summary mode and weight, result cap and model reranking
+ * (2.19.8), full-text excluded
  * meta keys, and the quota. A quota is sent only when it changed — changing
  * one needs admin on "*", and an omitted quota keeps the stored one; clearing
  * every limit sends {} to remove it.
@@ -91,6 +118,8 @@ export function applyAdvanced(payload, advanced, stored = {}) {
     retrieval.summaryWeight = Number(advanced.summaryWeight);
   }
   if (Number(advanced.maxTopK) > 0) retrieval.maxTopK = Number(advanced.maxTopK);
+  const rerank = buildRerank(advanced);
+  if (rerank) retrieval.rerank = rerank;
   if (Object.keys(retrieval).length > 0) payload.retrieval = retrieval;
   else delete payload.retrieval;
 

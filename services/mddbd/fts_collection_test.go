@@ -17,7 +17,7 @@ import (
 
 func ftsHits(t *testing.T, s *Server, collection, q string) int {
 	t.Helper()
-	resp, err := s.searchFTS(FTSSearchRequest{Collection: collection, Query: q}, time.Now())
+	resp, err := s.searchFTS(context.Background(), FTSSearchRequest{Collection: collection, Query: q}, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

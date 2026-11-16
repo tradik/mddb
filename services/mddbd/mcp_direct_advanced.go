@@ -282,19 +282,21 @@ func (c *DirectClient) crossSearch(ctx context.Context, req *MCPCrossSearchReque
 	}
 
 	waited := s.waitForIndexAll(ctx, req.TargetCollections, req.IndexWait)
-	items := s.crossSearchItems(crossSearchParams{
+	rr := s.newRerankRun("", req.Query, req.Rerank, req.Explain) // RAG-011
+	items := s.crossSearchItems(ctx, crossSearchParams{
 		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
-		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs, Feedback: fb,
+		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs, Feedback: fb, Rerank: rr,
 	})
 	s.countCross(algo, items, req.wantsPassages())
 
 	if req.wantsPassages() {
 		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
 		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
-		return &MCPCrossSearchResponse{Passages: &p}, nil
+		p.RerankResult = rr.Result()
+		return &MCPCrossSearchResponse{Passages: &p, RerankResult: p.RerankResult}, nil
 	}
 	s.crossImages(items, req.IncludeImages) // RAG-010
 	return &MCPCrossSearchResponse{
@@ -307,13 +309,15 @@ func (c *DirectClient) crossSearch(ctx context.Context, req *MCPCrossSearchReque
 		DistanceMetric:    metricName,
 		Indexing:          waited,
 		Plan:              req.explained(plan),
+		RerankResult:      rr.Result(),
 	}, nil
 }
 
 // validateCross checks a cross-collection search's options.
 func (req *MCPCrossSearchRequest) validateCross() error {
 	for _, validate := range []func() error{req.GroupBy.Validate, req.ValidateIndexWait, req.ValidatePassageOptions,
-		func() error { return validCrossSearchType(req.SearchType) }, req.ValidatePlanOptions, req.ValidateFeedback} {
+		func() error { return validCrossSearchType(req.SearchType) }, req.ValidatePlanOptions, req.ValidateFeedback,
+		req.ValidateRerank} {
 		if err := validate(); err != nil {
 			return err
 		}
@@ -327,18 +331,20 @@ func (s *Server) crossTextSearch(ctx context.Context, req *MCPCrossSearchRequest
 		return nil, fmt.Errorf("searchType %s needs a query", req.SearchType)
 	}
 	waited := s.waitForIndexAll(ctx, req.TargetCollections, req.IndexWait)
+	rr := s.newRerankRun("", req.Query, req.Rerank, req.Explain) // RAG-011
 	items := s.crossTextItems(ctx, crossTextParams{SearchType: req.SearchType, Query: req.Query,
 		Targets: req.TargetCollections, TopK: topK, FilterMeta: req.FilterMeta, Filter: req.Filter,
-		GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages()})
+		GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages(), Rerank: rr})
 	s.countCross("", items, req.wantsPassages())
 	if req.wantsPassages() {
 		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
 		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
-		return &MCPCrossSearchResponse{Passages: &p}, nil
+		p.RerankResult = rr.Result()
+		return &MCPCrossSearchResponse{Passages: &p, RerankResult: p.RerankResult}, nil
 	}
 	s.crossImages(items, req.IncludeImages) // RAG-010
 	return &MCPCrossSearchResponse{Results: items, Total: len(items), TargetCollections: req.TargetCollections,
-		Algorithm: req.SearchType, Indexing: waited}, nil
+		Algorithm: req.SearchType, Indexing: waited, RerankResult: rr.Result()}, nil
 }
 
 // crossQueryVector resolves what a cross-collection vector search searches

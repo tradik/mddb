@@ -1,11 +1,14 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mddb/internal/binlog"
 	"mddb/internal/embedding"
 	"mddb/internal/httpclient"
+	"mddb/internal/rerank"
 	"net/http"
 	"strings"
 	"time"
@@ -24,6 +27,63 @@ type EmbeddingConfig struct {
 	APIURL     string `json:"apiUrl"`     // API URL (for Ollama)
 	IsDefault  bool   `json:"isDefault"`  // is this the default config
 	CreatedAt  int64  `json:"createdAt"`  // creation timestamp
+	// Kind is what the model does: "" (or "embedding") embeds text, "rerank"
+	// orders search candidates (RAG-011). One store and one default per
+	// kind, so a reranking model is configured the way an embedding model is
+	// and a stored default overrides the environment for both.
+	Kind string `json:"kind,omitempty"`
+	// TimeoutMs and MaxCandidates apply to a rerank configuration only.
+	TimeoutMs     int `json:"timeoutMs,omitempty"`
+	MaxCandidates int `json:"maxCandidates,omitempty"`
+}
+
+// ConfigKindRerank marks a stored configuration of a reranking model.
+const ConfigKindRerank = "rerank"
+
+// kindOf is a configuration's kind with the legacy empty value named.
+func kindOf(c *EmbeddingConfig) string {
+	if c.Kind == ConfigKindRerank {
+		return ConfigKindRerank
+	}
+	return ""
+}
+
+// public is the configuration as a response carries it. A rerank key is
+// never returned (RAG-011): the panel shows whether one is set, and an
+// update without a key keeps the stored one. Embedding configurations keep
+// their documented behaviour.
+func (c *EmbeddingConfig) public() *EmbeddingConfig {
+	if kindOf(c) != ConfigKindRerank {
+		return c
+	}
+	out := *c
+	out.APIKey = ""
+	return &out
+}
+
+// validateModelConfig checks the fields a configuration of its kind needs.
+func validateModelConfig(c *EmbeddingConfig) error {
+	switch c.Kind {
+	case "", "embedding":
+		c.Kind = ""
+	case ConfigKindRerank:
+		if c.Provider != rerank.ProviderHTTP {
+			return errors.New("a rerank provider must be 'http'")
+		}
+		if c.APIURL == "" {
+			return errors.New("a rerank configuration needs apiUrl")
+		}
+		return nil
+	default:
+		return errors.New("kind must be 'embedding' or 'rerank'")
+	}
+	if !validEmbeddingProviders[c.Provider] {
+		return errors.New(invalidEmbeddingProvider)
+	}
+	if c.Dimensions <= 0 {
+		return errors.New("dimensions must be positive")
+	}
+	return nil
 }
 
 // validEmbeddingProviders are the providers a stored configuration may name.
@@ -70,7 +130,7 @@ func (s *Server) SaveEmbeddingConfig(config *EmbeddingConfig) error {
 				if err := json.Unmarshal(v, &existing); err != nil {
 					continue
 				}
-				if existing.IsDefault && existing.ID != config.ID {
+				if existing.IsDefault && existing.ID != config.ID && kindOf(&existing) == kindOf(config) {
 					existing.IsDefault = false
 					data, _ := json.Marshal(existing) // #nosec G117
 					_ = bucket.Put([]byte(existing.ID), data)
@@ -138,18 +198,23 @@ func (s *Server) ListEmbeddingConfigs() ([]*EmbeddingConfig, error) {
 
 // GetDefaultEmbeddingConfig returns the default embedding configuration
 func (s *Server) GetDefaultEmbeddingConfig() (*EmbeddingConfig, error) {
+	return s.defaultModelConfig("")
+}
+
+// defaultModelConfig returns the default configuration of a kind.
+func (s *Server) defaultModelConfig(kind string) (*EmbeddingConfig, error) {
 	configs, err := s.ListEmbeddingConfigs()
 	if err != nil {
 		return nil, err
 	}
 
 	for _, config := range configs {
-		if config.IsDefault {
+		if config.IsDefault && kindOf(config) == kind {
 			return config, nil
 		}
 	}
 
-	return nil, fmt.Errorf("no default embedding config found")
+	return nil, fmt.Errorf("no default %s config found", cmp.Or(kind, "embedding"))
 }
 
 // DeleteEmbeddingConfig deletes an embedding configuration
@@ -229,10 +294,22 @@ func (s *Server) handleListEmbeddingConfigs(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// ?kind=rerank lists the reranking models (RAG-011); without it the list
+	// is the embedding models it always was.
+	kind := r.URL.Query().Get("kind")
+	if kind == "embedding" {
+		kind = ""
+	}
+	out := make([]*EmbeddingConfig, 0, len(configs))
+	for _, c := range configs {
+		if kindOf(c) == kind {
+			out = append(out, c.public())
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"configs": configs,
+		"configs": out,
 	}) // nolint:errcheck // HTTP response already committed
 }
 
@@ -258,13 +335,8 @@ func (s *Server) handleCreateEmbeddingConfig(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if !validEmbeddingProviders[config.Provider] {
-		http.Error(w, invalidEmbeddingProvider, http.StatusBadRequest)
-		return
-	}
-
-	if config.Dimensions <= 0 {
-		http.Error(w, "dimensions must be positive", http.StatusBadRequest)
+	if err := validateModelConfig(&config); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -277,7 +349,7 @@ func (s *Server) handleCreateEmbeddingConfig(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(config) // #nosec G117 -- API key is intentionally returned to authenticated admin
+	_ = json.NewEncoder(w).Encode(config.public()) // #nosec G117 -- API key is intentionally returned to authenticated admin
 }
 
 func (s *Server) handleGetEmbeddingConfig(w http.ResponseWriter, r *http.Request, id string) {
@@ -292,7 +364,7 @@ func (s *Server) handleGetEmbeddingConfig(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(config) // #nosec G117 -- API key is intentionally returned to authenticated admin
+	_ = json.NewEncoder(w).Encode(config.public()) // #nosec G117 -- API key is intentionally returned to authenticated admin
 }
 
 func (s *Server) handleUpdateEmbeddingConfig(w http.ResponseWriter, r *http.Request, id string) {
@@ -313,16 +385,11 @@ func (s *Server) handleUpdateEmbeddingConfig(w http.ResponseWriter, r *http.Requ
 
 	config.ID = id // Ensure ID matches path
 
-	// Validate
-	if !validEmbeddingProviders[config.Provider] {
-		http.Error(w, invalidEmbeddingProvider, http.StatusBadRequest)
+	if err := validateModelConfig(&config); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	if config.Dimensions <= 0 {
-		http.Error(w, "dimensions must be positive", http.StatusBadRequest)
-		return
-	}
+	s.keepStoredRerankKey(&config)
 
 	if err := s.SaveEmbeddingConfig(&config); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -330,7 +397,7 @@ func (s *Server) handleUpdateEmbeddingConfig(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(config) // #nosec G117 -- API key is intentionally returned to authenticated admin
+	_ = json.NewEncoder(w).Encode(config.public()) // #nosec G117 -- API key is intentionally returned to authenticated admin
 }
 
 func (s *Server) handleDeleteEmbeddingConfig(w http.ResponseWriter, r *http.Request, id string) {
@@ -407,8 +474,12 @@ func (s *Server) handleSetDefaultEmbeddingConfig(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Reinitialize embedding with new default config
-	s.InitializeEmbeddingFromConfig(config)
+	// Reinitialize the model of this kind with the new default config
+	if kindOf(config) == ConfigKindRerank {
+		s.InitializeRerankFromConfig(config)
+	} else {
+		s.InitializeEmbeddingFromConfig(config)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{

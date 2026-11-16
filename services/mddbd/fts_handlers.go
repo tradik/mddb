@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"mddb/internal/fts"
@@ -68,6 +69,7 @@ type FTSSearchRequest struct {
 	GroupBy        *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 	PassageOptions          // format, passageLines (AGT-002)
 	ImageOptions            // includeImages (RAG-010)
+	RerankRequest           // rerank: {enabled, candidates, topN, explain} (RAG-011)
 }
 
 // FTSSearchResponse is the HTTP response for full-text search.
@@ -94,8 +96,9 @@ type FTSSearchResponse struct {
 	ContextTruncated bool `json:"contextTruncated,omitempty"`
 	// passages is set for format "passages" and is what the caller gets
 	// instead of this response (AGT-002).
-	passages    *PassagesResponse
-	LimitReport // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	passages     *PassagesResponse
+	LimitReport  // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	RerankResult // rerank, rerankSkipped (RAG-011)
 }
 
 // FTSResultWithDoc includes the full document in the result.
@@ -156,7 +159,7 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	if resp.passages != nil {
 		out = resp.passages
 	}
-	if cacheKey != "" {
+	if cacheKey = cacheableKey(cacheKey, resp); cacheKey != "" {
 		if body, err := json.Marshal(out); err == nil {
 			s.SearchCache.Set(cacheKey, body, int64(cacheTTL))
 			w.Header().Set("Content-Type", "application/json")
@@ -167,6 +170,16 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ok(w, out)
+}
+
+// cacheableKey is the cache key an answer may be stored under: none for an
+// answer whose requested rerank was skipped, which is not one worth repeating
+// (RAG-011).
+func cacheableKey(key string, resp *FTSSearchResponse) string {
+	if resp.RerankSkipped != "" {
+		return ""
+	}
+	return key
 }
 
 // normalizeFTSRequest validates a full-text request and resolves its limit.
@@ -202,14 +215,14 @@ func (s *Server) normalizeFTSRequest(req *FTSSearchRequest) error {
 		req.FieldWeights = s.summaryFieldWeights(req.Collection, s.ResolveSummaryMode(req.Collection, req.summaryMode), req.FieldWeights)
 	}
 	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
-	return req.ValidatePassageOptions()
+	return validateAll(req.ValidatePassageOptions, req.ValidateRerank)
 }
 
 // searchFTS runs a full-text search: spell correction, mode, filters, ranges,
 // boosts, facets, highlights and the context budget. It is the one
 // implementation behind POST /v1/fts and the MCP full_text_search tool; MCP
 // had a reduced copy without filters, modes or stemming control (#328).
-func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchResponse, error) {
+func (s *Server) searchFTS(ctx context.Context, req FTSSearchRequest, start time.Time) (*FTSSearchResponse, error) {
 	if err := s.normalizeFTSRequest(&req); err != nil {
 		return nil, err
 	}
@@ -232,6 +245,10 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 			}
 		}
 	}
+
+	// RAG-011: model reranking reads the corrected query, and the search
+	// fetches the model's pool.
+	rr := s.newRerankRun(req.Collection, req.Query, req.Rerank, false)
 
 	// Per-query stemming/synonym control on a view of the index, never on
 	// the shared one (see FTSIndex.QueryView).
@@ -297,7 +314,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	// run. Searching only the top req.Limit first let a filter keep just the
 	// matches that happened to rank there (#311). The search functions score
 	// every match either way — the limit only truncates their sorted output.
-	searchLimit := req.Limit
+	searchLimit := rr.pool(req.Limit)
 	if allowed != nil || len(docRanges) > 0 || len(req.Boost) > 0 || req.FacetScope == facetScopeAll || req.GroupBy != nil {
 		searchLimit = 0
 	}
@@ -429,7 +446,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 
 	// Load only the page, unless curation may hide some of it: then load all
 	// and let the truncation after curation pick the page.
-	window := req.Limit
+	window := rr.pool(req.Limit)
 	if req.GroupBy != nil || (s.CurationManager != nil && len(s.CurationManager.MatchingRules(req.Collection, req.Query)) > 0) {
 		window = 0
 	}
@@ -483,6 +500,8 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	})
 	// Curation: pin/hide must run AFTER filtering and range/boost but BEFORE
 	// facets so facet counts reflect what the client actually sees.
+	resp.Results = s.rerankFTSResults(ctx, rr, req.Collection, resp.Results)
+	req.Limit = rr.cut(req.Limit)
 	resp.Results = s.applyCurationFTS(req.Collection, req.Query, resp.Results)
 	resp.Results = groupTop(resp.Results, req.GroupBy,
 		func(r FTSResultWithDoc) string { return r.Document.ID },
@@ -534,6 +553,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 
 	resp.SpellCorrected = spellCorrected
 	resp.LimitReport = req.limitReport
+	resp.RerankResult = rr.Result()
 
 	if req.wantsPassages() {
 		hits := make([]passageSource, 0, len(resp.Results))
@@ -546,6 +566,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 			s.attachPassageImages(&p) // RAG-010
 		}
 		p.LimitReport = req.limitReport
+		p.RerankResult = resp.RerankResult
 		resp.passages = &p
 	} else if req.IncludeImages {
 		// RAG-010: each hit's images, by alt text and caption found or not.

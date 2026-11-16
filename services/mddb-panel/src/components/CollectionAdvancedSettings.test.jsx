@@ -10,7 +10,7 @@ const { default: CollectionAdvancedSettings } = await import('./CollectionAdvanc
 const { advancedFromConfig } = await import('../lib/collection-config');
 
 const value = advancedFromConfig({
-  retrieval: { vectorAlgorithm: 'hnsw', summaryMode: 'blend', summaryWeight: 2, maxTopK: 40 },
+  retrieval: { vectorAlgorithm: 'hnsw', summaryMode: 'blend', summaryWeight: 2, maxTopK: 40, rerank: { enabled: true, candidates: 30 } },
   fts: { excludeMetaKeys: ['url'] },
   quota: { maxDocuments: 1000 },
 });
@@ -34,6 +34,9 @@ describe('CollectionAdvancedSettings', () => {
     expect(screen.getByLabelText('Meta keys kept out of full-text search').value).toBe('url');
     expect(screen.getByLabelText('Max documents').value).toBe('1000');
     expect(screen.getByLabelText('Max bytes').value).toBe('');
+    expect(screen.getByLabelText('Default').value).toBe('on');
+    expect(screen.getByLabelText('Candidates').value).toBe('30');
+    expect(screen.getByLabelText('Keep (topN)').value).toBe('');
   });
 
   test('offers the MDDB default and every vector algorithm', () => {
@@ -48,6 +51,9 @@ describe('CollectionAdvancedSettings', () => {
     ['Document summaries', 'expand', 'summaryMode'],
     ['Summary weight', '0.5', 'summaryWeight'],
     ['Meta keys kept out of full-text search', 'url, sha', 'excludeMetaKeys'],
+    ['Default', 'off', 'rerankEnabled'],
+    ['Candidates', '20', 'rerankCandidates'],
+    ['Keep (topN)', '3', 'rerankTopN'],
   ])('changing %s reports %s', (label, next, key) => {
     const onChange = renderSettings();
     fireEvent.change(screen.getByLabelText(label), { target: { value: next } });

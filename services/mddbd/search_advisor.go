@@ -131,6 +131,10 @@ type SearchRecommendation struct {
 	TopK int `json:"topK,omitempty"`
 	// SummaryMode is "blend" when most documents carry a summary (RAG-009).
 	SummaryMode string `json:"summaryMode,omitempty"`
+	// Rerank is set when the evaluation set showed the reranking model
+	// helps (RAG-011); RerankModel names the configured model, if any.
+	Rerank      *RerankOptions `json:"rerank,omitempty"`
+	RerankModel string         `json:"rerankModel,omitempty"`
 
 	// Reasons explains every choice above, one line each. This is the part
 	// worth reading: a recommendation nobody can argue with is a
@@ -191,6 +195,7 @@ func (s *Server) RecommendSearch(collection string) (*SearchRecommendation, erro
 
 	rec := buildRecommendation(profile, s.Embedding != nil)
 	s.applyMeasurement(rec, collection)
+	s.adviseRerank(rec, collection) // RAG-011
 	return rec, nil
 }
 

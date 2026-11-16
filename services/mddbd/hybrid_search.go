@@ -77,7 +77,10 @@ type HybridSearchRequest struct {
 	summaryMode string
 	// limitReport is set when the server's cap lowered TopK (#368), for the
 	// response to say so.
-	limitReport LimitReport
+	limitReport   LimitReport
+	RerankRequest // rerank: {enabled, candidates, topN, explain} (RAG-011)
+	// rerankRun is the request's rerank stage, for the response (RAG-011).
+	rerankRun *rerankRun
 }
 
 // HybridGeoFilter restricts hybrid search to docs within radius of a point.
@@ -139,8 +142,9 @@ type HybridSearchResponse struct {
 	Plan *SearchPlan `json:"plan,omitempty"`
 	// ImageHits are the images the query matched by their picture, with
 	// includeImages and a provider that embeds images (RAG-010).
-	ImageHits   []ImageRef `json:"imageHits,omitempty"`
-	LimitReport            // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	ImageHits    []ImageRef `json:"imageHits,omitempty"`
+	LimitReport             // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	RerankResult            // rerank, rerankSkipped (RAG-011)
 }
 
 // runVectorSearch executes the vector portion of hybrid search, for callers

@@ -46,6 +46,7 @@ type vectorRun struct {
 	windowSize     int
 	bestChunk      map[string]int
 	groupTags      map[string]groupTag
+	rerank         *rerankRun // RAG-011; nil when the stage is off
 }
 
 // vectorSearch is VectorSearch before the limit report is attached.
@@ -63,11 +64,15 @@ func (c *DirectClient) vectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	// RAG-001: request > collection profile > historical default, under the
 	// server's cap (#368).
 	r.topK, req.limitReport = s.ResolveTopK(req.Collection, req.TopK, 5)
+	// RAG-011: with model reranking the search fetches the model's pool.
+	final := r.topK
+	r.rerank = s.newRerankRun(req.Collection, req.Query, req.Rerank, req.Explain)
+	r.topK = r.rerank.pool(r.topK)
 	// Oversample for chunk deduplication (SRCH-005).
 	r.searchTopK = OversampledTopK(r.topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 	r.allowed, r.filtered = s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter)
 	if req.QueryImage != "" { // RAG-010: search the image vectors with an image
-		return s.mcpImageQuery(ctx, req, r.topK, r.allowed, r.filtered, r.includeContent, r.waited)
+		return s.mcpImageQuery(ctx, req, final, r.allowed, r.filtered, r.includeContent, r.waited)
 	}
 	vectors, err := r.plan(ctx)
 	if err != nil {
@@ -85,7 +90,8 @@ func (c *DirectClient) vectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		s.Gain.Search(gainKind{Type: SearchTypeVector, Algorithm: r.ps.Algorithm}) // AGT-004
 		r.record(ctx, len(results))                                                // OPS-025
 	}
-	items := r.addPending(r.loadItems(ctx, results))
+	items := s.rerankMCPVector(ctx, r.rerank, r.addPending(r.loadItems(ctx, results)), final) // RAG-011
+	r.topK = final
 
 	// RAG-010: each hit's images, and the images the query matches.
 	var imageHits []ImageRef
@@ -112,7 +118,7 @@ func (s *Server) resolveVectorRequest(req *MCPVectorSearchRequest) error {
 	}
 	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
 	for _, validate := range []func() error{req.ValidatePassageOptions, req.ValidatePlanOptions,
-		req.ValidateFeedback, req.ValidateDecomposition} {
+		req.ValidateFeedback, req.ValidateDecomposition, req.ValidateRerank} {
 		if err := validate(); err != nil {
 			return err
 		}
@@ -308,6 +314,7 @@ func (r *vectorRun) item(doc storage.Doc, vr vec.VectorResult, rank, chunkIndex 
 				s.chunkModeFor(collection, &doc), s.chunkSizeFor(collection))
 		item.docTokens = approxTokens(doc.ContentMD)
 	}
+	item.rerankText = r.rerank.textFor(collection, &doc, item.ChunkText, nil) // RAG-011
 	if !r.includeContent {
 		doc.ContentMD = ""
 	}
@@ -348,7 +355,8 @@ func (r *vectorRun) passages(items []MCPVectorSearchResult, imageHits []ImageRef
 	}
 	p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), r.waited)
 	s.passageImages(&p, req.IncludeImages, imageHits)
-	return &MCPVectorSearchResponse{Passages: &p, Algorithm: r.ps.Algorithm}
+	p.RerankResult = r.rerank.Result()
+	return &MCPVectorSearchResponse{Passages: &p, Algorithm: r.ps.Algorithm, RerankResult: p.RerankResult}
 }
 
 // response answers a search with its results, under the collection's context
@@ -366,6 +374,7 @@ func (r *vectorRun) response(items []MCPVectorSearchResult, imageHits []ImageRef
 		// results, so an agent does not need a second call to learn how this
 		// collection wants its answers shaped.
 		ResponsePrompt: s.ResponsePrompt(req.Collection, req.Query),
+		RerankResult:   r.rerank.Result(),
 	}
 	s.setModel(resp)
 

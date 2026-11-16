@@ -65,6 +65,10 @@ type EvalConfig struct {
 	// QueryDecomposition measures query decomposition (SRCH-020) on vector
 	// and hybrid: off (default) or auto.
 	QueryDecomposition string `json:"queryDecomposition,omitempty"`
+	// Rerank measures model reranking (RAG-011): the same configuration with
+	// and without it is the comparison that says whether the model earns its
+	// latency. nil = the collection profile's.
+	Rerank *RerankOptions `json:"rerank,omitempty"`
 }
 
 func (c EvalConfig) label() string {
@@ -89,6 +93,9 @@ func (c EvalConfig) label() string {
 	}
 	if c.QueryDecomposition != "" {
 		l += " decomposition=" + c.QueryDecomposition
+	}
+	if c.Rerank != nil && c.Rerank.Enabled != nil {
+		l += fmt.Sprintf(" rerank=%t", *c.Rerank.Enabled)
 	}
 	return l
 }
@@ -117,15 +124,19 @@ type EvalQueryResult struct {
 
 // EvalConfigResult is one configuration's scores, averaged over the queries.
 type EvalConfigResult struct {
-	Config   string            `json:"config"`
-	Recall   float64           `json:"recallAtK"`
-	NDCG     float64           `json:"ndcgAtK"`
-	MRR      float64           `json:"mrr"`
-	P50Ms    float64           `json:"p50Ms"`
-	P99Ms    float64           `json:"p99Ms"`
-	Tokens   int               `json:"tokens"`
-	Error    string            `json:"error,omitempty"`
-	PerQuery []EvalQueryResult `json:"perQuery,omitempty"`
+	Config string  `json:"config"`
+	Recall float64 `json:"recallAtK"`
+	NDCG   float64 `json:"ndcgAtK"`
+	MRR    float64 `json:"mrr"`
+	P50Ms  float64 `json:"p50Ms"`
+	P95Ms  float64 `json:"p95Ms"`
+	P99Ms  float64 `json:"p99Ms"`
+	// RerankSkipped counts the queries whose requested rerank did not run
+	// (RAG-011); they are scored on the search's own order.
+	RerankSkipped int               `json:"rerankSkipped,omitempty"`
+	Tokens        int               `json:"tokens"`
+	Error         string            `json:"error,omitempty"`
+	PerQuery      []EvalQueryResult `json:"perQuery,omitempty"`
 }
 
 // EvalResult is the answer to POST /v1/eval.
@@ -192,73 +203,26 @@ func (s *Server) evalConfig(ctx context.Context, collection string, k int, c Eva
 	var lat []float64
 	for _, q := range queries {
 		start := time.Now()
-		keys, tokens, err := s.evalSearch(ctx, collection, k, c, q.Query)
+		a, err := s.evalSearch(ctx, evalQuery{collection: collection, k: k, c: c, query: q.Query})
 		lat = append(lat, float64(time.Since(start).Microseconds())/1000)
 		if err != nil {
 			res.Error = err.Error()
 			return res
 		}
-		r := scoreQuery(q, keys, k)
+		r := scoreQuery(q, a.keys, k)
 		res.Recall += r.Recall
 		res.NDCG += r.NDCG
 		res.MRR += r.RR
-		res.Tokens += tokens
+		res.Tokens += a.tokens
+		res.RerankSkipped += boolInt(a.rerankSkipped != "")
 		if details {
 			res.PerQuery = append(res.PerQuery, r)
 		}
 	}
 	n := float64(len(queries))
 	res.Recall, res.NDCG, res.MRR = round3(res.Recall/n), round3(res.NDCG/n), round3(res.MRR/n)
-	res.P50Ms, res.P99Ms = percentile(lat, 0.5), percentile(lat, 0.99)
+	res.P50Ms, res.P95Ms, res.P99Ms = percentile(lat, 0.5), percentile(lat, 0.95), percentile(lat, 0.99)
 	return res
-}
-
-// evalSearch runs one query and returns the ranked document keys and the
-// estimated tokens of what came back.
-func (s *Server) evalSearch(ctx context.Context, collection string, k int, c EvalConfig, query string) ([]string, int, error) {
-	var keys []string
-	tokens := 0
-	if err := validateSummarySettings(c.SummaryMode, nil); err != nil {
-		return nil, 0, err
-	}
-	if err := (DecompositionOptions{QueryDecomposition: c.QueryDecomposition}).ValidateDecomposition(); err != nil {
-		return nil, 0, err
-	}
-	switch c.SearchType {
-	case SearchTypeFTS:
-		resp, err := s.searchFTS(FTSSearchRequest{Collection: collection, Query: query, Limit: k, Algorithm: c.Algorithm,
-			BM25K1: c.BM25K1, BM25B: c.BM25B, skipContextBudget: true, summaryMode: c.SummaryMode}, time.Now())
-		if err != nil {
-			return nil, 0, err
-		}
-		for _, r := range resp.Results {
-			keys, tokens = append(keys, r.Document.Key), tokens+approxTokens(r.Document.ContentMD)
-		}
-	case SearchTypeVector:
-		resp, err := NewDirectClient(s).VectorSearch(ctx, &MCPVectorSearchRequest{Collection: collection, Query: query, TopK: k,
-			Algorithm: c.VectorAlgorithm, RetrievalMode: c.RetrievalMode, IncludeContent: true, noGain: true, summaryMode: c.SummaryMode,
-			DecompositionOptions: DecompositionOptions{QueryDecomposition: c.QueryDecomposition}})
-		if err != nil {
-			return nil, 0, err
-		}
-		for _, r := range resp.Results {
-			keys, tokens = append(keys, r.Document.Key), tokens+approxTokens(r.Document.ContentMD)
-		}
-	case SearchTypeHybrid:
-		items, _, err := s.hybridItems(ctx, HybridSearchRequest{Collection: collection, Query: query, TopK: k,
-			Algorithm: c.Algorithm, VectorAlgorithm: c.VectorAlgorithm, Alpha: c.Alpha, Strategy: c.Strategy, IncludeContent: true,
-			BM25K1: c.BM25K1, BM25B: c.BM25B, summaryMode: c.SummaryMode,
-			DecompositionOptions: DecompositionOptions{QueryDecomposition: c.QueryDecomposition}})
-		if err != nil {
-			return nil, 0, err
-		}
-		for _, it := range items {
-			keys, tokens = append(keys, it.Document.Key), tokens+approxTokens(it.Document.ContentMD)
-		}
-	default:
-		return nil, 0, fmt.Errorf("searchType must be fts, vector or hybrid, got %q", c.SearchType)
-	}
-	return uniqueKeys(keys), tokens, nil
 }
 
 func uniqueKeys(keys []string) []string {

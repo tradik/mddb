@@ -40,8 +40,9 @@ type CrossSearchRequest struct {
 	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
 	// include "role:reference" for every reference collection.
-	SearchType   string `json:"searchType,omitempty"`
-	ImageOptions        // includeImages (RAG-010): each hit's images, from its own collection
+	SearchType    string `json:"searchType,omitempty"`
+	ImageOptions         // includeImages (RAG-010): each hit's images, from its own collection
+	RerankRequest        // rerank: {enabled, candidates, topN, explain} (RAG-011)
 }
 
 // CrossSearchResultItem represents a single cross-collection search result.
@@ -59,6 +60,8 @@ type CrossSearchResultItem struct {
 	// chunks are summaryMode expand's chunks for the document, chosen by its
 	// own collection's profile (RAG-009): one passage each with passages.
 	chunks []int
+	// rerankText is the passage the reranking model reads (RAG-011).
+	rerankText string
 }
 
 // CrossSearchResponse represents the response from cross-collection search.
@@ -75,8 +78,9 @@ type CrossSearchResponse struct {
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
 	// Plan is how the vector search ran and why, when the request set explain
 	// (SRCH-013).
-	Plan        *SearchPlan `json:"plan,omitempty"`
-	LimitReport             // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	Plan         *SearchPlan `json:"plan,omitempty"`
+	LimitReport              // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	RerankResult             // rerank, rerankSkipped (RAG-011)
 }
 
 // handleCrossSearch handles POST /v1/cross-search
@@ -127,7 +131,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
-	if err := req.ValidateFeedback(); err != nil {
+	if err := validateAll(req.ValidateFeedback, req.ValidateRerank); err != nil {
 		unprocessable(w, err)
 		return
 	}
@@ -214,12 +218,13 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	waited := s.waitForIndexAll(r.Context(), req.TargetCollections, req.IndexWait)
-	items := s.crossSearchItems(crossSearchParams{
+	rr := s.newRerankRun("", req.Query, req.Rerank, req.Explain) // RAG-011
+	items := s.crossSearchItems(r.Context(), crossSearchParams{
 		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
-		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs, Feedback: fb,
+		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs, Feedback: fb, Rerank: rr,
 	})
 
 	// Track operation
@@ -231,6 +236,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
 		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
 		p.LimitReport = limitReport
+		p.RerankResult = rr.Result()
 		ok(w, p)
 		return
 	}
@@ -247,6 +253,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		Indexing:          waited,
 		Plan:              req.explained(plan),
 		LimitReport:       limitReport,
+		RerankResult:      rr.Result(),
 	}
 
 	if searchStatsEnabled() {

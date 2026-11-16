@@ -44,6 +44,7 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		DecompositionOptions: DecompositionOptions{QueryDecomposition: req.QueryDecomposition}, // SRCH-020
 		ImageOptions:         ImageOptions{IncludeImages: req.IncludeImages},                   // RAG-010
 		QueryImage:           req.QueryImage,
+		RerankRequest:        RerankRequest{Rerank: rerankOptionsFromProto(req.Rerank)}, // RAG-011
 	})
 	if err != nil {
 		return nil, searchStatus(err)
@@ -51,7 +52,8 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 	resp := &proto.VectorSearchResponse{Total: safeInt32(res.Total), Model: res.Model, Dimensions: safeInt32(res.Dimensions),
 		Algorithm: res.Algorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated,
 		Plan: planToProto(res.Plan), ImageHits: imageRefsToProto(res.ImageHits),
-		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}
+		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit),
+		Rerank: rerankReportToProto(res.Rerank), RerankSkipped: res.RerankSkipped}
 	if res.Passages != nil {
 		resp.Passages, resp.Total, resp.Indexing = passagesOf(res.Passages), safeInt32(res.Passages.Total), indexWaitToProto(res.Passages.Indexing)
 		resp.ImageHits = imageRefsToProto(res.Passages.ImageHits)
@@ -318,7 +320,8 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 		Fuzzy: int(req.Fuzzy), FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
 		Lang: req.Lang, Boost: req.Boost, FacetBy: req.FacetBy, FacetMaxValues: int(req.FacetMaxValues),
 		GroupBy: groupByOf(req.GroupBy), PassageOptions: passageOptions(req.Format, req.PassageLines),
-		BM25K1: req.Bm25K1, BM25B: req.Bm25B, ImageOptions: ImageOptions{IncludeImages: req.IncludeImages}}
+		BM25K1: req.Bm25K1, BM25B: req.Bm25B, ImageOptions: ImageOptions{IncludeImages: req.IncludeImages},
+		RerankRequest: RerankRequest{Rerank: rerankOptionsFromProto(req.Rerank)}} // RAG-011
 	if err := g.server.normalizeFTSRequest(&fr); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -327,7 +330,8 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 		return nil, searchStatus(err)
 	}
 	resp := &proto.FTSResponse{Total: safeInt32(res.Total), Algorithm: res.Algorithm, Fuzzy: safeInt32(res.Fuzzy),
-		Lang: res.Lang, ContextTruncated: res.ContextTruncated, LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}
+		Lang: res.Lang, ContextTruncated: res.ContextTruncated, LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit),
+		Rerank: rerankReportToProto(res.Rerank), RerankSkipped: res.RerankSkipped}
 	if res.passages != nil {
 		resp.Passages, resp.Total = passagesOf(res.passages), safeInt32(res.passages.Total)
 		return resp, nil
@@ -435,6 +439,7 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		FeedbackOptions:      feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
 		DecompositionOptions: DecompositionOptions{QueryDecomposition: req.QueryDecomposition}, // SRCH-020
 		ImageOptions:         ImageOptions{IncludeImages: req.IncludeImages},                   // RAG-010
+		RerankRequest:        RerankRequest{Rerank: rerankOptionsFromProto(req.Rerank)},        // RAG-011
 	})
 	if err != nil {
 		return nil, searchStatus(err)
@@ -442,7 +447,8 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 	resp := &proto.HybridSearchResponse{Total: safeInt32(res.Total), Strategy: res.Strategy, FtsAlgorithm: res.FTSAlgorithm,
 		VectorAlgorithm: res.VectorAlgorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated,
 		Plan: planToProto(res.Plan), ImageHits: imageRefsToProto(res.ImageHits),
-		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}
+		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit),
+		Rerank: rerankReportToProto(res.Rerank), RerankSkipped: res.RerankSkipped}
 	if res.Passages != nil {
 		resp.Passages, resp.Total, resp.Indexing = passagesOf(res.Passages), safeInt32(res.Passages.Total), indexWaitToProto(res.Passages.Indexing)
 		resp.ImageHits = imageRefsToProto(res.Passages.ImageHits)
@@ -516,6 +522,8 @@ func (g *GRPCServer) SearchAdvisor(ctx context.Context, req *proto.SearchAdvisor
 		SummaryMode:     rec.SummaryMode,
 		Reasons:         rec.Reasons,
 		Warnings:        rec.Warnings,
+		Rerank:          rerankOptionsToProto(rec.Rerank), // RAG-011
+		RerankModel:     rec.RerankModel,
 	}, nil
 }
 

@@ -2954,6 +2954,14 @@ paths:
       summary: List embedding configurations
       description: List all embedding model configurations.
       operationId: listEmbeddingConfigs
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          description: (v2.19.8+, RAG-011) `rerank` lists reranking models; omitted or `embedding` lists embedding models.
+          schema:
+            type: string
+            enum: [embedding, rerank]
       responses:
         "200":
           description: List of embedding configurations
@@ -9582,6 +9590,10 @@ components:
       description: What a search returns with format "passages" (AGT-002).
       required: [passages]
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankReport'
+        rerankSkipped:
+          $ref: '#/components/schemas/RerankSkipped'
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         passages: { type: array, items: { $ref: '#/components/schemas/Passage' } }
@@ -11002,6 +11014,8 @@ components:
       required:
         - collection
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankOptions'
         includeImages:
           type: boolean
           description: >
@@ -11229,6 +11243,66 @@ components:
         decomposition:
           $ref: '#/components/schemas/QueryDecomposition'
 
+    RerankOptions:
+      type: object
+      description: >-
+        (v2.19.8+, RAG-011) Order the search's best candidates with the
+        configured reranking model. Off unless `enabled` here or in the
+        collection's `retrieval.rerank`; without a configured provider an
+        enabled request answers with `rerankSkipped: notConfigured`. The model
+        reads passages (the chunk, or the window where the query meets the
+        document), at most 2048 characters each. Out of range returns 422
+        (400 on /v1/fts).
+      properties:
+        enabled:
+          type: boolean
+        candidates:
+          type: integer
+          minimum: 0
+          maximum: 200
+          description: Results the model orders; 0 = the profile's, then MDDB_RERANK_MAX_CANDIDATES (which also caps it).
+        topN:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: Results kept after reranking; 0 = topK.
+        explain:
+          type: boolean
+          description: Report each candidate's rank before and after in `rerank.moves`.
+
+    RerankReport:
+      type: object
+      description: (v2.19.8+, RAG-011) Present when the reranking model ordered the results.
+      properties:
+        model:
+          type: string
+        candidates:
+          type: integer
+          description: Passages sent to the model, cached ones included.
+        cached:
+          type: integer
+          description: Passages scored from the cache, without a call.
+        durationMs:
+          type: number
+        moves:
+          type: array
+          description: With explain, in the new order.
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              collection: { type: string, description: Cross search only. }
+              before: { type: integer }
+              after: { type: integer }
+              score: { type: number, description: The model's relevance score. }
+
+    RerankSkipped:
+      type: string
+      enum: [timeout, error, invalidResponse, budget, notConfigured, noQuery]
+      description: >-
+        (v2.19.8+, RAG-011) Present when a requested rerank did not run; the
+        results are the search's own order. A provider never fails a search.
+
     QueryDecompositionMode:
       type: string
       enum: [ "off", auto ]
@@ -11320,6 +11394,10 @@ components:
       type: object
       required: [results]
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankReport'
+        rerankSkipped:
+          $ref: '#/components/schemas/RerankSkipped'
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         imageHits:
@@ -11631,6 +11709,8 @@ components:
         - collection
         - query
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankOptions'
         includeImages:
           type: boolean
           description: >
@@ -11878,6 +11958,10 @@ components:
       type: object
       required: [results]
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankReport'
+        rerankSkipped:
+          $ref: '#/components/schemas/RerankSkipped'
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         results:
@@ -12368,6 +12452,8 @@ components:
         - collection
         - query
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankOptions'
         includeImages:
           type: boolean
           description: >
@@ -12620,6 +12706,10 @@ components:
       type: object
       required: [results]
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankReport'
+        rerankSkipped:
+          $ref: '#/components/schemas/RerankSkipped'
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         imageHits:
@@ -12785,6 +12875,14 @@ components:
         It changes nothing. `retrievalProfile` is the advice encoded as a
         RAG-001 profile, ready to `PUT` to `/v1/collection-config` if you agree.
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankOptions'
+        rerankModel:
+          type: string
+          description: >-
+            (v2.19.8+, RAG-011) The configured reranking model. `rerank` is set
+            only when the collection's evaluation set measured a higher nDCG with
+            the model; the reasons give the gain and the p95 it costs.
         profile:
           $ref: "#/components/schemas/CollectionProfile"
         searchType:
@@ -13356,6 +13454,8 @@ components:
       type: object
       required: [searchType]
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankOptions'
         name:
           type: string
         searchType:
@@ -13435,6 +13535,12 @@ components:
                 type: number
               p50Ms:
                 type: number
+              p95Ms:
+                type: number
+                description: (v2.19.8+) 95th percentile latency
+              rerankSkipped:
+                type: integer
+                description: (v2.19.8+, RAG-011) Queries whose requested rerank did not run
               p99Ms:
                 type: number
               tokens:
@@ -13859,6 +13965,22 @@ components:
         - model
         - dimensions
       properties:
+        kind:
+          type: string
+          enum: [embedding, rerank]
+          description: >-
+            (v2.19.8+, RAG-011) What the model does. Omitted or `embedding`: an
+            embedding model, as before. `rerank`: a reranking model —
+            `provider` must be `http` and `apiUrl` is required; `dimensions` is
+            not used; `apiKey` is accepted and never returned (an update
+            without it keeps the stored key). One default per kind.
+        timeoutMs:
+          type: integer
+          description: (v2.19.8+, rerank only) Limit on one call; default 2000.
+        maxCandidates:
+          type: integer
+          maximum: 200
+          description: (v2.19.8+, rerank only) Most results one search sends; default 50.
         id:
           type: string
           description: Unique identifier
@@ -14973,6 +15095,8 @@ components:
         default for that endpoint — so a collection without a profile behaves
         exactly as it did before this existed.
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankOptions'
         format:
           type: string
           enum: [ results, passages ]
@@ -15542,6 +15666,8 @@ components:
     CrossSearchRequest:
       type: object
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankOptions'
         includeImages:
           type: boolean
           description: >
@@ -15664,6 +15790,10 @@ components:
     CrossSearchResponse:
       type: object
       properties:
+        rerank:
+          $ref: '#/components/schemas/RerankReport'
+        rerankSkipped:
+          $ref: '#/components/schemas/RerankSkipped'
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         plan:

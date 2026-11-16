@@ -4,13 +4,18 @@
 import { describe, test, expect } from 'vitest';
 import {
   EDITED_RETRIEVAL_KEYS, QUOTA_FIELDS, omit, preservedConfig, advancedFromConfig, buildQuota, applyAdvanced,
+  rerankFromProfile, buildRerank,
 } from './collection-config.js';
 
 const emptyQuota = { maxDocuments: '', maxBytes: '', maxVectors: '', embeddingCallsPerDay: '', embeddingTokensPerDay: '' };
 
 /** Advanced dialog state with nothing set, overridden by `over`. */
 function advanced(over = {}) {
-  return { vectorAlgorithm: '', summaryMode: '', summaryWeight: '', maxTopK: '', excludeMetaKeys: '', quota: emptyQuota, ...over };
+  return {
+    vectorAlgorithm: '', summaryMode: '', summaryWeight: '', maxTopK: '',
+    rerankEnabled: '', rerankCandidates: '', rerankTopN: '',
+    excludeMetaKeys: '', quota: emptyQuota, ...over,
+  };
 }
 
 describe('constants', () => {
@@ -21,7 +26,7 @@ describe('constants', () => {
   });
 
   test('the dialog edits the 2.18.10 retrieval keys', () => {
-    expect(EDITED_RETRIEVAL_KEYS).toEqual(expect.arrayContaining(['vectorAlgorithm', 'summaryMode', 'summaryWeight', 'maxTopK']));
+    expect(EDITED_RETRIEVAL_KEYS).toEqual(expect.arrayContaining(['vectorAlgorithm', 'summaryMode', 'summaryWeight', 'maxTopK', 'rerank']));
   });
 });
 
@@ -88,9 +93,41 @@ describe('advancedFromConfig', () => {
       summaryMode: 'blend',
       summaryWeight: '0',
       maxTopK: '50',
+      rerankEnabled: '',
+      rerankCandidates: '',
+      rerankTopN: '',
       excludeMetaKeys: 'url, sha',
       quota: { ...emptyQuota, maxDocuments: '100', embeddingTokensPerDay: '9000' },
     });
+  });
+});
+
+describe('model reranking (RAG-011)', () => {
+  test.each([
+    ['nothing stored', undefined, { rerankEnabled: '', rerankCandidates: '', rerankTopN: '' }],
+    ['on with numbers', { enabled: true, candidates: 30, topN: 5 }, { rerankEnabled: 'on', rerankCandidates: '30', rerankTopN: '5' }],
+    ['off', { enabled: false }, { rerankEnabled: 'off', rerankCandidates: '', rerankTopN: '' }],
+  ])('reads %s', (_label, stored, want) => {
+    expect(rerankFromProfile(stored)).toEqual(want);
+    expect(advancedFromConfig({ retrieval: { rerank: stored } })).toMatchObject(want);
+  });
+
+  test.each([
+    ['nothing set', advanced(), null],
+    ['on', advanced({ rerankEnabled: 'on' }), { enabled: true }],
+    ['off with numbers', advanced({ rerankEnabled: 'off', rerankCandidates: '20', rerankTopN: '3' }), { enabled: false, candidates: 20, topN: 3 }],
+    ['zero and negative numbers dropped', advanced({ rerankCandidates: '0', rerankTopN: '-1' }), null],
+  ])('builds %s', (_label, fields, want) => {
+    expect(buildRerank(fields)).toEqual(want);
+  });
+
+  test('applyAdvanced sends the block in the retrieval profile', () => {
+    const out = applyAdvanced({ retrieval: { topK: 5 } }, advanced({ rerankEnabled: 'on', rerankCandidates: '40' }));
+    expect(out.retrieval).toEqual({ topK: 5, rerank: { enabled: true, candidates: 40 } });
+  });
+
+  test('a stored block the dialog cleared is not kept', () => {
+    expect(preservedConfig({ retrieval: { rerank: { enabled: true }, oversample: 2 } })).toEqual({ retrieval: { oversample: 2 } });
   });
 });
 

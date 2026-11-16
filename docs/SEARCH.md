@@ -1922,6 +1922,123 @@ curl -X POST http://localhost:11023/v1/hybrid-search \
 }
 ```
 
+## Model reranking (v2.19.8)
+
+Every ordering stage above — fusion, boosts, MMR, feedback rescoring, the
+exact pass after binary quantization — scores the query and a document from
+vectors or term statistics computed separately. A reranking model reads the
+query and a candidate passage together and returns one relevance number. It
+is slower and costs a provider call, so MDDB runs it as an optional stage on a
+short list a search has already found.
+
+**Off by default.** Without a configured provider (`MDDB_RERANK_*`, or a stored
+configuration of kind `rerank` — see [config.md](config.md#model-reranking-v2198-rag-011))
+and without a request or profile asking for it, no search changes.
+
+### Asking for it
+
+`/v1/vector-search`, `/v1/hybrid-search`, `/v1/fts` and `/v1/cross-search` take
+a `rerank` block; gRPC (`RerankOptions rerank`), the MCP search tools
+(`rerank: {enabled, candidates, top_n, explain}`) and GraphQL (`rerank:
+RerankInput` on `vectorSearch` and `fullTextSearch`) take the same:
+
+```bash
+curl -X POST http://localhost:11023/v1/hybrid-search -d '{
+  "collection": "docs", "query": "rotate the signing key", "topK": 5,
+  "rerank": {"enabled": true, "candidates": 30, "explain": true}
+}'
+```
+
+| Field | Meaning |
+|-------|---------|
+| `enabled` | on or off for this search; omitted follows the collection's retrieval profile |
+| `candidates` | how many of the search's best results the model orders; default the profile's, then `MDDB_RERANK_MAX_CANDIDATES` (50), which also caps it (at most 200) |
+| `topN` | results kept after reranking; default `topK` |
+| `explain` | report each candidate's rank before and after (a search's own `explain` does too) |
+
+The search fetches `candidates` results instead of `topK`, the model orders
+them, and the answer keeps `topK` (or `topN`, when smaller). Curation pins,
+grouping and the context budget apply after the model, as they do to any
+order.
+
+**Passages, not documents.** The model reads the chunk a chunk- or window-mode
+search cut, or the window of a document where the query's words (or the
+full-text half's matched terms) meet — at most 2048 characters per candidate.
+A call's size is bounded by `candidates × 2048` whatever the documents weigh.
+
+### What the response says
+
+```json
+"rerank": {"model": "my-reranker", "candidates": 30, "cached": 0, "durationMs": 41.7,
+           "moves": [{"id": "…", "before": 7, "after": 1, "score": 0.93}]},
+"rerankSkipped": "timeout"
+```
+
+`rerank` is present when the model ordered the results; `moves` only with
+explain (cross-search adds each move's `collection`). `rerankSkipped` is
+present when a requested rerank did not run, and the results are then the
+search's own order:
+
+| Reason | When |
+|--------|------|
+| `timeout` | the call ran over `MDDB_RERANK_TIMEOUT_MS` |
+| `error` | the provider answered with an error status or could not be reached |
+| `invalidResponse` | the answer could not be used: unparseable, an index out of range or repeated, a score that is not a number |
+| `budget` | a collection among the candidates has spent today's model budget |
+| `notConfigured` | `enabled` was asked for and no provider is configured |
+| `noQuery` | a cross-search by `queryVector` or `sourceDocID`: there is no text to read |
+
+A provider can never fail a search.
+
+### Cost and cache
+
+Each call counts one call and its estimated tokens (characters ÷ 4 of the
+query and the passages) against the collection's daily embedding budget
+(`quota.embeddingCallsPerDay`, `quota.embeddingTokensPerDay`); a cross-search
+charges each collection for its own passages. Scores are cached per (model,
+query, passage) — `MDDB_RERANK_CACHE_SIZE` pairs, one hour each — and a search
+whose pairs are all cached makes no call and is not charged. `cached` in the
+report counts them. Calls are counted as `rerank|applied` and
+`rerank|skipped|<reason>` in the operation metrics, and timed as the
+`search.rerank` span when tracing is on.
+
+### Per-collection default
+
+```json
+{"retrieval": {"rerank": {"enabled": true, "candidates": 30}}}
+```
+
+on `PUT /v1/collection-config` (gRPC `RetrievalProfileProto.rerank`) turns it
+on for every search of the collection; a request's own block wins field by
+field, so `{"rerank": {"enabled": false}}` turns it off for one search.
+
+### Is it worth it?
+
+Measure it on your own data: `/v1/eval` takes `rerank` per configuration and
+reports `p95Ms` beside nDCG@k, so the same configuration with and without the
+model is one request:
+
+```bash
+curl -X POST http://localhost:11023/v1/eval -d '{"collection": "docs", "configs": [
+  {"searchType": "hybrid", "rerank": {"enabled": false}},
+  {"searchType": "hybrid", "rerank": {"enabled": true}}]}'
+```
+
+A configuration's `rerankSkipped` counts the queries whose rerank did not run.
+With a model configured and an evaluation set stored, the Search Advisor runs
+this comparison for the configuration it recommends and adds
+`"rerank": {"enabled": true}` to the recommendation and its retrieval profile
+only when nDCG improves, stating the gain and the p95 it costs.
+
+### The provider
+
+One transport, as a fact about the code: `POST {apiUrl}/rerank` with
+`{"model", "query", "documents": [...], "top_n"}`, answered with
+`{"index", "relevance_score"}` (or `"score"`) entries under `results`, under
+`data`, or as the whole body. Services that implement this shape, hosted or
+running on the same machine, work without code changes; choosing one is the
+operator's decision.
+
 ## Measuring Instead of Guessing (v2.18.8+)
 
 Every recommendation in this guide is a starting point. Which configuration

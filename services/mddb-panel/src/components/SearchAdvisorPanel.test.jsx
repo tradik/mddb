@@ -10,7 +10,7 @@ vi.mock('../lib/mddb-client', () => ({ default: { searchAdvisor: vi.fn() } }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
-const { default: SearchAdvisorPanel } = await import('./SearchAdvisorPanel');
+const { default: SearchAdvisorPanel, rerankSetting } = await import('./SearchAdvisorPanel');
 
 const initialStore = useStore.getState();
 
@@ -35,6 +35,8 @@ const fullAdvice = {
   retrievalMode: 'chunks',
   topK: 8,
   summaryMode: 'prefer',
+  rerankModel: 'my-reranker',
+  rerank: { enabled: true },
   signals: { diversity: 'low' },
   reasons: ['Most documents are embedded.', 'Vocabulary is narrow.'],
   warnings: ['Only a sample was measured.', 'Lexical vectors only.'],
@@ -67,6 +69,17 @@ beforeEach(() => {
   vi.mocked(mddbClient.searchAdvisor).mockReset();
 });
 afterEach(cleanup);
+
+describe('rerankSetting (RAG-011)', () => {
+  test.each([
+    ['no advice', undefined, ''],
+    ['no model on the server', { rerank: { enabled: true } }, ''],
+    ['a model measured better', { rerankModel: 'm', rerank: { enabled: true } }, 'on'],
+    ['a model not recommended', { rerankModel: 'm' }, 'off'],
+  ])('%s', (_label, advice, want) => {
+    expect(rerankSetting(advice)).toBe(want);
+  });
+});
 
 describe('SearchAdvisorPanel', () => {
   test('with no collection, Measure is disabled and the panel asks for one', () => {
@@ -120,6 +133,8 @@ describe('SearchAdvisorPanel', () => {
       ['Retrieval mode', 'chunks'],
       ['Top K', '8'],
       ['Summary mode', 'prefer'],
+      ['Reranking model', 'my-reranker'],
+      ['Model reranking', 'on'],
       ['Diversity signal', 'low'],
     ]);
     const reasons = screen.getByRole('heading', { name: 'Why' }).parentElement.querySelectorAll('li');

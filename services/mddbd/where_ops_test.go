@@ -66,7 +66,7 @@ func TestWhere_DeleteMatchesTheDryRunExactly(t *testing.T) {
 		}
 		return nil
 	})
-	if r, _ := s.searchFTS(FTSSearchRequest{Collection: "c", Query: "body"}, time.Now()); r.Total != 3 {
+	if r, _ := s.searchFTS(context.Background(), FTSSearchRequest{Collection: "c", Query: "body"}, time.Now()); r.Total != 3 {
 		t.Fatalf("fts still finds deleted documents: %d", r.Total)
 	}
 }

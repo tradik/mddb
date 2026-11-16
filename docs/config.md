@@ -502,6 +502,32 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 | `MDDB_EMBEDDING_CACHE_SIZE` | `1024` | int | (v2.12.0+) Embeddings held in the query cache; `0` disables caching and restores the pre-2.12.0 path exactly |
 | `MDDB_EMBEDDING_CACHE_TTL` | `3600` | int | (v2.12.0+) Cache entry lifetime in seconds |
 
+### Model reranking (v2.19.8+, RAG-011)
+
+An optional reranking model orders a search's best candidates after
+retrieval — see [SEARCH.md](SEARCH.md#model-reranking-v2198). Nothing here is
+set by default, and with nothing set no search changes. A stored rerank
+configuration (`POST /v1/embedding-configs` with `"kind": "rerank"`, made the
+default with `POST /v1/embedding-configs/set-default`) overrides these
+variables, as a stored embedding configuration does.
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_RERANK_PROVIDER` | `""` (off) | string | `http` turns the stage on; `""` or `none` leaves it off. Any other value is logged and ignored |
+| `MDDB_RERANK_API_URL` | `""` | string | Base URL of the model server; MDDB posts to `{url}/rerank`. Required. Validated like an embedding provider's URL: loopback needs no opt-in, any other private or reserved address needs `MDDB_OUTBOUND_ALLOW_PRIVATE` or `MDDB_OUTBOUND_ALLOWLIST` |
+| `MDDB_RERANK_API_KEY` | `""` | string | Sent as `Authorization: Bearer <key>` when set. Never logged and never returned by the API |
+| `MDDB_RERANK_MODEL` | `""` | string | Sent as `model` in each request and reported in responses |
+| `MDDB_RERANK_TIMEOUT_MS` | `2000` | int | Limit on one model call. A call that runs over leaves the search's own order in place with `rerankSkipped: "timeout"` |
+| `MDDB_RERANK_MAX_CANDIDATES` | `50` | int | Most results one search sends to the model, and the default `candidates`; capped at 200 and at the server's result cap |
+| `MDDB_RERANK_CACHE_SIZE` | `4096` | int | (query, passage) scores remembered, one hour each; `0` turns the cache off |
+
+The request shape, as a fact about the code: `POST {url}/rerank` with
+`{"model", "query", "documents": [...], "top_n"}`, answered with a list of
+`{"index", "relevance_score"}` (or `"score"`) under `results`, under `data`,
+or as the whole body. Each call counts one call and its estimated tokens
+against the collection's daily embedding budget (`quota.embeddingCallsPerDay`,
+`quota.embeddingTokensPerDay`).
+
 ### Provider Defaults
 
 | Provider | `API_URL` | `MODEL` | `DIMENSIONS` |

@@ -189,7 +189,7 @@ func TestPassages_ProfileDefaultAndWindow(t *testing.T) {
 	if err := s.CollectionManager.Set("theme", &CollectionConfig{Retrieval: &RetrievalProfileDef{Format: FormatPassages}}); err != nil {
 		t.Fatal(err)
 	}
-	resp, err := s.searchFTS(FTSSearchRequest{Collection: "theme", Query: "background"}, time.Now())
+	resp, err := s.searchFTS(context.Background(), FTSSearchRequest{Collection: "theme", Query: "background"}, time.Now())
 	if err != nil || resp.passages == nil {
 		t.Fatalf("profile format: %v %+v", err, resp)
 	}

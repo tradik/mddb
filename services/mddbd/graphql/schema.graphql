@@ -201,6 +201,31 @@ type VectorSearchResponse {
   limitCapped: Boolean
   "The limit used; set only when limitCapped."
   limit: Int
+  "Set when the reranking model ordered the results (RAG-011)."
+  rerank: RerankReport
+  "Why a requested rerank did not run: timeout, error, invalidResponse, budget, notConfigured or noQuery (RAG-011)."
+  rerankSkipped: String
+}
+
+"A rerank that ran (RAG-011)."
+type RerankReport {
+  model: String!
+  "Passages sent to the model, cached ones included."
+  candidates: Int!
+  "Passages scored from the cache, without a call."
+  cached: Int!
+  durationMs: Float!
+  "Each candidate's rank before and after; with rerank.explain."
+  moves: [RerankMove!]
+}
+
+"One candidate's rank before and after reranking (RAG-011)."
+type RerankMove {
+  id: String!
+  collection: String
+  before: Int!
+  after: Int!
+  score: Float!
 }
 
 "How a vector search ran and why (SRCH-013): the index chosen and the reasons."
@@ -263,6 +288,10 @@ type FTSResponse {
   limitCapped: Boolean
   "The limit used; set only when limitCapped."
   limit: Int
+  "Set when the reranking model ordered the results (RAG-011)."
+  rerank: RerankReport
+  "Why a requested rerank did not run (RAG-011)."
+  rerankSkipped: String
 }
 
 # Stats and metrics
@@ -465,6 +494,23 @@ input VectorSearchInput {
   searched per clause, and each document keeps its best score.
   """
   queryDecomposition: String
+  "Order the best candidates with the reranking model (RAG-011); omit to follow the collection profile."
+  rerank: RerankInput
+}
+
+"""
+Model reranking of a search's best candidates (RAG-011). Off unless enabled
+here or in the collection's retrieval profile, and only with a reranking
+provider configured.
+"""
+input RerankInput {
+  enabled: Boolean
+  "Results the model orders; omit for the profile's, then the provider's maxCandidates."
+  candidates: Int
+  "Results kept after reranking; omit for topK."
+  topN: Int
+  "Report each candidate's rank before and after."
+  explain: Boolean
 }
 
 "A relevance-feedback example (SRCH-015): a document key or ID, or a vector — one, not both."
@@ -498,6 +544,8 @@ input FTSInput {
   passageLines: Int
   "Attach each hit's images (RAG-010)."
   includeImages: Boolean
+  "Order the best candidates with the reranking model (RAG-011)."
+  rerank: RerankInput
 }
 
 input RegisterWebhookInput {

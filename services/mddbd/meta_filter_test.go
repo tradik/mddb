@@ -250,13 +250,13 @@ func TestMetaFilter_SurfacesHTTP(t *testing.T) {
 	}
 
 	// FTS
-	resp, err := s.searchFTS(FTSSearchRequest{
+	resp, err := s.searchFTS(context.Background(), FTSSearchRequest{
 		Collection: "code", Query: "hnsw", Filter: parseFilter(t, `{"kind":{"not":["test"]}}`),
 	}, time.Now())
 	if err != nil || len(resp.Results) != 1 || resp.Results[0].Document.Key != "a" {
 		t.Fatalf("fts filter: %v %+v", err, resp)
 	}
-	resp, err = s.searchFTS(FTSSearchRequest{
+	resp, err = s.searchFTS(context.Background(), FTSSearchRequest{
 		Collection: "code", Query: "hnsw", Filter: parseFilter(t, `{"kind":{"in":["none"]}}`),
 	}, time.Now())
 	if err != nil || len(resp.Results) != 0 {
@@ -369,7 +369,7 @@ func TestFTS_RangeMetaUsesIndex(t *testing.T) {
 	s, cleanup := newHandlerTestServer(t)
 	defer cleanup()
 	seedFilterDocs(t, s)
-	resp, err := s.searchFTS(FTSSearchRequest{
+	resp, err := s.searchFTS(context.Background(), FTSSearchRequest{
 		Collection: "code", Query: "hnsw",
 		RangeMeta: []RangeFilter{{Field: "modified", Gte: "2026-09-01"}, {Field: "addedAt", Gte: "0"}},
 	}, time.Now())

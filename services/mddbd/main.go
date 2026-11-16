@@ -34,6 +34,7 @@ import (
 	"os/signal"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -111,6 +112,10 @@ type Server struct {
 	// the environment or from stored config, so /config can report where the
 	// configuration actually came from instead of inferring it.
 	DetectedEmbedding *embedding.DetectedProvider
+	// reranker is the reranking model searches may call (RAG-011); nil when
+	// none is configured. Atomic: a new default configuration replaces it
+	// while searches run.
+	reranker atomic.Pointer[rerankSetup]
 	// Geo search
 	GeoStore     *geo.GeoStore     // Persistent geo points in BoltDB ("geo" bucket)
 	GeoIndex     *geo.GeoIndex     // In-memory R-tree geo index (default)
@@ -591,6 +596,7 @@ func (s *Server) initSubsystems(clock *startupClock) (authEnabled bool) {
 	s.initExtreme()
 	s.initSearchIndexes()
 	s.initEmbedding()
+	s.initRerank() // RAG-011
 
 	// RAG-007: say so when the stored vectors were produced differently from
 	// how the configured provider produces them now. Reindexing is the

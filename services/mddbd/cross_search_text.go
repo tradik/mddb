@@ -82,6 +82,7 @@ type crossTextParams struct {
 	Filter         MetaFilter
 	GroupBy        *GroupBy
 	IncludeContent bool
+	Rerank         *rerankRun // RAG-011: orders the fused list; nil when off
 }
 
 // crossTextItems searches each target and fuses the ranked lists with RRF.
@@ -96,6 +97,7 @@ func (s *Server) crossTextItems(ctx context.Context, p crossTextParams) []CrossS
 		}
 	}
 	sort.SliceStable(fused, func(i, j int) bool { return fused[i].Score > fused[j].Score })
+	fused = s.rerankCross(ctx, p.Rerank, fused) // RAG-011
 	if p.GroupBy != nil {
 		fused = groupTop(fused, p.GroupBy,
 			func(it CrossSearchResultItem) string { return it.Document.ID },
@@ -107,6 +109,7 @@ func (s *Server) crossTextItems(ctx context.Context, p crossTextParams) []CrossS
 	if len(fused) > p.TopK {
 		fused = fused[:p.TopK]
 	}
+	fused = rerankTrim(p.Rerank, fused, p.TopK)
 	for i := range fused {
 		fused[i].Rank = i + 1
 		if !p.IncludeContent {
@@ -120,7 +123,7 @@ func (s *Server) crossTextItems(ctx context.Context, p crossTextParams) []CrossS
 func (s *Server) oneCollectionText(ctx context.Context, coll string, p crossTextParams) []CrossSearchResultItem {
 	var out []CrossSearchResultItem
 	if p.SearchType == CrossSearchFTS {
-		resp, err := s.searchFTS(FTSSearchRequest{Collection: coll, Query: p.Query, Limit: p.TopK,
+		resp, err := s.searchFTS(ctx, FTSSearchRequest{Collection: coll, Query: p.Query, Limit: p.Rerank.pool(p.TopK),
 			FilterMeta: p.FilterMeta, Filter: p.Filter, skipContextBudget: true}, time.Now())
 		if err != nil {
 			return nil
@@ -130,7 +133,7 @@ func (s *Server) oneCollectionText(ctx context.Context, coll string, p crossText
 		}
 		return out
 	}
-	items, ran, err := s.hybridItems(ctx, HybridSearchRequest{Collection: coll, Query: p.Query, TopK: p.TopK,
+	items, ran, err := s.hybridItems(ctx, HybridSearchRequest{Collection: coll, Query: p.Query, TopK: p.Rerank.pool(p.TopK),
 		FilterMeta: p.FilterMeta, Filter: p.Filter, IncludeContent: true})
 	if err != nil {
 		return nil
@@ -146,9 +149,10 @@ func (s *Server) oneCollectionText(ctx context.Context, coll string, p crossText
 func (s *Server) respondCrossText(w http.ResponseWriter, r *http.Request, req CrossSearchRequest) {
 	waited := s.waitForIndexAll(r.Context(), req.TargetCollections, req.IndexWait)
 	topK, limitReport := s.crossTopK(req.TargetCollections, req.TopK)
+	rr := s.newRerankRun("", req.Query, req.Rerank, req.Explain) // RAG-011
 	items := s.crossTextItems(r.Context(), crossTextParams{SearchType: req.SearchType, Query: req.Query,
 		Targets: req.TargetCollections, TopK: topK, FilterMeta: req.FilterMeta, Filter: req.Filter,
-		GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages()})
+		GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages(), Rerank: rr})
 	if s.Metrics != nil {
 		s.Metrics.IncOp("cross_search", req.SearchType)
 	}
@@ -157,12 +161,13 @@ func (s *Server) respondCrossText(w http.ResponseWriter, r *http.Request, req Cr
 		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
 		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
 		p.LimitReport = limitReport
+		p.RerankResult = rr.Result()
 		ok(w, p)
 		return
 	}
 	s.crossImages(items, req.IncludeImages) // RAG-010
 	ok(w, CrossSearchResponse{Results: items, Total: len(items), TargetCollections: req.TargetCollections,
-		Algorithm: req.SearchType, Indexing: waited, LimitReport: limitReport})
+		Algorithm: req.SearchType, Indexing: waited, LimitReport: limitReport, RerankResult: rr.Result()})
 }
 
 // crossTopK is the result count of a cross-search: 10 unless asked, under

@@ -54,7 +54,8 @@ type VectorSearchRequest struct {
 	QueryImage string `json:"queryImage,omitempty"`
 	// limitReport is set when the server's cap lowered TopK (#368), for the
 	// response to say so.
-	limitReport LimitReport
+	limitReport   LimitReport
+	RerankRequest // rerank: {enabled, candidates, topN, explain} (RAG-011)
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -80,6 +81,8 @@ type VectorSearchResultItem struct {
 	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
 	// Images are the document's images, with includeImages (RAG-010).
 	Images []ImageRef `json:"images,omitempty"`
+	// rerankText is the passage the reranking model reads (RAG-011).
+	rerankText string
 }
 
 // VectorSearchResponseHTTP represents the response from vector search.
@@ -105,8 +108,9 @@ type VectorSearchResponseHTTP struct {
 	Plan *SearchPlan `json:"plan,omitempty"`
 	// ImageHits are the images the query matched by their picture, with
 	// includeImages and a provider that embeds images (RAG-010).
-	ImageHits   []ImageRef `json:"imageHits,omitempty"`
-	LimitReport            // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	ImageHits    []ImageRef `json:"imageHits,omitempty"`
+	LimitReport             // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	RerankResult            // rerank, rerankSkipped (RAG-011)
 }
 
 // VectorReindexRequestHTTP represents a reindex request.
@@ -281,7 +285,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
-	if err := req.ValidateDecomposition(); err != nil {
+	if err := validateAll(req.ValidateDecomposition, req.ValidateRerank); err != nil {
 		unprocessable(w, err)
 		return
 	}
@@ -313,7 +317,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// Oversample for chunk deduplication: search for more results, then
 	// deduplicate. SRCH-005 makes the multiplier a request parameter — it was
 	// the fixed `topK * 3` here and in four other places.
-	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
+	// RAG-011: with model reranking the search fetches the model's pool.
+	rr := s.newRerankRun(req.Collection, req.Query, req.Rerank, req.Explain)
+	searchTopK := OversampledTopK(rr.pool(topK), s.ResolveOversample(req.Collection, req.Oversample), 20)
 	allowedIDs, filtered := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter)
 	if req.QueryImage != "" { // RAG-010: search the image vectors with an image
 		s.respondImageQuery(w, r, req, topK, allowedIDs, filtered, includeContent, waited)
@@ -407,7 +413,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// Dedupe (parent mode), groupBy, MMR over the oversampled set, then topK.
 	results, groupTags := s.shapeVectorResults(vectorShaping{
 		Collection: req.Collection, ChunkMode: chunkMode, GroupBy: req.GroupBy,
-		MMR: req.MMR, MMRLambda: req.MMRLambda, TopK: topK, DiskVecs: diskVecs, BestChunk: bestChunk,
+		MMR: req.MMR, MMRLambda: req.MMRLambda, TopK: rr.pool(topK), DiskVecs: diskVecs, BestChunk: bestChunk,
 	}, results)
 
 	windowSize := 0
@@ -460,6 +466,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 						s.chunkModeFor(req.Collection, &doc), s.chunkSizeFor(req.Collection))
 				item.docTokens = approxTokens(doc.ContentMD)
 			}
+			item.rerankText = rr.textFor(req.Collection, &doc, item.ChunkText, nil) // RAG-011
 			if !includeContent {
 				doc.ContentMD = ""
 			}
@@ -478,6 +485,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 			items = append(items, VectorSearchResultItem{Document: doc, Rank: len(items) + 1, PendingEmbedding: true})
 		}
 	}
+
+	items = s.rerankVectorItems(r.Context(), rr, items, topK) // RAG-011
 
 	// RAG-001: cap the total context this collection hands back. In chunk and
 	// window modes the passage is what the caller receives, so that is what
@@ -532,6 +541,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited)
 		s.passageImages(&p, req.IncludeImages, imageHits)
 		p.LimitReport = limitReport
+		p.RerankResult = rr.Result()
 		ok(w, p)
 		return
 	}
@@ -547,6 +557,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		Plan:             req.explained(ps.Plan),
 		ImageHits:        imageHits,
 		LimitReport:      limitReport,
+		RerankResult:     rr.Result(),
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()

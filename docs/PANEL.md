@@ -209,6 +209,15 @@ existed but nothing showed them):
   refusal shows the server's message.
 - **Search advisor**: recommended summary mode, the share of documents with a
   summary, and *Matches by meaning: No* for the lexical provider.
+- **Model reranking** (2.19.8, RAG-011): the collection settings dialog has a
+  *Model reranking* group — *Default* (MDDB default: off / On for every search
+  / Off), *Candidates* and *Keep (topN)* — stored as `retrieval.rerank`; a
+  search's own `rerank` block still wins. The Search Advisor shows the
+  server's *Reranking model* and *Model reranking: on* when the collection's
+  evaluation set measured a higher nDCG with it (*off* when it did not), and
+  *Apply to collection* stores that with the rest of the profile. The model
+  itself is configured on the server (`MDDB_RERANK_*`, or
+  `/v1/embedding-configs` with `kind: "rerank"`), not in the panel.
 
 - **Search surface, tracing and proxies** (Config and System pages, 2.18.10):
   from `GET /v1/config` — the Elasticsearch-compatible subset on or off with

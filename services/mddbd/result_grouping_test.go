@@ -154,7 +154,7 @@ func TestGroupBy_FTSAndProfileDefault(t *testing.T) {
 	defer cleanup()
 	seedGroupedRepo(t, s)
 
-	resp, err := s.searchFTS(FTSSearchRequest{Collection: "repo", Query: "retry", Limit: 10,
+	resp, err := s.searchFTS(context.Background(), FTSSearchRequest{Collection: "repo", Query: "retry", Limit: 10,
 		GroupBy: &GroupBy{Key: "author"}}, time.Now())
 	if err != nil {
 		t.Fatal(err)
@@ -173,11 +173,11 @@ func TestGroupBy_FTSAndProfileDefault(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	resp, _ = s.searchFTS(FTSSearchRequest{Collection: "repo", Query: "retry", Limit: 10}, time.Now())
+	resp, _ = s.searchFTS(context.Background(), FTSSearchRequest{Collection: "repo", Query: "retry", Limit: 10}, time.Now())
 	if len(resp.Results) != 4 {
 		t.Fatalf("profile groupBy: %d results", len(resp.Results))
 	}
-	resp, _ = s.searchFTS(FTSSearchRequest{Collection: "repo", Query: "retry", Limit: 10,
+	resp, _ = s.searchFTS(context.Background(), FTSSearchRequest{Collection: "repo", Query: "retry", Limit: 10,
 		GroupBy: &GroupBy{Key: "path"}}, time.Now())
 	if len(resp.Results) != 5 {
 		t.Fatalf("request overrides profile: %d results", len(resp.Results))
@@ -305,17 +305,17 @@ func TestCrossSearchItems_FilterAndTruncation(t *testing.T) {
 		Targets: []string{"repo", "notes"}, SearchTopK: 20, TopK: 2,
 		Metric: vec.ResolveSimilarity("cosine"), Filter: MetaFilter{"author": {In: []string{"bob"}, hasIn: true}},
 	}
-	items := s.crossSearchItems(p)
+	items := s.crossSearchItems(context.Background(), p)
 	if len(items) != 1 || items[0].Document.Key != "c" || items[0].Document.ContentMD != "" {
 		t.Fatalf("filter excludes notes entirely and keeps bob: %+v", items)
 	}
 	p.Filter, p.GroupBy = nil, &GroupBy{Key: "author"}
-	items = s.crossSearchItems(p)
+	items = s.crossSearchItems(context.Background(), p)
 	if len(items) != 2 || items[0].Rank != 1 || items[1].Rank != 2 {
 		t.Fatalf("grouped and cut to topK: %+v", items)
 	}
 	p.GroupBy, p.IncludeContent = nil, true
-	items = s.crossSearchItems(p)
+	items = s.crossSearchItems(context.Background(), p)
 	if len(items) != 2 || items[0].Document.ContentMD == "" {
 		t.Fatalf("ungrouped topK with content: %+v", items)
 	}

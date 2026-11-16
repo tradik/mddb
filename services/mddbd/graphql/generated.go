@@ -137,11 +137,13 @@ type ComplexityRoot struct {
 	}
 
 	FTSResponse struct {
-		Limit       func(childComplexity int) int
-		LimitCapped func(childComplexity int) int
-		Passages    func(childComplexity int) int
-		Results     func(childComplexity int) int
-		Total       func(childComplexity int) int
+		Limit         func(childComplexity int) int
+		LimitCapped   func(childComplexity int) int
+		Passages      func(childComplexity int) int
+		Rerank        func(childComplexity int) int
+		RerankSkipped func(childComplexity int) int
+		Results       func(childComplexity int) int
+		Total         func(childComplexity int) int
 	}
 
 	FTSResult struct {
@@ -302,6 +304,22 @@ type ComplexityRoot struct {
 		Texts func(childComplexity int) int
 	}
 
+	RerankMove struct {
+		After      func(childComplexity int) int
+		Before     func(childComplexity int) int
+		Collection func(childComplexity int) int
+		ID         func(childComplexity int) int
+		Score      func(childComplexity int) int
+	}
+
+	RerankReport struct {
+		Cached     func(childComplexity int) int
+		Candidates func(childComplexity int) int
+		DurationMs func(childComplexity int) int
+		Model      func(childComplexity int) int
+		Moves      func(childComplexity int) int
+	}
+
 	Schema struct {
 		Collection func(childComplexity int) int
 		Enabled    func(childComplexity int) int
@@ -361,15 +379,17 @@ type ComplexityRoot struct {
 	}
 
 	VectorSearchResponse struct {
-		Dimensions  func(childComplexity int) int
-		ImageHits   func(childComplexity int) int
-		Limit       func(childComplexity int) int
-		LimitCapped func(childComplexity int) int
-		Model       func(childComplexity int) int
-		Passages    func(childComplexity int) int
-		Plan        func(childComplexity int) int
-		Results     func(childComplexity int) int
-		Total       func(childComplexity int) int
+		Dimensions    func(childComplexity int) int
+		ImageHits     func(childComplexity int) int
+		Limit         func(childComplexity int) int
+		LimitCapped   func(childComplexity int) int
+		Model         func(childComplexity int) int
+		Passages      func(childComplexity int) int
+		Plan          func(childComplexity int) int
+		Rerank        func(childComplexity int) int
+		RerankSkipped func(childComplexity int) int
+		Results       func(childComplexity int) int
+		Total         func(childComplexity int) int
 	}
 
 	VectorSearchResult struct {
@@ -884,6 +904,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.FTSResponse.Passages(childComplexity), true
+	case "FTSResponse.rerank":
+		if e.ComplexityRoot.FTSResponse.Rerank == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FTSResponse.Rerank(childComplexity), true
+	case "FTSResponse.rerankSkipped":
+		if e.ComplexityRoot.FTSResponse.RerankSkipped == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FTSResponse.RerankSkipped(childComplexity), true
 	case "FTSResponse.results":
 		if e.ComplexityRoot.FTSResponse.Results == nil {
 			break
@@ -1773,6 +1805,68 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.QueryDecomposition.Texts(childComplexity), true
 
+	case "RerankMove.after":
+		if e.ComplexityRoot.RerankMove.After == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankMove.After(childComplexity), true
+	case "RerankMove.before":
+		if e.ComplexityRoot.RerankMove.Before == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankMove.Before(childComplexity), true
+	case "RerankMove.collection":
+		if e.ComplexityRoot.RerankMove.Collection == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankMove.Collection(childComplexity), true
+	case "RerankMove.id":
+		if e.ComplexityRoot.RerankMove.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankMove.ID(childComplexity), true
+	case "RerankMove.score":
+		if e.ComplexityRoot.RerankMove.Score == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankMove.Score(childComplexity), true
+
+	case "RerankReport.cached":
+		if e.ComplexityRoot.RerankReport.Cached == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankReport.Cached(childComplexity), true
+	case "RerankReport.candidates":
+		if e.ComplexityRoot.RerankReport.Candidates == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankReport.Candidates(childComplexity), true
+	case "RerankReport.durationMs":
+		if e.ComplexityRoot.RerankReport.DurationMs == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankReport.DurationMs(childComplexity), true
+	case "RerankReport.model":
+		if e.ComplexityRoot.RerankReport.Model == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankReport.Model(childComplexity), true
+	case "RerankReport.moves":
+		if e.ComplexityRoot.RerankReport.Moves == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RerankReport.Moves(childComplexity), true
+
 	case "Schema.collection":
 		if e.ComplexityRoot.Schema.Collection == nil {
 			break
@@ -2027,6 +2121,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.VectorSearchResponse.Plan(childComplexity), true
+	case "VectorSearchResponse.rerank":
+		if e.ComplexityRoot.VectorSearchResponse.Rerank == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResponse.Rerank(childComplexity), true
+	case "VectorSearchResponse.rerankSkipped":
+		if e.ComplexityRoot.VectorSearchResponse.RerankSkipped == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResponse.RerankSkipped(childComplexity), true
 	case "VectorSearchResponse.results":
 		if e.ComplexityRoot.VectorSearchResponse.Results == nil {
 			break
@@ -2167,6 +2273,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("IngestOptionsInput", ec.unmarshalInputIngestOptionsInput),
 			graphql.NewInputUnmarshaler("MetaInput", ec.unmarshalInputMetaInput),
 			graphql.NewInputUnmarshaler("RegisterWebhookInput", ec.unmarshalInputRegisterWebhookInput),
+			graphql.NewInputUnmarshaler("RerankInput", ec.unmarshalInputRerankInput),
 			graphql.NewInputUnmarshaler("RocchioInput", ec.unmarshalInputRocchioInput),
 			graphql.NewInputUnmarshaler("SearchInput", ec.unmarshalInputSearchInput),
 			graphql.NewInputUnmarshaler("SetGroupPermissionInput", ec.unmarshalInputSetGroupPermissionInput),
@@ -2477,6 +2584,10 @@ func (ec *executionContext) childFields_FTSResponse(ctx context.Context, field g
 		return ec.fieldContext_FTSResponse_limitCapped(ctx, field)
 	case "limit":
 		return ec.fieldContext_FTSResponse_limit(ctx, field)
+	case "rerank":
+		return ec.fieldContext_FTSResponse_rerank(ctx, field)
+	case "rerankSkipped":
+		return ec.fieldContext_FTSResponse_rerankSkipped(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type FTSResponse", field.Name)
 }
@@ -2707,6 +2818,38 @@ func (ec *executionContext) childFields_QueryDecomposition(ctx context.Context, 
 	return nil, fmt.Errorf("no field named %q was found under type QueryDecomposition", field.Name)
 }
 
+func (ec *executionContext) childFields_RerankMove(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_RerankMove_id(ctx, field)
+	case "collection":
+		return ec.fieldContext_RerankMove_collection(ctx, field)
+	case "before":
+		return ec.fieldContext_RerankMove_before(ctx, field)
+	case "after":
+		return ec.fieldContext_RerankMove_after(ctx, field)
+	case "score":
+		return ec.fieldContext_RerankMove_score(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type RerankMove", field.Name)
+}
+
+func (ec *executionContext) childFields_RerankReport(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "model":
+		return ec.fieldContext_RerankReport_model(ctx, field)
+	case "candidates":
+		return ec.fieldContext_RerankReport_candidates(ctx, field)
+	case "cached":
+		return ec.fieldContext_RerankReport_cached(ctx, field)
+	case "durationMs":
+		return ec.fieldContext_RerankReport_durationMs(ctx, field)
+	case "moves":
+		return ec.fieldContext_RerankReport_moves(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type RerankReport", field.Name)
+}
+
 func (ec *executionContext) childFields_Schema(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "collection":
@@ -2843,6 +2986,10 @@ func (ec *executionContext) childFields_VectorSearchResponse(ctx context.Context
 		return ec.fieldContext_VectorSearchResponse_limitCapped(ctx, field)
 	case "limit":
 		return ec.fieldContext_VectorSearchResponse_limit(ctx, field)
+	case "rerank":
+		return ec.fieldContext_VectorSearchResponse_rerank(ctx, field)
+	case "rerankSkipped":
+		return ec.fieldContext_VectorSearchResponse_rerankSkipped(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type VectorSearchResponse", field.Name)
 }
@@ -5506,6 +5653,61 @@ func (ec *executionContext) _FTSResponse_limit(ctx context.Context, field graphq
 }
 func (ec *executionContext) fieldContext_FTSResponse_limit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("FTSResponse", field, false, false, "Int")
+}
+
+func (ec *executionContext) _FTSResponse_rerank(ctx context.Context, field graphql.CollectedField, obj *FTSResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FTSResponse_rerank(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Rerank, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *RerankReport) graphql.Marshaler {
+			return ec.marshalORerankReport2ᚖmddbᚋgraphqlᚐRerankReport(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FTSResponse_rerank(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FTSResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_RerankReport(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FTSResponse_rerankSkipped(ctx context.Context, field graphql.CollectedField, obj *FTSResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FTSResponse_rerankSkipped(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RerankSkipped, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FTSResponse_rerankSkipped(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FTSResponse", field, false, false, "String")
 }
 
 func (ec *executionContext) _FTSResult_document(ctx context.Context, field graphql.CollectedField, obj *FTSResult) (ret graphql.Marshaler) {
@@ -9718,6 +9920,245 @@ func (ec *executionContext) fieldContext_QueryDecomposition_texts(_ context.Cont
 	return graphql.NewScalarFieldContext("QueryDecomposition", field, false, false, "String")
 }
 
+func (ec *executionContext) _RerankMove_id(ctx context.Context, field graphql.CollectedField, obj *RerankMove) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankMove_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RerankMove_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankMove", field, false, false, "String")
+}
+
+func (ec *executionContext) _RerankMove_collection(ctx context.Context, field graphql.CollectedField, obj *RerankMove) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankMove_collection(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Collection, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_RerankMove_collection(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankMove", field, false, false, "String")
+}
+
+func (ec *executionContext) _RerankMove_before(ctx context.Context, field graphql.CollectedField, obj *RerankMove) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankMove_before(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Before, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RerankMove_before(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankMove", field, false, false, "Int")
+}
+
+func (ec *executionContext) _RerankMove_after(ctx context.Context, field graphql.CollectedField, obj *RerankMove) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankMove_after(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.After, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RerankMove_after(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankMove", field, false, false, "Int")
+}
+
+func (ec *executionContext) _RerankMove_score(ctx context.Context, field graphql.CollectedField, obj *RerankMove) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankMove_score(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Score, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RerankMove_score(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankMove", field, false, false, "Float")
+}
+
+func (ec *executionContext) _RerankReport_model(ctx context.Context, field graphql.CollectedField, obj *RerankReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankReport_model(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Model, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RerankReport_model(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankReport", field, false, false, "String")
+}
+
+func (ec *executionContext) _RerankReport_candidates(ctx context.Context, field graphql.CollectedField, obj *RerankReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankReport_candidates(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Candidates, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RerankReport_candidates(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankReport", field, false, false, "Int")
+}
+
+func (ec *executionContext) _RerankReport_cached(ctx context.Context, field graphql.CollectedField, obj *RerankReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankReport_cached(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Cached, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RerankReport_cached(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankReport", field, false, false, "Int")
+}
+
+func (ec *executionContext) _RerankReport_durationMs(ctx context.Context, field graphql.CollectedField, obj *RerankReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankReport_durationMs(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DurationMs, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RerankReport_durationMs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RerankReport", field, false, false, "Float")
+}
+
+func (ec *executionContext) _RerankReport_moves(ctx context.Context, field graphql.CollectedField, obj *RerankReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RerankReport_moves(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Moves, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*RerankMove) graphql.Marshaler {
+			return ec.marshalORerankMove2ᚕᚖmddbᚋgraphqlᚐRerankMoveᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_RerankReport_moves(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RerankReport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_RerankMove(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Schema_collection(ctx context.Context, field graphql.CollectedField, obj *Schema) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10768,6 +11209,61 @@ func (ec *executionContext) _VectorSearchResponse_limit(ctx context.Context, fie
 }
 func (ec *executionContext) fieldContext_VectorSearchResponse_limit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("VectorSearchResponse", field, false, false, "Int")
+}
+
+func (ec *executionContext) _VectorSearchResponse_rerank(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResponse_rerank(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Rerank, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *RerankReport) graphql.Marshaler {
+			return ec.marshalORerankReport2ᚖmddbᚋgraphqlᚐRerankReport(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResponse_rerank(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "VectorSearchResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_RerankReport(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _VectorSearchResponse_rerankSkipped(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResponse_rerankSkipped(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RerankSkipped, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResponse_rerankSkipped(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("VectorSearchResponse", field, false, false, "String")
 }
 
 func (ec *executionContext) _VectorSearchResult_document(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResult) (ret graphql.Marshaler) {
@@ -12685,7 +13181,7 @@ func (ec *executionContext) unmarshalInputFTSInput(ctx context.Context, obj any)
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "limit", "format", "passageLines", "includeImages"}
+	fieldsInOrder := [...]string{"collection", "query", "limit", "format", "passageLines", "includeImages", "rerank"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12734,6 +13230,13 @@ func (ec *executionContext) unmarshalInputFTSInput(ctx context.Context, obj any)
 				return it, err
 			}
 			it.IncludeImages = data
+		case "rerank":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rerank"))
+			data, err := ec.unmarshalORerankInput2ᚖmddbᚋgraphqlᚐRerankInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Rerank = data
 		}
 	}
 	return it, nil
@@ -13140,6 +13643,69 @@ func (ec *executionContext) unmarshalInputRegisterWebhookInput(ctx context.Conte
 func UnmarshalRegisterWebhookInput(ctx context.Context, raw any) (RegisterWebhookInput, error) {
 	var out RegisterWebhookInput
 	err := graphql.UnmarshalNamedInputFromContext(ctx, "RegisterWebhookInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputRerankInput(ctx context.Context, obj any) (RerankInput, error) {
+	var it RerankInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"enabled", "candidates", "topN", "explain"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
+		case "candidates":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("candidates"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Candidates = data
+		case "topN":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("topN"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TopN = data
+		case "explain":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("explain"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Explain = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalRerankInput unmarshals raw into the RerankInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalRerankInput(ctx context.Context, raw any) (RerankInput, error) {
+	var out RerankInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "RerankInput", raw, &out)
 	return out, err
 }
 
@@ -13560,7 +14126,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio", "includeImages", "queryImage", "queryDecomposition"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio", "includeImages", "queryImage", "queryDecomposition", "rerank"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13728,6 +14294,13 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.QueryDecomposition = data
+		case "rerank":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rerank"))
+			data, err := ec.unmarshalORerankInput2ᚖmddbᚋgraphqlᚐRerankInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Rerank = data
 		}
 	}
 	return it, nil
@@ -14419,6 +14992,16 @@ func (ec *executionContext) _FTSResponse(ctx context.Context, sel ast.SelectionS
 			}
 		case "limit":
 			out.Values[i] = ec._FTSResponse_limit(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "rerank":
+			out.Values[i] = ec._FTSResponse_rerank(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "rerankSkipped":
+			out.Values[i] = ec._FTSResponse_rerankSkipped(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -15502,6 +16085,112 @@ func (ec *executionContext) _QueryDecomposition(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var rerankMoveImplementors = []string{"RerankMove"}
+
+func (ec *executionContext) _RerankMove(ctx context.Context, sel ast.SelectionSet, obj *RerankMove) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, rerankMoveImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RerankMove")
+		case "id":
+			out.Values[i] = ec._RerankMove_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "collection":
+			out.Values[i] = ec._RerankMove_collection(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "before":
+			out.Values[i] = ec._RerankMove_before(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "after":
+			out.Values[i] = ec._RerankMove_after(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "score":
+			out.Values[i] = ec._RerankMove_score(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var rerankReportImplementors = []string{"RerankReport"}
+
+func (ec *executionContext) _RerankReport(ctx context.Context, sel ast.SelectionSet, obj *RerankReport) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, rerankReportImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RerankReport")
+		case "model":
+			out.Values[i] = ec._RerankReport_model(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "candidates":
+			out.Values[i] = ec._RerankReport_candidates(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cached":
+			out.Values[i] = ec._RerankReport_cached(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "durationMs":
+			out.Values[i] = ec._RerankReport_durationMs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "moves":
+			out.Values[i] = ec._RerankReport_moves(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var schemaImplementors = []string{"Schema"}
 
 func (ec *executionContext) _Schema(ctx context.Context, sel ast.SelectionSet, obj *Schema) graphql.Marshaler {
@@ -15949,6 +16638,16 @@ func (ec *executionContext) _VectorSearchResponse(ctx context.Context, sel ast.S
 			}
 		case "limit":
 			out.Values[i] = ec._VectorSearchResponse_limit(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "rerank":
+			out.Values[i] = ec._VectorSearchResponse_rerank(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "rerankSkipped":
+			out.Values[i] = ec._VectorSearchResponse_rerankSkipped(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -16927,6 +17626,14 @@ func (ec *executionContext) unmarshalNRegisterWebhookInput2mddbᚋgraphqlᚐRegi
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNRerankMove2ᚖmddbᚋgraphqlᚐRerankMove(ctx context.Context, sel ast.SelectionSet, v *RerankMove) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "RerankMove!")
+		return graphql.Null
+	}
+	return ec._RerankMove(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNRole2mddbᚋgraphqlᚐRole(ctx context.Context, v any) (Role, error) {
 	var res Role
 	err := res.UnmarshalGQL(v)
@@ -17617,6 +18324,40 @@ func (ec *executionContext) marshalOQueryDecomposition2ᚖmddbᚋgraphqlᚐQuery
 		return graphql.Null
 	}
 	return ec._QueryDecomposition(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalORerankInput2ᚖmddbᚋgraphqlᚐRerankInput(ctx context.Context, v any) (*RerankInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputRerankInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalORerankMove2ᚕᚖmddbᚋgraphqlᚐRerankMoveᚄ(ctx context.Context, sel ast.SelectionSet, v []*RerankMove) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNRerankMove2ᚖmddbᚋgraphqlᚐRerankMove(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalORerankReport2ᚖmddbᚋgraphqlᚐRerankReport(ctx context.Context, sel ast.SelectionSet, v *RerankReport) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RerankReport(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalORocchioInput2ᚖmddbᚋgraphqlᚐRocchioInput(ctx context.Context, v any) (*RocchioInput, error) {

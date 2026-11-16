@@ -271,7 +271,8 @@ type MCPVectorSearchRequest struct {
 	// QueryImage searches by an image (RAG-010); see VectorSearchRequest.
 	QueryImage string `json:"queryImage,omitempty"`
 	// limitReport is set when the server's cap lowered TopK (#368).
-	limitReport LimitReport
+	limitReport   LimitReport
+	RerankRequest // rerank: {enabled, candidates, topN, explain} (RAG-011)
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -297,6 +298,8 @@ type MCPVectorSearchResult struct {
 	Images []ImageRef `json:"images,omitempty"`
 	// docTokens is the whole document's size in chunk modes (AGT-004).
 	docTokens int
+	// rerankText is the passage the reranking model reads (RAG-011).
+	rerankText string
 }
 
 // MCPVectorSearchResponse represents vector search results.
@@ -325,8 +328,9 @@ type MCPVectorSearchResponse struct {
 	ImageHits []ImageRef `json:"imageHits,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages    *PassagesResponse `json:"-"`
-	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	Passages     *PassagesResponse `json:"-"`
+	LimitReport                    // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	RerankResult                   // rerank, rerankSkipped (RAG-011)
 }
 
 // MCPVectorReindexRequest represents a reindex request.
@@ -409,6 +413,7 @@ type MCPFTSSearchRequest struct {
 	BM25B           *float64            `json:"bm25B,omitempty"`   // SRCH-018; nil = profile, then 0.75
 	PassageOptions                      // format, passageLines (AGT-002)
 	ImageOptions                        // includeImages (RAG-010)
+	RerankRequest                       // rerank: {enabled, candidates, topN, explain} (RAG-011)
 }
 
 // MCPFTSResult represents a single FTS result.
@@ -445,8 +450,9 @@ type MCPFTSSearchResponse struct {
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages    *PassagesResponse `json:"-"`
-	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	Passages     *PassagesResponse `json:"-"`
+	LimitReport                    // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	RerankResult                   // rerank, rerankSkipped (RAG-011)
 }
 
 // MCPFTSReindexRequest represents a request to reindex FTS for a collection.
@@ -508,6 +514,7 @@ type MCPHybridSearchRequest struct {
 	FeedbackOptions      // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 	DecompositionOptions // queryDecomposition (SRCH-020)
 	ImageOptions         // includeImages (RAG-010)
+	RerankRequest        // rerank: {enabled, candidates, topN, explain} (RAG-011)
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -557,8 +564,9 @@ type MCPHybridSearchResponse struct {
 	ImageHits []ImageRef `json:"imageHits,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages    *PassagesResponse `json:"-"`
-	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	Passages     *PassagesResponse `json:"-"`
+	LimitReport                    // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	RerankResult                   // rerank, rerankSkipped (RAG-011)
 }
 
 // MCPGeoSearchRequest represents a geo radius search.
@@ -842,7 +850,8 @@ type MCPCrossSearchRequest struct {
 	SearchType   string `json:"searchType,omitempty"`
 	ImageOptions        // includeImages (RAG-010)
 	// limitReport is set when the server's cap lowered TopK (#368).
-	limitReport LimitReport
+	limitReport   LimitReport
+	RerankRequest // rerank: {enabled, candidates, topN, explain} (RAG-011)
 }
 
 // MCPCrossSearchResponse is the response for cross_search.
@@ -861,8 +870,9 @@ type MCPCrossSearchResponse struct {
 	Plan *SearchPlan `json:"plan,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages    *PassagesResponse `json:"-"`
-	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	Passages     *PassagesResponse `json:"-"`
+	LimitReport                    // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	RerankResult                   // rerank, rerankSkipped (RAG-011)
 }
 
 // --- Find Duplicates MCP Types ---

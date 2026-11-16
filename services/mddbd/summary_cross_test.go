@@ -211,7 +211,7 @@ func TestSummaryCross_NoPlan(t *testing.T) {
 	s, cleanup := crossSummaryServer(t, &RetrievalProfileDef{SummaryMode: SummaryModeExpand})
 	defer cleanup()
 	q, _ := s.Embedding.Embed(context.Background(), generalQuery, embedding.RoleQuery)
-	items := s.crossSearchItems(crossSearchParams{Searcher: s.VectorSearchers["flat"], QueryVector: q,
+	items := s.crossSearchItems(context.Background(), crossSearchParams{Searcher: s.VectorSearchers["flat"], QueryVector: q,
 		Targets: []string{"sum", "plain"}, SearchTopK: 20, TopK: 5, Threshold: 0.3, Metric: vec.CosineSimilarity})
 	if len(items) != 1 || items[0].Document.Key != "plant" || len(items[0].chunks) != maxSummaryExpandChunks {
 		t.Fatalf("no plan: %+v", items)

@@ -105,6 +105,10 @@ type RetrievalProfileDef struct {
 	// MDDB_SEARCH_MAX_LIMIT alone. It can only lower that cap, never raise
 	// it: see search_limit.go.
 	MaxTopK int `json:"maxTopK,omitempty"`
+	// Rerank is the collection's default model reranking (RAG-011): enabled,
+	// candidates, topN. nil = off; a request's own rerank block wins field
+	// by field.
+	Rerank *RerankOptions `json:"rerank,omitempty"`
 }
 
 // HasHybridAlpha reports whether alpha was configured, including an explicit 0.
@@ -183,6 +187,9 @@ func (p *RetrievalProfileDef) validateTuning() error {
 		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if err := (PassageOptions{Format: p.Format}).ValidatePassageOptions(); err != nil {
+		return fmt.Errorf("invalid retrieval.%w", err)
+	}
+	if err := p.Rerank.Validate(); err != nil {
 		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if err := (fts.BM25Params{K1: floatOr(p.BM25K1, fts.DefaultBM25.K1), B: floatOr(p.BM25B, fts.DefaultBM25.B)}).Validate(); err != nil {
@@ -327,6 +334,7 @@ func retrievalProfileFromProto(p *proto.RetrievalProfileProto) *RetrievalProfile
 		SummaryMode:        p.SummaryMode,
 		SummaryWeight:      p.SummaryWeight,
 		MaxTopK:            int(p.MaxTopK),
+		Rerank:             rerankOptionsFromProto(p.Rerank),
 	}
 }
 
@@ -362,6 +370,7 @@ func retrievalProfileToProto(p *RetrievalProfileDef) *proto.RetrievalProfileProt
 		SummaryMode:        p.SummaryMode,
 		SummaryWeight:      p.SummaryWeight,
 		MaxTopK:            safeInt32(p.MaxTopK),
+		Rerank:             rerankOptionsToProto(p.Rerank),
 	}
 }
 

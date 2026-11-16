@@ -589,7 +589,8 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 		PassageOptions:  passageOptions(req.Format, req.PassageLines),
 		PlanOptions:     planOptions(req.Explain, req.LatencyTargetMs),
 		FeedbackOptions: feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
-		ImageOptions:    ImageOptions{IncludeImages: req.IncludeImages}, // RAG-010
+		ImageOptions:    ImageOptions{IncludeImages: req.IncludeImages},            // RAG-010
+		RerankRequest:   RerankRequest{Rerank: rerankOptionsFromProto(req.Rerank)}, // RAG-011
 	})
 	if err != nil {
 		return nil, searchStatus(err)
@@ -634,12 +635,14 @@ func crossSearchToProto(res *MCPCrossSearchResponse, targets []string) *proto.Cr
 	if res.Passages != nil {
 		return &proto.CrossSearchResponse{Passages: passagesOf(res.Passages), Total: safeInt32(res.Passages.Total),
 			TargetCollections: targets, Indexing: indexWaitToProto(res.Passages.Indexing),
-			LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}
+			LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit),
+			Rerank: rerankReportToProto(res.Rerank), RerankSkipped: res.RerankSkipped}
 	}
 	resp := &proto.CrossSearchResponse{Total: safeInt32(res.Total), SourceCollection: res.SourceCollection,
 		SourceDocId: res.SourceDocID, TargetCollections: res.TargetCollections, Algorithm: res.Algorithm,
 		DistanceMetric: res.DistanceMetric, Indexing: indexWaitToProto(res.Indexing), Plan: planToProto(res.Plan),
-		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}
+		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit),
+		Rerank: rerankReportToProto(res.Rerank), RerankSkipped: res.RerankSkipped}
 	for _, it := range res.Results {
 		d := it.Document
 		resp.Results = append(resp.Results, &proto.CrossSearchResultItem{Collection: it.Collection, Document: docToProto(&d),

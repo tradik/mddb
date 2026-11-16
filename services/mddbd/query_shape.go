@@ -164,7 +164,7 @@ func (s *Server) shapedFTS(ctx context.Context, req FTSSearchRequest, start time
 		return nil, err
 	}
 	defer release()
-	resp, err := s.searchFTS(req, start)
+	resp, err := s.searchFTS(ctx, req, start)
 	if err != nil {
 		return nil, err
 	}

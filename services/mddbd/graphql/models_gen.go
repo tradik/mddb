@@ -187,6 +187,8 @@ type FTSInput struct {
 	PassageLines *int    `json:"passageLines,omitempty"`
 	// Attach each hit's images (RAG-010).
 	IncludeImages *bool `json:"includeImages,omitempty"`
+	// Order the best candidates with the reranking model (RAG-011).
+	Rerank *RerankInput `json:"rerank,omitempty"`
 }
 
 type FTSResponse struct {
@@ -198,6 +200,10 @@ type FTSResponse struct {
 	LimitCapped *bool `json:"limitCapped,omitempty"`
 	// The limit used; set only when limitCapped.
 	Limit *int `json:"limit,omitempty"`
+	// Set when the reranking model ordered the results (RAG-011).
+	Rerank *RerankReport `json:"rerank,omitempty"`
+	// Why a requested rerank did not run (RAG-011).
+	RerankSkipped *string `json:"rerankSkipped,omitempty"`
 }
 
 type FTSResult struct {
@@ -392,6 +398,40 @@ type RegisterWebhookInput struct {
 	Collection string   `json:"collection"`
 }
 
+// Model reranking of a search's best candidates (RAG-011). Off unless enabled
+// here or in the collection's retrieval profile, and only with a reranking
+// provider configured.
+type RerankInput struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	// Results the model orders; omit for the profile's, then the provider's maxCandidates.
+	Candidates *int `json:"candidates,omitempty"`
+	// Results kept after reranking; omit for topK.
+	TopN *int `json:"topN,omitempty"`
+	// Report each candidate's rank before and after.
+	Explain *bool `json:"explain,omitempty"`
+}
+
+// One candidate's rank before and after reranking (RAG-011).
+type RerankMove struct {
+	ID         string  `json:"id"`
+	Collection *string `json:"collection,omitempty"`
+	Before     int     `json:"before"`
+	After      int     `json:"after"`
+	Score      float64 `json:"score"`
+}
+
+// A rerank that ran (RAG-011).
+type RerankReport struct {
+	Model string `json:"model"`
+	// Passages sent to the model, cached ones included.
+	Candidates int `json:"candidates"`
+	// Passages scored from the cache, without a call.
+	Cached     int     `json:"cached"`
+	DurationMs float64 `json:"durationMs"`
+	// Each candidate's rank before and after; with rerank.explain.
+	Moves []*RerankMove `json:"moves,omitempty"`
+}
+
 // Rocchio coefficients (SRCH-015): query, positive centroid, negative centroid.
 type RocchioInput struct {
 	Alpha *float64 `json:"alpha,omitempty"`
@@ -558,6 +598,8 @@ type VectorSearchInput struct {
 	// off (default) or auto (SRCH-020): a query of several clauses is also
 	// searched per clause, and each document keeps its best score.
 	QueryDecomposition *string `json:"queryDecomposition,omitempty"`
+	// Order the best candidates with the reranking model (RAG-011); omit to follow the collection profile.
+	Rerank *RerankInput `json:"rerank,omitempty"`
 }
 
 type VectorSearchResponse struct {
@@ -575,6 +617,10 @@ type VectorSearchResponse struct {
 	LimitCapped *bool `json:"limitCapped,omitempty"`
 	// The limit used; set only when limitCapped.
 	Limit *int `json:"limit,omitempty"`
+	// Set when the reranking model ordered the results (RAG-011).
+	Rerank *RerankReport `json:"rerank,omitempty"`
+	// Why a requested rerank did not run: timeout, error, invalidResponse, budget, notConfigured or noQuery (RAG-011).
+	RerankSkipped *string `json:"rerankSkipped,omitempty"`
 }
 
 type VectorSearchResult struct {

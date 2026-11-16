@@ -576,6 +576,28 @@ embedding call. On `hybrid_search` only the vector half is split. With
 `explain: true`, `plan.decomposition` gives the parts. See
 [Query Decomposition](SEARCH.md#query-decomposition--questions-with-several-needs-v21810).
 
+### Model reranking (v2.19.8)
+
+`semantic_search`, `hybrid_search`, `full_text_search` and `cross_search` take
+`rerank: {enabled, candidates, top_n, explain}`. With a reranking model
+configured on the server, the search fetches `candidates` results, the model
+orders them by reading the query and each passage together, and `top_k` (or
+`top_n`) come back:
+
+```json
+{"name": "hybrid_search", "arguments": {
+  "collection": "kb", "query": "rotate the signing key", "top_k": 5,
+  "rerank": {"enabled": true, "candidates": 30, "explain": true}
+}}
+```
+
+The answer carries `rerank` (model, candidates, cached, durationMs, and with
+`explain` each candidate's `before`/`after` rank). When the model times out,
+fails or the collection's budget is spent, the search's own order comes back
+with `rerankSkipped` naming why — the tool never fails because of the model.
+Off unless asked for here or in the collection's retrieval profile. See
+[Model reranking](SEARCH.md#model-reranking-v2198).
+
 ## Result Limits (v2.18.10+)
 
 Every tool that takes a result count — `limit`, `top_k` or `top_n` on
@@ -710,16 +732,16 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | Tool | Description |
 |------|-------------|
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
-| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. Since v2.18.9: `algorithm: "auto"`, `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), `include_images` (each hit's images, and `imageHits` with an image-capable provider) and `query_image` (search by an image; `query` may then be omitted). Since v2.18.10: `query_decomposition` (`off`/`auto`). |
+| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. Since v2.18.9: `algorithm: "auto"`, `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), `include_images` (each hit's images, and `imageHits` with an image-capable provider) and `query_image` (search by an image; `query` may then be omitted). Since v2.18.10: `query_decomposition` (`off`/`auto`). Since v2.19.8: `rerank` (model reranking, see [above](#model-reranking-v2198)). |
 | `get_indexing_status` | (v2.18.8) Is what was just written searchable yet? Queued and failed embeddings, progress and the oldest queued job, for a collection or the server. Read-only. |
 | `run_eval` | (v2.18.8) Measure search configurations on the collection's evaluation set: recall@k, nDCG@k, MRR, p50/p99 latency and tokens per configuration. Read-only. See [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing-v2188). Since v2.18.9 a configuration takes `summaryMode` (`off`, `blend`, `expand`) to measure [summaries](SEARCH.md#summaries--a-second-representation-v2189). |
 | `get_gain` | (v2.18.8) What retrieval saved over a window of days: searches by type and algorithm, tokens returned and tokens avoided by passages and chunks. Counts only. Read-only. |
 | `add_eval_query` | (v2.18.8) Add a query and the keys of the documents that should answer it, optionally graded 0–3, to the collection's evaluation set. |
-| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). Since v2.18.9 `include_images` attaches each hit's images. |
+| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). Since v2.18.9 `include_images` attaches each hit's images. Since v2.19.8: `rerank`. |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
-| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Since v2.18.9: `vector_algorithm: "auto"`, `explain`, `latency_target_ms`, and relevance feedback on the vector half (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images`. Since v2.18.10: `query_decomposition` (`off`/`auto`, vector half only). |
-| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. Since v2.18.9: `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images` (each hit's images from its own collection). |
+| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Since v2.18.9: `vector_algorithm: "auto"`, `explain`, `latency_target_ms`, and relevance feedback on the vector half (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images`. Since v2.18.10: `query_decomposition` (`off`/`auto`, vector half only). Since v2.19.8: `rerank`. |
+| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. Since v2.18.9: `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images` (each hit's images from its own collection). Since v2.19.8: `rerank` (needs `query`). |
 | `find_duplicates` | Find duplicate and similar documents within a collection. |
 
 ### Geo
