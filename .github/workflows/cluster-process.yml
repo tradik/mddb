@@ -1,0 +1,55 @@
+name: Cluster processes
+
+# GO-051. TestClusterProcesses (build tag clusterprocess) starts three real
+# mddbd processes, kills the leader with SIGKILL, waits for a new leader and
+# brings the old one back on its files. The in-process tests cannot show
+# that: a process that dies takes no deferred code with it.
+#
+# Runner minutes are paid for, so it is a check only the changes it measures
+# pay for: pull requests that touch the election, the replication or the
+# binlog. Never on push, and not a job of the bench-profile workflow, whose
+# path filter would start a 20-minute profile for an election-only change
+# (and this test for a vector-only one). Expected cost: about 3 minutes —
+# one build of the server, then roughly 30 seconds of test.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/mddbd/replication_*'
+      - 'services/mddbd/cluster_*'
+      - 'services/mddbd/internal/cluster/**'
+      - 'services/mddbd/internal/binlog/**'
+      - '.github/workflows/cluster-process.yml'
+
+# A newer push to the same pull request makes the older run worthless.
+concurrency:
+  group: cluster-process-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GO_VERSION: "1.27.4"
+  GOWORK: "off"
+
+jobs:
+  cluster-processes:
+    name: Leader election with real processes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/mddbd/go.sum
+
+      - name: Run TestClusterProcesses
+        working-directory: services/mddbd
+        run: go test -tags clusterprocess -run '^TestClusterProcesses$' -count=1 -timeout 10m -v .
