@@ -51,7 +51,7 @@ func (s *Server) setDocumentTTL(collection, key, lang string, ttl int64) (storag
 	}
 	var updated storage.Doc
 	var bo binlog.BinlogOps
-	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, bo.InTx(s.Binlog, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		dk := storage.DocKey(collection, docID)
 		v := bDocs.Get(dk)
@@ -65,16 +65,16 @@ func (s *Server) setDocumentTTL(collection, key, lang string, ttl int64) (storag
 		updated = *docPtr
 		updated.ExpiresAt = expiresAt
 		buf, err := marshalAndEncrypt(&updated, collection)
-		if err != nil {
-			return err
+		if err == nil {
+			bo.Put("docs", dk, buf)
+			err = bDocs.Put(dk, buf)
 		}
-		bo.Put("docs", dk, buf)
-		return bDocs.Put(dk, buf)
-	})
+		return err
+	}))
+	err = bo.Settle(s.Binlog, err)
 	if err != nil {
 		return storage.Doc{}, err
 	}
-	bo.FlushTo(s.Binlog)
 	s.invalidateDocReadCaches(collection, key, lang)
 	if s.TTLManager != nil {
 		if expiresAt > 0 {

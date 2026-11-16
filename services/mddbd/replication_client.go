@@ -40,6 +40,11 @@ type ReplicationClient struct {
 	maxLag        time.Duration
 	tlsConfig     *tls.Config
 	logConfig     *binlog.BinlogConfig
+	// cluster is set on a cluster node (GO-051): the client appends to the
+	// node's own log, sends its term, and sets aside what a new leader cut.
+	cluster *clusterRuntime
+	ackNow  chan struct{} // acknowledge at once (a cluster node)
+	dirty   bool          // the node's log was not closed cleanly
 
 	conn   *grpc.ClientConn
 	client proto.MDDBReplicationClient
@@ -69,6 +74,8 @@ type ReplicationClientConfig struct {
 	TLS *tls.Config
 	// Log configures the follower's copy of the leader's log; nil keeps none.
 	Log *binlog.BinlogConfig
+	// Cluster makes this the replication of a cluster node (GO-051).
+	Cluster *clusterRuntime
 }
 
 // NewReplicationClient creates a new replication client
@@ -93,6 +100,8 @@ func NewReplicationClient(s *Server, cfg ReplicationClientConfig) *ReplicationCl
 		maxLag:        cfg.MaxLag,
 		tlsConfig:     cfg.TLS,
 		logConfig:     cfg.Log,
+		cluster:       cfg.Cluster,
+		ackNow:        make(chan struct{}, 1),
 		stopCh:        make(chan struct{}),
 	}
 }
@@ -117,8 +126,8 @@ func (rc *ReplicationClient) Stop() {
 	close(rc.stopCh)
 	rc.wg.Wait()
 	rc.disconnect()
-	if log := rc.log.Swap(nil); log != nil {
-		_ = log.Close()
+	if log := rc.log.Swap(nil); log != nil && rc.cluster == nil {
+		_ = log.Close() // a cluster node's log is the server's, closed with it
 	}
 	slog.Info("Replication client stopped")
 }
@@ -246,10 +255,14 @@ func (rc *ReplicationClient) connect() error {
 	if rc.tlsConfig != nil {
 		creds = credentials.NewTLS(rc.tlsConfig)
 	}
-	conn, err := grpc.NewClient(rc.leaderAddr,
+	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(creds),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(64*1024*1024)), // 64MB for snapshots
-	)
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(64 * 1024 * 1024)), // 64MB for snapshots
+	}
+	if rc.cluster != nil {
+		opts = append(opts, rc.cluster.tr.extra...) // the node's network, as its elections use it
+	}
+	conn, err := grpc.NewClient(rc.leaderAddr, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to dial leader: %w", err)
 	}
@@ -281,12 +294,16 @@ func withReplicationSecret(ctx context.Context) context.Context {
 // replicate starts the binlog stream and applies entries until it ends.
 func (rc *ReplicationClient) replicate(ctx context.Context) error {
 	pos := rc.applier.Position()
-	stream, err := rc.client.StreamBinlog(ctx, &proto.StreamBinlogRequest{
+	req := &proto.StreamBinlogRequest{
 		FollowerId:      rc.followerID,
 		FromLsn:         pos.LSN,
 		ProtocolVersion: replicationProtocol,
 		LogId:           pos.LogID,
-	})
+	}
+	if c := rc.cluster; c != nil {
+		req.Term, req.TermHistory = c.node.Term(), termsToProto(c.s.Binlog.Terms())
+	}
+	stream, err := rc.client.StreamBinlog(ctx, req)
 	if err != nil {
 		return rc.streamEnded(err)
 	}
@@ -299,6 +316,9 @@ func (rc *ReplicationClient) replicate(ctx context.Context) error {
 	// headers; the Recv below returns it.
 	if header, err := stream.Header(); err == nil {
 		rc.adoptLeaderLog(header)
+	}
+	if err := rc.resyncIfDirty(); err != nil {
+		return err
 	}
 
 	in := make(chan received, applyBatchMax)
@@ -341,6 +361,9 @@ func (rc *ReplicationClient) streamEnded(err error) error {
 	if err == io.EOF {
 		return nil // the leader closed the stream: it is shutting down
 	}
+	if rc.cluster != nil {
+		rc.setAsideDiverged(err) // replication_cluster_follower.go
+	}
 	if status.Code(err) == codes.FailedPrecondition {
 		rc.needSnapshot.Store(true)
 		slog.Info("replication: the leader cannot continue from this follower's position; taking a snapshot", "reason", status.Convert(err).Message())
@@ -359,6 +382,8 @@ func (rc *ReplicationClient) ackLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
+			rc.acknowledge(ctx)
+		case <-rc.ackNow:
 			rc.acknowledge(ctx)
 		case <-ctx.Done():
 			return

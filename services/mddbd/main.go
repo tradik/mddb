@@ -188,6 +188,7 @@ type Server struct {
 	NodeID          string             // Unique node identifier
 	replServer      *ReplicationServer // Leader-side gRPC replication service
 	replClient      *ReplicationClient // Follower-side replication client
+	cluster         *clusterRuntime    // the node's part in a cluster (GO-051); nil outside one
 	// Readiness
 	Ready bool // Set to true after full initialization; health check returns "warming_up" until then
 }
@@ -469,6 +470,9 @@ func runServer(srvCfg ServerConfig) int {
 
 	// Start replication client (follower mode); stopped on the way out.
 	defer s.startReplicationClient()()
+	if s.cluster != nil {
+		s.cluster.start() // the replication service listens: elections can run
+	}
 
 	if s.ReplicationRole == "leader" {
 		slog.Info("replication leader started", "nodeID", s.NodeID, "currentLSN", s.Binlog.CurrentLSN())
@@ -1083,8 +1087,11 @@ func (s *Server) initEventsAndMetrics() {
 // initReplication sets the node's replication role, opens the binlog and,
 // on a follower, turns off the background writers.
 func (s *Server) initReplication() {
-	s.ReplicationRole = env("MDDB_REPLICATION_ROLE", "") // "leader", "follower", ""
 	s.NodeID = env("MDDB_NODE_ID", "")
+	if s.initClusterFromEnv() {
+		return // the election decides the role (GO-051)
+	}
+	s.ReplicationRole = env("MDDB_REPLICATION_ROLE", "") // "leader", "follower", ""
 	if s.NodeID == "" && s.ReplicationRole != "" {
 		s.NodeID = fmt.Sprintf("node-%d", time.Now().UnixNano()%100000)
 	}

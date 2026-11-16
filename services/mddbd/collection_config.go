@@ -245,15 +245,12 @@ func (cm *CollectionManager) put(collection string, cfg *CollectionConfig) error
 	}
 	key := []byte(collection)
 
-	if err := cm.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(cm.handle().Update, cm.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Put("colmeta", key, val)
 		b := tx.Bucket(bucketColMeta)
 		return b.Put(key, val)
 	}); err != nil {
 		return err
-	}
-
-	if cm.binlog != nil {
-		_ = cm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "colmeta", Key: CopyBytes(key), Value: CopyBytes(val)})
 	}
 
 	cm.mu.Lock()
@@ -268,15 +265,12 @@ func (cm *CollectionManager) put(collection string, cfg *CollectionConfig) error
 // Delete removes the config for a collection.
 func (cm *CollectionManager) Delete(collection string) error {
 	key := []byte(collection)
-	if err := cm.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(cm.handle().Update, cm.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Delete("colmeta", key)
 		b := tx.Bucket(bucketColMeta)
 		return b.Delete(key)
 	}); err != nil {
 		return err
-	}
-
-	if cm.binlog != nil {
-		_ = cm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: "colmeta", Key: CopyBytes(key)})
 	}
 
 	cm.mu.Lock()

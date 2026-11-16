@@ -150,6 +150,8 @@ var httpAccessRules = map[string]accessRule{
 	// Global administration.
 	"/v1/backup":                        ruleAdmin,
 	"/v1/tenants":                       ruleAdmin, // GO-054: every tenant's limits and usage
+	"/v1/replication/promote":           ruleAdmin, // GO-051
+	"/v1/replication/demote":            ruleAdmin,
 	"/v1/restore":                       ruleAdmin,
 	"/v1/geo-reindex":                   ruleAdmin,
 	"/v1/embedding-configs":             ruleAdmin,

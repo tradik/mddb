@@ -23,6 +23,7 @@ import (
 //     snapshot instead of continuing a history that is not the leader's.
 //   - baseLsn: the LSN before the first entry, which is all that is left of
 //     the position when retention or a new log has emptied the file.
+//   - terms: where each election term begins (GO-051), in a cluster.
 //   - state / cleanLsn: "clean" with the last LSN when the log was closed
 //     with everything on disk, "open" while it is in use. A log found "open"
 //     at start was not closed: the process died, and entries the leader had
@@ -48,6 +49,9 @@ type logMeta struct {
 	BaseLSN     uint64 `json:"baseLsn"`
 	State       string `json:"state"`
 	CleanLSN    uint64 `json:"cleanLsn"`
+	// Terms is where each election term begins (GO-051, binlog_terms.go);
+	// absent outside a cluster. A release that does not know it ignores it.
+	Terms []TermStart `json:"terms,omitempty"`
 }
 
 // metaStatus is what loadMeta found.
@@ -113,6 +117,7 @@ func (b *Binlog) saveMeta(state string) error {
 		BaseLSN:     b.baseLSN,
 		State:       state,
 		CleanLSN:    b.lsn.Load(),
+		Terms:       b.terms,
 	})
 	tmp := b.metaPath() + ".tmp"
 	// #nosec G304 -- next to the binlog, whose path the operator configured

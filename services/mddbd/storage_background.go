@@ -101,8 +101,14 @@ func (b *backgroundFreelist) run(db *bolt.DB, path string, meta boltMeta) {
 	slog.Info("freelist rebuilt; writes resumed", "elapsed", time.Since(start).Round(time.Second))
 }
 
-// writeBlocked is why a write cannot run now, or nil.
+// writeBlocked is why a write cannot run now, or nil: a freelist rebuild,
+// or — in a cluster — this node not leading (GO-051).
 func (s *Server) writeBlocked() error {
+	if s.cluster != nil {
+		if err := s.cluster.writeError(); err != nil {
+			return err
+		}
+	}
 	if err := s.freelistLoad.failed(); err != nil {
 		return fmt.Errorf("the database is read-only: rebuilding its freelist failed: %w", err)
 	}
@@ -114,6 +120,10 @@ func (s *Server) writeBlocked() error {
 
 // writeUnavailable answers a write refused by writeBlocked.
 func (s *Server) writeUnavailable(w http.ResponseWriter, err error) {
+	if nl, ok := errors.AsType[*notLeaderError](err); ok {
+		writeNotLeader(w, nl)
+		return
+	}
 	body := map[string]any{"error": err.Error()}
 	if s.freelistLoad != nil {
 		phase, _ := s.freelistLoad.clock.current()
@@ -160,6 +170,9 @@ func (g *GRPCServer) checkWritable() error {
 		return status.Error(codes.PermissionDenied, "read-only mode")
 	}
 	if err := g.server.writeBlocked(); err != nil {
+		if nl, ok := errors.AsType[*notLeaderError](err); ok {
+			return nl.grpcStatus()
+		}
 		return status.Error(codes.Unavailable, err.Error())
 	}
 	return nil

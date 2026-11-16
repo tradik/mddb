@@ -111,7 +111,7 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 	now := time.Now().Unix()
 	var saved storage.Doc
 	var bo binlog.BinlogOps
-	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, bo.InTx(s.Binlog, func(tx *bolt.Tx) error {
 		bDocs, bIdx, bByK := tx.Bucket([]byte("docs")), tx.Bucket([]byte("idxmeta")), tx.Bucket([]byte("bykey"))
 		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))
 		if docID == nil {
@@ -148,11 +148,11 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 		}
 		saved = doc
 		return s.writeRevision(tx, &bo, collection, doc.ID, now, buf)
-	})
+	}))
+	err = bo.Settle(s.Binlog, err)
 	if err != nil {
 		return storage.Doc{}, err
 	}
-	bo.FlushTo(s.Binlog)
 	// The cached copy is the old document; the next read takes the new one.
 	s.invalidateDocReadCaches(collection, key, lang)
 	// The after-write pipeline every write path shares (GO-001, GO-048). It

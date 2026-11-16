@@ -4784,6 +4784,9 @@ const (
 	MDDBReplication_StreamBinlog_FullMethodName      = "/mddb.MDDBReplication/StreamBinlog"
 	MDDBReplication_ReplicationStatus_FullMethodName = "/mddb.MDDBReplication/ReplicationStatus"
 	MDDBReplication_AcknowledgeLSN_FullMethodName    = "/mddb.MDDBReplication/AcknowledgeLSN"
+	MDDBReplication_RequestVote_FullMethodName       = "/mddb.MDDBReplication/RequestVote"
+	MDDBReplication_Heartbeat_FullMethodName         = "/mddb.MDDBReplication/Heartbeat"
+	MDDBReplication_StepDown_FullMethodName          = "/mddb.MDDBReplication/StepDown"
 )
 
 // MDDBReplicationClient is the client API for MDDBReplication service.
@@ -4798,6 +4801,12 @@ type MDDBReplicationClient interface {
 	ReplicationStatus(ctx context.Context, in *ReplicationStatusRequest, opts ...grpc.CallOption) (*ReplicationStatusResponse, error)
 	// AcknowledgeLSN allows a follower to confirm it has applied up to a given LSN
 	AcknowledgeLSN(ctx context.Context, in *AcknowledgeLSNRequest, opts ...grpc.CallOption) (*AcknowledgeLSNResponse, error)
+	// Cluster (GO-051, MDDB_CLUSTER_PEERS): a candidate asks for a vote.
+	RequestVote(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*VoteResponse, error)
+	// Cluster: the leader tells a node it leads in a term, and learns its position.
+	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
+	// Cluster: a promotion asks the leader to stop taking writes and hand over.
+	StepDown(ctx context.Context, in *StepDownRequest, opts ...grpc.CallOption) (*StepDownResponse, error)
 }
 
 type mDDBReplicationClient struct {
@@ -4866,6 +4875,36 @@ func (c *mDDBReplicationClient) AcknowledgeLSN(ctx context.Context, in *Acknowle
 	return out, nil
 }
 
+func (c *mDDBReplicationClient) RequestVote(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*VoteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VoteResponse)
+	err := c.cc.Invoke(ctx, MDDBReplication_RequestVote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBReplicationClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HeartbeatResponse)
+	err := c.cc.Invoke(ctx, MDDBReplication_Heartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBReplicationClient) StepDown(ctx context.Context, in *StepDownRequest, opts ...grpc.CallOption) (*StepDownResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StepDownResponse)
+	err := c.cc.Invoke(ctx, MDDBReplication_StepDown_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MDDBReplicationServer is the server API for MDDBReplication service.
 // All implementations must embed UnimplementedMDDBReplicationServer
 // for forward compatibility.
@@ -4878,6 +4917,12 @@ type MDDBReplicationServer interface {
 	ReplicationStatus(context.Context, *ReplicationStatusRequest) (*ReplicationStatusResponse, error)
 	// AcknowledgeLSN allows a follower to confirm it has applied up to a given LSN
 	AcknowledgeLSN(context.Context, *AcknowledgeLSNRequest) (*AcknowledgeLSNResponse, error)
+	// Cluster (GO-051, MDDB_CLUSTER_PEERS): a candidate asks for a vote.
+	RequestVote(context.Context, *VoteRequest) (*VoteResponse, error)
+	// Cluster: the leader tells a node it leads in a term, and learns its position.
+	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
+	// Cluster: a promotion asks the leader to stop taking writes and hand over.
+	StepDown(context.Context, *StepDownRequest) (*StepDownResponse, error)
 	mustEmbedUnimplementedMDDBReplicationServer()
 }
 
@@ -4899,6 +4944,15 @@ func (UnimplementedMDDBReplicationServer) ReplicationStatus(context.Context, *Re
 }
 func (UnimplementedMDDBReplicationServer) AcknowledgeLSN(context.Context, *AcknowledgeLSNRequest) (*AcknowledgeLSNResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AcknowledgeLSN not implemented")
+}
+func (UnimplementedMDDBReplicationServer) RequestVote(context.Context, *VoteRequest) (*VoteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestVote not implemented")
+}
+func (UnimplementedMDDBReplicationServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Heartbeat not implemented")
+}
+func (UnimplementedMDDBReplicationServer) StepDown(context.Context, *StepDownRequest) (*StepDownResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StepDown not implemented")
 }
 func (UnimplementedMDDBReplicationServer) mustEmbedUnimplementedMDDBReplicationServer() {}
 func (UnimplementedMDDBReplicationServer) testEmbeddedByValue()                         {}
@@ -4979,6 +5033,60 @@ func _MDDBReplication_AcknowledgeLSN_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDBReplication_RequestVote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBReplicationServer).RequestVote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDBReplication_RequestVote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBReplicationServer).RequestVote(ctx, req.(*VoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDBReplication_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartbeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBReplicationServer).Heartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDBReplication_Heartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBReplicationServer).Heartbeat(ctx, req.(*HeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDBReplication_StepDown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StepDownRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBReplicationServer).StepDown(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDBReplication_StepDown_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBReplicationServer).StepDown(ctx, req.(*StepDownRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MDDBReplication_ServiceDesc is the grpc.ServiceDesc for MDDBReplication service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -4993,6 +5101,18 @@ var MDDBReplication_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AcknowledgeLSN",
 			Handler:    _MDDBReplication_AcknowledgeLSN_Handler,
+		},
+		{
+			MethodName: "RequestVote",
+			Handler:    _MDDBReplication_RequestVote_Handler,
+		},
+		{
+			MethodName: "Heartbeat",
+			Handler:    _MDDBReplication_Heartbeat_Handler,
+		},
+		{
+			MethodName: "StepDown",
+			Handler:    _MDDBReplication_StepDown_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

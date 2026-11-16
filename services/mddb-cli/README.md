@@ -357,6 +357,17 @@ mddb-cli truncate blog -k 0
 - `-k, --keep N` - Number of revisions to keep (default: 5)
 - `-d, --drop-cache` - Drop cache (default: true)
 
+#### replication - Cluster status, promote and demote (v2.19.8+)
+
+```bash
+mddb-cli replication status            # role, term, leader, nodes
+mddb-cli replication promote           # admin: make this node the leader
+mddb-cli replication promote --force   # admin: without votes (automatic failover off only)
+mddb-cli replication demote            # admin: step the leader down
+```
+
+See [CLUSTER.md](../../docs/CLUSTER.md).
+
 #### stats - Show server statistics
 
 ```bash

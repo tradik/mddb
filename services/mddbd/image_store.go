@@ -40,18 +40,16 @@ func (s *Server) putImageBytes(collection, docID string, data []byte) error {
 	}
 	key := imageBytesKey(collection, docID)
 	if err == nil {
-		err = s.DBUpdateC(collection, func(tx *bolt.Tx) error {
+		err = s.updateLogged(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 			// Created at startup in both layouts; created here too, so a
 			// file from before the bucket existed takes images at once.
 			b, err := tx.CreateBucketIfNotExists(bucketImages)
 			if err == nil {
+				bo.Put(string(bucketImages), key, data)
 				err = b.Put(key, data)
 			}
 			return err
 		})
-	}
-	if err == nil && s.Binlog != nil {
-		_ = s.Binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: string(bucketImages), Key: key, Value: bytes.Clone(data)})
 	}
 	return err
 }
@@ -78,18 +76,14 @@ func (s *Server) imageBytes(collection, docID string) []byte {
 // deleteImageBytes removes an image document's bytes, if it has any.
 func (s *Server) deleteImageBytes(collection, docID string) {
 	key := imageBytesKey(collection, docID)
-	removed := false
-	_ = s.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	_ = s.updateLogged(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(bucketImages)
 		if b == nil || b.Get(key) == nil {
 			return nil
 		}
-		removed = true
+		bo.Delete(string(bucketImages), key)
 		return b.Delete(key)
 	})
-	if removed && s.Binlog != nil {
-		_ = s.Binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: string(bucketImages), Key: key})
-	}
 }
 
 // deleteCollectionImageBytes removes a collection's image bytes inside the

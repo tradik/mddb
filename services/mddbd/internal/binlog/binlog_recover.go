@@ -52,6 +52,7 @@ func (b *Binlog) openLog() error {
 		b.baseLSN, last = scan.first-1, scan.last
 	}
 	b.lsn.Store(last)
+	b.synced = last
 	b.firstTS = scan.firstTS
 	b.fileSize = scan.good
 	// A follower's copy without an ID is one the follower has not yet
@@ -59,8 +60,17 @@ func (b *Binlog) openLog() error {
 	if b.logID = parseLogID(meta.LogID); b.logID == 0 && !b.cfg.Replica {
 		b.logID = newLogID()
 	}
+	b.terms = meta.Terms
+	if n := len(b.terms); n > 0 {
+		b.term = b.terms[n-1].Term
+	}
 
-	if why := b.distrust(meta, status, last); why != "" {
+	why := b.untrusted(meta, status, last)
+	b.dirty = why != ""
+	if b.cfg.Replica {
+		why = "" // reconciled with what the follower applied instead
+	}
+	if why != "" {
 		slog.Warn("binlog cannot be continued; starting a new one — followers will resynchronise from a snapshot",
 			"path", b.path, "reason", why, "lastLSN", last)
 		if err := b.startNewLog(max(last, meta.BaseLSN, meta.CleanLSN) + resetJump); err != nil {
@@ -70,13 +80,14 @@ func (b *Binlog) openLog() error {
 	return b.saveMeta(stateOpen)
 }
 
-// distrust says why a leader's log cannot be continued, or "" when it can.
-// A follower's copy is never judged here: it is reconciled with what the
-// follower applied. A log without a sidecar was written before 2.19.8, which
-// kept no such record; it is taken as it is, as that release would have.
-func (b *Binlog) distrust(meta logMeta, status metaStatus, last uint64) string {
+// untrusted says why a leader's log cannot be continued, or "" when it can.
+// A follower's copy is not started again for it — it is reconciled with what
+// the follower applied — but is marked Dirty. A log without a sidecar was
+// written before 2.19.8, which kept no such record; it is taken as it is, as
+// that release would have.
+func (b *Binlog) untrusted(meta logMeta, status metaStatus, last uint64) string {
 	switch {
-	case b.cfg.Replica, status == metaMissing:
+	case status == metaMissing:
 		return ""
 	case status == metaUnreadable:
 		return "its sidecar is unreadable"
@@ -129,7 +140,15 @@ func (b *Binlog) scanExisting(size int64) (tailScan, error) {
 // startNewLog empties the file and continues at base under a new log ID.
 // The caller holds b.mu (or is the only user, at open) and saves the sidecar.
 func (b *Binlog) startNewLog(base uint64) error {
-	return b.restartAt(base, newLogID())
+	if err := b.restartAt(base, newLogID()); err != nil {
+		return err
+	}
+	// A new log has no history but the term its writes will carry.
+	b.terms = nil
+	if b.term != 0 {
+		b.terms = []TermStart{{Term: b.term, Start: base + 1}}
+	}
+	return nil
 }
 
 // restartAt empties the file and continues after base as log id.
@@ -141,8 +160,12 @@ func (b *Binlog) restartAt(base, id uint64) error {
 	b.fileSize, b.firstTS = 0, 0
 	b.baseLSN, b.logID = base, id
 	b.lsn.Store(base)
+	b.synced = base
 	b.recent = timeRing{}
 	b.failed = nil
+	// Whatever the database held that the old log did not, followers now
+	// take from a snapshot.
+	b.dirty, b.unlogged = false, false
 	return nil
 }
 
@@ -171,6 +194,7 @@ func (b *Binlog) Rebase(lsn, id uint64) error {
 	if err := b.restartAt(lsn, id); err != nil {
 		return err
 	}
+	b.terms = nil
 	return b.saveMeta(stateOpen)
 }
 

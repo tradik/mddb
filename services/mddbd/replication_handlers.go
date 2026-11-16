@@ -2,6 +2,7 @@ package main
 
 import (
 	"mddb/internal/binlog"
+	"mddb/internal/cluster"
 	proto "mddb/proto"
 	"net/http"
 	"time"
@@ -41,6 +42,19 @@ type ReplicationStatusResponse struct {
 	LastError string             `json:"last_error,omitempty"`
 	Followers []FollowerInfoJSON `json:"followers"`
 	Uptime    int64              `json:"uptime_seconds"`
+	// Term is the node's election term (GO-051); 0 outside a cluster.
+	Term uint64 `json:"term"`
+	// Cluster is the node's view of its cluster; absent outside one.
+	Cluster *ClusterStatusJSON `json:"cluster,omitempty"`
+}
+
+// ClusterStatusJSON is the election state, the acknowledgement mode and the
+// last file of writes this node had to cut when it rejoined.
+type ClusterStatusJSON struct {
+	cluster.Status
+	AckMode          string `json:"ack_mode"`
+	LastRejectedFile string `json:"last_rejected_file,omitempty"`
+	lastTerm         uint64
 }
 
 // FollowerInfoJSON is the JSON representation of a follower a leader knows
@@ -85,6 +99,9 @@ func (s *Server) replicationStatus() ReplicationStatusResponse {
 	if s.replClient != nil {
 		s.replClient.fillStatus(&resp)
 	}
+	if s.cluster != nil {
+		s.cluster.fillStatus(&resp)
+	}
 	return resp
 }
 
@@ -127,6 +144,15 @@ func (r ReplicationStatusResponse) toProto() *proto.ReplicationStatusResponse {
 		LogId:            r.LogID,
 		Connected:        r.Connected,
 		ProtocolVersion:  replicationProtocol,
+		Term:             r.Term,
+	}
+	if c := r.Cluster; c != nil {
+		out.LastTerm, out.LeaderId, out.Role = c.lastTerm, c.LeaderID, string(c.State)
+		for _, n := range c.Nodes {
+			if n.Self {
+				out.HttpAddr = n.HTTP
+			}
+		}
 	}
 	for _, f := range r.Followers {
 		out.Followers = append(out.Followers, &proto.FollowerInfo{

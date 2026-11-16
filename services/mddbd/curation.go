@@ -154,7 +154,8 @@ func (cm *CurationManager) Set(rule *CurationRule) error {
 	}
 	key := []byte(rule.ID)
 
-	if err := cm.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(cm.handle().Update, cm.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Put("curation", key, val)
 		b := tx.Bucket(bucketCuration)
 		if b == nil {
 			return errors.New("curation bucket missing")
@@ -162,10 +163,6 @@ func (cm *CurationManager) Set(rule *CurationRule) error {
 		return b.Put(key, val)
 	}); err != nil {
 		return err
-	}
-
-	if cm.binlog != nil {
-		_ = cm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "curation", Key: CopyBytes(key), Value: CopyBytes(val)})
 	}
 
 	cm.mu.Lock()
@@ -224,7 +221,8 @@ func (cm *CurationManager) ListAll() []*CurationRule {
 // Delete removes a rule by ID. No-op if already gone.
 func (cm *CurationManager) Delete(id string) error {
 	key := []byte(id)
-	if err := cm.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(cm.handle().Update, cm.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Delete("curation", key)
 		b := tx.Bucket(bucketCuration)
 		if b == nil {
 			return nil
@@ -232,9 +230,6 @@ func (cm *CurationManager) Delete(id string) error {
 		return b.Delete(key)
 	}); err != nil {
 		return err
-	}
-	if cm.binlog != nil {
-		_ = cm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: "curation", Key: CopyBytes(key)})
 	}
 	cm.mu.Lock()
 	if prev, ok := cm.byID[id]; ok {

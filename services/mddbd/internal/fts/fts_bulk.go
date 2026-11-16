@@ -80,7 +80,7 @@ func (f *FTSIndex) IndexDocs(collection string, docs []BulkDoc) error {
 	}
 
 	var bo binlog.BinlogOps
-	err = f.update(collection, func(tx *bolt.Tx) error {
+	err = f.update(collection, bo.InTx(f.binlog, func(tx *bolt.Tx) error {
 		var deferred sortedPuts
 		seen := make(map[string]bool, len(work))
 		for _, w := range work {
@@ -99,9 +99,9 @@ func (f *FTSIndex) IndexDocs(collection string, docs []BulkDoc) error {
 			}
 		}
 		return deferred.flush()
-	})
+	}))
+	err = bo.Settle(f.binlog, err)
 	if err == nil {
-		bo.FlushTo(f.binlog)
 		f.InvalidatePMI(collection)
 	}
 	return err

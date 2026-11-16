@@ -641,10 +641,37 @@ curl -X POST http://localhost:11023/v1/truncate \
 ### Horizontal Scaling
 - Read replicas: leader-follower replication, a binlog stream over gRPC ([REPLICATION.md](REPLICATION.md))
 - Load balancer for reads
-- Single write instance
+- Single write instance, elected among three or more nodes with `MDDB_CLUSTER_PEERS` ([Three-node cluster](#three-node-cluster))
 - No sharding: a node holds the whole database. To split data today, run separate instances, each with its own
   database file and collections, and route each request to the instance that holds the collection yourself — the
   server does no routing, rebalancing or cross-instance search
+
+### Three-node cluster
+
+Three nodes elect one leader and replace it when it fails; any one node may
+be lost ([CLUSTER.md](CLUSTER.md)). Every node gets the same peer list and
+secret, and its own id and advertised address:
+
+```bash
+# on 10.0.0.1 (n2 and n3 alike, with their own MDDB_NODE_ID and address)
+MDDB_NODE_ID=n1
+MDDB_CLUSTER_PEERS=n1=10.0.0.1:11024,n2=10.0.0.2:11024,n3=10.0.0.3:11024
+MDDB_CLUSTER_ADVERTISE_HTTP=http://10.0.0.1:11023
+MDDB_REPLICATION_SECRET=change-me-to-32-random-characters
+MDDB_REPLICATION_ACK=quorum        # optional: no acknowledged write is lost in a failover
+```
+
+- Put the nodes in separate failure domains (hosts, racks or zones); a
+  majority must survive what you plan for.
+- Open the gRPC port (11024) between the nodes only; clients use HTTP.
+- Send writes to any node: one that does not lead answers `421` with the
+  leader's address, and the clients follow it when `FollowLeader` is on. A
+  load balancer may send reads anywhere; for writes, health-check
+  `/v1/replication/status` and route to the node whose `cluster.writable` is
+  true.
+- Keep `MDDB_STORAGE_LAYOUT` the same on every node; snapshots are files.
+- Two data nodes give no automatic failover (two is not a majority of two):
+  add a third, small node, or promote by hand.
 
 ### Read Replicas (scheduled backup copy)
 

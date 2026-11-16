@@ -17,6 +17,10 @@ import (
 
 // resume loads the position from the database and opens the follower's log.
 func (rc *ReplicationClient) resume() {
+	if rc.cluster != nil {
+		rc.resumeShared() // replication_cluster_follower.go
+		return
+	}
 	pos, err := rc.server.loadReplicationPosition()
 	if err != nil {
 		slog.Warn("replication: could not read this follower's position; starting from the leader's first entry", "err", err)
@@ -39,16 +43,21 @@ func (rc *ReplicationClient) resume() {
 }
 
 // appendLog adds applied entries to the follower's log. Entries that do
-// not continue the log start it again at the applied position.
-func (rc *ReplicationClient) appendLog(entries []*binlog.BinlogEntry) {
+// not continue the log start it again at the applied position. A cluster
+// node's log is the one it would lead with, and is not started again: the
+// error ends replication and the node takes a snapshot.
+func (rc *ReplicationClient) appendLog(entries []*binlog.BinlogEntry) error {
 	log := rc.log.Load()
 	if log == nil {
-		return
+		return nil
 	}
-	if err := log.AppendReplicated(entries); err != nil {
-		slog.Warn("replication: this follower's log does not continue; starting it again at the applied position", "err", err)
-		rc.rebaseLog(rc.applier.Position())
+	err := log.AppendReplicated(entries)
+	if err == nil || rc.cluster != nil {
+		return err
 	}
+	slog.Warn("replication: this follower's log does not continue; starting it again at the applied position", "err", err)
+	rc.rebaseLog(rc.applier.Position())
+	return nil
 }
 
 // rebaseLog makes the follower's log an empty one continuing after pos.
@@ -57,7 +66,7 @@ func (rc *ReplicationClient) rebaseLog(pos replPosition) {
 	if log == nil {
 		return
 	}
-	if err := log.Rebase(pos.LSN, pos.LogID); err != nil {
+	if err := log.RebaseAt(pos.LSN, pos.LogID, pos.Term); err != nil {
 		slog.Warn("replication: could not restart this follower's log", "err", err)
 	}
 }

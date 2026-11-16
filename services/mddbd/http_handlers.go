@@ -336,12 +336,10 @@ func (s *Server) handleTruncate(w http.ResponseWriter, r *http.Request) {
 
 	var bo binlog.BinlogOps
 	// DropCache is accepted for compatibility; no rendered cache is kept.
-	err := s.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(req.Collection, bo.InTx(s.Binlog, func(tx *bolt.Tx) error {
 		return truncateCollectionRevisions(tx, &bo, req.Collection, req.KeepRevs)
-	})
-	if err == nil {
-		bo.FlushTo(s.Binlog)
-	}
+	}))
+	err = bo.Settle(s.Binlog, err)
 	if err != nil {
 		bad(w, err)
 		return

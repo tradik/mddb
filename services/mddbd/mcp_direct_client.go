@@ -412,12 +412,12 @@ func (c *DirectClient) Restore(ctx context.Context, req *MCPRestoreRequest) (*MC
 // collection via the direct client (see truncateCollectionRevisions).
 func (c *DirectClient) Truncate(ctx context.Context, req *MCPTruncateRequest) (*MCPTruncateResponse, error) {
 	var bo binlog.BinlogOps
-	err := c.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
+	err := c.server.DBUpdateC(req.Collection, bo.InTx(c.server.Binlog, func(tx *bolt.Tx) error {
 		return truncateCollectionRevisions(tx, &bo, req.Collection, req.KeepRevs)
-	})
+	}))
+	err = bo.Settle(c.server.Binlog, err)
 	if err != nil {
 		return nil, err
 	}
-	bo.FlushTo(c.server.Binlog)
 	return &MCPTruncateResponse{Status: "truncated"}, nil
 }

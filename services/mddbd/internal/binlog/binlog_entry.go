@@ -26,6 +26,10 @@ type BinlogEntry struct {
 	Key        []byte
 	Value      []byte
 	Checksum   uint32
+	// Term is the election term the entry was written in (GO-051). It is
+	// not in the file: the log keeps where each term begins
+	// (binlog_terms.go), and readers of the file ask it with TermAt.
+	Term uint64
 }
 
 // binlogEntryHeaderSize is the fixed header size:
@@ -139,10 +143,12 @@ func UnmarshalBinlogEntry(data []byte) (*BinlogEntry, int, error) {
 	}, pos, nil
 }
 
-// BinlogOps collects binlog entries during a BoltDB transaction.
-// After the transaction commits successfully, call FlushTo to append all entries to the binlog.
+// BinlogOps collects binlog entries during a BoltDB transaction. Logged
+// writes them to the log as the transaction's last step; FlushTo appends
+// them after a commit made some other way.
 type BinlogOps struct {
 	entries []*BinlogEntry
+	staged  bool // Logged wrote them before the commit
 }
 
 // Put records a Put operation.

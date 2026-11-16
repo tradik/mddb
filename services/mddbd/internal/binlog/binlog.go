@@ -35,7 +35,23 @@ type Binlog struct {
 	failed   error // first write error; the log accepts nothing after it
 	closed   bool
 	spoiled  bool // an append arrived after Close and took the clean mark back
+	dirty    bool // found not closed cleanly at open (binlog_recover.go)
+	unlogged bool // the gate refused an append made after its commit
 	recent   timeRing
+	synced   uint64 // last LSN known to be on disk
+
+	// Election terms (GO-051, binlog_terms.go): the term the node's own
+	// appends carry, and where each term begins in the log.
+	term  uint64
+	terms []TermStart
+
+	// gate, when set, refuses the node's own appends (a cluster follower);
+	// ackWait, when set, holds a logged write until enough followers have it.
+	gate    atomic.Pointer[WriteGate]
+	ackWait atomic.Pointer[AckWaiter]
+	// pending holds the first LSN of each logged write whose transaction
+	// has not returned yet (StableLSN).
+	pending map[uint64]struct{}
 
 	// scanMu keeps the file from being rewritten under a reader: scans hold
 	// it shared, retention takes it exclusively or leaves the file alone.
@@ -143,6 +159,7 @@ func NewBinlog(dbPath string, cfg BinlogConfig) (*Binlog, error) {
 		path:        binlogPath,
 		cfg:         cfg.withDefaults(),
 		subscribers: make(map[string]chan *BinlogEntry),
+		pending:     make(map[uint64]struct{}),
 		flusher:     make(chan struct{}, 1),
 		done:        make(chan struct{}),
 	}
@@ -159,7 +176,9 @@ func NewBinlog(dbPath string, cfg BinlogConfig) (*Binlog, error) {
 }
 
 // Append writes a new entry to the binlog. The LSN is assigned automatically.
-// This should be called AFTER a successful BoltDB commit.
+// It is for writes made outside a transaction Logged runs; such a write is
+// committed before it is appended, so two of them racing on one key can
+// reach the log in the other order than the database (see Logged).
 func (b *Binlog) Append(entry *BinlogEntry) error {
 	return b.AppendBatch([]*BinlogEntry{entry})
 }
@@ -170,28 +189,33 @@ func (b *Binlog) AppendBatch(entries []*BinlogEntry) error {
 	if len(entries) == 0 {
 		return nil
 	}
-	now := time.Now().UnixNano()
-
 	b.mu.Lock()
+	defer b.mu.Unlock()
+	if err := b.checkGate(); err != nil {
+		b.unlogged = true
+		return err
+	}
+	b.number(entries)
+	return b.writeLocked(entries, b.cfg.Sync == SyncCommit)
+}
+
+// number gives entries the next LSNs, the node's term and the time. The
+// caller holds b.mu.
+func (b *Binlog) number(entries []*BinlogEntry) {
+	now := time.Now().UnixNano()
 	next := b.lsn.Load()
 	for _, entry := range entries {
 		next++
 		entry.LSN = next
+		entry.Term = b.term
 		entry.Timestamp = now
 	}
-	err := b.writeLocked(entries)
-	b.mu.Unlock()
-	if err != nil {
-		return err
-	}
-
-	b.notifySubscribers(entries)
-	return nil
 }
 
-// writeLocked puts entries, LSNs already set, at the end of the log. The
-// caller holds b.mu.
-func (b *Binlog) writeLocked(entries []*BinlogEntry) error {
+// writeLocked puts entries, LSNs already set, at the end of the log and
+// hands them to the subscribers, in LSN order. sync writes them through to
+// the disk before it returns. The caller holds b.mu.
+func (b *Binlog) writeLocked(entries []*BinlogEntry, sync bool) error {
 	if b.closed {
 		b.spoilCleanClose()
 		return ErrBinlogClosed
@@ -211,7 +235,8 @@ func (b *Binlog) writeLocked(entries []*BinlogEntry) error {
 		}
 		b.recent.add(entry.LSN, entry.Timestamp)
 	}
-	if b.cfg.Sync == SyncCommit {
+	b.notifySubscribers(entries)
+	if sync {
 		return b.flush()
 	}
 	select {
@@ -346,6 +371,7 @@ func (b *Binlog) flush() error {
 	if err := syncFile(b.file); err != nil {
 		return b.fail(fmt.Errorf("failed to sync binlog: %w", err))
 	}
+	b.synced = b.lsn.Load()
 	return nil
 }
 
@@ -369,7 +395,8 @@ func (b *Binlog) periodicFlusher() {
 	}
 }
 
-// notifySubscribers sends entries to all active subscribers
+// notifySubscribers sends entries to all active subscribers. It is called
+// under b.mu, so every subscriber sees the entries in LSN order.
 func (b *Binlog) notifySubscribers(entries []*BinlogEntry) {
 	b.subMu.RLock()
 	defer b.subMu.RUnlock()

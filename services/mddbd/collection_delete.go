@@ -38,7 +38,7 @@ func (s *Server) deleteCollection(collection string) (int, error) {
 	var docs []deletedDocRef
 	var bo binlog.BinlogOps
 
-	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, bo.InTx(s.Binlog, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		bIdx := tx.Bucket(s.BucketNames.IdxMeta)
 		bRev := tx.Bucket(s.BucketNames.Rev)
@@ -100,11 +100,11 @@ func (s *Server) deleteCollection(collection string) (int, error) {
 		// prefix, so a document stored under two spellings of its key leaves
 		// neither behind.
 		return deleteCollectionByKeyEntries(bByK, collection, &bo)
-	})
+	}))
+	err = bo.Settle(s.Binlog, err)
 	if err != nil {
 		return 0, err
 	}
-	bo.FlushTo(s.Binlog)
 
 	s.cleanUpDeletedCollection(collection, docs)
 	return len(docs), nil

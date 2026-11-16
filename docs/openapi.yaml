@@ -481,6 +481,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RevisionConflict"
+        "421": {$ref: "#/components/responses/NotLeader"}
         "507": {$ref: "#/components/responses/InsufficientStorage"}
         "400":
           description: Invalid request
@@ -2714,6 +2715,73 @@ paths:
                 $ref: "#/components/schemas/ReplicationStatusResponse"
         "401": {$ref: "#/components/responses/Unauthorized"}
         "429": {$ref: "#/components/responses/RateLimited"}
+
+  /v1/replication/promote:
+    post:
+      tags:
+        - Replication
+      summary: Promote this cluster node to leader (admin)
+      description: |
+        (v2.19.8, GO-051) Makes this node the leader of its cluster. Refused
+        when a reachable node has a later log. A reachable leader is asked to
+        step down first; this node waits until it holds the leader's last
+        entry and stands for election. `force` takes the leadership without
+        votes and is only allowed with automatic failover off. See
+        [CLUSTER.md](CLUSTER.md#promotion-and-demotion).
+      operationId: promoteReplicationNode
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force: {type: boolean, default: false}
+      responses:
+        "200":
+          description: This node leads
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RoleChange"}
+        "400":
+          description: Not a cluster node, or a malformed body
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409":
+          description: Refused — another node has a later log, the election was lost, or the node did not catch up
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+
+  /v1/replication/demote:
+    post:
+      tags:
+        - Replication
+      summary: Step this cluster leader down (admin)
+      description: |
+        (v2.19.8, GO-051) The leader stops taking writes and tells the other
+        nodes they may elect a successor; it does not stand again for twice
+        the election timeout.
+      operationId: demoteReplicationNode
+      responses:
+        "200":
+          description: This node follows
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RoleChange"}
+        "400":
+          description: Not a cluster node
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409":
+          description: This node does not lead
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
 
   /v1/synonyms:
     get:
@@ -12549,8 +12617,10 @@ components:
           example: leader-1
         role:
           type: string
-          enum: [ standalone, leader, follower ]
-          description: Replication role of this node
+          enum: [ standalone, leader, follower, candidate ]
+          description: >
+            Replication role of this node; in a cluster (v2.19.8,
+            MDDB_CLUSTER_PEERS) its election state
           example: leader
         current_lsn:
           type: integer
@@ -12635,6 +12705,54 @@ components:
           format: int64
           description: Node uptime in seconds
           example: 86400
+        term:
+          type: integer
+          format: uint64
+          description: The node's election term (v2.19.8, GO-051); 0 outside a cluster
+          example: 5
+        cluster:
+          $ref: "#/components/schemas/ClusterStatus"
+
+    ClusterStatus:
+      type: object
+      description: >
+        (v2.19.8, GO-051) The node's view of its cluster; present only with
+        MDDB_CLUSTER_PEERS. See CLUSTER.md.
+      properties:
+        node_id: {type: string, example: n1}
+        state: {type: string, enum: [ leader, follower, candidate ], example: leader}
+        term: {type: integer, format: uint64, example: 5}
+        voted_for: {type: string, example: n1}
+        leader_id: {type: string, description: The leader this node knows; absent while none is, example: n1}
+        leader_addr: {type: string, description: The leader's HTTP address for clients, example: "http://10.0.0.1:11023"}
+        lease_valid: {type: boolean, description: This node leads inside a lease a majority answered}
+        writable: {type: boolean, description: This node takes writes now}
+        auto_failover: {type: boolean}
+        majority: {type: integer, example: 2}
+        ack_mode: {type: string, enum: [ async, quorum ], example: async}
+        last_rejected_file: {type: string, description: The last file of writes this node cut when it rejoined, example: "/data/rejected-writes-n1-term4-20261116T101500.000Z.jsonl"}
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string, example: n2}
+              grpc_addr: {type: string, example: "10.0.0.2:11024"}
+              http_addr: {type: string, example: "http://10.0.0.2:11023"}
+              state: {type: string, example: follower}
+              term: {type: integer, format: uint64}
+              last_lsn: {type: integer, format: uint64}
+              last_term: {type: integer, format: uint64}
+              last_seen: {type: string, format: date-time}
+              reachable: {type: boolean}
+              self: {type: boolean}
+
+    RoleChange:
+      type: object
+      properties:
+        node_id: {type: string, example: n2}
+        state: {type: string, example: leader}
+        term: {type: integer, format: uint64, example: 6}
 
     FollowerInfo:
       type: object
@@ -16253,6 +16371,25 @@ components:
         application/json:
           schema: {type: object}
   responses:
+    NotLeader:
+      description: >
+        (v2.19.8, GO-051) This cluster node does not lead; send the write to
+        the leader named in the X-MDDB-Leader header and in leaderAddr. Every
+        write endpoint answers so on a node that does not lead; while an
+        election runs it answers 503 with Retry-After instead. See CLUSTER.md.
+      headers:
+        X-MDDB-Leader:
+          description: The leader's HTTP base URL
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: {type: string, example: not the leader}
+              leaderAddr: {type: string, example: "http://10.0.0.2:11023"}
+              leaderId: {type: string, example: n2}
+              term: {type: integer, format: uint64, example: 5}
     ESBadRequest:
       description: An unsupported or malformed clause, named in error.reason
       content:

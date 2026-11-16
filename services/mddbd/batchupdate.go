@@ -205,7 +205,7 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 	// The documents written, for the post-write hooks after the commit.
 	var written []*ProcessedDoc
 	// Single transaction for all updates
-	err := bu.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	err := bu.server.DBUpdateC(collection, bo.InTx(bu.server.Binlog, func(tx *bolt.Tx) error {
 		if err := bu.server.checkWriteQuota(tx, collection, updateQuotaWrites(collection, updated)); err != nil {
 			return err
 		}
@@ -263,7 +263,8 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 		}
 
 		return nil
-	})
+	}))
+	err = bo.Settle(bu.server.Binlog, err)
 
 	if qe := wholeBatchRefusal(err); qe != nil { // GO-043, AGT-005
 		return nil, qe
@@ -273,7 +274,6 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
 		return resp, nil
 	}
-	bo.FlushTo(bu.server.Binlog)
 
 	// Enqueue metadata reindex jobs now that the write tx has committed.
 	// Enqueue never drops (synchronous fallback on a full queue); a returned

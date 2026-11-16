@@ -22,15 +22,15 @@ func (s *Server) deleteDocumentIf(collection, key, lang, expectedRevision string
 	docID := genID(collection, key, lang)
 	var bo binlog.BinlogOps
 	var deleted storage.Doc // captured for trigger evaluation
-	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, bo.InTx(s.Binlog, func(tx *bolt.Tx) error {
 		var err error
 		deleted, err = s.deleteDocTx(tx, &bo, docRef{collection, key, lang, docID}, expectedRevision)
 		return err
-	})
+	}))
+	err = bo.Settle(s.Binlog, err)
 	if err != nil {
 		return err
 	}
-	bo.FlushTo(s.Binlog)
 	s.dropDocumentVectors(collection, docID)
 	s.afterDelete(docRef{collection, key, lang, docID}, deleted)
 	return nil

@@ -116,7 +116,7 @@ func (s *Server) SaveEmbeddingConfig(config *EmbeddingConfig) error {
 	config.APIURL = safeURL
 
 	var bo binlog.BinlogOps
-	err = s.DBUpdate(func(tx *bolt.Tx) error {
+	err = s.DBUpdate(bo.InTx(s.Binlog, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("embedding_configs"))
 		if bucket == nil {
 			return fmt.Errorf("embedding_configs bucket not found")
@@ -146,10 +146,8 @@ func (s *Server) SaveEmbeddingConfig(config *EmbeddingConfig) error {
 
 		bo.Put("embedding_configs", []byte(config.ID), data)
 		return bucket.Put([]byte(config.ID), data)
-	})
-	if err == nil {
-		bo.FlushTo(s.Binlog)
-	}
+	}))
+	err = bo.Settle(s.Binlog, err)
 	return err
 }
 
@@ -220,18 +218,14 @@ func (s *Server) defaultModelConfig(kind string) (*EmbeddingConfig, error) {
 // DeleteEmbeddingConfig deletes an embedding configuration
 func (s *Server) DeleteEmbeddingConfig(id string) error {
 	key := []byte(id)
-	err := s.DBUpdate(func(tx *bolt.Tx) error {
+	return binlog.Logged(s.DBUpdate, s.Binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		bucket := tx.Bucket([]byte("embedding_configs"))
 		if bucket == nil {
 			return fmt.Errorf("embedding_configs bucket not found")
 		}
-
+		bo.Delete("embedding_configs", key)
 		return bucket.Delete(key)
 	})
-	if err == nil && s.Binlog != nil {
-		_ = s.Binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: "embedding_configs", Key: CopyBytes(key)})
-	}
-	return err
 }
 
 // HTTP Handlers

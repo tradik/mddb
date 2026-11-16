@@ -89,7 +89,7 @@ func receiveSnapshot(stream chunkReceiver, tmpPath string) (replPosition, error)
 		if err := w.write(chunk); err != nil {
 			return pos, fmt.Errorf("failed to write snapshot chunk: %w", err)
 		}
-		pos = replPosition{LSN: chunk.SnapshotLsn, LogID: chunk.LogId}
+		pos = replPosition{LSN: chunk.SnapshotLsn, LogID: chunk.LogId, Term: chunk.Term}
 		complete = chunk.IsLast
 	}
 	return pos, snapshotVerdict(pos, complete)
@@ -209,6 +209,7 @@ func (rc *ReplicationClient) adoptSnapshot(pos replPosition) error {
 	}
 	rc.applier.SetPosition(pos)
 	rc.rebaseLog(pos)
+	rc.dirty = false // the data is the leader's now
 	rc.lastAppliedAt.Store(time.Now().Unix())
 	rc.needSnapshot.Store(false)
 	rc.setError(nil)

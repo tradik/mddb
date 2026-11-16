@@ -1791,15 +1791,24 @@ service MDDBReplication {
 
   // AcknowledgeLSN allows a follower to confirm it has applied up to a given LSN
   rpc AcknowledgeLSN(AcknowledgeLSNRequest) returns (AcknowledgeLSNResponse);
+
+  // Cluster (GO-051, MDDB_CLUSTER_PEERS): a candidate asks for a vote.
+  rpc RequestVote(VoteRequest) returns (VoteResponse);
+
+  // Cluster: the leader tells a node it leads in a term, and learns its position.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Cluster: a promotion asks the leader to stop taking writes and hand over.
+  rpc StepDown(StepDownRequest) returns (StepDownResponse);
 }
 
 // The replication messages are versioned by protocol_version, sent by the
 // follower in every request and by the leader in the
 // "x-mddb-replication-protocol" response header. 0 (unset) is a release before
-// 2.19.8; 2 is 2.19.8. A node talks to an older peer by leaving out what that
-// peer does not know, and fields are only ever added: a later version (an
-// election term, for one) takes the next field numbers and the next
-// protocol_version.
+// 2.19.8; 2 is 2.19.8 before elections; 3 adds election terms (GO-051). A
+// node talks to an older peer by leaving out what that peer does not know,
+// and fields are only ever added: a later version takes the next field
+// numbers and the next protocol_version.
 
 message SnapshotRequest {
   string follower_id = 1;
@@ -1822,6 +1831,8 @@ message SnapshotChunk {
   // File the chunk belongs to: "" is the main database file, anything else
   // the name of a collection file (per-collection layout).
   string file = 7;
+  // Election term of the entry at snapshot_lsn (protocol 3; 0 outside a cluster).
+  uint64 term = 8;
 }
 
 message StreamBinlogRequest {
@@ -1831,6 +1842,18 @@ message StreamBinlogRequest {
   // ID of the log from_lsn is a position in (0: not known). A leader whose
   // log has another ID refuses the stream and the follower takes a snapshot.
   uint64 log_id = 4;
+  // Protocol 3 (cluster): the follower's current term, and where each term
+  // begins in its log. A leader with a lower term refuses to lead it; one
+  // whose history parts from the follower's below from_lsn says where
+  // (trailer "x-mddb-match-lsn") instead of streaming.
+  uint64 term = 5;
+  repeated TermStart term_history = 6;
+}
+
+// TermStart is the first LSN written in an election term.
+message TermStart {
+  uint64 term = 1;
+  uint64 start_lsn = 2;
 }
 
 message BinlogEntryProto {
@@ -1841,6 +1864,8 @@ message BinlogEntryProto {
   bytes key = 5;
   bytes value = 6;
   uint32 checksum = 7;
+  // Election term the entry was written in (protocol 3; 0 outside a cluster).
+  uint64 term = 8;
 }
 
 message ReplicationStatusRequest {}
@@ -1861,6 +1886,12 @@ message ReplicationStatusResponse {
   string log_id = 13;           // ID of the log current_lsn is a position in
   bool connected = 14;          // follower: the stream from the leader is open
   uint32 protocol_version = 15;
+  // Cluster (protocol 3): the node's term, the term of its last entry, the
+  // leader it knows and its own HTTP address.
+  uint64 term = 16;
+  uint64 last_term = 17;
+  string leader_id = 18;
+  string http_addr = 19;
 }
 
 message FollowerInfo {
@@ -1886,6 +1917,58 @@ message AcknowledgeLSNResponse {
   // The follower's lag as the leader measures it: the age of the oldest
   // entry it has not confirmed, 0 when it has them all.
   int64 lag_ms = 3;
+}
+
+// ---- Cluster (GO-051) ----
+//
+// A node with MDDB_CLUSTER_PEERS takes part in elections. A candidate asks
+// every peer for a vote in a new term; a peer gives one vote per term, to a
+// candidate whose log is at least as far as its own (last term, then last
+// LSN), and none while it hears from a leader. The leader sends heartbeats;
+// a node that answers one keeps the leader's lease alive.
+
+message VoteRequest {
+  uint64 term = 1;
+  string candidate_id = 2;
+  uint64 last_lsn = 3;
+  uint64 last_term = 4;
+}
+
+message VoteResponse {
+  uint64 term = 1;
+  bool granted = 2;
+  string reason = 3;
+}
+
+message HeartbeatRequest {
+  uint64 term = 1;
+  string leader_id = 2;
+  string leader_http = 3;   // where clients send writes
+  uint64 leader_lsn = 4;
+  // The leader is handing over (promotion): followers may vote at once.
+  bool release = 5;
+}
+
+message HeartbeatResponse {
+  uint64 term = 1;
+  bool ok = 2;
+  uint64 last_lsn = 3;
+  uint64 last_term = 4;
+  string http_addr = 5;
+  string state = 6;
+}
+
+message StepDownRequest {
+  uint64 term = 1;
+  string to_node = 2;       // the node being promoted
+}
+
+message StepDownResponse {
+  uint64 term = 1;
+  bool ok = 2;
+  uint64 last_lsn = 3;      // the last LSN the leader wrote
+  string reason = 4;
+  uint64 last_term = 5;     // and its term
 }
 
 // --- Temporal tracking ---

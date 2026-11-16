@@ -836,6 +836,34 @@ mddb-cli stats
 mddb-cli stats -j  # JSON output
 .fi
 .RE
+.SS replication status|promote|demote
+The node's replication and cluster state, and moving a cluster's leadership
+(v2.19.8+, nodes with MDDB_CLUSTER_PEERS).
+.PP
+.B mddb-cli replication status
+.br
+.B mddb-cli replication promote
+[\-\-force]
+.br
+.B mddb-cli replication demote
+.PP
+.B status
+shows the role, LSN, term, leader, whether the node takes writes, the last
+rejected-writes file and every node it knows.
+.B promote
+(admin) makes the node --server points at the leader; it is refused when a
+reachable node has a later log. --force takes the leadership without votes,
+only with automatic failover off.
+.B demote
+(admin) steps the leader down.
+.PP
+Examples:
+.RS
+.nf
+mddb-cli -s http://n2:11023 replication promote
+mddb-cli -s http://n1:11023 replication demote
+.fi
+.RE
 .SS diagnose
 Save a diagnose bundle to attach to an issue (v2.18.10+). The server builds a
 tar.gz describing itself \(em build, configuration through an allowlist, stats,

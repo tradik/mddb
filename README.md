@@ -432,7 +432,8 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 **[Full compliance map, threat model, operational checklist](docs/SECURITY.md)**
 
 ### Replication
-- ✅ **Leader-Follower Replication** - Binlog streaming over gRPC for read scaling; no automatic failover (promoting a follower is a manual step) and no sharding
+- ✅ **Leader-Follower Replication** - Binlog streaming over gRPC for read scaling; no sharding
+- ✅ **Leader Election (2.19.8)** - With `MDDB_CLUSTER_PEERS` three or more nodes elect the leader by majority, replace a failed one, answer writes on other nodes with the leader's address, and set aside writes a returning old leader alone had; optional quorum acknowledgements ([CLUSTER.md](docs/CLUSTER.md))
 - ✅ **Automatic Catch-up** - Followers pull missing transactions
 - ✅ **Zero-Downtime Snapshots** - Full sync for new followers
 - ✅ **Cluster Monitoring** - Web panel with health and lag metrics

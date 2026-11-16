@@ -134,7 +134,7 @@ func (bd *BatchDeleter) commitDelete(collection string, deleted []*DeletedDoc) *
 
 	var bo binlog.BinlogOps
 	// Single transaction for all deletions
-	err := bd.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	err := bd.server.DBUpdateC(collection, bo.InTx(bd.server.Binlog, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(bd.server.BucketNames.Docs)
 		bIdx := tx.Bucket(bd.server.BucketNames.IdxMeta)
 		bRev := tx.Bucket(bd.server.BucketNames.Rev)
@@ -194,13 +194,13 @@ func (bd *BatchDeleter) commitDelete(collection string, deleted []*DeletedDoc) *
 		}
 
 		return nil
-	})
+	}))
+	err = bo.Settle(bd.server.Binlog, err)
 
 	if err != nil {
 		resp.Failed++
 		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
 	} else {
-		bo.FlushTo(bd.server.Binlog)
 		// Once per batch rather than per document: the generation counter
 		// makes one bump enough for the whole collection (GO-031).
 		bd.server.invalidateSearchCache(collection)

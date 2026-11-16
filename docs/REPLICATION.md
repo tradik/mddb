@@ -9,7 +9,7 @@ status: publish
 
 MDDB supports **leader-follower replication** for horizontal read scaling. A single leader node handles all writes and streams changes to one or more read-only follower nodes via a binary replication log (binlog).
 
-Replication is not failover. When the leader stops, followers keep serving reads but nothing is promoted: a follower becomes a leader only when an operator restarts it as one ([Manual failover](#manual-failover)).
+With `MDDB_REPLICATION_ROLE` alone, replication is not failover: when the leader stops, followers keep serving reads but nothing is promoted ([Manual failover](#manual-failover)). From 2.19.8 the nodes can elect their leader instead — set `MDDB_CLUSTER_PEERS` and a majority replaces a failed leader, writes on any other node are answered with the leader's address, and a returning old leader sets aside the writes nobody else received ([CLUSTER.md](CLUSTER.md)).
 
 ## Architecture
 
@@ -387,6 +387,10 @@ service MDDBReplication {
     rpc StreamBinlog(StreamBinlogRequest) returns (stream BinlogEntryProto);
     rpc ReplicationStatus(ReplicationStatusRequest) returns (ReplicationStatusResponse);
     rpc AcknowledgeLSN(AcknowledgeLSNRequest) returns (AcknowledgeLSNResponse);
+    // Cluster nodes (MDDB_CLUSTER_PEERS, v2.19.8):
+    rpc RequestVote(VoteRequest) returns (VoteResponse);
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+    rpc StepDown(StepDownRequest) returns (StepDownResponse);
 }
 ```
 
@@ -395,16 +399,19 @@ service MDDBReplication {
 | `RequestSnapshot` | Every database file streamed in 1 MB chunks from read transactions (`bolt.Tx.WriteTo()`), each chunk naming its file, then a closing chunk |
 | `StreamBinlog` | Historical entries after a given LSN + real-time tailing. Opens with the headers `x-mddb-replication-protocol` and `x-mddb-log-id` |
 | `ReplicationStatus` | The same report as `GET /v1/replication/status` |
-| `AcknowledgeLSN` | Follower confirms the LSN it has applied. The leader keeps the entries after it (retention) and answers with the follower's lag as it measures it |
+| `AcknowledgeLSN` | Follower confirms the LSN it has applied. The leader keeps the entries after it (retention) and answers with the follower's lag as it measures it; with `MDDB_REPLICATION_ACK=quorum` it is what a write waits for |
+| `RequestVote`, `Heartbeat`, `StepDown` | Elections between cluster nodes, authorised like the streams ([CLUSTER.md](CLUSTER.md)) |
 
 ### Versions
 
-Requests carry `protocol_version` (2 in 2.19.8; unset from older releases)
-and the leader answers with the `x-mddb-replication-protocol` header. Fields
-are only ever added: a node leaves out what an older peer does not know, and
-an older peer ignores what it does not read. A later version — an election
-term, for one — takes new field numbers, the next protocol version and, for
-the file, the next `entryFormat` in the sidecar.
+Requests carry `protocol_version` (3 in 2.19.8; unset from older releases)
+and the leader answers with the `x-mddb-replication-protocol` header, and in
+a cluster with `x-mddb-term`. Fields are only ever added: a node leaves out
+what an older peer does not know, and an older peer ignores what it does not
+read. Protocol 3 adds election terms: every streamed entry and snapshot
+carries the term it was written in, and a cluster follower sends its term
+and where each term begins in its log. The file layout is unchanged — the
+terms are a list in the sidecar — so `entryFormat` stays 1.
 
 ## Follower Sync Flow
 
@@ -577,7 +584,7 @@ Everything written through a path that records binlog entries:
 
 - **Single leader**: Only one node can accept writes. Multi-leader is not supported.
 - **Eventual consistency**: Followers may serve slightly stale reads during replication lag.
-- **No automatic failover**: Promoting a follower to leader requires manual reconfiguration.
+- **No automatic failover without a cluster**: with `MDDB_REPLICATION_ROLE` alone, promoting a follower requires manual reconfiguration. With `MDDB_CLUSTER_PEERS` and three or more nodes the leader is elected ([CLUSTER.md](CLUSTER.md)).
 - **A leader crash costs every follower a snapshot** ([Durability and crashes](#durability-and-crashes)).
 - **Binlog retention**: a follower behind the hard size limit, or gone longer than `MDDB_BINLOG_MAX_AGE`, resynchronises from a snapshot.
 - **Same storage layout** on leader and follower for snapshots.
@@ -585,6 +592,10 @@ Everything written through a path that records binlog entries:
 - **Upgrade followers first** across an on-disk format change: each server migrates its own files at startup, and a follower applies key-index entries from an older leader in the new form, but a follower on an older release does not understand the new form ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version)).
 
 ## Upgrading to 2.19.8
+
+Moving to a cluster with elections is described in
+[CLUSTER.md](CLUSTER.md#upgrading). Without `MDDB_CLUSTER_PEERS` the notes
+below apply.
 
 Upgrade **followers first**, then the leader. Every combination keeps
 replicating; what differs is when a follower takes a snapshot:
@@ -684,7 +695,11 @@ spec:
 
 ### Manual Failover
 
-If the leader goes down:
+In a cluster (`MDDB_CLUSTER_PEERS`) use `POST /v1/replication/promote` or
+`mddb-cli replication promote` instead: it checks that no reachable node has
+a later log and moves the other nodes to the new leader
+([CLUSTER.md](CLUSTER.md#promotion-and-demotion)). Without a cluster, if the
+leader goes down:
 
 ```bash
 # 1. Stop the failed leader

@@ -107,15 +107,15 @@ func (sm *SynonymManager) Set(collection, term string, synonyms []string) error 
 
 	key := synKey(collection, term)
 	var bo binlog.BinlogOps
-	err = sm.db.Update(func(tx *bolt.Tx) error {
+	err = sm.db.Update(bo.InTx(sm.binlog, func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketSynonyms)
 		bo.Put("synonyms", key, data)
 		return b.Put(key, data)
-	})
+	}))
+	err = bo.Settle(sm.binlog, err)
 	if err != nil {
 		return err
 	}
-	bo.FlushTo(sm.binlog)
 
 	sm.mu.Lock()
 	if sm.cache[collection] == nil {
@@ -143,15 +143,15 @@ func (sm *SynonymManager) Delete(collection, term string) error {
 	term = strings.ToLower(strings.TrimSpace(term))
 	key := synKey(collection, term)
 	var bo binlog.BinlogOps
-	err := sm.db.Update(func(tx *bolt.Tx) error {
+	err := sm.db.Update(bo.InTx(sm.binlog, func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketSynonyms)
 		bo.Delete("synonyms", key)
 		return b.Delete(key)
-	})
+	}))
+	err = bo.Settle(sm.binlog, err)
 	if err != nil {
 		return err
 	}
-	bo.FlushTo(sm.binlog)
 
 	sm.mu.Lock()
 	if coll, ok := sm.cache[collection]; ok {

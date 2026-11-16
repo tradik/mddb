@@ -64,7 +64,7 @@ func (t *TTLManager) EnsureBuckets() error {
 // Set stores a TTL entry for a document. Removes any previous TTL first.
 func (t *TTLManager) Set(collection, docID string, expiresAt int64) error {
 	var bo binlog.BinlogOps
-	err := boltx.Update(t.rt(), collection, func(tx *bolt.Tx) error {
+	err := boltx.Update(t.rt(), collection, bo.InTx(t.binlog, func(tx *bolt.Tx) error {
 		bTTL := tx.Bucket(bucketTTL)
 		bRev := tx.Bucket(bucketTTLRev)
 
@@ -95,17 +95,15 @@ func (t *TTLManager) Set(collection, docID string, expiresAt int64) error {
 		binary.BigEndian.PutUint64(buf[:], uint64(expiresAt))
 		bo.Put("ttlrev", revKey, buf[:])
 		return bRev.Put(revKey, buf[:])
-	})
-	if err == nil {
-		bo.FlushTo(t.binlog)
-	}
+	}))
+	err = bo.Settle(t.binlog, err)
 	return err
 }
 
 // Remove deletes TTL entries for a document.
 func (t *TTLManager) Remove(collection, docID string) error {
 	var bo binlog.BinlogOps
-	err := boltx.Update(t.rt(), collection, func(tx *bolt.Tx) error {
+	err := boltx.Update(t.rt(), collection, bo.InTx(t.binlog, func(tx *bolt.Tx) error {
 		bTTL := tx.Bucket(bucketTTL)
 		bRev := tx.Bucket(bucketTTLRev)
 
@@ -118,10 +116,8 @@ func (t *TTLManager) Remove(collection, docID string) error {
 		}
 		bo.Delete("ttlrev", revKey)
 		return bRev.Delete(revKey)
-	})
-	if err == nil {
-		bo.FlushTo(t.binlog)
-	}
+	}))
+	err = bo.Settle(t.binlog, err)
 	return err
 }
 

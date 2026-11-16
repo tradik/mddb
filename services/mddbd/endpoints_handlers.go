@@ -358,6 +358,8 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 
 		// Replication
 		{Method: "GET", Path: "/v1/replication/status", Description: "Replication/cluster status", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/replication/promote", Description: "Make this cluster node the leader (admin)", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/replication/demote", Description: "Step this cluster leader down (admin)", RequiresAuth: authEnabled},
 
 		// System info
 		{Method: "GET", Path: "/v1/system/info", Description: "System information", RequiresAuth: authEnabled},

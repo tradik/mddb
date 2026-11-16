@@ -150,15 +150,12 @@ func (wm *WebhookManager) Register(url string, events []string, collection strin
 
 	data, _ := json.Marshal(wh)
 	whKey := []byte("wh|" + wh.ID)
-	if err := wm.db.Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(wm.db.Update, wm.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Put("webhooks", whKey, data)
 		b := tx.Bucket(bucketWebhooks)
 		return b.Put(whKey, data)
 	}); err != nil {
 		return nil, err
-	}
-
-	if wm.binlog != nil {
-		_ = wm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "webhooks", Key: bytes.Clone(whKey), Value: bytes.Clone(data)})
 	}
 
 	wm.mu.Lock()
@@ -180,15 +177,12 @@ func (wm *WebhookManager) List() []Webhook {
 // Delete removes a webhook by ID.
 func (wm *WebhookManager) Delete(id string) error {
 	whKey := []byte("wh|" + id)
-	if err := wm.db.Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(wm.db.Update, wm.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Delete("webhooks", whKey)
 		b := tx.Bucket(bucketWebhooks)
 		return b.Delete(whKey)
 	}); err != nil {
 		return err
-	}
-
-	if wm.binlog != nil {
-		_ = wm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: "webhooks", Key: bytes.Clone(whKey)})
 	}
 
 	wm.mu.Lock()

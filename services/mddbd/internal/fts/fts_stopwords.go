@@ -102,7 +102,7 @@ func (swm *StopWordManager) Add(collection string, words []string) error {
 	}
 
 	var bo binlog.BinlogOps
-	err := swm.db.Update(func(tx *bolt.Tx) error {
+	err := swm.db.Update(bo.InTx(swm.binlog, func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketStopWords)
 		for _, w := range normalized {
 			key := swKey(collection, w)
@@ -112,11 +112,11 @@ func (swm *StopWordManager) Add(collection string, words []string) error {
 			}
 		}
 		return nil
-	})
+	}))
+	err = bo.Settle(swm.binlog, err)
 	if err != nil {
 		return err
 	}
-	bo.FlushTo(swm.binlog)
 
 	swm.mu.Lock()
 	if swm.cache[collection] == nil {
@@ -144,15 +144,15 @@ func (swm *StopWordManager) Delete(collection, word string) error {
 
 	key := swKey(collection, word)
 	var bo binlog.BinlogOps
-	err := swm.db.Update(func(tx *bolt.Tx) error {
+	err := swm.db.Update(bo.InTx(swm.binlog, func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketStopWords)
 		bo.Delete("stopwords", key)
 		return b.Delete(key)
-	})
+	}))
+	err = bo.Settle(swm.binlog, err)
 	if err != nil {
 		return err
 	}
-	bo.FlushTo(swm.binlog)
 
 	swm.mu.Lock()
 	if coll, ok := swm.cache[collection]; ok {

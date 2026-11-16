@@ -32,6 +32,7 @@ var (
 type replPosition struct {
 	LSN   uint64
 	LogID uint64 // the log LSN is a position in; 0 when the leader has no IDs
+	Term  uint64 // election term of the entry at LSN, when known; not stored
 }
 
 // stampApplied records in tx that the file holds everything through pos.

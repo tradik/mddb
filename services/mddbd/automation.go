@@ -156,15 +156,12 @@ func (am *AutomationManager) Create(rule AutomationRule) (*AutomationRule, error
 	}
 
 	key := autoKey(rule.ID)
-	if err := am.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(am.handle().Update, am.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Put("automation", key, data)
 		b := tx.Bucket(bucketAutomation)
 		return b.Put(key, data)
 	}); err != nil {
 		return nil, err
-	}
-
-	if am.binlog != nil {
-		_ = am.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "automation", Key: CopyBytes(key), Value: CopyBytes(data)})
 	}
 
 	am.mu.Lock()
@@ -223,15 +220,12 @@ func (am *AutomationManager) Update(id string, update AutomationRule) (*Automati
 	}
 
 	key := autoKey(id)
-	if err := am.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(am.handle().Update, am.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Put("automation", key, data)
 		b := tx.Bucket(bucketAutomation)
 		return b.Put(key, data)
 	}); err != nil {
 		return nil, err
-	}
-
-	if am.binlog != nil {
-		_ = am.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "automation", Key: CopyBytes(key), Value: CopyBytes(data)})
 	}
 
 	am.mu.Lock()
@@ -250,15 +244,12 @@ func (am *AutomationManager) Update(id string, update AutomationRule) (*Automati
 // Delete removes an automation rule by ID.
 func (am *AutomationManager) Delete(id string) error {
 	key := autoKey(id)
-	if err := am.handle().Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(am.handle().Update, am.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Delete("automation", key)
 		b := tx.Bucket(bucketAutomation)
 		return b.Delete(key)
 	}); err != nil {
 		return err
-	}
-
-	if am.binlog != nil {
-		_ = am.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: "automation", Key: CopyBytes(key)})
 	}
 
 	am.mu.Lock()

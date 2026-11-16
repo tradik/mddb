@@ -158,6 +158,10 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDBReplication/StreamBinlog":      ruleHandler,
 	"/mddb.MDDBReplication/ReplicationStatus": ruleHandler,
 	"/mddb.MDDBReplication/AcknowledgeLSN":    ruleHandler,
+	// Elections (GO-051), authorised the same way.
+	"/mddb.MDDBReplication/RequestVote": ruleHandler,
+	"/mddb.MDDBReplication/Heartbeat":   ruleHandler,
+	"/mddb.MDDBReplication/StepDown":    ruleHandler,
 
 	// Server reflection, for grpcurl: the schema, no data.
 	"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo":      ruleAuthenticated,

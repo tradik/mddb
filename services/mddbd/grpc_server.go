@@ -95,7 +95,7 @@ func newGRPCTransport(s *Server, opts ...grpc.ServerOption) *grpc.Server {
 	proto.RegisterMDDBServer(grpcServer, NewGRPCServer(s))
 
 	// Register replication service (available on all nodes for status queries)
-	if s.ReplicationRole == "leader" || s.ReplicationRole == "follower" {
+	if s.ReplicationRole == "leader" || s.ReplicationRole == "follower" || s.cluster != nil {
 		rs := NewReplicationServer(s)
 		s.replServer = rs
 		proto.RegisterMDDBReplicationServer(grpcServer, rs)
@@ -106,7 +106,7 @@ func newGRPCTransport(s *Server, opts ...grpc.ServerOption) *grpc.Server {
 		hasSecret := os.Getenv("MDDB_REPLICATION_SECRET") != ""
 		authOn := os.Getenv("MDDB_AUTH_ENABLED") == "true"
 		hasMTLS := s.Config.TLS.ClientCAFile != ""
-		if s.ReplicationRole == "leader" && !hasSecret && !authOn && !hasMTLS {
+		if (s.ReplicationRole == "leader" || s.cluster != nil) && !hasSecret && !authOn && !hasMTLS {
 			slog.Warn("replication leader has no auth, MDDB_REPLICATION_SECRET, or mTLS. "+
 				"Snapshot/binlog requests will be refused. Set MDDB_REPLICATION_SECRET, enable "+
 				"MDDB_AUTH_ENABLED, or configure mTLS (TLS client CA) before followers can sync.",
@@ -454,13 +454,13 @@ func (g *GRPCServer) Truncate(ctx context.Context, req *proto.TruncateRequest) (
 	}
 
 	var bo binlog.BinlogOps
-	err := g.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
+	err := g.server.DBUpdateC(req.Collection, bo.InTx(g.server.Binlog, func(tx *bolt.Tx) error {
 		return truncateCollectionRevisions(tx, &bo, req.Collection, int(req.KeepRevs))
-	})
+	}))
+	err = bo.Settle(g.server.Binlog, err)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	bo.FlushTo(g.server.Binlog)
 
 	return &proto.TruncateResponse{Status: "truncated"}, nil
 }

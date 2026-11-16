@@ -753,6 +753,15 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 | `MDDB_REPLICATION_TLS_KEY` | `""` | string | Follower: the client certificate's key (PEM) |
 | `MDDB_REPLICATION_TLS_SERVER_NAME` | `""` | string | Follower: the name the leader's certificate must carry, when it differs from the host in `MDDB_REPLICATION_LEADER_ADDR` |
 | `MDDB_REPLICATION_SECRET` | `""` | string | Shared secret for the snapshot and binlog streams; the same value on the leader and every follower. Without it, auth or mTLS, a leader refuses them ([REPLICATION.md](REPLICATION.md#securing-replication)) |
+| `MDDB_CLUSTER_PEERS` | `""` | string | Every node of a cluster, this one included: `id=host:grpcport,…`. Turns on leader election; `MDDB_REPLICATION_ROLE` then only bootstraps (`leader`) ([CLUSTER.md](CLUSTER.md), v2.19.8+) |
+| `MDDB_CLUSTER_ADVERTISE_HTTP` | `""` | string | This node's HTTP base URL, sent to clients whose write reached a node that does not lead (v2.19.8+) |
+| `MDDB_CLUSTER_AUTO_FAILOVER` | `true` | bool | Nodes stand for election on their own; forced off below three nodes, where a leader is made by promotion (v2.19.8+) |
+| `MDDB_CLUSTER_BOOTSTRAP` | `false` | bool | Lead a cluster that has never had a term at once (v2.19.8+) |
+| `MDDB_CLUSTER_HEARTBEAT` | `500ms` | duration | How often the leader reaches every node (v2.19.8+) |
+| `MDDB_CLUSTER_ELECTION_TIMEOUT` | `3s` | duration | Silence after which a node stands for election; each wait is drawn between it and twice it; at least twice the heartbeat. The leader's lease is three quarters of it (v2.19.8+) |
+| `MDDB_CLUSTER_REJECTED_DIR` | `""` | string | Where a node that rejoins saves the writes the new leader never had (default: next to the binlog) ([CLUSTER.md](CLUSTER.md#rejected-writes), v2.19.8+) |
+| `MDDB_REPLICATION_ACK` | `async` | string | `async`: a write returns once the leader committed it; `quorum`: once a majority of the cluster holds it. `quorum` needs `MDDB_CLUSTER_PEERS` (v2.19.8+) |
+| `MDDB_REPLICATION_ACK_TIMEOUT` | `5s` | duration | How long a quorum write waits for the majority before it fails (v2.19.8+) |
 | `MDDB_FREELIST_SYNC` | auto | bool | Write bbolt's freelist on every commit so opening the database reads one page instead of the whole file. On a 908 MB database: 7 ms and 37 MB RSS instead of ~400 ms and 938 MB; minutes from a cold disk on large files ([DEPLOYMENT.md](DEPLOYMENT.md#large-databases-startup-time-and-memory)). Since v2.18.2 a clean shutdown stores the freelist anyway; this setting is what protects a start after a crash. Unset (or `auto`, v2.18.2+): on for a file of `MDDB_FREELIST_SYNC_THRESHOLD` or more, decided at start; `true`/`false` force it |
 | `MDDB_FREELIST_SYNC_THRESHOLD` | `4294967296` | int | File size in bytes from which `MDDB_FREELIST_SYNC` defaults to on (v2.18.2+) |
 | `MDDB_STATS_TTL` | `300` | int | Seconds between background recounts for `/v1/stats` on a database whose count is slow (v2.18.5+) |

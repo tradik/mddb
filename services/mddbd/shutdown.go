@@ -52,6 +52,7 @@ func (s *Server) shutdownSteps() []shutdownStep {
 	//    close: it used to be stopped after them, and the entry in hand
 	//    failed with "database not open" (GO-050).
 	add("replication-client", s.replClient != nil, func() { s.replClient.Stop() })
+	add("cluster", s.cluster != nil, func() { s.cluster.stop() })
 
 	// 2. Drain the queues, so what was accepted is finished or recorded.
 	add("bulk-ingest", s.BulkIngest != nil, func() { s.BulkIngest.Stop() })

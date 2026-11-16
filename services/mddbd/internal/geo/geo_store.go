@@ -49,49 +49,41 @@ func (gs *GeoStore) EnsureBucket() error {
 func (gs *GeoStore) Put(collection, docID string, lat, lng float64) error {
 	key := buildGeoKey(collection, docID)
 	value := encodeGeoValue(lat, lng)
-	err := boltx.Update(gs.rt(), collection, func(tx *bolt.Tx) error {
+	return gs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return fmt.Errorf("geo bucket not found")
 		}
+		bo.Put("geo", key, value)
 		return b.Put(key, value)
 	})
-	if err == nil && gs.binlog != nil {
-		_ = gs.binlog.Append(&binlog.BinlogEntry{
-			Type:       binlog.BinlogPut,
-			BucketName: "geo",
-			Key:        bytes.Clone(key),
-			Value:      bytes.Clone(value),
-		})
-	}
-	return err
+}
+
+// update runs a write transaction on collection's file and records what fn
+// collects in the binlog, in commit order.
+func (gs *GeoStore) update(collection string, fn func(*bolt.Tx, *binlog.BinlogOps) error) error {
+	route := func(f func(*bolt.Tx) error) error { return boltx.Update(gs.rt(), collection, f) }
+	return binlog.Logged(route, gs.binlog, fn)
 }
 
 // Delete removes a (collection, docID) point. No-op if absent.
 func (gs *GeoStore) Delete(collection, docID string) error {
 	key := buildGeoKey(collection, docID)
-	err := boltx.Update(gs.rt(), collection, func(tx *bolt.Tx) error {
+	return gs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return nil
 		}
+		bo.Delete("geo", key)
 		return b.Delete(key)
 	})
-	if err == nil && gs.binlog != nil {
-		_ = gs.binlog.Append(&binlog.BinlogEntry{
-			Type:       binlog.BinlogDelete,
-			BucketName: "geo",
-			Key:        bytes.Clone(key),
-		})
-	}
-	return err
 }
 
 // DeleteCollection drops all geo points for a collection. Called from the
 // regular /v1/delete-collection path alongside the FTS/vector cleanup.
 func (gs *GeoStore) DeleteCollection(collection string) error {
 	prefix := buildGeoPrefix(collection)
-	return boltx.Update(gs.rt(), collection, func(tx *bolt.Tx) error {
+	return gs.update(collection, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return nil
@@ -105,13 +97,7 @@ func (gs *GeoStore) DeleteCollection(collection string) error {
 			if err := b.Delete(k); err != nil {
 				return err
 			}
-			if gs.binlog != nil {
-				_ = gs.binlog.Append(&binlog.BinlogEntry{
-					Type:       binlog.BinlogDelete,
-					BucketName: "geo",
-					Key:        bytes.Clone(k),
-				})
-			}
+			bo.Delete("geo", k)
 		}
 		return nil
 	})

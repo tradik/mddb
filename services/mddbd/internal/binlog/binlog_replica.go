@@ -14,21 +14,18 @@ func (b *Binlog) AppendReplicated(entries []*BinlogEntry) error {
 		return nil
 	}
 	b.mu.Lock()
+	defer b.mu.Unlock()
 	next := b.lsn.Load()
 	for _, entry := range entries {
 		next++
 		if entry.LSN != next {
-			b.mu.Unlock()
 			return fmt.Errorf("%w: got %d, want %d", ErrLSNGap, entry.LSN, next)
 		}
 	}
-	err := b.writeLocked(entries)
-	b.mu.Unlock()
-	if err != nil {
+	if err := b.noteTermsLocked(entries); err != nil {
 		return err
 	}
-	b.notifySubscribers(entries)
-	return nil
+	return b.writeLocked(entries, b.cfg.Sync == SyncCommit)
 }
 
 // timeRingSize is how many of the newest entries the log remembers the

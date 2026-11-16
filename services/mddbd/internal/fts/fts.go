@@ -298,11 +298,11 @@ func (f *FTSIndex) IndexWithLang(collection, docID, content, lang string) error 
 	}
 
 	var bo binlog.BinlogOps
-	err := f.update(collection, func(tx *bolt.Tx) error {
+	err := f.update(collection, bo.InTx(f.binlog, func(tx *bolt.Tx) error {
 		return f.indexTermsInTx(tx, &bo, putNow, collection, docID, terms)
-	})
+	}))
+	err = bo.Settle(f.binlog, err)
 	if err == nil {
-		bo.FlushTo(f.binlog)
 		f.InvalidatePMI(collection)
 	}
 	return err
@@ -477,7 +477,7 @@ func (f *FTSIndex) Index(collection, docID, content string) error {
 	}
 
 	var bo binlog.BinlogOps
-	err := f.update(collection, func(tx *bolt.Tx) error {
+	err := f.update(collection, bo.InTx(f.binlog, func(tx *bolt.Tx) error {
 		bFTS := tx.Bucket(bucketFTS)
 		bRev := tx.Bucket(bucketFTSRev)
 
@@ -522,9 +522,9 @@ func (f *FTSIndex) Index(collection, docID, content string) error {
 			docLength += uint32(count) // #nosec G115 -- value always positive and bounded
 		}
 		return f.IndexBM25Meta(tx, collection, docID, docLength)
-	})
+	}))
+	err = bo.Settle(f.binlog, err)
 	if err == nil {
-		bo.FlushTo(f.binlog)
 		f.InvalidatePMI(collection)
 	}
 	return err
@@ -547,18 +547,18 @@ func (f *FTSIndex) RemoveDocs(collection string, docIDs []string) error {
 	for start := 0; start < len(docIDs); start += removeBatch {
 		end := min(start+removeBatch, len(docIDs))
 		var bo binlog.BinlogOps
-		err := f.update(collection, func(tx *bolt.Tx) error {
+		err := f.update(collection, bo.InTx(f.binlog, func(tx *bolt.Tx) error {
 			for _, docID := range docIDs[start:end] {
 				if err := f.removeInTx(tx, &bo, collection, docID); err != nil {
 					return err
 				}
 			}
 			return nil
-		})
+		}))
+		err = bo.Settle(f.binlog, err)
 		if err != nil {
 			return err
 		}
-		bo.FlushTo(f.binlog)
 	}
 	if len(docIDs) > 0 {
 		f.InvalidatePMI(collection)

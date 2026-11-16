@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"bytes"
 	"fmt"
 	"mddb/internal/binlog"
 	"mddb/internal/boltx"
@@ -107,15 +106,12 @@ func (sm *SchemaManager) Set(collection, schemaJSON string) error {
 
 	key := []byte("schema|" + collection)
 	val := []byte(schemaJSON)
-	if err := sm.db.Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(sm.db.Update, sm.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Put("schemas", key, val)
 		b := tx.Bucket(bucketSchemas)
 		return b.Put(key, val)
 	}); err != nil {
 		return err
-	}
-
-	if sm.binlog != nil {
-		_ = sm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: "schemas", Key: bytes.Clone(key), Value: bytes.Clone(val)})
 	}
 
 	sm.mu.Lock()
@@ -138,15 +134,12 @@ func (sm *SchemaManager) Get(collection string) (string, bool) {
 // Delete removes the schema for a collection (disables validation).
 func (sm *SchemaManager) Delete(collection string) error {
 	key := []byte("schema|" + collection)
-	if err := sm.db.Update(func(tx *bolt.Tx) error {
+	if err := binlog.Logged(sm.db.Update, sm.binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
+		bo.Delete("schemas", key)
 		b := tx.Bucket(bucketSchemas)
 		return b.Delete(key)
 	}); err != nil {
 		return err
-	}
-
-	if sm.binlog != nil {
-		_ = sm.binlog.Append(&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: "schemas", Key: bytes.Clone(key)})
 	}
 
 	sm.mu.Lock()

@@ -5116,6 +5116,8 @@ admin on `*`, "authenticated" for any valid token or API key. See
 | GET, POST, DELETE | `/v1/mcp/keys` | global admin | [MCP.md](MCP.md#dynamic-key-management-api) |
 | POST | `/v1/mcp/keys/disable` | global admin | [MCP.md](MCP.md#dynamic-key-management-api) |
 | GET | `/v1/replication/status` | authenticated | [REPLICATION.md](REPLICATION.md#http-endpoint) |
+| POST | `/v1/replication/promote` | global admin | [CLUSTER.md](CLUSTER.md#promotion-and-demotion) |
+| POST | `/v1/replication/demote` | global admin | [CLUSTER.md](CLUSTER.md#promotion-and-demotion) |
 | POST | `/v1/spell-suggest` | `read` | [SYMSPELL.md](SYMSPELL.md#spell-suggestions) (needs `MDDB_SPELL=true`) |
 | POST | `/v1/spell-cleanup` | `read` | [SYMSPELL.md](SYMSPELL.md#apply-corrections) (needs `MDDB_SPELL=true`) |
 | GET, PUT, DELETE | `/v1/spell-dictionary` | `read` for GET, `write` otherwise | [SYMSPELL.md](SYMSPELL.md#custom-dictionary) (needs `MDDB_SPELL=true`) |

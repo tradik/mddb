@@ -64,12 +64,13 @@ func (rs *ReplicationServer) authorizeReplication(ctx context.Context) error {
 
 // replicationProtocol is the version of the replication messages this build
 // speaks (proto/mddb.proto). 0 is a release before 2.19.8, which sent none.
-const replicationProtocol = 2
+const replicationProtocol = 3
 
 // Response headers a leader opens a binlog stream with.
 const (
 	replProtocolHeader = "x-mddb-replication-protocol"
 	replLogIDHeader    = "x-mddb-log-id"
+	replTermHeader     = "x-mddb-term" // a cluster leader's term (GO-051)
 )
 
 // ReplicationServer implements the MDDBReplication gRPC service (leader-side).
@@ -91,7 +92,11 @@ func NewReplicationServer(s *Server) *ReplicationServer {
 		server:    s,
 		followers: make(map[string]*FollowerState),
 	}
-	if s.ReplicationRole == "leader" && s.Binlog != nil {
+	if s.cluster != nil {
+		// Every cluster node may lead: retention keeps what its followers
+		// need whenever it does. The position in the files is not used.
+		s.Binlog.SetRetentionFloor(rs.retentionFloor)
+	} else if s.ReplicationRole == "leader" && s.Binlog != nil {
 		s.Binlog.SetRetentionFloor(rs.retentionFloor)
 		if err := s.clearReplicationPosition(); err != nil {
 			slog.Warn("replication: could not clear this node's old follower position", "err", err)
@@ -122,14 +127,20 @@ func (rs *ReplicationServer) StreamBinlog(req *proto.StreamBinlogRequest, stream
 	if req.FollowerId == "" {
 		return status.Error(codes.InvalidArgument, "follower_id is required")
 	}
+	if c := rs.server.cluster; c != nil {
+		if err := c.checkStream(req); err != nil {
+			return err
+		}
+	}
 	if err := rs.checkFollowerPosition(req); err != nil {
 		return err
 	}
-	// The handshake's answer: which protocol and which log. A follower from
-	// before 2.19.8 does not read it.
+	// The handshake's answer: which protocol, which log and — in a cluster —
+	// which term. A follower from before 2.19.8 does not read it.
 	_ = stream.SendHeader(metadata.Pairs(
 		replProtocolHeader, fmt.Sprint(replicationProtocol),
-		replLogIDHeader, binlog.FormatLogID(bl.LogID())))
+		replLogIDHeader, binlog.FormatLogID(bl.LogID()),
+		replTermHeader, fmt.Sprint(bl.Term())))
 
 	state := rs.trackFollower(req.FollowerId, peerAddr(stream.Context()), req.FromLsn)
 	defer rs.releaseFollower(state)
@@ -193,7 +204,11 @@ func (t *binlogTail) send(entry *binlog.BinlogEntry) error {
 	if entry.LSN != t.sent+1 {
 		return errStreamGap
 	}
-	if err := t.stream.Send(entryToProto(entry)); err != nil {
+	p := entryToProto(entry)
+	if p.Term == 0 {
+		p.Term = t.log.TermAt(entry.LSN) // read back from the file, which keeps no terms
+	}
+	if err := t.stream.Send(p); err != nil {
 		return err
 	}
 	t.sent = entry.LSN
@@ -305,6 +320,9 @@ func (rs *ReplicationServer) AcknowledgeLSN(ctx context.Context, req *proto.Ackn
 		fs.LastSeenAt = time.Now().Unix()
 	}
 	rs.mu.Unlock()
+	if c := rs.server.cluster; c != nil {
+		c.acks.record(req.FollowerId, req.ConfirmedLsn)
+	}
 
 	resp := &proto.AcknowledgeLSNResponse{Ok: true}
 	if bl := rs.server.Binlog; bl != nil {
@@ -324,6 +342,7 @@ func entryToProto(e *binlog.BinlogEntry) *proto.BinlogEntryProto {
 		Key:        e.Key,
 		Value:      e.Value,
 		Checksum:   e.Checksum,
+		Term:       e.Term,
 	}
 }
 
@@ -337,5 +356,6 @@ func protoToEntry(p *proto.BinlogEntryProto) *binlog.BinlogEntry {
 		Key:        p.Key,
 		Value:      p.Value,
 		Checksum:   p.Checksum,
+		Term:       p.Term,
 	}
 }

@@ -63,15 +63,15 @@ func (s *Server) addDocumentWith(w docWrite, opts postBatchOptions) (storage.Doc
 	collection, key, lang := w.collection, w.key, w.lang
 	var res docWriteResult
 	var bo binlog.BinlogOps
-	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, bo.InTx(s.Binlog, func(tx *bolt.Tx) error {
 		var err error
 		res, err = s.putDocTx(tx, &bo, w)
 		return err
-	})
+	}))
+	err = bo.Settle(s.Binlog, err)
 	if err != nil {
 		return storage.Doc{}, false, err
 	}
-	bo.FlushTo(s.Binlog)
 	s.refreshDocReadCache(collection, key, lang, res.buf)
 	// The after-write pipeline every write path shares (GO-001, GO-048).
 	s.firePostBatchHooks(collection, []*ProcessedDoc{{DocID: res.doc.ID, Doc: res.doc, IsUpdate: !res.isNew}}, opts)

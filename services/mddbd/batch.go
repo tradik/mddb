@@ -207,7 +207,7 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 
 	var bo binlog.BinlogOps
 	// Single transaction for all documents
-	err := bp.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
+	err := bp.server.DBUpdateC(collection, bo.InTx(bp.server.Binlog, func(tx *bolt.Tx) error {
 		if err := bp.server.checkWriteQuota(tx, collection, docQuotaWrites(collection, processed)); err != nil {
 			return err
 		}
@@ -228,7 +228,8 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 			committed = append(committed, p)
 		}
 		return nil
-	})
+	}))
+	err = bo.Settle(bp.server.Binlog, err)
 
 	if qe := wholeBatchRefusal(err); qe != nil { // GO-043, AGT-005
 		return nil, nil, qe
@@ -239,7 +240,6 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 		// The transaction rolled back — nothing was actually committed.
 		return resp, nil, nil
 	}
-	bo.FlushTo(bp.server.Binlog)
 
 	return resp, committed, nil
 }

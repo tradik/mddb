@@ -24,10 +24,12 @@ import (
 //
 // The files are read one after another, each in its own read transaction,
 // while writes go on. That is sound because the snapshot's LSN is taken
-// first: a commit reaches the database before its entry reaches the binlog,
-// so every file read afterwards holds at least everything through that LSN,
-// and the follower replays the log from it. Entries a file already contains
-// are applied again and leave it as the leader has it.
+// first, and it is the log's stable LSN — every entry through it belongs to
+// a transaction that has returned (GO-051: entries are appended inside their
+// transaction, just before it commits) — so every file read afterwards holds
+// at least everything through that LSN, and the follower replays the log
+// from it. Entries a file already contains are applied again and leave it as
+// the leader has it.
 
 const snapshotChunkSize = 1024 * 1024 // 1MB
 
@@ -76,7 +78,9 @@ func (rs *ReplicationServer) RequestSnapshot(req *proto.SnapshotRequest, stream 
 	slog.Info("Replication follower requested snapshot", "followerID", req.FollowerId)
 
 	// The position first, the files after (see above).
-	out := &snapshotSender{stream: stream, logID: rs.server.Binlog.LogID(), lsn: rs.server.Binlog.CurrentLSN()}
+	bl := rs.server.Binlog
+	out := &snapshotSender{stream: stream, logID: bl.LogID(), lsn: bl.StableLSN()}
+	out.term = bl.TermAt(out.lsn)
 	if err := rs.sendSnapshotFiles(out); err != nil {
 		slog.Warn("Replication snapshot failed", "followerID", req.FollowerId, "err", err)
 		return status.Error(codes.Internal, err.Error())
@@ -115,6 +119,7 @@ type snapshotSender struct {
 	stream proto.MDDBReplication_RequestSnapshotServer
 	lsn    uint64
 	logID  uint64
+	term   uint64 // of the entry at lsn (GO-051)
 	files  int
 
 	// The file being sent.
@@ -149,6 +154,7 @@ func (o *snapshotSender) Write(p []byte) (int, error) {
 		TotalSize:   o.size,
 		SnapshotLsn: o.lsn,
 		LogId:       o.logID,
+		Term:        o.term,
 		File:        o.name,
 	})
 	if err != nil {
@@ -161,5 +167,5 @@ func (o *snapshotSender) Write(p []byte) (int, error) {
 // finish sends the chunk that says the snapshot is complete. A follower that
 // reaches the end of the stream without it has part of a snapshot.
 func (o *snapshotSender) finish() error {
-	return o.stream.Send(&proto.SnapshotChunk{IsLast: true, SnapshotLsn: o.lsn, LogId: o.logID})
+	return o.stream.Send(&proto.SnapshotChunk{IsLast: true, SnapshotLsn: o.lsn, LogId: o.logID, Term: o.term})
 }

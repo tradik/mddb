@@ -115,7 +115,11 @@ func (rc *ReplicationClient) applyEntries(batch []*binlog.BinlogEntry) error {
 		rc.needSnapshot.Store(true)
 		return fmt.Errorf("replication stopped, resynchronising from a snapshot: %w", err)
 	}
-	rc.appendLog(batch)
+	if err := rc.appendLog(batch); err != nil {
+		rc.needSnapshot.Store(true)
+		return fmt.Errorf("replication stopped, resynchronising from a snapshot: %w", err)
+	}
+	rc.ackSoon()
 	rc.connected.Store(true)
 	rc.lastAppliedAt.Store(time.Now().Unix())
 	return nil
