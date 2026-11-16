@@ -96,6 +96,19 @@ func readMap(b *bolt.Bucket) (*placementTable, error) {
 // edits a copy of the stored one, and reports false when nothing is to be
 // written. The new map is adopted at once.
 func (p *placementRuntime) changeMap(change func(*placementTable) (bool, error)) (*placementTable, error) {
+	p.mapMu.Lock()
+	defer p.mapMu.Unlock()
+	next, err := p.writeMap(change)
+	if err != nil {
+		return nil, err
+	}
+	p.adopt(next)
+	return next, nil
+}
+
+// writeMap is changeMap without adopting the new map: a move's switch hands
+// it to the target first (placement_move.go). The caller holds mapMu.
+func (p *placementRuntime) writeMap(change func(*placementTable) (bool, error)) (*placementTable, error) {
 	var next *placementTable
 	err := binlog.Logged(p.s.DBUpdate, p.s.Binlog, func(tx *bolt.Tx, bo *binlog.BinlogOps) error {
 		b, err := tx.CreateBucketIfNotExists(bucketPlacement)
@@ -123,6 +136,5 @@ func (p *placementRuntime) changeMap(change func(*placementTable) (bool, error))
 	if err != nil {
 		return nil, err
 	}
-	p.adopt(next)
 	return next, nil
 }

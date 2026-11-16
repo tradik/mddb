@@ -29,6 +29,7 @@ type scriptedLeader struct {
 	importer func(stream proto.MDDBReplication_ImportCollectionServer) error
 	fenceErr error
 	through  uint64
+	pushErr  error
 }
 
 func (l *scriptedLeader) ReplicationStatus(context.Context, *proto.ReplicationStatusRequest) (*proto.ReplicationStatusResponse, error) {
@@ -54,7 +55,7 @@ func (l *scriptedLeader) FenceCollection(context.Context, *proto.FenceCollection
 }
 
 func (l *scriptedLeader) PushPlacement(context.Context, *proto.PlacementMap) (*proto.PushPlacementResponse, error) {
-	return &proto.PushPlacementResponse{}, nil
+	return &proto.PushPlacementResponse{}, l.pushErr
 }
 
 // serveScripted starts l and returns its group of one node.
@@ -232,4 +233,26 @@ func TestPlacementMetaDutiesSealAndGiveUpOrphans(t *testing.T) {
 	}
 	g2.table.Store(&placementTable{Entries: map[string]placementEntry{}})
 	g2.pinLocal()
+}
+
+func TestPlacementSwitchWaitsForTheTargetOnlySoLong(t *testing.T) {
+	p := moveRig(t, &scriptedLeader{id: "s"}, &scriptedLeader{id: "d", pushErr: errors.New("busy")})
+	p.cfg.fenceTimeout = 30 * time.Millisecond
+	if err := p.switchTo(moveStatus{Collection: "c", From: "src", To: "dst"}); err != nil {
+		t.Fatal(err)
+	}
+	if g, _ := p.owner("c"); g != "dst" {
+		t.Fatalf("after a switch the target could not be told of: %s", g)
+	}
+}
+
+func TestPlacementAwaitLeaseGivesUp(t *testing.T) {
+	_, _, follower := groupsOfTwo(t)
+	p := unitRuntime(follower, nil, nil)
+	p.cfg.fenceTimeout = 20 * time.Millisecond
+	began := time.Now()
+	p.awaitLease(context.Background())
+	if time.Since(began) < 20*time.Millisecond {
+		t.Fatal("a node without a lease did not wait for one")
+	}
 }

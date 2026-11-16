@@ -127,13 +127,40 @@ func (p *placementRuntime) copyAndSwitch(ctx context.Context, m *move) error {
 	if err := w.wait(func(pr importState) bool { return pr.applied >= through }, catchUpTimeout); err != nil {
 		return err
 	}
-	if _, err := p.changeMap(func(t *placementTable) (bool, error) {
-		t.Entries[st.Collection] = placementEntry{Group: st.To}
-		return true, nil
-	}); err != nil {
+	if err := p.switchTo(st); err != nil {
 		return err
 	}
-	p.pushMap(st.To, st.From)
+	p.pushMap(st.From)
+	return nil
+}
+
+// switchTo names the target in the map. The target takes the new map
+// before anyone else: this node's held writes, and every node's fetch, see
+// it only after, so none is sent to a target that does not know yet.
+func (p *placementRuntime) switchTo(st moveStatus) error {
+	p.mapMu.Lock()
+	defer p.mapMu.Unlock()
+	next, err := p.writeMap(func(t *placementTable) (bool, error) {
+		t.Entries[st.Collection] = placementEntry{Group: st.To}
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+	// Until the target has it: a target that cannot be told now learns it
+	// within a refresh, and a request this node sends there meanwhile may
+	// come back once.
+	m := next.toProto(p.s.NodeID)
+	deadline := time.Now().Add(p.cfg.fenceTimeout)
+	for {
+		err := p.pushTo(st.To, m)
+		if err == nil || !time.Now().Before(deadline) {
+			break
+		}
+		p.leaders.forget(st.To)
+		time.Sleep(p.cfg.refresh / 4)
+	}
+	p.adopt(next)
 	return nil
 }
 
@@ -208,19 +235,30 @@ func (p *placementRuntime) abandonMove(c string) {
 // pushMap hands the current map to the leaders of groups, in order; the
 // other nodes fetch it within a refresh.
 func (p *placementRuntime) pushMap(groups ...string) {
-	m := p.current().toProto(p.s.NodeID)
+	p.pushTable(p.current(), groups...)
+}
+
+// pushTable hands t to the leaders of groups, in order; a group that
+// cannot be reached learns it within a refresh.
+func (p *placementRuntime) pushTable(t *placementTable, groups ...string) {
+	m := t.toProto(p.s.NodeID)
 	for _, g := range groups {
-		if g == p.cfg.self || g == "" {
-			continue
+		if g != p.cfg.self && g != "" {
+			_ = p.pushTo(g, m)
 		}
-		c, err := p.leaderClient(g)
-		if err != nil {
-			continue
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
-		_, _ = c.PushPlacement(withReplicationSecret(ctx), m)
-		cancel()
 	}
+}
+
+// pushTo hands m to group's leader.
+func (p *placementRuntime) pushTo(group string, m *proto.PlacementMap) error {
+	c, err := p.leaderClient(group)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
+	defer cancel()
+	_, err = c.PushPlacement(withReplicationSecret(ctx), m)
+	return err
 }
 
 // importState is an import's last reported progress.

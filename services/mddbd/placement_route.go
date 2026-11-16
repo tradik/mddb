@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Routing REST requests across groups (GO-052). Every route is registered
@@ -146,14 +148,34 @@ func (p *placementRuntime) serveInGroup(w http.ResponseWriter, r *http.Request, 
 }
 
 // toLeader serves the request here when this node leads group, and sends
-// it to group's leader otherwise. With no known leader of its own group it
-// is served here too, where the write guards answer as without placement.
+// it to group's leader otherwise. A node that leads its group but has
+// briefly lost its lease — a heartbeat late under load — waits for it, up
+// to the fence timeout, rather than sending the request to itself. With no
+// known leader of its own group the request is served here too, where the
+// write guards answer as without placement.
 func (p *placementRuntime) toLeader(w http.ResponseWriter, r *http.Request, group string, next http.Handler) {
-	if group == p.cfg.self && (p.leads() || p.leaderOf(group) == "") {
-		next.ServeHTTP(w, r)
-		return
+	if group == p.cfg.self {
+		leader := p.leaderOf(group)
+		if leader == p.s.NodeID {
+			p.awaitLease(r.Context())
+		}
+		if leader == "" || leader == p.s.NodeID || p.leads() {
+			next.ServeHTTP(w, r)
+			return
+		}
 	}
 	p.forward(w, r, group)
+}
+
+// leaseWait is how often awaitLease looks again.
+const leaseWait = 5 * time.Millisecond
+
+// awaitLease waits until this node may write, at most the fence timeout.
+func (p *placementRuntime) awaitLease(ctx context.Context) {
+	deadline := time.Now().Add(p.cfg.fenceTimeout)
+	for !p.leads() && time.Now().Before(deadline) && ctx.Err() == nil {
+		time.Sleep(leaseWait)
+	}
 }
 
 // resolveNames is names without empties and duplicates, aliases resolved.

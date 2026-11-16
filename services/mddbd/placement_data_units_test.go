@@ -336,9 +336,14 @@ func TestPlacementDropFailuresAndCaches(t *testing.T) {
 		{Type: binlog.BinlogPut, BucketName: "schemas", Key: []byte("schema|" + c), Value: []byte("{}")}}); err != nil {
 		t.Fatal(err)
 	}
-	waitE2E(t, "the follower to hold the collection", func() bool {
+	waitE2E(t, "the follower to hold the collection and its settings", func() bool {
 		_, n := follower.s.collectionChecksum(c)
-		return n == 1
+		settings := 0
+		_ = scanBuckets(follower.s.DB, settingsBucketNames(), ownedBy(c), func(string, []byte, []byte) error {
+			settings++
+			return nil
+		})
+		return n == 1 && settings == 1
 	})
 	// A follower's log takes no write: the drop fails, file first.
 	if err := follower.s.placement.dropCopy(c); err == nil {

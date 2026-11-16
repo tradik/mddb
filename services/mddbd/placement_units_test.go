@@ -135,6 +135,13 @@ func TestPlacementInitRefusesAConfigurationNotMatchingTheCluster(t *testing.T) {
 		t.Fatalf("mismatch: %v", err)
 	}
 	(&placementRuntime{}).shutdown() // never started: nothing to stop
+	// The server's shutdown stops the placement loop before the cluster.
+	idle := &Server{placement: &placementRuntime{}}
+	for _, step := range idle.shutdownSteps() {
+		if step.name == "placement" {
+			step.fn()
+		}
+	}
 	if got := n.s.placement.knownLeaderHTTP("meta"); got != n.http.URL {
 		t.Fatalf("own leader: %q", got)
 	}

@@ -60,7 +60,9 @@ func (p *placementRuntime) step(seen map[string]time.Time, round int) {
 // node asks the meta leader.
 func (p *placementRuntime) refreshMap() {
 	if p.leadsMeta() {
+		p.mapMu.Lock()
 		p.adopt(p.storedMap())
+		p.mapMu.Unlock()
 		return
 	}
 	c, err := p.leaderClient(p.cfg.meta)

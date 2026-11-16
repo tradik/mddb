@@ -39,6 +39,9 @@ type placementRuntime struct {
 	ring  *ConsistentHash
 	table atomic.Pointer[placementTable]
 
+	// mapMu orders the meta leader's map writes with what it adopts: a
+	// move's switch reaches the target before this node takes it.
+	mapMu     sync.Mutex
 	changedMu sync.Mutex    // serialises adopting maps
 	changed   chan struct{} // closed and replaced when a newer map is adopted
 
