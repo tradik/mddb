@@ -22,8 +22,12 @@ name: Benchmark profile
 #     A growth under 0.25 ms never counts (scheduling, not a regression), and
 #     a raw p95 more than 3× the baseline's — scaled by how much slower this
 #     runner calibrates — fails whatever the shares say.
+#     Two runs of the same build on one busy machine differed by up to 30%
+#     on single p95s, so a gate that fails on p95 alone (exit status 3)
+#     measures the search scenarios once more and fails only if they fail
+#     again: about 15 more minutes, spent only when it matters.
 #   - no write acknowledged before kill -9 may be missing after the restart,
-#     and the follower must reach the leader's checksum after its downtime.
+#     and a follower that reached the leader in the baseline must reach it.
 
 permissions:
   contents: read
@@ -85,11 +89,31 @@ jobs:
           echo "file=${file}" >> "$GITHUB_OUTPUT"
           echo "baseline: ${file:-none}"
 
-      - name: Run the profile
+      - name: Build the server and the harness
         run: |
-          make bench-profile PROFILE="${PROFILE}" BENCH_OUT=bench-run/result.json \
-            BENCH_WORK_DIR="${RUNNER_TEMP}/bench-profile" \
-            BENCH_BASELINE="${{ steps.baseline.outputs.file }}" BENCH_ARGS=-keep
+          mkdir -p "${RUNNER_TEMP}/bench-profile" bench-run
+          (cd services/mddbd && go build -trimpath -o "${RUNNER_TEMP}/bench-profile/mddbd" .)
+          (cd tools/bench && go build -o "${RUNNER_TEMP}/bench-profile/profile" ./profile)
+
+      - name: Run the profile
+        env:
+          BASELINE: ${{ steps.baseline.outputs.file }}
+        run: |
+          set +e
+          run() {
+            "${RUNNER_TEMP}/bench-profile/profile" -profile "${PROFILE}" \
+              -mddbd "${RUNNER_TEMP}/bench-profile/mddbd" -work-dir "${RUNNER_TEMP}/bench-profile" \
+              -commit "$(git rev-parse --short=8 HEAD)" -keep \
+              ${BASELINE:+-baseline "${BASELINE}"} "$@"
+          }
+          run -out bench-run/result.json
+          rc=$?
+          if [ "${rc}" -eq 3 ]; then
+            echo "::warning::only p95 limits failed; measuring the search scenarios again before failing"
+            run -only search -out bench-run/confirm.json
+            rc=$?
+          fi
+          exit "${rc}"
 
       - name: Upload the result
         if: always()

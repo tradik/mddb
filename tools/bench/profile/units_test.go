@@ -94,6 +94,10 @@ func TestExecuteFromFiles(t *testing.T) {
 	if err := execute(config{In: in}, &out, io.Discard); err != nil {
 		t.Error(err)
 	}
+	// -out over the baseline still compares with the baseline as it was.
+	if err := execute(config{In: bad, Out: in, Baseline: in, Limits: defaultThresholds}, &out, io.Discard); err == nil {
+		t.Error("a run written over its baseline compared with itself")
+	}
 	if err := execute(config{SyncDocs: filepath.Join(dir, "absent.md"), Results: dir}, &out, io.Discard); err == nil {
 		t.Error("sync of an absent document")
 	}

@@ -158,7 +158,11 @@ changes to the vector indexes, the search paths, the binlog, replication or
 the harness) runs the small profile and fails on a recall@10 drop of more
 than 0.02, a p95 growth of more than 15% (compared as each scenario's share
 of the run's geometric-mean p95, so a slower runner does not fail it), a lost
-acknowledged write, or a follower that does not catch up.
+acknowledged write, or a follower that caught up in the baseline and no
+longer does. p95 is noisy on a shared machine — two runs of the same build
+here differed by up to 30% on single scenarios, recall by 0.003 — so a gate
+that fails on p95 alone measures the search scenarios again and fails only
+if they fail twice.
 
 ### 2.19.7, small profile
 

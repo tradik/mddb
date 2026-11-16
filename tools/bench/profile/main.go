@@ -68,8 +68,23 @@ func main() {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "profile:", err)
-		exit(1)
+		exit(exitCode(err))
 	}
+}
+
+// errLatencyOnly marks a gate whose every failure is a p95 limit. The run
+// exits with exitLatencyOnly for it, so CI can measure once more before it
+// blames the change for what may be a noisy shared runner.
+var errLatencyOnly = errors.New("latency only")
+
+const exitLatencyOnly = 3
+
+// exitCode is the process exit status for err.
+func exitCode(err error) int {
+	if errors.Is(err, errLatencyOnly) {
+		return exitLatencyOnly
+	}
+	return 1
 }
 
 // exit is os.Exit, swapped in tests.
@@ -121,8 +136,17 @@ func execute(cfg config, out, log io.Writer) error {
 	if cfg.SyncDocs != "" {
 		return syncDocs(cfg.SyncDocs, cfg.Results)
 	}
-	var res *Result
+	// The baseline is read first: a missing one fails before a long run, and
+	// -out naming the baseline's own file cannot turn the gate into a
+	// comparison of the run with itself.
+	var base *Result
 	var err error
+	if cfg.Baseline != "" {
+		if base, err = readResult(cfg.Baseline); err != nil {
+			return err
+		}
+	}
+	var res *Result
 	if cfg.In != "" {
 		res, err = readResult(cfg.In)
 	} else {
@@ -140,12 +164,8 @@ func execute(cfg config, out, log io.Writer) error {
 	if cfg.Markdown {
 		_, _ = fmt.Fprint(out, render(res))
 	}
-	if cfg.Baseline == "" {
+	if base == nil {
 		return nil
-	}
-	base, err := readResult(cfg.Baseline)
-	if err != nil {
-		return err
 	}
 	return gate(compare(base, res, cfg.Limits), cfg.Baseline, out)
 }
@@ -158,6 +178,9 @@ func gate(c comparison, baseline string, out io.Writer) error {
 	}
 	for _, f := range c.Failures {
 		_, _ = fmt.Fprintln(out, "  FAIL:", f)
+	}
+	if len(c.Failures) > 0 && c.Latency == len(c.Failures) {
+		return fmt.Errorf("%d p95 regression(s) against the baseline: %w", len(c.Failures), errLatencyOnly)
 	}
 	if len(c.Failures) > 0 {
 		return fmt.Errorf("%d regression(s) against the baseline", len(c.Failures))

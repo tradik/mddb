@@ -40,7 +40,10 @@ var defaultThresholds = thresholds{P95Regression: 0.15, RecallDrop: 0.02, MinDel
 type comparison struct {
 	Mode     string   // "raw p95" or "p95 share of the run"
 	Failures []string // empty = pass
-	Notes    []string // differences that do not fail the gate
+	// Latency counts the failures that are p95 limits: when it is all of
+	// them, a second measurement can tell a regression from a noisy runner.
+	Latency int
+	Notes   []string // differences that do not fail the gate
 }
 
 // sameMachine reports whether two results were measured on the same kind of
@@ -116,6 +119,7 @@ func (c *comparison) compareSearch(base, cur *Result, t thresholds, raw bool) {
 		}
 		// expected is the baseline p95 carried to this run's speed.
 		expected := b.P95 / baseMean * curMean
+		failures := len(c.Failures)
 		switch {
 		case m.P95 > expected*(1+t.P95Regression) && m.P95-expected > t.MinDeltaMs:
 			c.Failures = append(c.Failures, fmt.Sprintf("%s: p95 %.3f ms, expected at most %.3f ms (baseline %.3f ms, +%.0f%% allowed, %s)",
@@ -126,6 +130,7 @@ func (c *comparison) compareSearch(base, cur *Result, t thresholds, raw bool) {
 		case m.P95 < expected*(1-t.P95Regression) && expected-m.P95 > t.MinDeltaMs:
 			c.Notes = append(c.Notes, fmt.Sprintf("%s: p95 %.3f ms, faster than the %.3f ms expected", b.Name, m.P95, expected))
 		}
+		c.Latency += len(c.Failures) - failures
 	}
 }
 

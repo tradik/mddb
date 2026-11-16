@@ -32,7 +32,7 @@ func TestCompareSameMachineRaw(t *testing.T) {
 	}
 	slow := result("cpu", 10, map[string]float64{"a": 1, "b": 2, "c": 4.8, "d": 8}, map[string]float64{"a": 0.92})
 	c := compare(base, slow, defaultThresholds)
-	if len(c.Failures) != 2 || !strings.Contains(c.Failures[0], "recall@10") || !strings.Contains(c.Failures[1], "c: p95") {
+	if c.Latency != 1 || len(c.Failures) != 2 || !strings.Contains(c.Failures[0], "recall@10") || !strings.Contains(c.Failures[1], "c: p95") {
 		t.Errorf("a 20%% slower scenario and a 0.03 recall loss: %+v", c.Failures)
 	}
 	fast := result("cpu", 10, map[string]float64{"a": 1, "b": 2, "c": 2, "d": 8}, nil)
@@ -122,7 +122,14 @@ func TestGate(t *testing.T) {
 		t.Errorf("%v\n%s", err, out.String())
 	}
 	out.Reset()
-	if err := gate(comparison{Failures: []string{"f"}}, "b.json", &out); err == nil || !strings.Contains(out.String(), "FAIL: f") {
+	err := gate(comparison{Failures: []string{"f"}}, "b.json", &out)
+	if err == nil || !strings.Contains(out.String(), "FAIL: f") || exitCode(err) != 1 {
 		t.Errorf("%v\n%s", err, out.String())
+	}
+	if err := gate(comparison{Failures: []string{"p95"}, Latency: 1}, "b.json", &out); exitCode(err) != exitLatencyOnly {
+		t.Errorf("a latency-only failure: %v", err)
+	}
+	if err := gate(comparison{Failures: []string{"p95", "recall"}, Latency: 1}, "b.json", &out); exitCode(err) != 1 {
+		t.Errorf("latency and recall: %v", err)
 	}
 }
