@@ -62,7 +62,7 @@ func TestScanFromSkipsWhatTheFollowerHas(t *testing.T) {
 func TestScanFromReportsATrimmedLogUpFront(t *testing.T) {
 	bl := newScanLog(t, 10)
 	bl.mu.Lock()
-	bl.oldestLSN = 5
+	bl.baseLSN = 4
 	bl.mu.Unlock()
 	called := false
 	err := bl.ScanFrom(2, func(*BinlogEntry) error { called = true; return nil })
@@ -131,6 +131,7 @@ func TestReopeningAfterATornAppendKeepsTheLogUsable(t *testing.T) {
 	for _, cut := range []int{3, 12, 25} { // inside the LSN, the header, the body
 		t.Run("", func(t *testing.T) {
 			_ = os.Remove(filepath.Join(dir, "mddb.binlog"))
+			_ = os.Remove(filepath.Join(dir, "mddb.binlog.meta"))
 			bl, err := NewBinlog(db, BinlogConfig{})
 			if err != nil {
 				t.Fatal(err)

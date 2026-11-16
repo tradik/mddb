@@ -2,9 +2,8 @@ package binlog
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -14,20 +13,34 @@ import (
 
 // Binlog implements a binary replication log for leader-follower replication.
 // The leader appends all BoltDB mutations (Put/Delete per bucket) to the binlog.
-// Followers stream entries from a given LSN to replicate state.
+// Followers stream entries from a given LSN to replicate state, and keep the
+// entries they apply in a log of their own under the leader's LSNs.
+//
+// Entries in the file are consecutive: the first one is baseLSN+1 and the last
+// one is the current LSN. What the file cannot say about itself — which log it
+// is, where an empty one continues, whether it was closed cleanly — is in the
+// sidecar next to it (binlog_meta.go).
 type Binlog struct {
 	mu     sync.Mutex
 	file   *os.File
 	writer *bufio.Writer
 	path   string
+	cfg    BinlogConfig
 
-	lsn       atomic.Uint64
-	oldestLSN uint64 // oldest LSN still in the file
-	fileSize  int64
+	lsn      atomic.Uint64
+	baseLSN  uint64 // LSN of the entry before the first one in the file
+	firstTS  int64  // timestamp of the oldest entry in the file, 0 when unknown
+	fileSize int64
+	logID    uint64
+	failed   error // first write error; the log accepts nothing after it
+	closed   bool
+	spoiled  bool // an append arrived after Close and took the clean mark back
+	recent   timeRing
 
-	// Retention
-	maxSize int64         // max binlog file size (default 256MB)
-	maxAge  time.Duration // max retention (default 24h)
+	// scanMu keeps the file from being rewritten under a reader: scans hold
+	// it shared, retention takes it exclusively or leaves the file alone.
+	scanMu sync.RWMutex
+	floor  atomic.Pointer[RetentionFloorFunc]
 
 	// Real-time subscribers (followers tailing the log)
 	subscribers map[string]chan *BinlogEntry
@@ -39,20 +52,76 @@ type Binlog struct {
 	closeOnce sync.Once
 }
 
+// SyncMode is when an appended entry reaches the disk.
+type SyncMode string
+
+const (
+	// SyncInterval returns from an append once the entry is buffered and
+	// syncs in the background, about every 100 ms. A crash can lose the
+	// entries of that window; the next start notices and starts a new log.
+	SyncInterval SyncMode = "interval"
+	// SyncCommit syncs before an append returns.
+	SyncCommit SyncMode = "commit"
+)
+
 // BinlogConfig holds configuration for the binlog
 type BinlogConfig struct {
 	Path    string        // file path (default: alongside DB file)
-	MaxSize int64         // max segment size in bytes (default: 256MB)
-	MaxAge  time.Duration // max retention time (default: 24h)
+	MaxSize int64         // size retention trims the file at (default: 256MB)
+	MaxAge  time.Duration // age retention drops entries at (default: 24h)
+	// HardMaxSize is the size entries a follower has not confirmed are kept
+	// up to (default: 4 × MaxSize). Past it they are dropped and that
+	// follower takes a snapshot.
+	HardMaxSize int64
+	Sync        SyncMode // default: SyncInterval
+	// Replica marks a follower's copy of the leader's log: its entries keep
+	// the leader's LSNs, and an unclean stop does not start a new log — the
+	// follower reconciles it with what it applied (Rebase).
+	Replica bool
+	// RetentionInterval is how often retention runs (default: 1 minute;
+	// negative: only when EnforceRetention is called).
+	RetentionInterval time.Duration
 }
 
 const (
-	defaultBinlogMaxSize = 256 * 1024 * 1024 // 256MB
-	defaultBinlogMaxAge  = 24 * time.Hour
-	binlogBufferSize     = 256 * 1024 // 256KB write buffer
-	binlogSubscriberCap  = 4096       // channel buffer for subscribers
-	binlogFlushInterval  = 100 * time.Millisecond
+	defaultBinlogMaxSize     = 256 * 1024 * 1024 // 256MB
+	defaultBinlogMaxAge      = 24 * time.Hour
+	defaultRetentionInterval = time.Minute
+	hardMaxFactor            = 4
+	binlogBufferSize         = 256 * 1024 // 256KB write buffer
+	binlogSubscriberCap      = 4096       // channel buffer for subscribers
+	binlogFlushInterval      = 100 * time.Millisecond
 )
+
+// Errors of the append path.
+var (
+	// ErrBinlogLSNTooOld is returned when the requested LSN is no longer in the binlog
+	ErrBinlogLSNTooOld = errors.New("requested LSN is older than the binlog's oldest entry; full snapshot required")
+	// ErrBinlogClosed is returned by an append after Close.
+	ErrBinlogClosed = errors.New("binlog is closed")
+	// ErrLSNGap is returned when a replicated entry does not continue the log.
+	ErrLSNGap = errors.New("replicated entry does not follow the log's last LSN")
+)
+
+// withDefaults fills in what the caller left unset.
+func (cfg BinlogConfig) withDefaults() BinlogConfig {
+	if cfg.MaxSize <= 0 {
+		cfg.MaxSize = defaultBinlogMaxSize
+	}
+	if cfg.MaxAge <= 0 {
+		cfg.MaxAge = defaultBinlogMaxAge
+	}
+	if cfg.HardMaxSize < cfg.MaxSize {
+		cfg.HardMaxSize = cfg.MaxSize * hardMaxFactor
+	}
+	if cfg.Sync != SyncCommit {
+		cfg.Sync = SyncInterval
+	}
+	if cfg.RetentionInterval == 0 {
+		cfg.RetentionInterval = defaultRetentionInterval
+	}
+	return cfg
+}
 
 // NewBinlog creates a new binlog at the given path.
 // If dbPath is provided and config.Path is empty, the binlog is placed alongside the DB file.
@@ -68,136 +137,31 @@ func NewBinlog(dbPath string, cfg BinlogConfig) (*Binlog, error) {
 		return nil, fmt.Errorf("failed to open binlog: %w", err)
 	}
 
-	stat, err := file.Stat()
-	if err != nil {
-		_ = file.Close()
-		return nil, fmt.Errorf("failed to stat binlog: %w", err)
-	}
-
-	maxSize := cfg.MaxSize
-	if maxSize <= 0 {
-		maxSize = defaultBinlogMaxSize
-	}
-	maxAge := cfg.MaxAge
-	if maxAge <= 0 {
-		maxAge = defaultBinlogMaxAge
-	}
-
 	b := &Binlog{
 		file:        file,
 		writer:      bufio.NewWriterSize(file, binlogBufferSize),
 		path:        binlogPath,
-		fileSize:    stat.Size(),
-		maxSize:     maxSize,
-		maxAge:      maxAge,
+		cfg:         cfg.withDefaults(),
 		subscribers: make(map[string]chan *BinlogEntry),
 		flusher:     make(chan struct{}, 1),
 		done:        make(chan struct{}),
 	}
-
-	// Recover LSN from existing data
-	if stat.Size() > 0 {
-		if err := b.recoverLSN(); err != nil {
-			_ = file.Close()
-			return nil, fmt.Errorf("failed to recover binlog LSN: %w", err)
-		}
-	} else {
-		b.oldestLSN = 0
+	if err := b.openLog(); err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("failed to recover binlog: %w", err)
 	}
 
-	// Start periodic flusher
 	go b.periodicFlusher()
-
+	if b.cfg.RetentionInterval > 0 {
+		go b.retentionLoop()
+	}
 	return b, nil
-}
-
-// recoverLSN scans the binlog file to find the oldest and latest LSN
-func (b *Binlog) recoverLSN() error {
-	if _, err := b.file.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-
-	// Entries are read with the same decoder ScanFrom uses, so a torn or
-	// corrupt tail is recognised the same way: the end of what can be trusted.
-	// It used to be fatal — a crash in the middle of an append left a file the
-	// server refused to start with — or, when the tear fell inside the first
-	// eight bytes, was kept: the file is opened for appending, so every later
-	// entry landed after bytes no reader could get past, and followers stopped
-	// receiving anything written after the crash.
-	reader := bufio.NewReaderSize(b.file, binlogBufferSize)
-	var firstLSN, lastLSN uint64
-	var good int64
-	for {
-		entry, n, err := readEntry(reader)
-		if err != nil {
-			break
-		}
-		if firstLSN == 0 {
-			firstLSN = entry.LSN
-		}
-		lastLSN = entry.LSN
-		good += int64(n)
-	}
-
-	if good < b.fileSize {
-		slog.Warn("binlog ends in an incomplete entry, most likely a write cut short by a crash; dropping it",
-			"path", b.path, "keptBytes", good, "droppedBytes", b.fileSize-good, "lastLSN", lastLSN)
-		// Through the path, not b.file: on Windows a file opened with
-		// O_APPEND has append access only, and truncating through it is
-		// refused. The second handle shares the file, as Go opens it.
-		if err := os.Truncate(b.path, good); err != nil {
-			return fmt.Errorf("truncating the incomplete tail: %w", err)
-		}
-		b.fileSize = good
-	}
-
-	b.oldestLSN = firstLSN
-	b.lsn.Store(lastLSN)
-
-	// Seek back to end for appending
-	if _, err := b.file.Seek(0, io.SeekEnd); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Append writes a new entry to the binlog. The LSN is assigned automatically.
 // This should be called AFTER a successful BoltDB commit.
 func (b *Binlog) Append(entry *BinlogEntry) error {
-	b.mu.Lock()
-
-	// Assign LSN
-	newLSN := b.lsn.Add(1)
-	entry.LSN = newLSN
-	entry.Timestamp = time.Now().UnixNano()
-
-	// Serialize
-	data := MarshalBinlogEntry(entry)
-
-	// Write to buffer
-	n, err := b.writer.Write(data)
-	if err != nil {
-		b.mu.Unlock()
-		return fmt.Errorf("failed to write binlog entry: %w", err)
-	}
-	b.fileSize += int64(n)
-
-	if b.oldestLSN == 0 {
-		b.oldestLSN = newLSN
-	}
-
-	// Trigger async flush
-	select {
-	case b.flusher <- struct{}{}:
-	default:
-	}
-
-	b.mu.Unlock()
-
-	// Notify subscribers (outside lock)
-	b.notifySubscribers(entry)
-
-	return nil
+	return b.AppendBatch([]*BinlogEntry{entry})
 }
 
 // AppendBatch writes multiple entries in a single lock acquisition.
@@ -206,42 +170,72 @@ func (b *Binlog) AppendBatch(entries []*BinlogEntry) error {
 	if len(entries) == 0 {
 		return nil
 	}
+	now := time.Now().UnixNano()
 
 	b.mu.Lock()
-
-	now := time.Now().UnixNano()
+	next := b.lsn.Load()
 	for _, entry := range entries {
-		newLSN := b.lsn.Add(1)
-		entry.LSN = newLSN
+		next++
+		entry.LSN = next
 		entry.Timestamp = now
-
-		data := MarshalBinlogEntry(entry)
-		n, err := b.writer.Write(data)
-		if err != nil {
-			b.mu.Unlock()
-			return fmt.Errorf("failed to write binlog batch entry: %w", err)
-		}
-		b.fileSize += int64(n)
-
-		if b.oldestLSN == 0 {
-			b.oldestLSN = newLSN
-		}
+	}
+	err := b.writeLocked(entries)
+	b.mu.Unlock()
+	if err != nil {
+		return err
 	}
 
-	// Trigger async flush
+	b.notifySubscribers(entries)
+	return nil
+}
+
+// writeLocked puts entries, LSNs already set, at the end of the log. The
+// caller holds b.mu.
+func (b *Binlog) writeLocked(entries []*BinlogEntry) error {
+	if b.closed {
+		b.spoilCleanClose()
+		return ErrBinlogClosed
+	}
+	if b.failed != nil {
+		return b.failed
+	}
+	for _, entry := range entries {
+		n, err := b.writer.Write(MarshalBinlogEntry(entry))
+		if err != nil {
+			return b.fail(fmt.Errorf("failed to write binlog entry: %w", err))
+		}
+		b.fileSize += int64(n)
+		b.lsn.Store(entry.LSN)
+		if b.firstTS == 0 {
+			b.firstTS = entry.Timestamp
+		}
+		b.recent.add(entry.LSN, entry.Timestamp)
+	}
+	if b.cfg.Sync == SyncCommit {
+		return b.flush()
+	}
 	select {
 	case b.flusher <- struct{}{}:
 	default:
 	}
-
-	b.mu.Unlock()
-
-	// Notify subscribers
-	for _, entry := range entries {
-		b.notifySubscribers(entry)
-	}
-
 	return nil
+}
+
+// fail records the first write error. A log that failed to take an entry
+// has a hole followers cannot see past, so it takes nothing more; it is not
+// marked clean at Close, and the next start begins a new log.
+func (b *Binlog) fail(err error) error {
+	if b.failed == nil {
+		b.failed = err
+	}
+	return err
+}
+
+// Err is the write error that stopped the log, or nil.
+func (b *Binlog) Err() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.failed
 }
 
 // ReadFrom reads all entries with LSN > fromLSN into memory.
@@ -286,86 +280,25 @@ func (b *Binlog) CurrentLSN() uint64 {
 	return b.lsn.Load()
 }
 
-// OldestLSN returns the oldest LSN still in the binlog
+// OldestLSN returns the oldest LSN still in the binlog, 0 when it is empty.
 func (b *Binlog) OldestLSN() uint64 {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.oldestLSN
+	return b.oldestLocked()
 }
 
-// Rotate truncates the binlog, keeping only entries from keepFromLSN onwards.
-// If keepFromLSN is 0, truncates everything.
-func (b *Binlog) Rotate(keepFromLSN uint64) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	// Flush first
-	if err := b.flush(); err != nil {
-		return err
+func (b *Binlog) oldestLocked() uint64 {
+	if b.lsn.Load() == b.baseLSN {
+		return 0
 	}
-
-	if keepFromLSN == 0 {
-		// Full truncate
-		return b.truncate()
-	}
-
-	// Read entries to keep
-	f, err := os.Open(b.path)
-	if err != nil {
-		return err
-	}
-
-	allData, err := io.ReadAll(f)
-	_ = f.Close()
-	if err != nil {
-		return err
-	}
-
-	// Find entries to keep
-	var keepData []byte
-	pos := 0
-	for pos < len(allData) {
-		entry, n, err := UnmarshalBinlogEntry(allData[pos:])
-		if err != nil {
-			break
-		}
-		if entry.LSN >= keepFromLSN {
-			keepData = allData[pos:]
-			break
-		}
-		pos += n
-	}
-
-	// Rewrite file
-	if err := b.file.Close(); err != nil {
-		return err
-	}
-
-	// #nosec G304 -- Path is constructed safely
-	file, err := os.OpenFile(filepath.Clean(b.path), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-
-	b.file = file
-	b.writer = bufio.NewWriterSize(file, binlogBufferSize)
-
-	if len(keepData) > 0 {
-		n, err := b.writer.Write(keepData)
-		if err != nil {
-			return err
-		}
-		b.fileSize = int64(n)
-		b.oldestLSN = keepFromLSN
-	} else {
-		b.fileSize = 0
-		b.oldestLSN = 0
-	}
-
-	return b.flush()
+	return b.baseLSN + 1
 }
 
 // Close flushes and closes the binlog. It is safe to call Close more than once.
+//
+// A log that closed with everything on disk is marked clean. An append that
+// arrives afterwards — a writer still running at shutdown — takes the mark
+// back, so the next start does not trust a log that is missing that write.
 func (b *Binlog) Close() error {
 	var closeErr error
 	b.closeOnce.Do(func() {
@@ -373,13 +306,8 @@ func (b *Binlog) Close() error {
 
 		b.mu.Lock()
 		defer b.mu.Unlock()
+		b.closed = true
 
-		if err := b.flush(); err != nil {
-			closeErr = err
-			return
-		}
-
-		// Close all subscriber channels
 		b.subMu.Lock()
 		for id, ch := range b.subscribers {
 			close(ch)
@@ -387,66 +315,37 @@ func (b *Binlog) Close() error {
 		}
 		b.subMu.Unlock()
 
-		closeErr = b.file.Close()
+		closeErr = b.flush()
+		if closeErr == nil {
+			closeErr = b.saveMeta(stateClean)
+		}
+		if err := b.file.Close(); closeErr == nil {
+			closeErr = err
+		}
 	})
 	return closeErr
 }
 
-// Stats returns binlog statistics
-func (b *Binlog) Stats() BinlogStats {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.subMu.RLock()
-	subCount := len(b.subscribers)
-	b.subMu.RUnlock()
-
-	return BinlogStats{
-		CurrentLSN:  b.lsn.Load(),
-		OldestLSN:   b.oldestLSN,
-		FileSize:    b.fileSize,
-		Subscribers: subCount,
-		Path:        b.path,
+// spoilCleanClose takes back the clean mark of a closed log.
+func (b *Binlog) spoilCleanClose() {
+	if b.spoiled {
+		return
 	}
+	b.spoiled = true
+	_ = b.saveMeta(stateOpen)
 }
 
-// BinlogStats contains binlog statistics
-type BinlogStats struct {
-	CurrentLSN  uint64 `json:"current_lsn"`
-	OldestLSN   uint64 `json:"oldest_lsn"`
-	FileSize    int64  `json:"file_size"`
-	Subscribers int    `json:"subscribers"`
-	Path        string `json:"path"`
-}
-
-// flush flushes the write buffer and syncs to disk
+// flush flushes the write buffer and syncs to disk. An error stops the log.
 func (b *Binlog) flush() error {
+	if b.failed != nil {
+		return b.failed
+	}
 	if err := b.writer.Flush(); err != nil {
-		return fmt.Errorf("failed to flush binlog: %w", err)
+		return b.fail(fmt.Errorf("failed to flush binlog: %w", err))
 	}
-	if err := b.file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync binlog: %w", err)
+	if err := syncFile(b.file); err != nil {
+		return b.fail(fmt.Errorf("failed to sync binlog: %w", err))
 	}
-	return nil
-}
-
-// truncate clears the entire binlog
-func (b *Binlog) truncate() error {
-	if err := b.file.Close(); err != nil {
-		return err
-	}
-
-	// #nosec G304 -- Path is constructed safely
-	file, err := os.OpenFile(filepath.Clean(b.path), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to truncate binlog: %w", err)
-	}
-
-	b.file = file
-	b.writer = bufio.NewWriterSize(file, binlogBufferSize)
-	b.fileSize = 0
-	b.oldestLSN = 0
-
 	return nil
 }
 
@@ -458,33 +357,31 @@ func (b *Binlog) periodicFlusher() {
 	for {
 		select {
 		case <-ticker.C:
-			b.mu.Lock()
-			_ = b.flush()
-			b.mu.Unlock()
 		case <-b.flusher:
-			b.mu.Lock()
-			_ = b.flush()
-			b.mu.Unlock()
 		case <-b.done:
 			return
 		}
+		b.mu.Lock()
+		if !b.closed {
+			_ = b.flush()
+		}
+		b.mu.Unlock()
 	}
 }
 
-// notifySubscribers sends an entry to all active subscribers
-func (b *Binlog) notifySubscribers(entry *BinlogEntry) {
+// notifySubscribers sends entries to all active subscribers
+func (b *Binlog) notifySubscribers(entries []*BinlogEntry) {
 	b.subMu.RLock()
 	defer b.subMu.RUnlock()
 
 	for _, ch := range b.subscribers {
-		select {
-		case ch <- entry:
-		default:
-			// Subscriber is too slow, drop entry.
-			// The follower will need to re-sync from file.
+		for _, entry := range entries {
+			select {
+			case ch <- entry:
+			default:
+				// Subscriber is too slow, drop entry.
+				// The stream reads it back from the file.
+			}
 		}
 	}
 }
-
-// ErrBinlogLSNTooOld is returned when the requested LSN is no longer in the binlog
-var ErrBinlogLSNTooOld = fmt.Errorf("requested LSN is older than the binlog's oldest entry; full snapshot required")

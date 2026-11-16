@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -172,14 +171,6 @@ func TestPerCollectionReplicationRoutesEntries(t *testing.T) {
 	}
 	if ra.LastAppliedLSN() != 6 {
 		t.Errorf("last applied %d", ra.LastAppliedLSN())
-	}
-}
-
-func TestPerCollectionRefusesSnapshots(t *testing.T) {
-	s := perCollectionServer(t)
-	rc := &ReplicationClient{server: s}
-	if err := rc.requestSnapshot(context.Background()); err != errSnapshotPerCollection {
-		t.Errorf("follower snapshot: %v", err)
 	}
 }
 

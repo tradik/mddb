@@ -1080,14 +1080,14 @@ func (s *Server) initReplication() {
 		slog.Info("Replication follower mode — forced read-only")
 	}
 
-	// Initialize binlog (auto-enabled for leader, opt-in for standalone)
+	// Initialize binlog (auto-enabled for leader, opt-in for standalone).
+	// A follower's binlog is its copy of the leader's, which the replication
+	// client keeps (GO-050); nothing on the follower writes to it otherwise.
+	binlogCfg, err := binlogConfigFromEnv()
+	fatalOnErr(err, "Invalid binlog configuration")
 	binlogEnabled := env("MDDB_BINLOG_ENABLED", "false") == "true" || s.ReplicationRole == "leader"
-	if binlogEnabled {
-		bl, err := binlog.NewBinlog(s.Path, binlog.BinlogConfig{
-			Path:    env("MDDB_BINLOG_PATH", ""),
-			MaxSize: 256 * 1024 * 1024, // 256MB
-			MaxAge:  24 * time.Hour,
-		})
+	if binlogEnabled && s.ReplicationRole != "follower" {
+		bl, err := binlog.NewBinlog(s.Path, binlogCfg)
 		fatalOnErr(err, "Failed to initialize binlog")
 		s.Binlog = bl
 		slog.Info("binlog enabled", "currentLSN", bl.CurrentLSN())
@@ -1464,9 +1464,15 @@ func (s *Server) startReplicationClient() (stop func()) {
 	if leaderAddr == "" {
 		fatal("MDDB_REPLICATION_ROLE=follower requires MDDB_REPLICATION_LEADER_ADDR")
 	}
+	tlsCfg, err := replicationTLSFromEnv()
+	fatalOnErr(err, "Invalid replication TLS configuration")
+	logCfg, err := binlogConfigFromEnv()
+	fatalOnErr(err, "Invalid binlog configuration")
 	replClient := NewReplicationClient(s, ReplicationClientConfig{
 		LeaderAddr: leaderAddr,
 		FollowerID: s.NodeID,
+		TLS:        tlsCfg,
+		Log:        &logCfg,
 	})
 	s.replClient = replClient
 	replClient.Start()

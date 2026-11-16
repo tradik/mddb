@@ -337,7 +337,6 @@ func TestCovARunServerFollowerWithEverythingOff(t *testing.T) {
 	for _, want := range []string{
 		"source=autodetected",
 		"Replication follower mode",
-		"binlog enabled",
 		"Replication disabled TTL cleanup and embedding worker on follower",
 		"Replication client started",
 		"Panel mode external",

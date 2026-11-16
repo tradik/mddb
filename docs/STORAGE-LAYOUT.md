@@ -16,7 +16,7 @@ Since 2.18.2 mddb can keep each collection in a bbolt file of its own
 | Deleting a collection | frees pages inside the file; the file keeps its size | removes the collection's file: the space is back at once |
 | Start after a crash | one freelist walk over the whole file | each file is walked on its own, in the background, so writes to a small collection do not wait for a large one |
 | Backup | one file | the main file plus one file per collection |
-| Replication snapshot | yes | no (see [Limits](#limits)) |
+| Replication snapshot | the file | the main file and every collection file (v2.19.8+; leader and follower in the same layout) |
 
 Planned restarts are fast in both layouts: a clean shutdown stores the
 freelist of every file ([STORAGE-TUNING.md](STORAGE-TUNING.md)).
@@ -174,11 +174,14 @@ overwritten.
 
 ## Limits
 
-- **Replication snapshots** stream one file, so a leader in this layout
-  refuses them and a follower in it does not ask. The binlog works as before:
-  each entry is applied to the file its key belongs to. Start a follower from
-  a backup of the leader (the main file and its `.d` directory) and let it
-  catch up from the binlog.
+- **Replication snapshots need the same layout on both sides.** Since 2.19.8
+  a snapshot carries the main file and every collection file, and the
+  follower installs them as a restore does. A leader refuses a snapshot to a
+  follower in the other layout, naming both; convert the stopped follower with
+  `-split-collections` or `-merge-collections`. A follower in this layout
+  cannot take a snapshot from a leader before 2.19.8, whose snapshots are one
+  file. The binlog is applied as before: each entry to the file its key
+  belongs to ([REPLICATION.md](REPLICATION.md#snapshots)).
 - **Write transactions do not span files.** A replicated batch that touches
   several collections is applied as one transaction per file, in order.
 - Global managers (users, automations, webhooks...) are unaffected by the

@@ -711,8 +711,17 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 | `MDDB_REPLICATION_ROLE` | `""` | string | Role: `"leader"`, `"follower"`, or `""` (standalone) |
 | `MDDB_NODE_ID` | `""` | string | Unique node ID (required for replication) |
 | `MDDB_REPLICATION_LEADER_ADDR` | `""` | string | Leader address for follower nodes |
-| `MDDB_BINLOG_ENABLED` | `false` | bool | Enable binary log (auto-enabled for leaders) |
-| `MDDB_BINLOG_PATH` | `""` | string | Custom binlog file path |
+| `MDDB_BINLOG_ENABLED` | `false` | bool | Enable binary log (auto-enabled for leaders). A follower always keeps its copy of the leader's log at the binlog path and opens no log of its own (v2.19.8+) |
+| `MDDB_BINLOG_PATH` | `""` | string | Custom binlog file path (default: `mddb.binlog` next to the database). Its sidecar is `<path>.meta` |
+| `MDDB_BINLOG_SYNC` | `interval` | string | When an entry reaches the disk: `interval` syncs in the background about every 100 ms; `commit` syncs before the write returns. A leader stopped uncleanly in either mode starts a new log and its followers resynchronise from a snapshot ([REPLICATION.md](REPLICATION.md#durability-and-crashes), v2.19.8+) |
+| `MDDB_BINLOG_MAX_SIZE` | `268435456` | int (bytes) | Size at which retention drops the oldest entries, down to half of it — except entries a known follower has not confirmed (v2.19.8+) |
+| `MDDB_BINLOG_HARD_MAX_SIZE` | 4 × max size | int (bytes) | Size past which even unconfirmed entries are dropped; a follower behind them takes a snapshot (v2.19.8+) |
+| `MDDB_BINLOG_MAX_AGE` | `24h` | duration | Age past which entries are dropped, except those a known follower has not confirmed; also how long a disconnected follower is remembered (v2.19.8+) |
+| `MDDB_REPLICATION_TLS` | `false` | bool | Follower: dial the leader over TLS. Implied by any of the `MDDB_REPLICATION_TLS_*` files (v2.19.8+) |
+| `MDDB_REPLICATION_TLS_CA` | `""` | string | Follower: PEM CA bundle the leader's certificate is checked against (default: the system pool) |
+| `MDDB_REPLICATION_TLS_CERT` | `""` | string | Follower: client certificate (PEM) for a leader that requires mTLS; set with `MDDB_REPLICATION_TLS_KEY` |
+| `MDDB_REPLICATION_TLS_KEY` | `""` | string | Follower: the client certificate's key (PEM) |
+| `MDDB_REPLICATION_TLS_SERVER_NAME` | `""` | string | Follower: the name the leader's certificate must carry, when it differs from the host in `MDDB_REPLICATION_LEADER_ADDR` |
 | `MDDB_REPLICATION_SECRET` | `""` | string | Shared secret for the snapshot and binlog streams; the same value on the leader and every follower. Without it, auth or mTLS, a leader refuses them ([REPLICATION.md](REPLICATION.md#securing-replication)) |
 | `MDDB_FREELIST_SYNC` | auto | bool | Write bbolt's freelist on every commit so opening the database reads one page instead of the whole file. On a 908 MB database: 7 ms and 37 MB RSS instead of ~400 ms and 938 MB; minutes from a cold disk on large files ([DEPLOYMENT.md](DEPLOYMENT.md#large-databases-startup-time-and-memory)). Since v2.18.2 a clean shutdown stores the freelist anyway; this setting is what protects a start after a crash. Unset (or `auto`, v2.18.2+): on for a file of `MDDB_FREELIST_SYNC_THRESHOLD` or more, decided at start; `true`/`false` force it |
 | `MDDB_FREELIST_SYNC_THRESHOLD` | `4294967296` | int | File size in bytes from which `MDDB_FREELIST_SYNC` defaults to on (v2.18.2+) |

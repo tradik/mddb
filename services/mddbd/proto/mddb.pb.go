@@ -11665,11 +11665,16 @@ func (x *RestoreRevisionRequest) GetTimestamp() int64 {
 }
 
 type SnapshotRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	FollowerId    string                 `protobuf:"bytes,1,opt,name=follower_id,json=followerId,proto3" json:"follower_id,omitempty"`
-	CurrentLsn    uint64                 `protobuf:"varint,2,opt,name=current_lsn,json=currentLsn,proto3" json:"current_lsn,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	FollowerId string                 `protobuf:"bytes,1,opt,name=follower_id,json=followerId,proto3" json:"follower_id,omitempty"`
+	CurrentLsn uint64                 `protobuf:"varint,2,opt,name=current_lsn,json=currentLsn,proto3" json:"current_lsn,omitempty"`
+	// Storage layout of the follower: "single" or "per-collection" (unset: a
+	// follower before 2.19.8, single-file). A snapshot is files, and they only
+	// fit a follower in the leader's layout.
+	Layout          string `protobuf:"bytes,3,opt,name=layout,proto3" json:"layout,omitempty"`
+	ProtocolVersion uint32 `protobuf:"varint,4,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SnapshotRequest) Reset() {
@@ -11716,13 +11721,32 @@ func (x *SnapshotRequest) GetCurrentLsn() uint64 {
 	return 0
 }
 
+func (x *SnapshotRequest) GetLayout() string {
+	if x != nil {
+		return x.Layout
+	}
+	return ""
+}
+
+func (x *SnapshotRequest) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
 type SnapshotChunk struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	Offset        uint64                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
-	TotalSize     uint64                 `protobuf:"varint,3,opt,name=total_size,json=totalSize,proto3" json:"total_size,omitempty"`
-	IsLast        bool                   `protobuf:"varint,4,opt,name=is_last,json=isLast,proto3" json:"is_last,omitempty"`
-	SnapshotLsn   uint64                 `protobuf:"varint,5,opt,name=snapshot_lsn,json=snapshotLsn,proto3" json:"snapshot_lsn,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Data        []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Offset      uint64                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`                        // offset within the file this chunk belongs to
+	TotalSize   uint64                 `protobuf:"varint,3,opt,name=total_size,json=totalSize,proto3" json:"total_size,omitempty"` // size of that file
+	IsLast      bool                   `protobuf:"varint,4,opt,name=is_last,json=isLast,proto3" json:"is_last,omitempty"`          // last chunk of the whole snapshot
+	SnapshotLsn uint64                 `protobuf:"varint,5,opt,name=snapshot_lsn,json=snapshotLsn,proto3" json:"snapshot_lsn,omitempty"`
+	// ID of the leader's log at snapshot_lsn (0: a leader before 2.19.8).
+	LogId uint64 `protobuf:"varint,6,opt,name=log_id,json=logId,proto3" json:"log_id,omitempty"`
+	// File the chunk belongs to: "" is the main database file, anything else
+	// the name of a collection file (per-collection layout).
+	File          string `protobuf:"bytes,7,opt,name=file,proto3" json:"file,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -11792,10 +11816,28 @@ func (x *SnapshotChunk) GetSnapshotLsn() uint64 {
 	return 0
 }
 
+func (x *SnapshotChunk) GetLogId() uint64 {
+	if x != nil {
+		return x.LogId
+	}
+	return 0
+}
+
+func (x *SnapshotChunk) GetFile() string {
+	if x != nil {
+		return x.File
+	}
+	return ""
+}
+
 type StreamBinlogRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	FollowerId    string                 `protobuf:"bytes,1,opt,name=follower_id,json=followerId,proto3" json:"follower_id,omitempty"`
-	FromLsn       uint64                 `protobuf:"varint,2,opt,name=from_lsn,json=fromLsn,proto3" json:"from_lsn,omitempty"`
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	FollowerId      string                 `protobuf:"bytes,1,opt,name=follower_id,json=followerId,proto3" json:"follower_id,omitempty"`
+	FromLsn         uint64                 `protobuf:"varint,2,opt,name=from_lsn,json=fromLsn,proto3" json:"from_lsn,omitempty"`
+	ProtocolVersion uint32                 `protobuf:"varint,3,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	// ID of the log from_lsn is a position in (0: not known). A leader whose
+	// log has another ID refuses the stream and the follower takes a snapshot.
+	LogId         uint64 `protobuf:"varint,4,opt,name=log_id,json=logId,proto3" json:"log_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -11840,6 +11882,20 @@ func (x *StreamBinlogRequest) GetFollowerId() string {
 func (x *StreamBinlogRequest) GetFromLsn() uint64 {
 	if x != nil {
 		return x.FromLsn
+	}
+	return 0
+}
+
+func (x *StreamBinlogRequest) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *StreamBinlogRequest) GetLogId() uint64 {
+	if x != nil {
+		return x.LogId
 	}
 	return 0
 }
@@ -11976,13 +12032,19 @@ type ReplicationStatusResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	NodeId           string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	Role             string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
-	CurrentLsn       uint64                 `protobuf:"varint,3,opt,name=current_lsn,json=currentLsn,proto3" json:"current_lsn,omitempty"`
-	LeaderAddr       string                 `protobuf:"bytes,4,opt,name=leader_addr,json=leaderAddr,proto3" json:"leader_addr,omitempty"`
-	LastAppliedAt    int64                  `protobuf:"varint,5,opt,name=last_applied_at,json=lastAppliedAt,proto3" json:"last_applied_at,omitempty"`
+	CurrentLsn       uint64                 `protobuf:"varint,3,opt,name=current_lsn,json=currentLsn,proto3" json:"current_lsn,omitempty"`            // leader: last LSN written; follower: last LSN applied
+	LeaderAddr       string                 `protobuf:"bytes,4,opt,name=leader_addr,json=leaderAddr,proto3" json:"leader_addr,omitempty"`             // follower: the leader it replicates from
+	LastAppliedAt    int64                  `protobuf:"varint,5,opt,name=last_applied_at,json=lastAppliedAt,proto3" json:"last_applied_at,omitempty"` // follower: Unix seconds of the last applied entry
 	Followers        []*FollowerInfo        `protobuf:"bytes,6,rep,name=followers,proto3" json:"followers,omitempty"`
-	ReplicationLagMs int64                  `protobuf:"varint,7,opt,name=replication_lag_ms,json=replicationLagMs,proto3" json:"replication_lag_ms,omitempty"`
+	ReplicationLagMs int64                  `protobuf:"varint,7,opt,name=replication_lag_ms,json=replicationLagMs,proto3" json:"replication_lag_ms,omitempty"` // follower: its lag as the leader last measured it
 	BinlogOldestLsn  uint64                 `protobuf:"varint,8,opt,name=binlog_oldest_lsn,json=binlogOldestLsn,proto3" json:"binlog_oldest_lsn,omitempty"`
 	BinlogSizeBytes  int64                  `protobuf:"varint,9,opt,name=binlog_size_bytes,json=binlogSizeBytes,proto3" json:"binlog_size_bytes,omitempty"`
+	Healthy          bool                   `protobuf:"varint,10,opt,name=healthy,proto3" json:"healthy,omitempty"`
+	LagEntries       uint64                 `protobuf:"varint,11,opt,name=lag_entries,json=lagEntries,proto3" json:"lag_entries,omitempty"` // follower: entries the leader had that it had not applied
+	LastError        string                 `protobuf:"bytes,12,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`     // why the node is not healthy
+	LogId            string                 `protobuf:"bytes,13,opt,name=log_id,json=logId,proto3" json:"log_id,omitempty"`                 // ID of the log current_lsn is a position in
+	Connected        bool                   `protobuf:"varint,14,opt,name=connected,proto3" json:"connected,omitempty"`                     // follower: the stream from the leader is open
+	ProtocolVersion  uint32                 `protobuf:"varint,15,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -12080,13 +12142,59 @@ func (x *ReplicationStatusResponse) GetBinlogSizeBytes() int64 {
 	return 0
 }
 
+func (x *ReplicationStatusResponse) GetHealthy() bool {
+	if x != nil {
+		return x.Healthy
+	}
+	return false
+}
+
+func (x *ReplicationStatusResponse) GetLagEntries() uint64 {
+	if x != nil {
+		return x.LagEntries
+	}
+	return 0
+}
+
+func (x *ReplicationStatusResponse) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+func (x *ReplicationStatusResponse) GetLogId() string {
+	if x != nil {
+		return x.LogId
+	}
+	return ""
+}
+
+func (x *ReplicationStatusResponse) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+func (x *ReplicationStatusResponse) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
 type FollowerInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FollowerId    string                 `protobuf:"bytes,1,opt,name=follower_id,json=followerId,proto3" json:"follower_id,omitempty"`
 	ConfirmedLsn  uint64                 `protobuf:"varint,2,opt,name=confirmed_lsn,json=confirmedLsn,proto3" json:"confirmed_lsn,omitempty"`
 	LastSeenAt    int64                  `protobuf:"varint,3,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
 	Address       string                 `protobuf:"bytes,4,opt,name=address,proto3" json:"address,omitempty"`
-	LagMs         int64                  `protobuf:"varint,5,opt,name=lag_ms,json=lagMs,proto3" json:"lag_ms,omitempty"`
+	LagMs         int64                  `protobuf:"varint,5,opt,name=lag_ms,json=lagMs,proto3" json:"lag_ms,omitempty"` // age of the oldest entry the follower has not confirmed
+	Connected     bool                   `protobuf:"varint,6,opt,name=connected,proto3" json:"connected,omitempty"`      // false: gone, still remembered so its entries are kept
+	LagEntries    uint64                 `protobuf:"varint,7,opt,name=lag_entries,json=lagEntries,proto3" json:"lag_entries,omitempty"`
+	Status        string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`                      // healthy, warning, unhealthy, disconnected
+	LagExact      bool                   `protobuf:"varint,9,opt,name=lag_exact,json=lagExact,proto3" json:"lag_exact,omitempty"` // false: lag_ms is a lower bound
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -12156,6 +12264,34 @@ func (x *FollowerInfo) GetLagMs() int64 {
 	return 0
 }
 
+func (x *FollowerInfo) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+func (x *FollowerInfo) GetLagEntries() uint64 {
+	if x != nil {
+		return x.LagEntries
+	}
+	return 0
+}
+
+func (x *FollowerInfo) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *FollowerInfo) GetLagExact() bool {
+	if x != nil {
+		return x.LagExact
+	}
+	return false
+}
+
 type AcknowledgeLSNRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FollowerId    string                 `protobuf:"bytes,1,opt,name=follower_id,json=followerId,proto3" json:"follower_id,omitempty"`
@@ -12209,9 +12345,12 @@ func (x *AcknowledgeLSNRequest) GetConfirmedLsn() uint64 {
 }
 
 type AcknowledgeLSNResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
-	LeaderLsn     uint64                 `protobuf:"varint,2,opt,name=leader_lsn,json=leaderLsn,proto3" json:"leader_lsn,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Ok        bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	LeaderLsn uint64                 `protobuf:"varint,2,opt,name=leader_lsn,json=leaderLsn,proto3" json:"leader_lsn,omitempty"`
+	// The follower's lag as the leader measures it: the age of the oldest
+	// entry it has not confirmed, 0 when it has them all.
+	LagMs         int64 `protobuf:"varint,3,opt,name=lag_ms,json=lagMs,proto3" json:"lag_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -12256,6 +12395,13 @@ func (x *AcknowledgeLSNResponse) GetOk() bool {
 func (x *AcknowledgeLSNResponse) GetLeaderLsn() uint64 {
 	if x != nil {
 		return x.LeaderLsn
+	}
+	return 0
+}
+
+func (x *AcknowledgeLSNResponse) GetLagMs() int64 {
+	if x != nil {
+		return x.LagMs
 	}
 	return 0
 }
@@ -23927,23 +24073,29 @@ const file_mddb_proto_rawDesc = "" +
 	"collection\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
 	"\x04lang\x18\x03 \x01(\tR\x04lang\x12\x1c\n" +
-	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\"S\n" +
+	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\"\x96\x01\n" +
 	"\x0fSnapshotRequest\x12\x1f\n" +
 	"\vfollower_id\x18\x01 \x01(\tR\n" +
 	"followerId\x12\x1f\n" +
 	"\vcurrent_lsn\x18\x02 \x01(\x04R\n" +
-	"currentLsn\"\x96\x01\n" +
+	"currentLsn\x12\x16\n" +
+	"\x06layout\x18\x03 \x01(\tR\x06layout\x12)\n" +
+	"\x10protocol_version\x18\x04 \x01(\rR\x0fprotocolVersion\"\xc1\x01\n" +
 	"\rSnapshotChunk\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x04R\x06offset\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x03 \x01(\x04R\ttotalSize\x12\x17\n" +
 	"\ais_last\x18\x04 \x01(\bR\x06isLast\x12!\n" +
-	"\fsnapshot_lsn\x18\x05 \x01(\x04R\vsnapshotLsn\"Q\n" +
+	"\fsnapshot_lsn\x18\x05 \x01(\x04R\vsnapshotLsn\x12\x15\n" +
+	"\x06log_id\x18\x06 \x01(\x04R\x05logId\x12\x12\n" +
+	"\x04file\x18\a \x01(\tR\x04file\"\x93\x01\n" +
 	"\x13StreamBinlogRequest\x12\x1f\n" +
 	"\vfollower_id\x18\x01 \x01(\tR\n" +
 	"followerId\x12\x19\n" +
-	"\bfrom_lsn\x18\x02 \x01(\x04R\afromLsn\"\xbb\x01\n" +
+	"\bfrom_lsn\x18\x02 \x01(\x04R\afromLsn\x12)\n" +
+	"\x10protocol_version\x18\x03 \x01(\rR\x0fprotocolVersion\x12\x15\n" +
+	"\x06log_id\x18\x04 \x01(\x04R\x05logId\"\xbb\x01\n" +
 	"\x10BinlogEntryProto\x12\x10\n" +
 	"\x03lsn\x18\x01 \x01(\x04R\x03lsn\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\rR\x04type\x12\x1c\n" +
@@ -23953,7 +24105,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x03key\x18\x05 \x01(\fR\x03key\x12\x14\n" +
 	"\x05value\x18\x06 \x01(\fR\x05value\x12\x1a\n" +
 	"\bchecksum\x18\a \x01(\rR\bchecksum\"\x1a\n" +
-	"\x18ReplicationStatusRequest\"\xea\x02\n" +
+	"\x18ReplicationStatusRequest\"\xa4\x04\n" +
 	"\x19ReplicationStatusResponse\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04role\x18\x02 \x01(\tR\x04role\x12\x1f\n" +
@@ -23965,7 +24117,16 @@ const file_mddb_proto_rawDesc = "" +
 	"\tfollowers\x18\x06 \x03(\v2\x12.mddb.FollowerInfoR\tfollowers\x12,\n" +
 	"\x12replication_lag_ms\x18\a \x01(\x03R\x10replicationLagMs\x12*\n" +
 	"\x11binlog_oldest_lsn\x18\b \x01(\x04R\x0fbinlogOldestLsn\x12*\n" +
-	"\x11binlog_size_bytes\x18\t \x01(\x03R\x0fbinlogSizeBytes\"\xa7\x01\n" +
+	"\x11binlog_size_bytes\x18\t \x01(\x03R\x0fbinlogSizeBytes\x12\x18\n" +
+	"\ahealthy\x18\n" +
+	" \x01(\bR\ahealthy\x12\x1f\n" +
+	"\vlag_entries\x18\v \x01(\x04R\n" +
+	"lagEntries\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\f \x01(\tR\tlastError\x12\x15\n" +
+	"\x06log_id\x18\r \x01(\tR\x05logId\x12\x1c\n" +
+	"\tconnected\x18\x0e \x01(\bR\tconnected\x12)\n" +
+	"\x10protocol_version\x18\x0f \x01(\rR\x0fprotocolVersion\"\x9b\x02\n" +
 	"\fFollowerInfo\x12\x1f\n" +
 	"\vfollower_id\x18\x01 \x01(\tR\n" +
 	"followerId\x12#\n" +
@@ -23973,15 +24134,21 @@ const file_mddb_proto_rawDesc = "" +
 	"\flast_seen_at\x18\x03 \x01(\x03R\n" +
 	"lastSeenAt\x12\x18\n" +
 	"\aaddress\x18\x04 \x01(\tR\aaddress\x12\x15\n" +
-	"\x06lag_ms\x18\x05 \x01(\x03R\x05lagMs\"]\n" +
+	"\x06lag_ms\x18\x05 \x01(\x03R\x05lagMs\x12\x1c\n" +
+	"\tconnected\x18\x06 \x01(\bR\tconnected\x12\x1f\n" +
+	"\vlag_entries\x18\a \x01(\x04R\n" +
+	"lagEntries\x12\x16\n" +
+	"\x06status\x18\b \x01(\tR\x06status\x12\x1b\n" +
+	"\tlag_exact\x18\t \x01(\bR\blagExact\"]\n" +
 	"\x15AcknowledgeLSNRequest\x12\x1f\n" +
 	"\vfollower_id\x18\x01 \x01(\tR\n" +
 	"followerId\x12#\n" +
-	"\rconfirmed_lsn\x18\x02 \x01(\x04R\fconfirmedLsn\"G\n" +
+	"\rconfirmed_lsn\x18\x02 \x01(\x04R\fconfirmedLsn\"^\n" +
 	"\x16AcknowledgeLSNResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x1d\n" +
 	"\n" +
-	"leader_lsn\x18\x02 \x01(\x04R\tleaderLsn\"\xb5\x01\n" +
+	"leader_lsn\x18\x02 \x01(\x04R\tleaderLsn\x12\x15\n" +
+	"\x06lag_ms\x18\x03 \x01(\x03R\x05lagMs\"\xb5\x01\n" +
 	"\x14TemporalQueryRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +

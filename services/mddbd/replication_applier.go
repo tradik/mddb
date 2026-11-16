@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
@@ -10,12 +12,20 @@ import (
 	"sync/atomic"
 
 	bolt "go.etcd.io/bbolt"
+	bolterrors "go.etcd.io/bbolt/errors"
 )
 
 // ReplicationApplier applies binlog entries from the leader to the local BoltDB and in-memory state.
+//
+// GO-050: the position — the last LSN applied and the log it belongs to — is
+// written by the transaction that applies the entry (replication_position.go),
+// and an entry that cannot be applied is an error the caller must act on, not
+// a line in the log: a follower that skipped an entry and went on was no
+// longer a copy of its leader, and nothing said so.
 type ReplicationApplier struct {
 	server      *Server
 	lastApplied atomic.Uint64
+	logID       atomic.Uint64
 }
 
 // NewReplicationApplier creates a new replication applier
@@ -45,17 +55,17 @@ func (ra *ReplicationApplier) ApplyBatch(entries []*binlog.BinlogEntry) error {
 			}
 			end++
 		}
+		// What is already in the files stays applied when a later group
+		// fails: the position follows the files, never the batch.
 		if err := ra.applyGroup(target, everywhere, entries[start:end]); err != nil {
-			return err
+			return fmt.Errorf("applying LSN %d (%s %s): %w", entries[start].LSN, entries[start].Type, entries[start].BucketName, err)
 		}
+		for _, entry := range entries[start:end] {
+			ra.updateInMemoryState(entry)
+		}
+		ra.lastApplied.Store(entries[end-1].LSN)
 		start = end
 	}
-
-	// Update in-memory state for each entry
-	for _, entry := range entries {
-		ra.updateInMemoryState(entry)
-	}
-	ra.lastApplied.Store(entries[len(entries)-1].LSN)
 	return nil
 }
 
@@ -74,52 +84,77 @@ func (ra *ReplicationApplier) target(entry *binlog.BinlogEntry) (string, bool) {
 }
 
 func (ra *ReplicationApplier) applyGroup(target string, everywhere bool, group []*binlog.BinlogEntry) error {
+	pos := replPosition{LSN: group[len(group)-1].LSN, LogID: ra.logID.Load()}
 	apply := func(tx *bolt.Tx) error {
 		for _, entry := range group {
-			if entry.Type == binlog.BinlogDeleteBucket {
-				if err := tx.DeleteBucket([]byte(entry.BucketName)); err != nil {
-					slog.Warn("Replication applier failed to delete bucket", "bucketName", entry.BucketName, "err", err)
-				}
-				continue
-			}
-			if entry.Type == binlog.BinlogCheckpoint {
-				continue
-			}
-			bucket, err := tx.CreateBucketIfNotExists([]byte(entry.BucketName))
-			if err != nil {
+			if err := applyEntry(tx, entry); err != nil {
 				return err
-			}
-			key := entry.Key
-			if entry.BucketName == "bykey" {
-				// DOC-017: a leader on an older release sends key-index
-				// entries as written; they land in this build's form.
-				key, _ = storage.NormalizeByKeyEntry(key)
-			}
-			switch entry.Type {
-			case binlog.BinlogPut:
-				if err := bucket.Put(key, entry.Value); err != nil {
-					return err
-				}
-			case binlog.BinlogDelete:
-				if err := bucket.Delete(key); err != nil {
-					return err
-				}
 			}
 		}
 		return nil
 	}
+	// The position goes into the transaction that holds the change.
+	applyAndStamp := func(tx *bolt.Tx) error {
+		if err := apply(tx); err != nil {
+			return err
+		}
+		return stampApplied(tx, pos)
+	}
 	if everywhere {
+		// One transaction per file cannot carry one position: a crash
+		// half-way would leave it on the files already done and the entry
+		// missing from the rest. It is recorded once, in the main file,
+		// after the last file — and the entry, a bucket removed, is applied
+		// again without harm if the crash comes before that.
 		for _, db := range ra.server.collectionDBs() {
 			if err := db.Update(apply); err != nil {
 				return err
 			}
 		}
-		return nil
+		return ra.server.saveReplicationPosition(pos)
 	}
 	if target != "" {
-		return ra.server.DBUpdateC(target, apply)
+		return ra.server.DBUpdateC(target, applyAndStamp)
 	}
-	return ra.server.DBUpdate(apply)
+	return ra.server.DBUpdate(applyAndStamp)
+}
+
+// applyEntry makes one entry's change in tx.
+func applyEntry(tx *bolt.Tx, entry *binlog.BinlogEntry) error {
+	switch entry.Type {
+	case binlog.BinlogDeleteBucket:
+		return ignoreMissingBucket(tx.DeleteBucket([]byte(entry.BucketName)))
+	case binlog.BinlogCheckpoint:
+		return nil // carries no change; it still moves the position
+	case binlog.BinlogPut, binlog.BinlogDelete:
+	default:
+		// From a leader newer than this build. Skipping what this build
+		// does not understand is how a follower drifts.
+		return fmt.Errorf("unknown binlog entry type %d", entry.Type)
+	}
+	bucket, err := tx.CreateBucketIfNotExists([]byte(entry.BucketName))
+	if err != nil {
+		return err
+	}
+	key := entry.Key
+	if entry.BucketName == "bykey" {
+		// DOC-017: a leader on an older release sends key-index
+		// entries as written; they land in this build's form.
+		key, _ = storage.NormalizeByKeyEntry(key)
+	}
+	if entry.Type == binlog.BinlogPut {
+		return bucket.Put(key, entry.Value)
+	}
+	return bucket.Delete(key)
+}
+
+// ignoreMissingBucket drops the error of removing a bucket that is not
+// there: the follower is already where the entry leads.
+func ignoreMissingBucket(err error) error {
+	if errors.Is(err, bolterrors.ErrBucketNotFound) {
+		return nil
+	}
+	return err
 }
 
 // LastAppliedLSN returns the last applied LSN
@@ -130,6 +165,17 @@ func (ra *ReplicationApplier) LastAppliedLSN() uint64 {
 // SetLastAppliedLSN sets the last applied LSN (used after snapshot restore).
 func (ra *ReplicationApplier) SetLastAppliedLSN(lsn uint64) {
 	ra.lastApplied.Store(lsn)
+}
+
+// Position is the last applied LSN and the log it is a position in.
+func (ra *ReplicationApplier) Position() replPosition {
+	return replPosition{LSN: ra.lastApplied.Load(), LogID: ra.logID.Load()}
+}
+
+// SetPosition moves the applier to pos without writing it.
+func (ra *ReplicationApplier) SetPosition(pos replPosition) {
+	ra.lastApplied.Store(pos.LSN)
+	ra.logID.Store(pos.LogID)
 }
 
 // updateInMemoryState updates in-memory caches and indices based on the replicated bucket

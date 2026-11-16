@@ -1,13 +1,15 @@
 ---
 title: "MDDB Replication (Leader-Follower)"
 slug: "docs/replication"
-description: "Leader-follower replication in MDDB: binlog streaming to read-only followers for horizontal read scaling, with lag monitoring and failover notes."
+description: "Leader-follower replication in MDDB: a binlog streamed over gRPC to read-only followers, with durable follower positions, enforced retention, snapshots in both storage layouts, TLS, and measured lag."
 status: publish
 ---
 
 # MDDB Replication (Leader-Follower)
 
-MDDB supports **leader-follower replication** for horizontal read scaling and high availability. A single leader node handles all writes and streams changes to one or more read-only follower nodes via a binary replication log (binlog).
+MDDB supports **leader-follower replication** for horizontal read scaling. A single leader node handles all writes and streams changes to one or more read-only follower nodes via a binary replication log (binlog).
+
+Replication is not failover. When the leader stops, followers keep serving reads but nothing is promoted: a follower becomes a leader only when an operator restarts it as one ([Manual failover](#manual-failover)).
 
 ## Architecture
 
@@ -28,17 +30,18 @@ graph LR
 sequenceDiagram
     participant C as Client
     participant L as Leader
-    participant BL as Binlog
+    participant BL as Leader binlog
     participant F as Follower
 
     C->>L: POST /v1/add (write)
     L->>L: BoltDB commit
     L->>BL: Append entry (LSN=42)
     BL-->>F: StreamBinlog (LSN=42)
-    F->>F: Apply to local BoltDB
-    F->>L: AcknowledgeLSN(42)
+    F->>F: Apply to local BoltDB, recording LSN 42 in the same transaction
+    F->>F: Append LSN 42 to its own copy of the binlog
+    F->>L: AcknowledgeLSN(42) (every 10 s)
+    L-->>F: lag as the leader measures it
 
-    Note over F: Follower is now up to date
     C->>F: POST /v1/get (read)
     F-->>C: Document (from local BoltDB)
 ```
@@ -47,9 +50,9 @@ sequenceDiagram
 
 - **Single-leader**: One node accepts writes, followers are read-only
 - **Pull-based**: Followers pull changes from the leader via gRPC streaming
-- **Eventual consistency**: Followers lag behind the leader by milliseconds (typically <50ms on LAN)
-- **Automatic catch-up**: Followers reconnect and catch up after disconnects
-- **Full snapshot sync**: New followers receive a full database snapshot before switching to incremental replication
+- **Eventual consistency**: Followers apply entries after the leader commits them; how far behind a follower is, is measured and reported ([Monitoring](#monitoring))
+- **Resume where it stopped**: a follower records its position in its own database and continues from it after a restart or a disconnect
+- **Snapshot when the log cannot help**: a new follower, one whose entries the leader no longer keeps, and one that failed to apply an entry receive a full snapshot
 
 ## Quick Start
 
@@ -57,19 +60,21 @@ sequenceDiagram
 
 ```bash
 MDDB_REPLICATION_ROLE=leader \
+MDDB_REPLICATION_SECRET=change-me-to-32-random-characters \
 MDDB_PATH=/data/leader.db \
 MDDB_HTTP_PORT=11023 \
 MDDB_GRPC_PORT=11024 \
 ./mddbd
 ```
 
-The leader automatically enables the binlog and exposes the `MDDBReplication` gRPC service.
+The leader automatically enables the binlog and exposes the `MDDBReplication` gRPC service. Without a replication secret, mTLS or authentication it refuses every follower ([Securing replication](#securing-replication)).
 
 ### 2. Start a Follower
 
 ```bash
 MDDB_REPLICATION_ROLE=follower \
 MDDB_REPLICATION_LEADER_ADDR=leader-host:11024 \
+MDDB_REPLICATION_SECRET=change-me-to-32-random-characters \
 MDDB_PATH=/data/follower.db \
 MDDB_HTTP_PORT=11033 \
 MDDB_GRPC_PORT=11034 \
@@ -79,9 +84,10 @@ MDDB_GRPC_PORT=11034 \
 The follower:
 - Automatically switches to **read-only mode**
 - Connects to the leader's gRPC port
-- Downloads a full snapshot (if starting fresh). The snapshot must pass
-  bbolt's full integrity check before it replaces the follower's database
-  ([BACKUP.md](BACKUP.md))
+- Resumes from the position recorded in its database, or — starting fresh,
+  or when the leader no longer has the entries it needs — downloads a full
+  snapshot. The snapshot must pass bbolt's full integrity check before it
+  replaces the follower's database ([BACKUP.md](BACKUP.md))
 - Tails the binlog for real-time updates
 
 #### How the stream guarantees every entry (v2.15.4)
@@ -107,6 +113,23 @@ The leader sends every LSN after the follower's position, once and in order:
   from starting, or to stay in the file so that every later entry was
   unreadable.
 
+#### What a follower guarantees (v2.19.8)
+
+- **Its position survives a restart.** The last LSN applied, and the log it
+  belongs to, are written by the same transaction that applies the entry
+  (bucket `replmeta`, never replicated). A restarted follower asks for the
+  entries after it: none applied twice, none skipped, no snapshot. It used to
+  keep the position in memory and ask for the log from the start.
+- **It never skips an entry.** An entry that does not follow the last one, or
+  that cannot be applied, stops the follower: it reports itself unhealthy with
+  the reason in `last_error` and replaces its data with a snapshot before it
+  applies anything else. It used to log the entry and carry on without it.
+- **It refuses a history that is not the leader's.** A follower sends the ID
+  of the log its position is in. A leader with another log, or one that has
+  not reached the follower's LSN, answers "snapshot required".
+- **It keeps its own binlog** with the leader's LSNs, timestamps and log ID —
+  a copy of the leader's history on every node ([The follower's binlog](#the-followers-binlog)).
+
 ### 3. Verify Replication
 
 ```bash
@@ -120,7 +143,7 @@ curl -X POST http://leader-host:11023/v1/add \
     "contentMd": "# Hello from leader"
   }'
 
-# Read from follower (after a few ms)
+# Read from follower
 curl -X POST http://follower-host:11033/v1/get \
   -d '{"collection":"blog","key":"hello","lang":"en_US"}'
 
@@ -141,6 +164,7 @@ services:
       - leader-data:/data
     environment:
       MDDB_REPLICATION_ROLE: leader
+      MDDB_REPLICATION_SECRET: ${MDDB_REPLICATION_SECRET}
       MDDB_PATH: /data/mddb.db
 
   follower-1:
@@ -153,6 +177,7 @@ services:
     environment:
       MDDB_REPLICATION_ROLE: follower
       MDDB_REPLICATION_LEADER_ADDR: leader:11024
+      MDDB_REPLICATION_SECRET: ${MDDB_REPLICATION_SECRET}
       MDDB_PATH: /data/mddb.db
     depends_on:
       leader:
@@ -168,6 +193,7 @@ services:
     environment:
       MDDB_REPLICATION_ROLE: follower
       MDDB_REPLICATION_LEADER_ADDR: leader:11024
+      MDDB_REPLICATION_SECRET: ${MDDB_REPLICATION_SECRET}
       MDDB_PATH: /data/mddb.db
     depends_on:
       leader:
@@ -194,44 +220,54 @@ volumes:
 |----------|---------|-------------|
 | `MDDB_REPLICATION_ROLE` | `""` (standalone) | Node role: `leader`, `follower`, or empty for standalone |
 | `MDDB_REPLICATION_LEADER_ADDR` | - | Follower only: gRPC address of the leader (e.g. `leader:11024`) |
-| `MDDB_NODE_ID` | auto-generated | Unique node identifier |
-| `MDDB_BINLOG_ENABLED` | `false` | Enable binlog without replication (standalone mode). Auto-enabled for `leader` role |
-| `MDDB_BINLOG_PATH` | alongside DB file | Custom binlog file path |
-| `MDDB_REPLICATION_SECRET` | `""` | Shared secret authenticating the snapshot/binlog streams (SEC-001). Set the **same** value on leader and follower. See [Securing replication](#securing-replication). |
+| `MDDB_NODE_ID` | auto-generated | Unique node identifier; a follower is known to the leader by it |
+| `MDDB_BINLOG_ENABLED` | `false` | Enable binlog without replication (standalone mode). Auto-enabled for `leader` role. A follower ignores it and keeps its copy of the leader's binlog instead |
+| `MDDB_BINLOG_PATH` | `mddb.binlog` next to the DB file | Binlog file path, on a follower too. Its sidecar is `<path>.meta` |
+| `MDDB_BINLOG_SYNC` | `interval` | `interval`: an append returns once the entry is buffered; the file is synced about every 100 ms. `commit`: synced before the write returns ([Durability and crashes](#durability-and-crashes)) |
+| `MDDB_BINLOG_MAX_SIZE` | `268435456` (256 MB) | Retention trims the binlog when it passes this size ([Retention](#retention)) |
+| `MDDB_BINLOG_HARD_MAX_SIZE` | 4 × max size | Size past which entries a follower still needs are dropped too |
+| `MDDB_BINLOG_MAX_AGE` | `24h` | Entries older than this are dropped; a disconnected follower is remembered this long |
+| `MDDB_REPLICATION_SECRET` | `""` | Shared secret authenticating the snapshot, binlog and acknowledgement calls (SEC-001). Set the **same** value on leader and follower. See [Securing replication](#securing-replication). |
+| `MDDB_REPLICATION_TLS` | `false` | Follower: dial the leader over TLS. Implied by any of the three files below |
+| `MDDB_REPLICATION_TLS_CA` | system pool | Follower: PEM bundle the leader's certificate is checked against |
+| `MDDB_REPLICATION_TLS_CERT` / `MDDB_REPLICATION_TLS_KEY` | - | Follower: client certificate and key, for a leader that requires mTLS |
+| `MDDB_REPLICATION_TLS_SERVER_NAME` | host of the leader address | Follower: name the leader's certificate must carry |
 
-These limits are fixed in the code and have no setting: a binlog segment is
-rotated at 256 MB and kept for 24 hours, a follower reconnects every 5 seconds,
-and a follower more than 30 seconds behind reports unhealthy.
+These are fixed in the code and have no setting: a follower reconnects 5
+seconds after a stream ends (at once when it needs a snapshot), acknowledges
+every 10 seconds, and reports unhealthy when the leader measures it more than
+30 seconds behind.
 
 ### Securing replication
 
-The leader's snapshot and binlog gRPC streams expose the **entire database** — including the `auth_users` (bcrypt password hashes) and `auth_apikeys` buckets — and a live tail of every write. They are therefore gated by `authorizeReplication` (SEC-001), which runs **before** any database access and accepts a request only when one of the following is satisfied:
+The leader's snapshot and binlog gRPC streams expose the **entire database** — including the `auth_users` (bcrypt password hashes) and `auth_apikeys` buckets — and a live tail of every write. They, and the acknowledgements that decide what the leader's binlog keeps, are therefore gated by `authorizeReplication` (SEC-001), which runs **before** any database access and accepts a request only when one of the following is satisfied:
 
-1. **Shared secret** — set `MDDB_REPLICATION_SECRET` to the same random string (≥ 32 chars) on **both** the leader and every follower. The follower sends it as the `x-mddb-replication-secret` gRPC metadata header; the leader compares it in constant time (`crypto/subtle.ConstantTimeCompare`). This is the simplest option for cross-host links without full mTLS.
-2. **mTLS** — a verified client certificate (set `MDDB_TLS_CLIENT_CA` to a trusted-CA PEM bundle) authenticates the follower; no secret needed.
+1. **Shared secret** — set `MDDB_REPLICATION_SECRET` to the same random string (≥ 32 chars) on **both** the leader and every follower. The follower sends it as the `x-mddb-replication-secret` gRPC metadata header; the leader compares it in constant time (`crypto/subtle.ConstantTimeCompare`).
+2. **mTLS** — the leader's gRPC listener requires client certificates (`MDDB_TLS_ENABLED=true` with `MDDB_TLS_CLIENT_CA`), and the follower presents one (`MDDB_REPLICATION_TLS_CERT`, `MDDB_REPLICATION_TLS_KEY`, and `MDDB_REPLICATION_TLS_CA` for the leader's CA). A verified client certificate authenticates the follower; no secret needed.
 3. **Main auth** — with `MDDB_AUTH_ENABLED=true`, an admin-authenticated context is accepted.
 
-> ⚠️ A node started as `leader` with **none** of these configured refuses every `RequestSnapshot`/`StreamBinlog` call with `PermissionDenied` and logs a loud startup warning. Never expose the gRPC port to an untrusted network without one of the mechanisms above — anyone who can reach it could otherwise exfiltrate the whole database in a single call.
+Until 2.19.8 a follower always dialled in plaintext, whatever was configured; with any `MDDB_REPLICATION_TLS*` setting it now dials over TLS and checks the leader's certificate.
+
+> ⚠️ A node started as `leader` with **none** of these configured refuses every `RequestSnapshot`/`StreamBinlog`/`AcknowledgeLSN` call with `PermissionDenied` and logs a loud startup warning. Never expose the gRPC port to an untrusted network without one of the mechanisms above — anyone who can reach it could otherwise exfiltrate the whole database in a single call.
 
 ### Role Behavior
 
 | Setting | Writes | Reads | Binlog | Replication |
 |---------|--------|-------|--------|-------------|
-| (empty / standalone) | Yes | Yes | Off | Off |
+| (empty / standalone) | Yes | Yes | Off (`MDDB_BINLOG_ENABLED=true` turns it on) | Off |
 | `leader` | Yes | Yes | On | Serves followers |
-| `follower` | No (read-only) | Yes | Off | Pulls from leader |
+| `follower` | No (read-only) | Yes | Copy of the leader's | Pulls from leader |
 
 ### Follower: Disabled Subsystems
 
-When running as a follower, these subsystems are automatically disabled (they come from the leader's binlog):
+When running as a follower, these subsystems are automatically disabled (their results come from the leader's binlog):
 
 - **Embedding Worker** - Embeddings are replicated from the leader
 - **TTL Cleanup** - TTL deletions arrive via binlog
-- **Index Queue** - Metadata indexing arrives via binlog
 
 ## Binlog
 
-The binary replication log records every write operation (Put/Delete) to BoltDB. It serves as the change stream that followers consume.
+The binary replication log records every write operation to BoltDB. It serves as the change stream that followers consume.
 
 ### Entry Format
 
@@ -241,20 +277,97 @@ The binary replication log records every write operation (Put/Delete) to BoltDB.
 
 | Field | Size | Description |
 |-------|------|-------------|
-| LSN | 8 bytes | Monotonically increasing Log Sequence Number |
-| Type | 1 byte | `1`=Put, `2`=Delete |
-| Timestamp | 8 bytes | Unix nanoseconds |
+| LSN | 8 bytes | Log Sequence Number; consecutive within a log |
+| Type | 1 byte | `1`=Put, `2`=Delete, `3`=DeleteBucket, `4`=Checkpoint |
+| Timestamp | 8 bytes | Unix nanoseconds when the leader wrote it |
 | BucketName | 2+N bytes | Target BoltDB bucket |
 | Key | 4+N bytes | Document key |
 | Value | 4+N bytes | Document value (empty for Delete) |
 | Checksum | 4 bytes | CRC32 of the entry |
 
+The layout is the one every release has written: a 2.19.7 binlog opens as
+it is, and an older release reads one 2.19.8 wrote. A follower refuses an
+entry type it does not know instead of skipping it.
+
+### The sidecar
+
+What the file of entries cannot say about itself is in `<binlog>.meta`, a
+small JSON file next to it, replaced in one rename:
+
+| Field | Meaning |
+|-------|---------|
+| `version` | Layout of the sidecar (1) |
+| `entryFormat` | Layout of the entries in the log (1, as above) |
+| `logId` | Which log this is (16 hex digits). A new log gets a new ID |
+| `baseLsn` | The LSN before the first entry in the file — all that is left of the position when retention has emptied the file |
+| `state` / `cleanLsn` | `open` while in use; `clean` and the last LSN once closed with everything on disk |
+
+A sidecar with a higher `version` or `entryFormat` than the build knows makes
+the server refuse to start rather than misread the log. A binlog without a
+sidecar was written before 2.19.8; it is taken as it is, and gets one.
+
+### Durability and crashes
+
+The leader commits a write to BoltDB first and appends its entries to the
+binlog afterwards. With `MDDB_BINLOG_SYNC=interval` (the default) the append
+is buffered and synced about every 100 ms; with `commit` it is synced before
+the write returns, which costs a sync per write. In either mode a process that
+dies can leave committed writes that never reached the binlog — the buffered
+ones, or one whose append had not started.
+
+Nothing in the file says which. So a leader whose binlog was not closed
+cleanly (`state` is not `clean`, or the file does not end at `cleanLsn`) does
+not continue it: at start it logs a warning and **begins a new log** under a
+new ID, 2^32 LSNs further on so that no position a follower holds can be
+mistaken for one in it. Every follower is then told "snapshot required" and
+resynchronises. A clean stop, in either mode, keeps the log and its
+followers' positions. `commit` narrows what a crash can lose from the binlog;
+it does not avoid the resynchronisation after one.
+
+A binlog that fails to take an entry (a write or sync error) takes nothing
+more: the leader's status turns unhealthy with `binlog stopped: …`, and the
+next start begins a new log. A restore also begins a new log.
+
+### Retention
+
+Retention runs every minute (and is enforced; until 2.19.8 the limits were
+stored and never read, and the binlog grew without bound):
+
+- When the file passes `MDDB_BINLOG_MAX_SIZE`, its oldest entries are dropped
+  until half of that size is left.
+- Entries older than `MDDB_BINLOG_MAX_AGE` are dropped whatever the size.
+- **Entries a follower has not acknowledged are kept** past both limits, so a
+  follower that is behind or briefly away catches up from the log. The leader
+  remembers a disconnected follower for `MDDB_BINLOG_MAX_AGE`, then forgets
+  it.
+- **Up to a safety cap**: past `MDDB_BINLOG_HARD_MAX_SIZE` the oldest entries
+  go even if a follower needs them, and the leader logs that a follower
+  behind the cut resynchronises from a snapshot.
+
+A follower whose position is older than what the binlog holds is answered
+"LSN too old, snapshot required" and takes a snapshot — also when it starts
+from LSN 0 against a binlog that no longer starts at its first entry. That
+case used to replay what was left of the log as if it were all of it.
+
+The followers on record are in memory: a leader that restarts keeps entries
+only for followers that have reconnected when retention next runs.
+
+### The follower's binlog
+
+A follower writes every entry it applies to its own binlog (at
+`MDDB_BINLOG_PATH`, or `mddb.binlog` next to its database), with the leader's
+LSNs, timestamps and log ID. The copy is written after the entry is applied;
+a follower that stops between the two finds its copy behind its data and
+starts the copy again, empty, at the applied position. A snapshot does the
+same. Nothing else on a follower writes to it. Retention applies to it by
+size and age.
+
 ### Performance
 
-- **Buffered I/O**: 256KB write buffer with periodic flush (100ms)
-- **Async flush**: Writes are buffered; fsync happens periodically or on demand
-- **Compact format**: Binary serialization (~30% smaller than JSON)
+- **Buffered I/O**: 256KB write buffer, synced about every 100 ms (`interval`) or on every write (`commit`)
+- **Compact format**: Binary serialization
 - **Subscriber channels**: Real-time push to followers via Go channels
+- **Timestamps of the newest 65,536 entries are kept in memory** to measure lag
 
 ## gRPC Replication Service
 
@@ -271,69 +384,65 @@ service MDDBReplication {
 
 | Method | Description |
 |--------|-------------|
-| `RequestSnapshot` | Full BoltDB snapshot streamed in 1MB chunks (uses `bolt.Tx.WriteTo()`) |
-| `StreamBinlog` | Historical entries from a given LSN + real-time tailing |
-| `ReplicationStatus` | Node role, LSN, lag, follower info |
-| `AcknowledgeLSN` | Follower confirms applied LSN (for retention) |
+| `RequestSnapshot` | Every database file streamed in 1 MB chunks from read transactions (`bolt.Tx.WriteTo()`), each chunk naming its file, then a closing chunk |
+| `StreamBinlog` | Historical entries after a given LSN + real-time tailing. Opens with the headers `x-mddb-replication-protocol` and `x-mddb-log-id` |
+| `ReplicationStatus` | The same report as `GET /v1/replication/status` |
+| `AcknowledgeLSN` | Follower confirms the LSN it has applied. The leader keeps the entries after it (retention) and answers with the follower's lag as it measures it |
+
+### Versions
+
+Requests carry `protocol_version` (2 in 2.19.8; unset from older releases)
+and the leader answers with the `x-mddb-replication-protocol` header. Fields
+are only ever added: a node leaves out what an older peer does not know, and
+an older peer ignores what it does not read. A later version — an election
+term, for one — takes new field numbers, the next protocol version and, for
+the file, the next `entryFormat` in the sidecar.
 
 ## Follower Sync Flow
 
 ```mermaid
 flowchart TD
-    A[Follower starts] --> B{Has local DB?}
-    B -->|No| C[RequestSnapshot from leader]
-    B -->|Yes| D[StreamBinlog from last LSN]
-    C --> E[Write snapshot to temp file]
-    E --> F[Replace local DB]
-    F --> G[Reload in-memory state]
-    G --> D
-    D --> H{LSN too old?}
-    H -->|Yes| C
-    H -->|No| I[Apply entries to local BoltDB]
-    I --> J[AcknowledgeLSN]
+    A[Follower starts] --> B[Read position from own database]
+    B --> D[StreamBinlog from position, with log ID]
+    D --> H{Leader: same log, LSN still held, not ahead?}
+    H -->|No: snapshot required| C[RequestSnapshot]
+    C --> E[Receive files next to the database]
+    E --> F[Swap them in, record the snapshot position]
+    F --> D
+    H -->|Yes| I[Apply entry + position in one transaction]
+    I --> X{Applied, and LSN = last + 1?}
+    X -->|No| U[Unhealthy, last_error set] --> C
+    X -->|Yes| J[Append to own binlog]
     J --> D
     D --> K{Connection lost?}
-    K -->|Yes| L[Wait retry interval]
+    K -->|Yes| L[Wait 5 s]
     L --> D
 ```
 
-### Initial Sync
+### Snapshots
 
-1. Follower connects with `StreamBinlog(fromLSN=0)`
-2. If leader responds with `FailedPrecondition` (LSN too old), follower requests full snapshot
-3. Leader streams BoltDB snapshot via `bolt.Tx.WriteTo()` in 1MB chunks (non-blocking read-only transaction)
-4. Follower saves to temp file, replaces local DB, reloads in-memory state
-5. Follower resumes `StreamBinlog` from the snapshot's LSN
+1. The leader takes its current LSN and log ID, then streams the main
+   database file and, in the per-collection layout, every collection file,
+   each from its own read transaction while writes go on. A commit reaches
+   the database before its entry reaches the binlog, so every file holds at
+   least everything through that LSN; entries after it that a file already
+   holds are applied again and leave it as the leader has it.
+2. The follower writes the files next to its database, checks them, and swaps
+   them in as a restore does (collection files first, put back if the main
+   file fails), then records the snapshot's LSN and log ID.
+3. The follower resumes `StreamBinlog` from that position.
+
+Leader and follower must use the same `MDDB_STORAGE_LAYOUT`: a snapshot is
+the leader's files. A leader refuses a follower in the other layout and says
+so. A follower in the per-collection layout cannot take a snapshot from a
+leader before 2.19.8, whose snapshots are one file ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#limits)).
 
 ### Reconnection
 
-- Follower retries every 5 seconds (fixed)
-- If binlog still has the needed LSN: incremental catch-up
-- If LSN is too old (binlog rotated): full snapshot re-sync
-
-### Follower State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> STARTING : Initialization
-    STARTING --> CONNECTING : Connect to gRPC Leader
-    
-    CONNECTING --> REQUEST_SYNC : Connected
-    CONNECTING --> CONNECTING : Retry on failure
-    
-    REQUEST_SYNC --> SYNC_SNAPSHOT : Has no DB or LSN too old
-    REQUEST_SYNC --> SYNC_BINLOG : Has DB and LSN valid
-    
-    SYNC_SNAPSHOT --> RELOAD_DB : Snapshot downloaded
-    RELOAD_DB --> SYNC_BINLOG : DB reloaded in memory
-    
-    SYNC_BINLOG --> APPLY_TRANSACTIONS : Receive StreamBinlog chunk
-    APPLY_TRANSACTIONS --> ACKNOWLEDGE : Saved to BoltDB
-    ACKNOWLEDGE --> SYNC_BINLOG : Loop
-    
-    SYNC_BINLOG --> DISCONNECTED : Connection lost
-    DISCONNECTED --> CONNECTING : Wait retry interval
-```
+- Follower retries 5 seconds after a stream ends
+- If the binlog still has the entries after its position: incremental catch-up
+- If not (trimmed, a new log after a leader crash or restore, or the follower
+  is ahead of the leader): full snapshot
 
 ## Monitoring
 
@@ -349,16 +458,25 @@ GET /v1/replication/status
   "node_id": "leader-1",
   "role": "leader",
   "current_lsn": 45230,
+  "log_id": "3f9a0c51d2e4b788",
   "binlog_oldest_lsn": 40000,
   "binlog_size_bytes": 15728640,
+  "binlog_max_size_bytes": 268435456,
+  "binlog_sync": "interval",
+  "connected": false,
+  "replication_lag_ms": 0,
+  "lag_entries": 0,
   "healthy": true,
   "followers": [
     {
       "follower_id": "follower-1",
-      "address": "10.0.0.2:11034",
+      "address": "10.0.0.2:51544",
       "confirmed_lsn": 45228,
       "lag_ms": 12,
+      "lag_entries": 2,
+      "lag_exact": true,
       "last_seen_at": 1709500000,
+      "connected": true,
       "status": "healthy"
     }
   ],
@@ -372,58 +490,109 @@ GET /v1/replication/status
   "node_id": "follower-1",
   "role": "follower",
   "current_lsn": 45228,
+  "log_id": "3f9a0c51d2e4b788",
+  "binlog_oldest_lsn": 1,
+  "binlog_size_bytes": 2097152,
+  "binlog_max_size_bytes": 268435456,
+  "binlog_sync": "interval",
   "leader_addr": "leader:11024",
+  "connected": true,
   "replication_lag_ms": 12,
+  "lag_entries": 2,
+  "last_applied_at": 1709500000,
   "healthy": true,
   "followers": [],
   "uptime_seconds": 3600
 }
 ```
 
+- `current_lsn` is the last LSN written on a leader and the last LSN applied
+  on a follower.
+- **Lag is time, measured from the entries' own timestamps**: the age of the
+  oldest entry the follower has not confirmed. It used to be the LSN
+  difference times ten. The leader keeps the timestamps of its newest 65,536
+  entries; for a follower further behind, `lag_ms` is a lower bound and
+  `lag_exact` is false. A follower's `replication_lag_ms` is what the leader
+  measured at its last acknowledgement, so it is up to 10 seconds old.
+- `healthy` is false, with the reason in `last_error`, on a follower that is
+  not connected, is waiting for a snapshot, stopped on an entry it could not
+  apply, or is more than 30 seconds behind — and on a node whose binlog
+  stopped taking entries. It used to be the constant `true`.
+- A follower's `status`: `healthy` up to 1 s of lag, `warning` up to 30 s,
+  `unhealthy` beyond, `disconnected` when it has no stream (it stays listed
+  while the leader remembers it).
+
+The same report is served over gRPC by `ReplicationStatus`.
+
 ### Prometheus Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
 | `mddb_replication_role` | gauge | 1=leader, 2=follower, 0=standalone |
-| `mddb_replication_lsn` | gauge | Current LSN on this node |
-| `mddb_replication_lag_ms` | gauge | Follower replication lag in ms |
-| `mddb_binlog_entries_total` | counter | Total binlog entries written |
+| `mddb_replication_lsn` | gauge | Current LSN of the node's binlog (leader, or standalone with a binlog) |
 | `mddb_binlog_size_bytes` | gauge | Current binlog file size |
+| `mddb_binlog_oldest_lsn` | gauge | Oldest LSN still in the binlog |
+| `mddb_replication_followers_connected` | gauge | Binlog streams open on the leader |
+
+Follower lag is in `/v1/replication/status`, not in a metric. The
+`ops.replication_lag_high` webhook fires on a follower whose lag passes
+`MDDB_INCIDENT_LAG_THRESHOLD_MS`.
 
 ### Health Check
 
-The `/health` endpoint includes replication status. A follower reports unhealthy if lag exceeds 30 seconds (fixed).
+`/health` does not report replication. Use `/v1/replication/status`:
+`healthy` and `last_error`.
 
 ### Web Panel
 
 The admin panel includes a **Cluster** tab (under Administration) that shows:
-- Node role and status badges
-- Real-time LSN and binlog statistics
-- Connected followers with lag indicators
-- Lag history chart (last 5 minutes)
+- Node role and health, with the reason when it is not healthy
+- LSN, log ID and binlog size against its limit
+- The followers the leader knows, with lag in time and in entries
+- Lag history chart (last 5 minutes, sampled while the tab is open)
 
 ## What Gets Replicated
+
+Everything written through a path that records binlog entries:
 
 | Subsystem | Replicated | Notes |
 |-----------|:----------:|-------|
 | Documents (CRUD) | Yes | All Put/Delete to `docs` bucket |
 | Revisions | Yes | All revision entries |
 | Metadata indices | Yes | `idxmeta`, `bykey` buckets |
-| Vector embeddings | Yes | `vectors` bucket + in-memory index reload |
+| Vector embeddings | Yes | `vectors` bucket; the follower adds them to its in-memory indexes |
 | Full-text index | Yes | FTS tokens in BoltDB |
-| Webhooks | Yes | Config in BoltDB, follower reloads in-memory |
-| Schemas | Yes | Config in BoltDB, follower reloads in-memory |
-| Auth (users/groups) | Yes | Auth data in BoltDB |
-| TTL metadata | Yes | TTL expiry stored with documents |
+| Webhooks, schemas, automations, aliases, collection configs | Yes | Config in BoltDB; the follower reloads its in-memory copy |
+| Auth (users, API keys) | Snapshot only | In the files a snapshot carries; later changes on the leader are not streamed |
 
 ## Limitations
 
 - **Single leader**: Only one node can accept writes. Multi-leader is not supported.
 - **Eventual consistency**: Followers may serve slightly stale reads during replication lag.
 - **No automatic failover**: Promoting a follower to leader requires manual reconfiguration.
-- **Binlog retention**: If the leader's binlog is rotated before a follower catches up, a full snapshot re-sync is required.
+- **A leader crash costs every follower a snapshot** ([Durability and crashes](#durability-and-crashes)).
+- **Binlog retention**: a follower behind the hard size limit, or gone longer than `MDDB_BINLOG_MAX_AGE`, resynchronises from a snapshot.
+- **Same storage layout** on leader and follower for snapshots.
 - **gRPC only**: Replication uses gRPC (port 11024). Both leader and follower must have gRPC ports accessible.
 - **Upgrade followers first** across an on-disk format change: each server migrates its own files at startup, and a follower applies key-index entries from an older leader in the new form, but a follower on an older release does not understand the new form ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version)).
+
+## Upgrading to 2.19.8
+
+Upgrade **followers first**, then the leader. Every combination keeps
+replicating; what differs is when a follower takes a snapshot:
+
+- **A 2.19.8 follower of an older leader** starts without a recorded
+  position, asks for the log from LSN 0 and applies what the leader still
+  has, as before; if that log no longer starts at its first entry, the
+  follower notices the gap and takes a snapshot. In the per-collection layout
+  it cannot take one from an older leader (one-file snapshots).
+- **A 2.19.8 leader** keeps its existing binlog, gets a sidecar on the first
+  start and enforces retention from then on.
+- **An older follower of a 2.19.8 leader** keeps streaming while it stays
+  connected. After a restart it asks for the log from LSN 0 again; a 2.19.8
+  leader whose binlog no longer starts at its first entry refuses that, and an
+  older follower does not act on the refusal — it retries until it is
+  upgraded.
 
 ## Examples
 
@@ -482,6 +651,11 @@ spec:
               value: "follower"
             - name: MDDB_REPLICATION_LEADER_ADDR
               value: "mddb-leader.default.svc.cluster.local:11024"
+            - name: MDDB_REPLICATION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: mddb-replication
+                  key: secret
             - name: MDDB_PATH
               value: "/data/mddb.db"
           ports:
@@ -509,6 +683,7 @@ If the leader goes down:
 
 # 2. Promote a follower to leader
 MDDB_REPLICATION_ROLE=leader \
+MDDB_REPLICATION_SECRET=change-me-to-32-random-characters \
 MDDB_PATH=/data/mddb.db \
 MDDB_HTTP_PORT=11023 \
 MDDB_GRPC_PORT=11024 \
@@ -518,14 +693,23 @@ MDDB_GRPC_PORT=11024 \
 # Update MDDB_REPLICATION_LEADER_ADDR and restart
 ```
 
+The promoted node removes its follower position and opens its copy of the
+old leader's binlog as its own. A follower that was stopped cleanly continues
+that log, under the same log ID: the other followers continue from it, and
+one that had applied more than the promoted node is refused as ahead of the
+leader and takes a snapshot. A follower that was not stopped cleanly starts a
+new log, and every other follower takes a snapshot.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Follower stuck at LSN 0 | Can't connect to leader | Check `MDDB_REPLICATION_LEADER_ADDR` and firewall rules |
-| "full snapshot required" | Binlog rotated | Follower will auto-snapshot; the binlog keeps 256 MB per segment and 24 hours (fixed) |
+| Follower stuck at LSN 0, `connected: false` | Can't connect to leader | Check `MDDB_REPLICATION_LEADER_ADDR`, firewall rules, the secret or TLS settings; `last_error` says what failed |
+| "snapshot required" in the follower log | Binlog trimmed, a new log after a leader crash or restore, or the follower ahead of the leader | Nothing: the follower takes a snapshot |
+| "the leader stores data in the … layout" | Leader and follower in different storage layouts | Convert the stopped follower (`-split-collections` / `-merge-collections`) |
+| `last_error: replication stopped, resynchronising from a snapshot` | An entry the follower could not apply | Nothing: it resynchronises; the error names the entry |
 | High replication lag | Slow network or overloaded follower | Check network, reduce write load, add followers |
-| Follower reports unhealthy | Lag > 30 seconds (fixed) | Investigate lag cause |
+| Leader `healthy: false`, `binlog stopped` | The binlog could not write or sync | Check disk space and permissions; restart the leader (a new log, followers resynchronise) |
 | "binlog not enabled" | Leader not configured | Set `MDDB_REPLICATION_ROLE=leader` |
 
 **[Back to Documentation](README.md)**

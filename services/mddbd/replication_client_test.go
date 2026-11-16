@@ -166,16 +166,17 @@ func TestReplicationClientIsHealthy(t *testing.T) {
 		t.Error("expected unhealthy when nothing applied")
 	}
 
-	// Applied recently: healthy
+	// Connected and current: healthy
+	rc.connected.Store(true)
 	rc.lastAppliedAt.Store(time.Now().Unix())
 	if !rc.IsHealthy() {
 		t.Error("expected healthy after recent apply")
 	}
 
-	// Applied long ago: unhealthy
-	rc.lastAppliedAt.Store(time.Now().Add(-1 * time.Minute).Unix())
+	// Further behind than MaxLag, as the leader measured it: unhealthy
+	rc.lagMs.Store((time.Minute).Milliseconds())
 	if rc.IsHealthy() {
-		t.Error("expected unhealthy when last applied > maxLag ago")
+		t.Error("expected unhealthy when the lag is over maxLag")
 	}
 }
 

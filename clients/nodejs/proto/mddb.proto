@@ -1751,22 +1751,44 @@ service MDDBReplication {
   rpc AcknowledgeLSN(AcknowledgeLSNRequest) returns (AcknowledgeLSNResponse);
 }
 
+// The replication messages are versioned by protocol_version, sent by the
+// follower in every request and by the leader in the
+// "x-mddb-replication-protocol" response header. 0 (unset) is a release before
+// 2.19.8; 2 is 2.19.8. A node talks to an older peer by leaving out what that
+// peer does not know, and fields are only ever added: a later version (an
+// election term, for one) takes the next field numbers and the next
+// protocol_version.
+
 message SnapshotRequest {
   string follower_id = 1;
   uint64 current_lsn = 2;
+  // Storage layout of the follower: "single" or "per-collection" (unset: a
+  // follower before 2.19.8, single-file). A snapshot is files, and they only
+  // fit a follower in the leader's layout.
+  string layout = 3;
+  uint32 protocol_version = 4;
 }
 
 message SnapshotChunk {
   bytes data = 1;
-  uint64 offset = 2;
-  uint64 total_size = 3;
-  bool is_last = 4;
+  uint64 offset = 2;      // offset within the file this chunk belongs to
+  uint64 total_size = 3;  // size of that file
+  bool is_last = 4;       // last chunk of the whole snapshot
   uint64 snapshot_lsn = 5;
+  // ID of the leader's log at snapshot_lsn (0: a leader before 2.19.8).
+  uint64 log_id = 6;
+  // File the chunk belongs to: "" is the main database file, anything else
+  // the name of a collection file (per-collection layout).
+  string file = 7;
 }
 
 message StreamBinlogRequest {
   string follower_id = 1;
   uint64 from_lsn = 2;
+  uint32 protocol_version = 3;
+  // ID of the log from_lsn is a position in (0: not known). A leader whose
+  // log has another ID refuses the stream and the follower takes a snapshot.
+  uint64 log_id = 4;
 }
 
 message BinlogEntryProto {
@@ -1784,13 +1806,19 @@ message ReplicationStatusRequest {}
 message ReplicationStatusResponse {
   string node_id = 1;
   string role = 2;
-  uint64 current_lsn = 3;
-  string leader_addr = 4;
-  int64 last_applied_at = 5;
+  uint64 current_lsn = 3;       // leader: last LSN written; follower: last LSN applied
+  string leader_addr = 4;       // follower: the leader it replicates from
+  int64 last_applied_at = 5;    // follower: Unix seconds of the last applied entry
   repeated FollowerInfo followers = 6;
-  int64 replication_lag_ms = 7;
+  int64 replication_lag_ms = 7; // follower: its lag as the leader last measured it
   uint64 binlog_oldest_lsn = 8;
   int64 binlog_size_bytes = 9;
+  bool healthy = 10;
+  uint64 lag_entries = 11;      // follower: entries the leader had that it had not applied
+  string last_error = 12;       // why the node is not healthy
+  string log_id = 13;           // ID of the log current_lsn is a position in
+  bool connected = 14;          // follower: the stream from the leader is open
+  uint32 protocol_version = 15;
 }
 
 message FollowerInfo {
@@ -1798,7 +1826,11 @@ message FollowerInfo {
   uint64 confirmed_lsn = 2;
   int64 last_seen_at = 3;
   string address = 4;
-  int64 lag_ms = 5;
+  int64 lag_ms = 5;        // age of the oldest entry the follower has not confirmed
+  bool connected = 6;      // false: gone, still remembered so its entries are kept
+  uint64 lag_entries = 7;
+  string status = 8;       // healthy, warning, unhealthy, disconnected
+  bool lag_exact = 9;      // false: lag_ms is a lower bound
 }
 
 message AcknowledgeLSNRequest {
@@ -1809,6 +1841,9 @@ message AcknowledgeLSNRequest {
 message AcknowledgeLSNResponse {
   bool ok = 1;
   uint64 leader_lsn = 2;
+  // The follower's lag as the leader measures it: the age of the oldest
+  // entry it has not confirmed, 0 when it has them all.
+  int64 lag_ms = 3;
 }
 
 // --- Temporal tracking ---

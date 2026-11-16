@@ -10,6 +10,8 @@ import (
 
 	"mddb/internal/binlog"
 	proto "mddb/proto"
+
+	"google.golang.org/grpc/metadata"
 )
 
 // The binlog stream a follower tails (#267 comment). Three ways it lost or
@@ -29,6 +31,9 @@ type recordingStream struct {
 }
 
 func (s *recordingStream) Context() context.Context { return s.ctx }
+
+// SendHeader takes the handshake headers (GO-050); the stream needs no more.
+func (s *recordingStream) SendHeader(metadata.MD) error { return nil }
 
 func (s *recordingStream) Send(e *proto.BinlogEntryProto) error {
 	s.mu.Lock()

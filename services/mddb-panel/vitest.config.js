@@ -78,6 +78,10 @@ const coverageFiles = [
   'src/components/ReindexJobsTable.jsx',
   'src/components/CodeSymbolPanel.jsx',
   'src/components/CodeSymbolParts.jsx', // 2.19.3: split from CodeSymbolPanel
+  // 2.19.8: the Cluster tab shows what replication status measures (GO-050).
+  'src/lib/cluster-format.js',
+  'src/components/ClusterPanel.jsx',
+  'src/components/ClusterFollowers.jsx',
   'src/components/ImagePreview.jsx',
   // 2.19.0: files touched by the panel catch-up that had no tests.
   'src/App.jsx',

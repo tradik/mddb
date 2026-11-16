@@ -217,7 +217,7 @@ func TestAcknowledgeLSN_KnownFollower(t *testing.T) {
 	}
 	rs.mu.Unlock()
 
-	resp, err := rs.AcknowledgeLSN(context.Background(), &proto.AcknowledgeLSNRequest{
+	resp, err := rs.AcknowledgeLSN(authedReplCtx(t, "ack-secret"), &proto.AcknowledgeLSNRequest{
 		FollowerId:   "follower-1",
 		ConfirmedLsn: 42,
 	})
@@ -244,7 +244,7 @@ func TestAcknowledgeLSN_UnknownFollower(t *testing.T) {
 	rs := NewReplicationServer(s)
 
 	// Acknowledge from unknown follower - should still succeed (no error)
-	resp, err := rs.AcknowledgeLSN(context.Background(), &proto.AcknowledgeLSNRequest{
+	resp, err := rs.AcknowledgeLSN(authedReplCtx(t, "ack-secret"), &proto.AcknowledgeLSNRequest{
 		FollowerId:   "unknown",
 		ConfirmedLsn: 10,
 	})
@@ -264,7 +264,7 @@ func TestAcknowledgeLSN_NoBinlog(t *testing.T) {
 	_ = bl.Close()
 	s.Binlog = nil
 
-	resp, err := rs.AcknowledgeLSN(context.Background(), &proto.AcknowledgeLSNRequest{
+	resp, err := rs.AcknowledgeLSN(authedReplCtx(t, "ack-secret"), &proto.AcknowledgeLSNRequest{
 		FollowerId:   "follower-1",
 		ConfirmedLsn: 10,
 	})
@@ -508,8 +508,13 @@ func TestReplicationStatus_FollowerLag(t *testing.T) {
 	}
 
 	follower := resp.Followers[0]
-	if follower.LagMs <= 0 {
-		t.Errorf("expected positive lag when follower is behind (currentLSN=%d, confirmed=3), got %d", currentLSN, follower.LagMs)
+	// GO-050: the lag is the age of the oldest unconfirmed entry, which was
+	// just written, and the count of entries behind — not LSNs times ten.
+	if follower.LagEntries != currentLSN-3 {
+		t.Errorf("expected %d entries of lag (currentLSN=%d, confirmed=3), got %d", currentLSN-3, currentLSN, follower.LagEntries)
+	}
+	if follower.LagMs > 5000 || !follower.LagExact {
+		t.Errorf("lag of entries written just now: %d ms, exact %v", follower.LagMs, follower.LagExact)
 	}
 }
 

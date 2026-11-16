@@ -21,17 +21,26 @@ import (
 // ScanFrom calls fn for every entry with LSN > fromLSN, in file order, and
 // stops at the first error fn returns. Returns ErrBinlogLSNTooOld when the
 // entries after fromLSN are no longer in the file — checked before reading,
-// not after.
+// not after, and for a reader starting from 0 as for any other: a log that
+// no longer begins at its first entry cannot bring an empty follower up to
+// date, and replaying what is left of it used to pass for that.
 //
 // A truncated or corrupt entry ends the scan without an error: it is the tail
 // of a write that did not complete, and nothing after it can be trusted.
+//
+// The file is not rewritten while a scan runs: retention waits its turn.
 func (b *Binlog) ScanFrom(fromLSN uint64, fn func(*BinlogEntry) error) error {
+	b.scanMu.RLock()
+	defer b.scanMu.RUnlock()
+
 	b.mu.Lock()
-	_ = b.flush() // pending writes must be readable
-	oldest := b.oldestLSN
+	if !b.closed {
+		_ = b.flush() // pending writes must be readable
+	}
+	base := b.baseLSN
 	b.mu.Unlock()
 
-	if fromLSN > 0 && oldest > 0 && fromLSN < oldest {
+	if fromLSN < base {
 		return ErrBinlogLSNTooOld
 	}
 

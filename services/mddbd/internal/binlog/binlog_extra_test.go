@@ -77,9 +77,9 @@ func TestBinlogRotatePartial(t *testing.T) {
 	if got := bl.OldestLSN(); got != 3 {
 		t.Fatalf("after Rotate OldestLSN = %d, want 3", got)
 	}
-	entries, err := bl.ReadFrom(0)
+	entries, err := bl.ReadFrom(2)
 	if err != nil {
-		t.Fatalf("ReadFrom(0): %v", err)
+		t.Fatalf("ReadFrom(2): %v", err)
 	}
 	if len(entries) != 3 {
 		t.Fatalf("kept %d entries, want 3 (LSN 3,4,5)", len(entries))
@@ -87,9 +87,13 @@ func TestBinlogRotatePartial(t *testing.T) {
 	if entries[0].LSN != 3 {
 		t.Fatalf("first kept LSN = %d, want 3", entries[0].LSN)
 	}
-	// Requesting an LSN now older than the retained window must error.
-	if _, err := bl.ReadFrom(2); !errors.Is(err, ErrBinlogLSNTooOld) {
-		t.Fatalf("ReadFrom(2) err = %v, want ErrBinlogLSNTooOld", err)
+	// Requesting an LSN now older than the retained window must error —
+	// from the very start as much as from the middle (GO-050): what is left
+	// of a log is not the whole of it.
+	for _, from := range []uint64{0, 1} {
+		if _, err := bl.ReadFrom(from); !errors.Is(err, ErrBinlogLSNTooOld) {
+			t.Fatalf("ReadFrom(%d) err = %v, want ErrBinlogLSNTooOld", from, err)
+		}
 	}
 }
 
@@ -97,15 +101,24 @@ func TestBinlogRotateFullTruncate(t *testing.T) {
 	bl, cleanup := newTestBinlog(t)
 	defer cleanup()
 	appendN(t, bl, 4)
+	before := bl.LogID()
 	if err := bl.Rotate(0); err != nil {
 		t.Fatalf("Rotate(0): %v", err)
 	}
-	entries, err := bl.ReadFrom(0)
-	if err != nil {
-		t.Fatalf("ReadFrom(0): %v", err)
+	// GO-050: a new log, not the old one emptied — a new ID, and LSNs no
+	// follower of the old log can hold.
+	if bl.LogID() == before {
+		t.Error("the log kept its ID across Rotate(0)")
 	}
-	if len(entries) != 0 {
-		t.Fatalf("after full truncate got %d entries, want 0", len(entries))
+	if got := bl.CurrentLSN(); got != 4+resetJump {
+		t.Fatalf("CurrentLSN = %d, want %d", got, uint64(4+resetJump))
+	}
+	entries, err := bl.ReadFrom(bl.CurrentLSN())
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("after full truncate got %d entries, err %v; want none", len(entries), err)
+	}
+	if _, err := bl.ReadFrom(4); !errors.Is(err, ErrBinlogLSNTooOld) {
+		t.Fatalf("a follower of the old log was not sent to a snapshot: %v", err)
 	}
 }
 
@@ -285,12 +298,15 @@ func TestBinlogRotateKeepNothing(t *testing.T) {
 	if got := bl.OldestLSN(); got != 0 {
 		t.Fatalf("OldestLSN after keep-nothing rotate = %d, want 0", got)
 	}
-	entries, err := bl.ReadFrom(0)
+	entries, err := bl.ReadFrom(3)
 	if err != nil {
-		t.Fatalf("ReadFrom(0): %v", err)
+		t.Fatalf("ReadFrom(3): %v", err)
 	}
 	if len(entries) != 0 {
 		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if got := bl.CurrentLSN(); got != 3 {
+		t.Fatalf("CurrentLSN = %d, want 3: dropping entries does not move the position", got)
 	}
 }
 

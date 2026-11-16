@@ -12103,6 +12103,9 @@ components:
 
     ReplicationStatusResponse:
       type: object
+      description: >
+        (v2.19.8, GO-050) What the node measures, not estimates. Also served
+        over gRPC as MDDBReplication.ReplicationStatus.
       properties:
         node_id:
           type: string
@@ -12116,36 +12119,81 @@ components:
         current_lsn:
           type: integer
           format: uint64
-          description: Current Log Sequence Number
+          description: >
+            Leader (and a standalone node with a binlog): the last LSN
+            written. Follower: the last LSN applied, as recorded in its
+            database.
           example: 45230
+        log_id:
+          type: string
+          description: >
+            ID of the log current_lsn is a position in (16 hex digits). A
+            leader that was not stopped cleanly starts a new log under a new
+            ID, and its followers take a snapshot.
+          example: 3f9a0c51d2e4b788
         binlog_oldest_lsn:
           type: integer
           format: uint64
-          description: Oldest LSN still in the binlog (leader only)
+          description: Oldest LSN still in this node's binlog (a follower's is its copy of the leader's)
           example: 40000
         binlog_size_bytes:
           type: integer
           format: int64
-          description: Binlog file size in bytes (leader only)
+          description: Binlog file size in bytes
           example: 15728640
+        binlog_max_size_bytes:
+          type: integer
+          format: int64
+          description: Size at which retention trims the binlog (MDDB_BINLOG_MAX_SIZE)
+          example: 268435456
+        binlog_sync:
+          type: string
+          enum: [ interval, commit ]
+          description: When an entry reaches the disk (MDDB_BINLOG_SYNC)
+          example: interval
         leader_addr:
           type: string
-          description: Address of the leader node (follower only)
+          description: Address of the leader (follower only)
           example: leader:11024
+        connected:
+          type: boolean
+          description: Follower only — the stream from the leader is open
+          example: true
         replication_lag_ms:
           type: integer
           format: int64
-          description: Replication lag in milliseconds (follower only)
+          description: >
+            Follower only — the age of the oldest entry it had not applied,
+            as the leader measured it at the last acknowledgement (every 10
+            seconds); 0 when it had them all.
           example: 12
+        lag_entries:
+          type: integer
+          format: uint64
+          description: Follower only — entries the leader had that it had not applied, at the last acknowledgement
+          example: 0
+        last_applied_at:
+          type: integer
+          format: int64
+          description: Follower only — Unix seconds of the last applied entry or snapshot
+          example: 1709500000
         healthy:
           type: boolean
-          description: Whether this node is healthy
+          description: >
+            False on a follower that is not connected, is waiting for a
+            snapshot, stopped on an entry it could not apply, or is more than
+            30 seconds behind; and on a node whose binlog stopped taking
+            entries. last_error says which.
           example: true
+        last_error:
+          type: string
+          description: Why the node is not healthy; absent when it is
+          example: ""
         followers:
           type: array
           items:
             $ref: "#/components/schemas/FollowerInfo"
-          description: Connected followers (leader only)
+          description: Followers the leader knows, connected or recently gone (leader only)
         uptime_seconds:
           type: integer
           format: int64
@@ -12166,23 +12214,40 @@ components:
         confirmed_lsn:
           type: integer
           format: uint64
-          description: Last LSN confirmed by this follower
+          description: Last LSN this follower acknowledged; retention keeps the entries after it
           example: 45228
         lag_ms:
           type: integer
           format: int64
-          description: Estimated replication lag in milliseconds
+          description: >
+            Age of the oldest entry the follower has not confirmed, from that
+            entry's timestamp; 0 when it has them all.
           example: 12
+        lag_entries:
+          type: integer
+          format: uint64
+          description: Entries written that the follower has not confirmed
+          example: 2
+        lag_exact:
+          type: boolean
+          description: >
+            False when lag_ms is a lower bound — the follower is behind more
+            entries than the leader keeps timestamps for (65,536), or behind
+            the start of the current log.
+          example: true
         last_seen_at:
           type: integer
           format: int64
-          description: Unix timestamp of last communication
+          description: Unix timestamp of the last stream or acknowledgement
           example: 1709500000
+        connected:
+          type: boolean
+          description: False for a follower that is gone and still remembered (up to MDDB_BINLOG_MAX_AGE)
+          example: true
         status:
           type: string
-          enum: [ healthy, warning, unhealthy ]
-          description: "Follower health status (healthy: <1s lag, warning: 1-30s,
-            unhealthy: >30s)"
+          enum: [ healthy, warning, unhealthy, disconnected ]
+          description: "healthy: lag up to 1 s; warning: up to 30 s; unhealthy: more; disconnected: no stream"
           example: healthy
 
     HybridSearchRequest:

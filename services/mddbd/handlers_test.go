@@ -37,15 +37,29 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 	}
 	_ = f.Close()
 
-	db, err := bolt.Open(f.Name(), 0600, nil)
-	if err != nil {
+	s := newHandlerTestServerAt(t, f.Name())
+	cleanup := func() {
+		if s.DB != nil {
+			_ = s.DB.Close()
+		}
 		_ = os.Remove(f.Name())
+	}
+	return s, cleanup
+}
+
+// newHandlerTestServerAt is newHandlerTestServer on the database at path,
+// which it opens or creates and leaves for the caller to close — a test
+// that restarts a node opens the same files again (GO-050).
+func newHandlerTestServerAt(t testing.TB, path string) *Server {
+	t.Helper()
+	db, err := bolt.Open(path, 0600, nil)
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	s := &Server{
 		DB:    db,
-		Path:  f.Name(),
+		Path:  path,
 		Mode:  ModeRW,
 		Ready: true,
 		BucketNames: BucketNames{
@@ -59,7 +73,6 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 
 	if err := s.ensureBuckets(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 
@@ -67,7 +80,6 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 	s.VectorStore = vector.NewVectorStore(db)
 	if err := s.VectorStore.EnsureBucket(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 	s.VectorIndex = vector.NewVectorIndex()
@@ -76,7 +88,6 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 	s.CollectionManager = NewCollectionManager(db)
 	if err := s.CollectionManager.EnsureBucket(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 
@@ -100,7 +111,6 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 	s.TTLManager = ttl.NewTTLManager(db, serverTTLReaper{s: s})
 	if err := s.TTLManager.EnsureBuckets(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 
@@ -108,7 +118,6 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 	s.FTSIndex = fts.NewFTSIndex(db)
 	if err := s.FTSIndex.EnsureBuckets(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 
@@ -116,12 +125,10 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 	s.WebhookManager = webhooks.NewWebhookManager(db)
 	if err := s.WebhookManager.EnsureBucket(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 	if err := s.WebhookManager.LoadAll(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 
@@ -129,23 +136,17 @@ func newHandlerTestServer(t testing.TB) (*Server, func()) {
 	s.SchemaManager = schema.NewSchemaManager(db)
 	if err := s.SchemaManager.EnsureBucket(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 	if err := s.SchemaManager.LoadAll(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 
 	// Metrics (disabled in tests — avoids goroutines)
 	s.Metrics = metrics.NewMetrics(false, &serverMetricsStats{s: s})
 
-	cleanup := func() {
-		_ = db.Close()
-		_ = os.Remove(f.Name())
-	}
-	return s, cleanup
+	return s
 }
 
 // addTestDoc is a convenience helper that creates a document via the internal

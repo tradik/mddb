@@ -2,24 +2,34 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"mddb/internal/binlog"
 	proto "mddb/proto"
 	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
 // ReplicationClient manages the follower's connection to the leader.
+//
+// GO-050. The follower resumes from the position in its database, not from
+// the start of the leader's log. An entry it cannot apply — or one that does
+// not follow the last — stops it: the node reports itself unhealthy and
+// replaces its data with a snapshot before it applies anything else, where it
+// used to log the entry and carry on without it. What it applies it also
+// writes to a log of its own under the leader's LSNs.
 type ReplicationClient struct {
 	server        *Server
 	leaderAddr    string
@@ -28,12 +38,21 @@ type ReplicationClient struct {
 	retryInterval time.Duration
 	ackInterval   time.Duration
 	maxLag        time.Duration
+	tlsConfig     *tls.Config
+	logConfig     *binlog.BinlogConfig
 
 	conn   *grpc.ClientConn
 	client proto.MDDBReplicationClient
+	// log is this follower's copy of the leader's log; nil when it could not
+	// be opened, which costs the copy and nothing else.
+	log atomic.Pointer[binlog.Binlog]
 
 	lastAppliedAt atomic.Int64
 	lagMs         atomic.Int64
+	lagEntries    atomic.Uint64
+	connected     atomic.Bool
+	needSnapshot  atomic.Bool
+	lastError     atomic.Pointer[string]
 	running       atomic.Bool
 	stopCh        chan struct{}
 	wg            sync.WaitGroup
@@ -46,6 +65,10 @@ type ReplicationClientConfig struct {
 	RetryInterval time.Duration
 	AckInterval   time.Duration
 	MaxLag        time.Duration
+	// TLS is how the leader is dialled; nil is plaintext.
+	TLS *tls.Config
+	// Log configures the follower's copy of the leader's log; nil keeps none.
+	Log *binlog.BinlogConfig
 }
 
 // NewReplicationClient creates a new replication client
@@ -68,6 +91,8 @@ func NewReplicationClient(s *Server, cfg ReplicationClientConfig) *ReplicationCl
 		retryInterval: cfg.RetryInterval,
 		ackInterval:   cfg.AckInterval,
 		maxLag:        cfg.MaxLag,
+		tlsConfig:     cfg.TLS,
+		logConfig:     cfg.Log,
 		stopCh:        make(chan struct{}),
 	}
 }
@@ -77,9 +102,11 @@ func (rc *ReplicationClient) Start() {
 	if rc.running.Swap(true) {
 		return // already running
 	}
+	rc.resume()
 	rc.wg.Add(1)
 	go rc.loop()
-	slog.Info("Replication client started", "leaderAddr", rc.leaderAddr, "followerID", rc.followerID)
+	slog.Info("Replication client started", "leaderAddr", rc.leaderAddr, "followerID", rc.followerID,
+		"fromLSN", rc.applier.LastAppliedLSN())
 }
 
 // Stop gracefully stops the replication client
@@ -89,13 +116,15 @@ func (rc *ReplicationClient) Stop() {
 	}
 	close(rc.stopCh)
 	rc.wg.Wait()
-	if rc.conn != nil {
-		_ = rc.conn.Close()
+	rc.disconnect()
+	if log := rc.log.Swap(nil); log != nil {
+		_ = log.Close()
 	}
 	slog.Info("Replication client stopped")
 }
 
-// LagMs returns the current replication lag in milliseconds
+// LagMs returns the replication lag in milliseconds, as the leader measured
+// it at the last acknowledgement.
 func (rc *ReplicationClient) LagMs() int64 {
 	return rc.lagMs.Load()
 }
@@ -105,13 +134,59 @@ func (rc *ReplicationClient) LastAppliedAt() int64 {
 	return rc.lastAppliedAt.Load()
 }
 
-// IsHealthy returns true if the replication lag is within acceptable bounds
+// IsHealthy reports whether this follower is a current copy of its leader:
+// the stream is open, nothing has failed, and the lag is within bounds.
 func (rc *ReplicationClient) IsHealthy() bool {
-	lastApplied := rc.lastAppliedAt.Load()
-	if lastApplied == 0 {
-		return false // never applied anything
+	return rc.unhealthyReason() == ""
+}
+
+// unhealthyReason says why the follower is not healthy, or "".
+func (rc *ReplicationClient) unhealthyReason() string {
+	if e := rc.lastError.Load(); e != nil {
+		return *e
 	}
-	return time.Since(time.Unix(lastApplied, 0)) < rc.maxLag
+	switch {
+	case rc.needSnapshot.Load():
+		return "waiting for a snapshot from the leader"
+	case !rc.connected.Load():
+		return "not connected to the leader"
+	case rc.lagMs.Load() > rc.maxLag.Milliseconds():
+		return fmt.Sprintf("replication lag %d ms is over the limit of %d ms", rc.lagMs.Load(), rc.maxLag.Milliseconds())
+	}
+	return ""
+}
+
+// setError records why replication is failing; nil clears it.
+func (rc *ReplicationClient) setError(err error) {
+	if err == nil {
+		rc.lastError.Store(nil)
+		return
+	}
+	msg := err.Error()
+	rc.lastError.Store(&msg)
+}
+
+// fillStatus adds the follower's side to a status response.
+func (rc *ReplicationClient) fillStatus(resp *ReplicationStatusResponse) {
+	pos := rc.applier.Position()
+	resp.CurrentLSN = pos.LSN
+	if pos.LogID != 0 {
+		resp.LogID = binlog.FormatLogID(pos.LogID)
+	}
+	if log := rc.log.Load(); log != nil {
+		stats := log.Stats()
+		resp.BinlogOldest = stats.OldestLSN
+		resp.BinlogSize = stats.FileSize
+		resp.BinlogMaxSize = stats.MaxSize
+		resp.BinlogSync = stats.Sync
+	}
+	resp.LeaderAddr = rc.leaderAddr
+	resp.Connected = rc.connected.Load()
+	resp.ReplicationLag = rc.lagMs.Load()
+	resp.LagEntries = rc.lagEntries.Load()
+	resp.LastAppliedAt = rc.lastAppliedAt.Load()
+	resp.LastError = rc.unhealthyReason()
+	resp.Healthy = resp.LastError == ""
 }
 
 // loop is the main replication loop with reconnection logic
@@ -119,29 +194,60 @@ func (rc *ReplicationClient) loop() {
 	defer rc.wg.Done()
 
 	for rc.running.Load() {
-		if err := rc.connect(); err != nil {
-			slog.Warn("Replication failed to connect to leader", "leaderAddr", rc.leaderAddr, "err", err)
-			rc.waitRetry()
-			continue
+		err := rc.session()
+		rc.connected.Store(false)
+		rc.disconnect()
+		if err != nil {
+			rc.setError(err)
+			slog.Warn("Replication stream error", "leaderAddr", rc.leaderAddr, "err", err)
 		}
-
-		if err := rc.replicate(); err != nil {
-			slog.Warn("Replication stream error", "err", err)
-			rc.disconnect()
+		// A follower that has just learned it needs a snapshot asks for it
+		// at once; every other end of a session waits before the next.
+		if err == nil || !rc.needSnapshot.Load() || errors.Is(err, errSnapshotFailed) {
 			rc.waitRetry()
-			continue
 		}
 	}
 }
 
+// errSnapshotFailed marks a session that ended because the snapshot it needed
+// could not be taken.
+var errSnapshotFailed = errors.New("snapshot failed")
+
+// session is one connection to the leader: a snapshot if one is due, then
+// the binlog stream until it ends.
+func (rc *ReplicationClient) session() error {
+	if err := rc.connect(); err != nil {
+		return fmt.Errorf("failed to connect to leader: %w", err)
+	}
+	ctx, cancel := context.WithCancel(withReplicationSecret(context.Background()))
+	defer cancel()
+	// Stop ends a stream that is waiting for the next entry.
+	go func() {
+		select {
+		case <-rc.stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	if rc.needSnapshot.Load() {
+		if err := rc.requestSnapshot(ctx); err != nil {
+			return fmt.Errorf("%w: %w", errSnapshotFailed, err)
+		}
+	}
+	return rc.replicate(ctx)
+}
+
 // connect establishes a gRPC connection to the leader
 func (rc *ReplicationClient) connect() error {
-	if rc.conn != nil {
-		_ = rc.conn.Close()
-	}
+	rc.disconnect()
 
+	creds := insecure.NewCredentials()
+	if rc.tlsConfig != nil {
+		creds = credentials.NewTLS(rc.tlsConfig)
+	}
 	conn, err := grpc.NewClient(rc.leaderAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(creds),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(64*1024*1024)), // 64MB for snapshots
 	)
 	if err != nil {
@@ -150,7 +256,6 @@ func (rc *ReplicationClient) connect() error {
 
 	rc.conn = conn
 	rc.client = proto.NewMDDBReplicationClient(conn)
-	slog.Info("Replication connected to leader", "leaderAddr", rc.leaderAddr)
 	return nil
 }
 
@@ -173,159 +278,104 @@ func withReplicationSecret(ctx context.Context) context.Context {
 	return ctx
 }
 
-// replicate starts the binlog stream and applies entries
-func (rc *ReplicationClient) replicate() error {
-	fromLSN := rc.applier.LastAppliedLSN()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = withReplicationSecret(ctx)
-
-	// Start binlog stream
+// replicate starts the binlog stream and applies entries until it ends.
+func (rc *ReplicationClient) replicate(ctx context.Context) error {
+	pos := rc.applier.Position()
 	stream, err := rc.client.StreamBinlog(ctx, &proto.StreamBinlogRequest{
-		FollowerId: rc.followerID,
-		FromLsn:    fromLSN,
+		FollowerId:      rc.followerID,
+		FromLsn:         pos.LSN,
+		ProtocolVersion: replicationProtocol,
+		LogId:           pos.LogID,
 	})
 	if err != nil {
-		st, ok := status.FromError(err)
-		if ok && st.Code() == codes.FailedPrecondition {
-			// LSN too old, need full snapshot
-			slog.Info("replication LSN too old, requesting full snapshot")
-			if err := rc.requestSnapshot(ctx); err != nil {
-				return fmt.Errorf("snapshot failed: %w", err)
-			}
-			// Retry binlog stream after snapshot
-			return nil
-		}
-		return err
+		return rc.streamEnded(err)
 	}
-
-	// Start ack goroutine
 	go rc.ackLoop(ctx)
 
-	// Receive and apply entries
-	for {
-		select {
-		case <-rc.stopCh:
-			return nil
-		default:
-		}
+	// The leader answers with its headers before the first entry, or with
+	// its refusal. One from before 2.19.8 sends headers with its first
+	// entry, so this waits for that entry and the follower shows as
+	// connected from its first acknowledgement instead. A refusal has no
+	// headers; the Recv below returns it.
+	if header, err := stream.Header(); err == nil {
+		rc.adoptLeaderLog(header)
+	}
 
+	for {
 		entry, err := stream.Recv()
-		if err == io.EOF {
-			return nil
-		}
 		if err != nil {
-			return fmt.Errorf("stream recv error: %w", err)
+			return rc.streamEnded(err)
 		}
-
-		// Apply entry
-		binlogEntry := protoToEntry(entry)
-		if err := rc.applier.Apply(binlogEntry); err != nil {
-			slog.Warn("replication failed to apply entry", "lsn", entry.Lsn, "err", err)
-			continue // skip and continue (eventual consistency)
+		if err := rc.applyEntry(protoToEntry(entry)); err != nil {
+			return err
 		}
-
-		rc.lastAppliedAt.Store(time.Now().Unix())
-
-		// Update lag estimate
-		entryTime := time.Unix(0, entry.Timestamp)
-		rc.lagMs.Store(time.Since(entryTime).Milliseconds())
 	}
 }
 
-// requestSnapshot downloads a full database snapshot from the leader
-func (rc *ReplicationClient) requestSnapshot(ctx context.Context) error {
-	if rc.server.collectionStore() != nil {
-		return errSnapshotPerCollection
+// adoptLeaderLog takes the log ID from a leader's stream headers. Reaching
+// here with headers means the leader accepted this follower's position, so
+// a follower that knew no ID — a new one, or one upgraded from a release
+// without them — is in that log.
+func (rc *ReplicationClient) adoptLeaderLog(header metadata.MD) {
+	if len(header.Get(replProtocolHeader)) == 0 {
+		return // a leader before 2.19.8: no IDs
 	}
-	ctx = withReplicationSecret(ctx)
-	stream, err := rc.client.RequestSnapshot(ctx, &proto.SnapshotRequest{
-		FollowerId: rc.followerID,
-		CurrentLsn: rc.applier.LastAppliedLSN(),
-	})
+	rc.connected.Store(true)
+	rc.setError(nil)
+	ids := header.Get(replLogIDHeader)
+	if len(ids) == 0 {
+		return
+	}
+	var id uint64
+	if _, err := fmt.Sscanf(ids[0], "%x", &id); err != nil || id == rc.applier.Position().LogID {
+		return
+	}
+	pos := replPosition{LSN: rc.applier.LastAppliedLSN(), LogID: id}
+	rc.applier.SetPosition(pos)
+	if log := rc.log.Load(); log != nil && log.LogID() != id {
+		rc.rebaseLog(pos)
+	}
+}
+
+// streamEnded turns the end of a stream into the session's result. A leader
+// that says the follower's position cannot be continued (FailedPrecondition:
+// trimmed away, another log, ahead of the leader) is answered with a
+// snapshot. The refusal arrives here, with the first read, and not from the
+// call that opened the stream — which is where this used to look for it, so
+// a follower that had fallen behind the log retried the stream for ever.
+func (rc *ReplicationClient) streamEnded(err error) error {
+	if err == io.EOF {
+		return nil // the leader closed the stream: it is shutting down
+	}
+	if status.Code(err) == codes.FailedPrecondition {
+		rc.needSnapshot.Store(true)
+		slog.Info("replication: the leader cannot continue from this follower's position; taking a snapshot", "reason", status.Convert(err).Message())
+	}
+	if rc.running.Load() {
+		return fmt.Errorf("stream recv error: %w", err)
+	}
+	return nil // stopped
+}
+
+// applyEntry applies one entry from the stream and adds it to the follower's
+// log. An entry that does not follow the last one applied, or cannot be
+// applied, ends replication from the log: the follower's data is no longer
+// known to be the leader's, and only a snapshot makes it so again.
+func (rc *ReplicationClient) applyEntry(entry *binlog.BinlogEntry) error {
+	err := error(nil)
+	if want := rc.applier.LastAppliedLSN() + 1; entry.LSN != want {
+		err = fmt.Errorf("the leader sent LSN %d where %d was due", entry.LSN, want)
+	} else {
+		err = rc.applier.Apply(entry)
+	}
 	if err != nil {
-		return fmt.Errorf("failed to request snapshot: %w", err)
+		rc.needSnapshot.Store(true)
+		return fmt.Errorf("replication stopped, resynchronising from a snapshot: %w", err)
 	}
-
-	// Write to temp file
-	tmpPath := rc.server.Path + ".snapshot.tmp"
-	// #nosec G304 -- Extension is hardcoded and safe
-	tmpFile, err := os.Create(filepath.Clean(tmpPath))
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
-	}
-
-	var snapshotLSN uint64
-	var totalReceived uint64
-
-	for {
-		chunk, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			_ = tmpFile.Close()
-			_ = os.Remove(tmpPath)
-			return fmt.Errorf("failed to receive snapshot chunk: %w", err)
-		}
-
-		if _, err := tmpFile.Write(chunk.Data); err != nil {
-			_ = tmpFile.Close()
-			_ = os.Remove(tmpPath)
-			return fmt.Errorf("failed to write snapshot chunk: %w", err)
-		}
-
-		totalReceived += uint64(len(chunk.Data))
-		snapshotLSN = chunk.SnapshotLsn
-
-		if chunk.IsLast {
-			break
-		}
-	}
-
-	_ = tmpFile.Close()
-	slog.Info("replication snapshot received", "totalReceived", totalReceived, "snapshotLSN", snapshotLSN)
-
-	// Replace the database and rebuild in-memory state atomically with respect
-	// to live readers (GO-004). The restore write lock drains in-flight
-	// DBView/DBUpdate calls and blocks new ones, so no handler observes a
-	// closed or half-swapped *bolt.DB.
-	// swapDatabase rebuilds the derived in-memory state as part of reopening,
-	// so there is no separate rebuild here.
-	if err := rc.server.withRestoreLock(func() error {
-		return rc.replaceDatabase(tmpPath)
-	}); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("failed to replace database: %w", err)
-	}
-
-	// Set the applier's LSN to the snapshot LSN (atomic, lock-free).
-	rc.applier.SetLastAppliedLSN(snapshotLSN)
+	rc.appendLog(entry)
+	rc.connected.Store(true)
 	rc.lastAppliedAt.Store(time.Now().Unix())
-
-	slog.Info("replication snapshot applied", "snapshotLSN", snapshotLSN)
 	return nil
-}
-
-// replaceDatabase swaps the live database for a received snapshot.
-//
-// SEC-018: this used to be a third hand-rolled close-rename-reopen. It did not
-// check that the snapshot was a database, so a truncated stream was
-// indistinguishable from a good one until the reopen — by which point the live
-// database had already been renamed over. Any failure left the follower holding
-// a closed handle with no way back, and it reopened with hand-written bolt
-// options rather than the tuned ones, so a follower that had ever taken a
-// snapshot ran with a different mmap and lock configuration than everything
-// else in the process.
-//
-// The snapshot is renamed rather than copied: it is a temp file this client
-// created and is about to delete, and copying a multi-gigabyte file to throw
-// the original away is waste.
-func (rc *ReplicationClient) replaceDatabase(snapshotPath string) error {
-	return rc.server.swapDatabase(snapshotPath, func(dst string) error {
-		return os.Rename(snapshotPath, dst)
-	})
 }
 
 // ackLoop periodically sends LSN acknowledgments to the leader
@@ -336,29 +386,35 @@ func (rc *ReplicationClient) ackLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			if rc.client == nil {
-				continue
-			}
-			lsn := rc.applier.LastAppliedLSN()
-			resp, err := rc.client.AcknowledgeLSN(ctx, &proto.AcknowledgeLSNRequest{
-				FollowerId:   rc.followerID,
-				ConfirmedLsn: lsn,
-			})
-			if err != nil {
-				continue
-			}
-			// Update lag based on leader's current LSN
-			if resp.LeaderLsn > lsn {
-				rc.lagMs.Store(int64(resp.LeaderLsn-lsn) * 10) // #nosec G115 -- LSN diff within int64 range
-			} else {
-				rc.lagMs.Store(0)
-			}
+			rc.acknowledge(ctx)
 		case <-ctx.Done():
-			return
-		case <-rc.stopCh:
 			return
 		}
 	}
+}
+
+// acknowledge tells the leader what has been applied — which is what lets it
+// trim its log — and takes the lag the leader measured in return.
+func (rc *ReplicationClient) acknowledge(ctx context.Context) {
+	client := rc.client
+	if client == nil {
+		return
+	}
+	lsn := rc.applier.LastAppliedLSN()
+	resp, err := client.AcknowledgeLSN(ctx, &proto.AcknowledgeLSNRequest{
+		FollowerId:   rc.followerID,
+		ConfirmedLsn: lsn,
+	})
+	if err != nil {
+		return
+	}
+	rc.connected.Store(true)
+	rc.lagMs.Store(resp.LagMs)
+	entries := uint64(0)
+	if resp.LeaderLsn > lsn {
+		entries = resp.LeaderLsn - lsn
+	}
+	rc.lagEntries.Store(entries)
 }
 
 // waitRetry waits for the retry interval or until stopped

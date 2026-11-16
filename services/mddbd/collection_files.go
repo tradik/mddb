@@ -410,11 +410,6 @@ func (s *Server) dropCollectionFiles() {
 	s.collFiles = nil
 }
 
-// errSnapshotPerCollection is why replication snapshots are refused in the
-// per-collection layout: a snapshot streams one file.
-var errSnapshotPerCollection = errors.New("replication snapshots are not available with MDDB_STORAGE_LAYOUT=per-collection: " +
-	"a snapshot streams one file; start the follower from a backup of the leader (main file plus its .d directory) and let it catch up from the binlog")
-
 // openCollectionFile opens one collection file. When its freelist is not
 // stored (after a crash), it opens without it and rebuilds it in the
 // background, as the main file does (#333): reads of the collection work at

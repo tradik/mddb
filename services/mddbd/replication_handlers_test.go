@@ -245,6 +245,7 @@ func TestHandleReplicationStatus_FollowerLagHealthy(t *testing.T) {
 				Address:      "10.0.0.1:11024",
 				ConfirmedLSN: currentLSN,
 				LastSeenAt:   time.Now().Unix(),
+				Connected:    true,
 			},
 		},
 		mu: sync.RWMutex{},
