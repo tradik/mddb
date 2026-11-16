@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -108,10 +109,21 @@ func (f *fakeLog) hooks() Hooks {
 	}
 }
 
-const (
-	hb = 10 * time.Millisecond
-	et = 60 * time.Millisecond
+// The test cluster's heartbeat and election timeout. Windows sleeps and
+// timers have a resolution near 15.6 ms, which turns a 10 ms heartbeat into
+// one every 15–30 ms and leaves a 45 ms lease two heartbeats deep, so a
+// leader lost its lease to scheduling noise; there both are five times longer.
+var (
+	hb = scaledForTimers(10 * time.Millisecond)
+	et = scaledForTimers(60 * time.Millisecond)
 )
+
+func scaledForTimers(d time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return 5 * d
+	}
+	return d
+}
 
 type group struct {
 	t    *testing.T
