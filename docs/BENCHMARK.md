@@ -114,10 +114,10 @@ Shows how many documents each algorithm returns (limit=10) to verify they all fi
 
 ## Reproducible profile: latency, recall, ingest and recovery (TEST-005)
 
-One harness, [`tools/bench/profile`](../tools/bench/profile/main.go), measures
+One harness, [`tools/bench/profile`](https://github.com/tradik/mddb/tree/main/tools/bench/profile), measures
 search, ingest, start-up and recovery on a corpus drawn from a seed, and
 writes everything it measured — with the machine, the Go version and the
-commit — to one JSON file in [`docs/benchmarks/`](benchmarks/). The tables
+commit — to one JSON file in [`docs/benchmarks/`](https://github.com/tradik/mddb/tree/main/docs/benchmarks). The tables
 below are rendered from those files; a test
 (`TestBenchmarkDocInSyncWithResultFiles` in `tools/bench/profile`) fails when a
 table and its file disagree, so every number here has a file behind it.
