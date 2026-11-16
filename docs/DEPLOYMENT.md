@@ -642,9 +642,9 @@ curl -X POST http://localhost:11023/v1/truncate \
 - Read replicas: leader-follower replication, a binlog stream over gRPC ([REPLICATION.md](REPLICATION.md))
 - Load balancer for reads
 - Single write instance, elected among three or more nodes with `MDDB_CLUSTER_PEERS` ([Three-node cluster](#three-node-cluster))
-- No sharding: a node holds the whole database. To split data today, run separate instances, each with its own
-  database file and collections, and route each request to the instance that holds the collection yourself — the
-  server does no routing, rebalancing or cross-instance search
+- Collections spread over several clusters (node groups), each group holding whole collections; every node sends a
+  request to the group holding its collection ([Node groups](#node-groups)). One collection is never split across
+  groups, and nothing rebalances on its own: a collection moves when an admin moves it
 
 ### Three-node cluster
 
@@ -672,6 +672,32 @@ MDDB_REPLICATION_ACK=quorum        # optional: no acknowledged write is lost in 
 - Keep `MDDB_STORAGE_LAYOUT` the same on every node; snapshots are files.
 - Two data nodes give no automatic failover (two is not a majority of two):
   add a third, small node, or promote by hand.
+
+### Node groups
+
+When the collections no longer fit on one node, run several clusters and
+place each collection in one of them ([CLUSTER.md](CLUSTER.md#placing-collections-across-groups)):
+
+- Each group is a cluster as above: its nodes' `MDDB_CLUSTER_PEERS` list
+  exactly the group's nodes. Three nodes per group for automatic failover.
+- Every node, in every group, gets the same `MDDB_PLACEMENT_GROUPS` (for
+  example one file, `MDDB_PLACEMENT_GROUPS=@/etc/mddb/placement.json`),
+  naming the meta group and each node's id, gRPC address and REST URL. A
+  node only ever forwards requests to those addresses.
+- `MDDB_STORAGE_LAYOUT=per-collection` on every node; convert an existing
+  database with `mddbd -split-collections` first.
+- Run the meta group with `MDDB_REPLICATION_ACK=quorum`: it holds the
+  placement map, and the users, keys and other global settings.
+- Start the meta group first, then the others. With existing data, each
+  group's leader records the collections it holds in the map; check them
+  with `GET /v1/placement` or `mddb-cli placement`.
+- Open the gRPC port between all nodes of all groups, and the REST port as
+  well: nodes forward REST requests to each other's REST URLs.
+- Clients may use any node for REST and gRPC. Send GraphQL, `/es`, MCP and
+  multipart uploads to a node of the group holding the collection.
+- A collection must fit on one node. Move one with
+  `mddb-cli placement move <collection> <group>`; adding a group means
+  restarting every node with the new `MDDB_PLACEMENT_GROUPS`.
 
 ### Read Replicas (scheduled backup copy)
 

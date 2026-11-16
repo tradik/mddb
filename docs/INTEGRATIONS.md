@@ -406,7 +406,9 @@ graph LR
 
 MDDB and [OpenSearch](https://opensearch.org/) overlap on search, but they are
 built for different sizes of deployment. MDDB is one process on one machine,
-with read-only followers for read scaling ([REPLICATION.md](REPLICATION.md)).
+with read-only followers for read scaling ([REPLICATION.md](REPLICATION.md));
+from 2.19.8 several MDDB clusters can share the collections, each holding
+whole collections ([CLUSTER.md](CLUSTER.md#placing-collections-across-groups)).
 OpenSearch is a cluster: an index is split into shards spread over nodes. This
 section says when MDDB is enough on its own, when OpenSearch is the better
 tool, how to move between them, and how to run both.
@@ -415,7 +417,7 @@ tool, how to move between them, and how to run both.
 
 | | MDDB (v2.18.10) | OpenSearch |
 |---|---|---|
-| Deployment | One node; leader-follower replication copies the whole database to each follower | A cluster; shards and replicas spread one index over many nodes |
+| Deployment | One node; leader-follower replication copies the whole database to each follower. From 2.19.8, node groups each hold whole collections, never part of one ([CLUSTER.md](CLUSTER.md#placing-collections-across-groups)) | A cluster; shards and replicas spread one index over many nodes |
 | Vector search | 8 index types (flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ) and `algorithm: "auto"`, which picks one per query from the collection size, memory and filter ([SEARCH.md](SEARCH.md)). int8/int4 quantization and disk-only vectors cut memory ([QUANTIZATION.md](QUANTIZATION.md)). Every vector of a collection lives on one machine | k-NN plugin (Lucene, Faiss); vectors are split across shards and nodes |
 | Measured vector scale | Synthetic 32-dimension corpus, recall@10 against the exact top 10 ([BENCHMARK.md](BENCHMARK.md#vector-query-planner-v2189)): 200k vectors, HNSW 0.46 ms p50 at recall 1.000; 2M vectors, trained IVF 14 ms p50 at recall 1.000. 2M took about 2 hours to load and 10 minutes to train IVF on one machine | Scales by adding nodes |
 | Full text | TF-IDF, BM25, BM25F, PMISparse; 8 query modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy, expression); stemming for 17 languages; synonyms, stop words, typo tolerance, per-query BM25 `k1`/`b`. One index per document, covering the body and metadata values; no custom analyzers | Analyzer chains per field (tokenizers, token filters, ICU, language analyzers), per-field mappings |
@@ -438,8 +440,9 @@ tool, how to move between them, and how to run both.
 
 ### When to add or choose OpenSearch
 
-- One index must outgrow one machine's memory or disk, or writes must scale
-  beyond one leader. MDDB has no sharding.
+- One index must outgrow one machine's memory or disk, or writes to one
+  collection must scale beyond one leader. MDDB places whole collections on
+  node groups and never splits one collection across nodes.
 - Search depends on analyzers: per-field tokenisation, ICU, n-gram or edge
   n-gram fields, language analyzers MDDB's stemmers do not cover.
 - You need aggregations beyond counts and histograms (metrics, pipeline,

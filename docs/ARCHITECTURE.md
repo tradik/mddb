@@ -199,8 +199,9 @@ Every update creates a new revision with timestamp.
 
 **Trade-offs**:
 - Single-writer (not an issue for most use cases)
-- Not distributed
-- Limited to single machine
+- One database file per node (or one file per collection with `MDDB_STORAGE_LAYOUT=per-collection`)
+- A collection is limited to one machine; node groups spread whole collections, never parts of one
+  ([Collection placement](#collection-placement))
 
 ## Access Modes
 
@@ -255,9 +256,45 @@ MDDB exposes three layered extension mechanisms — each documented in its own f
 - Run multiple read-only instances
 - Single write instance
 - Leader-follower replication: the leader streams its binlog to followers over gRPC ([REPLICATION.md](REPLICATION.md))
-- No sharding: a node holds the whole database. To split data today, run separate instances, each with its own
-  database file and collections, and send each request to the instance that holds the collection — the server does
-  no routing, rebalancing or cross-instance search
+- Leader election among three or more nodes ([CLUSTER.md](CLUSTER.md))
+- Collection placement across node groups (2.19.8+, below): by whole collection, never splitting one
+
+### Collection placement
+
+With `MDDB_PLACEMENT_GROUPS` the nodes form groups, each a replicated cluster,
+and every collection belongs as a whole to one group
+([CLUSTER.md](CLUSTER.md#placing-collections-across-groups)). The pieces, in
+the order a request meets them:
+
+1. **Router** (`placement_route.go`, `placement_grpc.go`). Every REST route is
+   wrapped by it after the access gate, so a request is authenticated and
+   authorised where it arrives. It looks up the group of each collection the
+   request names and serves the request, sends it to that group's leader
+   (only addresses from the configuration), or answers `421` in redirect
+   mode. gRPC unary calls are routed the same way by an interceptor.
+2. **Placement map** (`placement_map.go`). Which group holds each collection
+   and which collections are moving, versioned by the meta group's term and a
+   counter. A collection the map does not name belongs to the group a
+   consistent hash of its name gives (`consistent_hash.go`); group leaders pin
+   the collections they hold.
+3. **Meta group** (`placement_sync.go`, `placement_global.go`). Its leader
+   stores the map (bucket `placement`) and the global settings (users, keys,
+   tenants, aliases, webhooks, automations, embedding and chat settings); the
+   other groups' leaders copy those settings every few seconds through their
+   own logs.
+4. **Entry gate in the log** (`placement_keys.go`). The binlog asks it before
+   it logs a write: a write to a collection the node's group does not hold,
+   or one being switched over by a move, is refused inside the write's
+   transaction. This catches writes from surfaces the router does not see
+   (GraphQL, `/es`, MCP, uploads).
+5. **Fan-out** (`placement_fanout*.go`). Cross-search over several groups and
+   `/v1/stats` ask each group's leader for its part and merge the answers on
+   the receiving node.
+6. **Moves** (`placement_move.go`, `placement_import.go`,
+   `placement_export.go`, `placement_drop.go`). The meta leader copies a
+   collection to another group while it takes writes, fences the source,
+   switches the map once the target has every write, and the old group drops
+   its copy later.
 
 ### Database Size
 - Suitable for: 10K - 1M documents

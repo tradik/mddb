@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"net"
 	"io"
 	"net/http"
 	"strconv"
@@ -46,8 +48,12 @@ func (p *placementRuntime) forward(w http.ResponseWriter, r *http.Request, group
 		}
 		resp, err := p.send(r, n.HTTP, body, hops+1)
 		if err != nil {
-			p.leaders.forget(group) // ask again who leads, and try once more
-			continue
+			p.leaders.forget(group) // ask again who leads
+			if notSent(err) {
+				continue // the request never left: try once more
+			}
+			writePlacementBusy(w, "the node group holding the collection did not answer: "+err.Error())
+			return
 		}
 		if resp.StatusCode == http.StatusMisdirectedRequest && attempt == 0 {
 			_ = resp.Body.Close()
@@ -72,6 +78,13 @@ func (p *placementRuntime) send(r *http.Request, base string, body []byte, hops 
 	}
 	out.Header.Set(hdrPlacementHops, strconv.Itoa(hops))
 	return p.client.Do(out) // #nosec G704 -- base is a configured node's URL (MDDB_PLACEMENT_GROUPS), never the request's
+}
+
+// notSent reports an error from before the request was sent — no
+// connection — after which sending it again cannot repeat a write.
+func notSent(err error) bool {
+	var op *net.OpError
+	return errors.As(err, &op) && op.Op == "dial"
 }
 
 // copyResponse writes resp to w and closes it.

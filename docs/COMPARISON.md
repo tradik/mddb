@@ -158,10 +158,12 @@ benchmark will fix that.
 
 Closer in shape, and the trade is scale against footprint. These are built to
 shard across a cluster; MDDB is built to be one file you can copy.
+From 2.19.8 several MDDB clusters can share the collections, each holding
+whole collections ([CLUSTER.md](CLUSTER.md#placing-collections-across-groups)).
 
 | | MDDB | MongoDB | CouchDB |
 |---|---|---|---|
-| Horizontal sharding | none — one node holds the whole database; split by hand into separate instances | automatic, mature | clustered |
+| Horizontal sharding | by whole collection across replicated node groups (placement map, consistent-hash default, explicit moves under load); one collection is never split; no automatic rebalancing | automatic, mature | clustered |
 | Protocols | HTTP, gRPC, GraphQL, MCP | wire protocol | HTTP |
 | Change feed | webhooks, binlog replication | change streams | `_changes` |
 | Markdown-aware | yes | no | no |
@@ -185,7 +187,7 @@ and on analysis depth; they cost a JVM, a cluster, and an operations budget.
 | Ranking algorithms | TF-IDF, BM25, BM25F, [PMISparse](PMISPARSE.md) | BM25 plus a large analysis toolkit |
 | Analyzers | stemming, stop words, synonyms, 30+ languages | far more, and pluggable |
 | Vector search | built in, hybrid with keyword | built in (recent versions) |
-| Distributed search | no | yes, that is the product |
+| Distributed search | cross-search over collections held by different node groups; one collection's index stays on one node | yes, that is the product |
 
 The algorithm choice is measured too, on quality as well as speed:
 [FTS Algorithm Benchmark](BENCHMARK.md) compares all four on the same corpus,
@@ -223,7 +225,7 @@ path it maps onto, so the search numbers above are the ones that apply.
 | Index types | flat, IVF, quantized (int8/int4) | HNSW, IVF-PQ, DiskANN, more |
 | Hybrid keyword + vector | native, one query, alpha or RRF | usually a separate keyword system |
 | The documents themselves | stored here | usually somewhere else |
-| Scale ceiling | one machine's disk | designed for billions |
+| Scale ceiling | one machine's disk per collection | designed for billions |
 
 The honest framing: if vector search *is* your application and you have more
 than a few million vectors, use something built for that. MDDB's advantage is
@@ -329,7 +331,8 @@ authors keep their editor, and the content becomes searchable by an agent.
 - You are building for agents, and want MCP that was designed in rather than
   adapted on.
 - One binary and one file is a feature, not a limitation.
-- Your corpus fits comfortably on one machine.
+- Each collection fits comfortably on one machine (several collections can
+  be spread over node groups).
 
 ## When it does not
 
@@ -337,7 +340,7 @@ authors keep their editor, and the content becomes searchable by an agent.
 - You need a distributed search or vector cluster. Use one.
 - Your authors are not developers and need an editorial workflow. Use a CMS —
   and put MDDB behind it if the content should also be searchable by an agent.
-- You need more vectors than one machine's disk holds.
+- You need more vectors in one collection than one machine's disk holds.
 
 ---
 

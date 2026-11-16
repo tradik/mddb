@@ -12,7 +12,8 @@ import (
 
 // Asking every group (GO-052): a fan-out sends each group its part, marked
 // with X-MDDB-Placement-Partial so the node answers from its own group
-// only. This node's own group is answered here, by the handler itself.
+// only. Each part is a group leader's answer; a leader answers its own
+// group's part here, by the handler itself.
 
 // askPart sends a part of r to group and returns the answer's body; payload
 // replaces the body when not nil.
@@ -27,7 +28,7 @@ func (p *placementRuntime) askPart(r *http.Request, group string, payload any, n
 		}
 	}
 	var resp *http.Response
-	if group == p.cfg.self {
+	if group == p.cfg.self && p.leads() { // a group's part is its leader's answer
 		resp = p.serveHere(r, body, next)
 	} else {
 		n, ok := p.leaderNode(group)

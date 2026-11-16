@@ -333,6 +333,20 @@ Complete list of MDDB features organized by category.
 
 See [Replication Guide](REPLICATION.md) for setup instructions and examples.
 
+### Leader Election (2.19.8+)
+- **Elected leader** - With `MDDB_CLUSTER_PEERS` three or more nodes elect the leader by majority and replace a failed one
+- **Quorum acknowledgements** - `MDDB_REPLICATION_ACK=quorum` returns a write once a majority holds it
+
+### Collection Placement (2.19.8+)
+- **Node groups** - With `MDDB_PLACEMENT_GROUPS` several clusters share the collections; each collection belongs as a whole to one group
+- **Routing on every node** - REST and gRPC requests go to the group holding the collection; writes to users, keys and other global settings go to the meta group
+- **Consistent-hash default** - A new collection goes to the group its name hashes to; existing ones are pinned, so adding a group moves nothing
+- **Cross-group answers** - Cross-search and `/v1/stats` ask every group and merge the results
+- **Moves under load** - `mddb-cli placement move <collection> <group>` copies a collection to another group while it takes reads and writes, then switches over without losing an acknowledged write
+- **Limits** - One collection is never split across groups; no automatic rebalancing
+
+See [Cluster Guide](CLUSTER.md) for leader election and placement.
+
 ## Operations & Management
 
 ### Export & Backup

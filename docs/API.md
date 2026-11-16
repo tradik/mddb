@@ -5118,6 +5118,8 @@ admin on `*`, "authenticated" for any valid token or API key. See
 | GET | `/v1/replication/status` | authenticated | [REPLICATION.md](REPLICATION.md#http-endpoint) |
 | POST | `/v1/replication/promote` | global admin | [CLUSTER.md](CLUSTER.md#promotion-and-demotion) |
 | POST | `/v1/replication/demote` | global admin | [CLUSTER.md](CLUSTER.md#promotion-and-demotion) |
+| GET | `/v1/placement` | global admin | [CLUSTER.md](CLUSTER.md#moving-a-collection) (v2.19.8+; answered by the meta group's leader) |
+| POST | `/v1/placement/move` | global admin | [CLUSTER.md](CLUSTER.md#moving-a-collection) (v2.19.8+; answered by the meta group's leader) |
 | POST | `/v1/spell-suggest` | `read` | [SYMSPELL.md](SYMSPELL.md#spell-suggestions) (needs `MDDB_SPELL=true`) |
 | POST | `/v1/spell-cleanup` | `read` | [SYMSPELL.md](SYMSPELL.md#apply-corrections) (needs `MDDB_SPELL=true`) |
 | GET, PUT, DELETE | `/v1/spell-dictionary` | `read` for GET, `write` otherwise | [SYMSPELL.md](SYMSPELL.md#custom-dictionary) (needs `MDDB_SPELL=true`) |

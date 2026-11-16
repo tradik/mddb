@@ -25,6 +25,7 @@ info:
     - Export capabilities (NDJSON, ZIP)
     - Backup and restore operations
     - **Replication** - Leader-follower replication with binlog streaming
+    - **Collection placement** (v2.19.8) - Whole collections placed across node groups; any node routes a request to the group holding its collection (see /v1/placement)
     - **Automation** - Webhooks, triggers (FTS/vector/hybrid + sentiment), crons
     - **Automation Logs** - Execution history with configurable TTL retention
 
@@ -138,6 +139,8 @@ tags:
     description: Prometheus-compatible metrics endpoint
   - name: Replication
     description: Leader-follower replication status and monitoring
+  - name: Placement
+    description: "(v2.19.8) Collections placed across node groups, and moves between them"
   - name: Synonyms
     description: FTS synonym dictionary management
   - name: Curation
@@ -2782,6 +2785,90 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/ErrorResponse"}
+
+  /v1/placement:
+    get:
+      tags:
+        - Placement
+      summary: Collection placement across node groups (admin)
+      description: |
+        (v2.19.8, GO-052) The node groups and their leaders, every collection
+        the placement map names, and the recent moves. Answered by the meta
+        group's leader whichever node receives it. Without
+        MDDB_PLACEMENT_GROUPS the answer is `{"enabled": false}`. See
+        [CLUSTER.md](CLUSTER.md#placing-collections-across-groups).
+      operationId: getPlacement
+      responses:
+        "200":
+          description: The placement
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PlacementStatus"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "421": {$ref: "#/components/responses/NotLeader"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+
+  /v1/placement/move:
+    post:
+      tags:
+        - Placement
+      summary: Move a collection to another node group (admin)
+      description: |
+        (v2.19.8, GO-052) Copies the collection to the target group while it
+        keeps serving reads and writes, holds its writes briefly while the
+        map switches, then the old group drops its copy after
+        MDDB_PLACEMENT_DROP_GRACE. No acknowledged write is lost. Run by the
+        meta group's leader. Without `wait` the answer is 202 at once; poll
+        GET /v1/placement. See
+        [CLUSTER.md](CLUSTER.md#moving-a-collection).
+      operationId: movePlacementCollection
+      parameters:
+        - name: wait
+          in: query
+          required: false
+          description: "true: answer when the move ends (200 done, 409 failed)"
+          schema: {type: boolean, default: false}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PlacementMoveRequest"}
+      responses:
+        "200":
+          description: "With wait=true: the move is done"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  move: {$ref: "#/components/schemas/PlacementMove"}
+        "202":
+          description: The move started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  move: {$ref: "#/components/schemas/PlacementMove"}
+        "400":
+          description: "collection or group missing, an unknown group, or placement not configured"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409":
+          description: "The collection is already in that group, a move of it is running, or (wait=true) the move failed — then move carries its state and error"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: {type: string}
+                  move: {$ref: "#/components/schemas/PlacementMove"}
+        "421": {$ref: "#/components/responses/NotLeader"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
 
   /v1/synonyms:
     get:
@@ -11273,6 +11360,15 @@ components:
           example: 84
         indexing:
           $ref: '#/components/schemas/IndexingStatus'
+        groups:
+          type: array
+          description: "(v2.19.8, GO-052) Only with collection placement (MDDB_PLACEMENT_GROUPS): every node group asked, with its document count, or the error when it did not answer. collections then lists each group's collections and the totals cover all groups; the other fields are the receiving node's."
+          items:
+            type: object
+            properties:
+              name: {type: string, example: g2}
+              totalDocuments: {type: integer, example: 1200}
+              error: {type: string, description: "Why the group did not answer; absent when it did"}
         statsComputedAt:
           type: string
           format: date-time
@@ -12753,6 +12849,82 @@ components:
         node_id: {type: string, example: n2}
         state: {type: string, example: leader}
         term: {type: integer, format: uint64, example: 6}
+
+    PlacementStatus:
+      type: object
+      description: "(v2.19.8, GO-052) The placement as the answering node (the meta group's leader) sees it. Without MDDB_PLACEMENT_GROUPS only enabled: false."
+      required: [enabled]
+      properties:
+        enabled: {type: boolean, description: "Whether MDDB_PLACEMENT_GROUPS is set"}
+        nodeId: {type: string, example: n1}
+        group: {type: string, description: "The answering node's group", example: g1}
+        metaGroup: {type: string, example: g1}
+        version: {type: integer, format: uint64, description: "The map's version within its term", example: 14}
+        term: {type: integer, format: uint64, description: "The meta group's term the map was written in", example: 3}
+        route: {type: string, enum: [forward, redirect], description: "MDDB_PLACEMENT_ROUTE"}
+        groups:
+          type: array
+          items: {$ref: "#/components/schemas/PlacementGroup"}
+        collections:
+          type: array
+          description: "Every collection the map names, by name. A collection not listed belongs to the group the consistent hash of its name gives."
+          items: {$ref: "#/components/schemas/PlacementCollection"}
+        moves:
+          type: array
+          description: "The last 20 finished moves (oldest first), then the running ones. Kept in the meta leader's memory: a new meta leader starts with none."
+          items: {$ref: "#/components/schemas/PlacementMove"}
+
+    PlacementGroup:
+      type: object
+      properties:
+        name: {type: string, example: g2}
+        meta: {type: boolean, description: "Whether this is the meta group"}
+        leader: {type: string, description: "The group leader's node id, empty when not known", example: n4}
+        leaderHttp: {type: string, description: "The group leader's REST base URL", example: "http://10.0.1.1:11023"}
+        nodes:
+          type: array
+          items: {$ref: "#/components/schemas/PlacementNode"}
+        collections: {type: integer, description: "How many collections the map places in the group", example: 12}
+
+    PlacementNode:
+      type: object
+      description: "A node as MDDB_PLACEMENT_GROUPS names it"
+      properties:
+        id: {type: string, description: "Its MDDB_NODE_ID", example: n4}
+        grpc: {type: string, description: "Its gRPC address, as in MDDB_CLUSTER_PEERS", example: "10.0.1.1:11024"}
+        http: {type: string, description: "Its REST base URL", example: "http://10.0.1.1:11023"}
+
+    PlacementCollection:
+      type: object
+      properties:
+        name: {type: string, example: articles}
+        group: {type: string, description: "The group holding it", example: g1}
+        movingTo: {type: string, description: "The target group while a move runs; empty otherwise", example: ""}
+
+    PlacementMove:
+      type: object
+      properties:
+        collection: {type: string, example: articles}
+        from: {type: string, example: g1}
+        to: {type: string, example: g2}
+        phase:
+          type: string
+          enum: [copying, catching-up, fenced, done, failed]
+          description: "copying: the target copies the keys; catching-up: it applies the writes made meanwhile; fenced: writes are held while the map switches"
+        startedAt: {type: string, format: date-time}
+        finishedAt: {type: string, description: "RFC 3339 time; empty while the move runs"}
+        keysCopied: {type: integer, format: uint64}
+        sourceLsn: {type: integer, format: uint64, description: "The source log position the target has to reach"}
+        appliedLsn: {type: integer, format: uint64, description: "The source log position the target has applied"}
+        error: {type: string, description: "Why the move was given up; empty otherwise"}
+        durationMs: {type: integer, format: int64}
+
+    PlacementMoveRequest:
+      type: object
+      required: [collection, group]
+      properties:
+        collection: {type: string, description: "The collection, or an alias of it", example: articles}
+        group: {type: string, description: "The group to move it to", example: g2}
 
     FollowerInfo:
       type: object
@@ -16377,9 +16549,18 @@ components:
         the leader named in the X-MDDB-Leader header and in leaderAddr. Every
         write endpoint answers so on a node that does not lead; while an
         election runs it answers 503 with Retry-After instead. See CLUSTER.md.
+        (v2.19.8, GO-052) With collection placement and
+        MDDB_PLACEMENT_ROUTE=redirect, any request for a collection held by
+        another node group (and a write to a global setting or a
+        /v1/placement request on a node outside the meta group's leader) is
+        answered so too: X-MDDB-Leader is that group's leader, X-MDDB-Group
+        the group, and the body carries group instead of term.
       headers:
         X-MDDB-Leader:
           description: The leader's HTTP base URL
+          schema: {type: string}
+        X-MDDB-Group:
+          description: "(v2.19.8) With placement redirects: the node group holding the collection"
           schema: {type: string}
       content:
         application/json:
@@ -16390,6 +16571,7 @@ components:
               leaderAddr: {type: string, example: "http://10.0.0.2:11023"}
               leaderId: {type: string, example: n2}
               term: {type: integer, format: uint64, example: 5}
+              group: {type: string, description: "(v2.19.8) With placement redirects: the node group", example: g2}
     ESBadRequest:
       description: An unsupported or malformed clause, named in error.reason
       content:

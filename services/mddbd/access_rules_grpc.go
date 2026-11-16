@@ -162,6 +162,10 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDBReplication/RequestVote": ruleHandler,
 	"/mddb.MDDBReplication/Heartbeat":   ruleHandler,
 	"/mddb.MDDBReplication/StepDown":    ruleHandler,
+	// GO-052: the placement between nodes, authorised like replication.
+	"/mddb.MDDBReplication/GetPlacement": ruleHandler, "/mddb.MDDBReplication/PushPlacement": ruleHandler,
+	"/mddb.MDDBReplication/PinCollections": ruleHandler, "/mddb.MDDBReplication/ExportKeys": ruleHandler,
+	"/mddb.MDDBReplication/ImportCollection": ruleHandler, "/mddb.MDDBReplication/FenceCollection": ruleHandler,
 
 	// Server reflection, for grpcurl: the schema, no data.
 	"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo":      ruleAuthenticated,

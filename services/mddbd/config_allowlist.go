@@ -106,6 +106,9 @@ var configKeys = map[string]configClass{
 	"MDDB_CLUSTER_PEERS": cfgPublic, "MDDB_CLUSTER_ADVERTISE_HTTP": cfgPublic, "MDDB_CLUSTER_AUTO_FAILOVER": cfgPublic,
 	"MDDB_CLUSTER_BOOTSTRAP": cfgPublic, "MDDB_CLUSTER_ELECTION_TIMEOUT": cfgPublic, "MDDB_CLUSTER_HEARTBEAT": cfgPublic,
 	"MDDB_CLUSTER_REJECTED_DIR": cfgPublic, "MDDB_REPLICATION_ACK": cfgPublic, "MDDB_REPLICATION_ACK_TIMEOUT": cfgPublic,
+	// GO-052: node groups; the groups name only addresses, never a secret.
+	"MDDB_PLACEMENT_GROUPS": cfgPublic, "MDDB_PLACEMENT_ROUTE": cfgPublic, "MDDB_PLACEMENT_REFRESH": cfgPublic,
+	"MDDB_PLACEMENT_DROP_GRACE": cfgPublic, "MDDB_PLACEMENT_FENCE_TIMEOUT": cfgPublic,
 	"MDDB_BINLOG_ENABLED": cfgPublic, "MDDB_BINLOG_SYNC": cfgPublic, "MDDB_BINLOG_MAX_SIZE": cfgPublic,
 	"MDDB_BINLOG_HARD_MAX_SIZE": cfgPublic, "MDDB_BINLOG_MAX_AGE": cfgPublic, "MDDB_REPLICATION_TLS": cfgPublic,
 	"MDDB_CHAT_PROMPT_MAX_BYTES": cfgPublic, "MDDB_CHAT_RETENTION_DAYS": cfgPublic, "MDDB_CHAT_GAP_SCORE": cfgPublic, "MDDB_CHAT_SKILL_MAX_BYTES": cfgPublic, "MDDB_CLIENT_IP_HEADER": cfgPublic, "MDDB_CODE_MAX_SYMBOLS": cfgPublic, "MDDB_CODE_MAX_FACTS": cfgPublic,

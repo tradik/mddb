@@ -61,14 +61,27 @@ type testPlacement struct {
 	t     *testing.T
 	cfg   placementConfig
 	nodes []*placementNodeT
+	setup func(*Server) // what a test adds to every node, once it has its log
 }
 
-// startTestPlacement starts groups of the given sizes; meta is the first.
+// startTestPlacement starts groups of the given sizes, meta the meta group.
 func startTestPlacement(t *testing.T, sizes map[string]int, meta string) *testPlacement {
+	t.Helper()
+	return startTestPlacementOf(t, sizes, meta, nil)
+}
+
+// startTestPlacementWith starts groups whose meta group is "meta", with
+// setup run on every node.
+func startTestPlacementWith(t *testing.T, sizes map[string]int, setup func(*Server)) *testPlacement {
+	t.Helper()
+	return startTestPlacementOf(t, sizes, "meta", setup)
+}
+
+func startTestPlacementOf(t *testing.T, sizes map[string]int, meta string, setup func(*Server)) *testPlacement {
 	t.Helper()
 	useSecret(t)
 	t.Setenv("MDDB_STORAGE_LAYOUT", "per-collection")
-	tp := &testPlacement{t: t, cfg: placementConfig{meta: meta, groups: map[string][]placementNode{},
+	tp := &testPlacement{t: t, setup: setup, cfg: placementConfig{meta: meta, groups: map[string][]placementNode{},
 		refresh: testPlacementRefresh, dropGrace: testDropGrace, fenceTimeout: 5 * time.Second}}
 	root := t.TempDir()
 	names := make([]string, 0, len(sizes))
@@ -131,6 +144,10 @@ func (tp *testPlacement) boot(n *placementNodeT) {
 	n.s.WebhookManager.SetBinlog(n.s.Binlog)
 	n.s.SchemaManager.SetBinlog(n.s.Binlog)
 	n.s.CollectionManager.SetBinlog(n.s.Binlog)
+	n.s.VectorIndex.SetReady()
+	if tp.setup != nil {
+		tp.setup(n.s)
+	}
 	if err := n.s.initPlacement(tp.cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +161,7 @@ func (tp *testPlacement) boot(n *placementNodeT) {
 	mux := http.NewServeMux()
 	n.s.registerRoutes(mux, false)
 	n.handler.mu.Lock()
-	n.handler.h = mux
+	n.handler.h = n.s.withAliases(mux) // as wrapHTTPHandler installs it
 	n.handler.mu.Unlock()
 	n.s.cluster.start()
 	n.s.placement.start()
