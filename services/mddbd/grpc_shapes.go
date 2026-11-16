@@ -165,7 +165,8 @@ func searchStatus(err error) error {
 	case errors.Is(err, errEmbedQuery):
 		return status.Error(codes.Internal, err.Error())
 	}
-	return status.Error(codes.InvalidArgument, err.Error())
+	// GO-053: a search refused at the concurrency limit is RESOURCE_EXHAUSTED.
+	return grpcError(codes.InvalidArgument, err)
 }
 
 // imageRefsToProto converts image references (RAG-010).

@@ -123,6 +123,9 @@ func grpcError(code codes.Code, err error) error {
 	if asReadOnlyError(err) != nil { // AGT-005
 		code = codes.PermissionDenied
 	}
+	if errors.Is(err, ErrSearchBusy) { // GO-053: the search concurrency limit
+		code = codes.ResourceExhausted
+	}
 	return status.Error(code, err.Error())
 }
 
@@ -143,7 +146,8 @@ func graphQLErrorPresenter(ctx context.Context, err error) *gqlerror.Error {
 }
 
 // mcpQuotaContent is the structured content of a failed tool call refused by
-// a quota or by a read-only collection (AGT-005), nil for any other failure.
+// a quota, by a read-only collection (AGT-005) or by the search concurrency
+// limit (GO-053), nil for any other failure.
 // The GraphQL presenter puts the same detail in an error's extensions.
 func mcpQuotaContent(err error) map[string]any {
 	if qe := asQuotaError(err); qe != nil {
@@ -152,5 +156,5 @@ func mcpQuotaContent(err error) map[string]any {
 	if re := asReadOnlyError(err); re != nil {
 		return re.detail()
 	}
-	return nil
+	return searchBusyDetail(err) // GO-053: nil unless the search limit refused
 }

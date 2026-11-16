@@ -27,7 +27,7 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/bulk-ingest-jobs", s.handleBulkIngestList)
 	mux.HandleFunc("/v1/ingest", s.guardWrite(s.handleIngest))
 	mux.HandleFunc("/v1/get", s.handleGet)
-	mux.HandleFunc("/v1/search", s.handleSearch)
+	mux.HandleFunc("/v1/search", s.withSearchLimit(s.handleSearch)) // GO-053
 	mux.HandleFunc("/v1/export", s.handleExport)
 	mux.HandleFunc("/v1/backup", s.handleBackup)
 	mux.HandleFunc("/v1/restore", s.guardWrite(s.handleRestore))
@@ -37,9 +37,11 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/delete-collection", s.guardWrite(s.handleDeleteCollection))
 	mux.HandleFunc("/v1/stats", s.handleStats)
 	mux.HandleFunc("/v1/storage", s.handleStorage) // #335: bytes per bucket and collection
-	// GO-033: the four query paths that hold working memory for the length of
-	// the request queue behind a semaphore, so a burst becomes a 503 a client
-	// can retry rather than an OOM that takes every other request with it.
+	// GO-033: the query paths that hold working memory for the length of the
+	// request queue behind a semaphore, so a burst becomes a 503 a client can
+	// retry rather than an OOM that takes every other request with it. GO-053:
+	// gRPC, GraphQL and MCP queue behind the same slots, in the search core
+	// (searchSlot); a REST route that reaches the core holds one slot.
 	mux.HandleFunc("/v1/vector-search", s.withSearchLimit(s.handleVectorSearch))
 	mux.HandleFunc("/v1/vector-reindex", s.guardWrite(s.handleVectorReindex))
 	mux.HandleFunc("/v1/vector-stats", s.handleVectorStats)
@@ -144,7 +146,7 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	// Memory RAG endpoints
 	mux.HandleFunc("/v1/memory/session", s.guardWrite(s.handleMemorySessionCreate))
 	mux.HandleFunc("/v1/memory/message", s.guardWrite(s.handleMemoryMessageAdd))
-	mux.HandleFunc("/v1/memory/recall", s.handleMemoryRecall)
+	mux.HandleFunc("/v1/memory/recall", s.withSearchLimit(s.handleMemoryRecall)) // GO-053
 	mux.HandleFunc("/v1/memory/summarize", s.guardWrite(s.handleMemorySummarize))
 	mux.HandleFunc("/v1/memory/sessions", s.handleMemorySessionsList)
 	mux.HandleFunc("/v1/memory/history", s.handleMemoryHistory)
@@ -153,8 +155,8 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/chat/conversations", s.handleChatConversations)
 	mux.HandleFunc("/v1/chat/conversations/", s.handleChatConversations)
 
-	mux.HandleFunc("/v1/cross-search", s.handleCrossSearch)
-	mux.HandleFunc("/v1/find-duplicates", s.handleFindDuplicates)
+	mux.HandleFunc("/v1/cross-search", s.withSearchLimit(s.handleCrossSearch))       // GO-053
+	mux.HandleFunc("/v1/find-duplicates", s.withSearchLimit(s.handleFindDuplicates)) // GO-053
 	mux.HandleFunc("/v1/aggregate", s.withSearchLimit(s.handleAggregate))
 	// Temporal event tracking. Switched off, its routes answer the JSON
 	// "feature disabled" 404 rather than the mux's plain-text one.

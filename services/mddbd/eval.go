@@ -143,6 +143,13 @@ func defaultEvalConfigs() []EvalConfig {
 
 // RunEval scores each configuration on the evaluation set. It reads only.
 func (s *Server) RunEval(ctx context.Context, req EvalRequest) (*EvalResult, error) {
+	return limitedSearch(ctx, s, func(ctx context.Context) (*EvalResult, error) {
+		return s.runEval(ctx, req) // GO-053: one search slot for the whole run
+	})
+}
+
+// runEval is RunEval under the slot its caller holds.
+func (s *Server) runEval(ctx context.Context, req EvalRequest) (*EvalResult, error) {
 	if req.Collection == "" {
 		return nil, errors.New("collection is required")
 	}

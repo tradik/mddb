@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 
 	"mddb/internal/envconf"
+	json "mddb/internal/jsonx"
 )
 
 // Bounded concurrency for heavy queries (GO-033).
@@ -22,9 +24,15 @@ import (
 //
 // This bounds concurrency, not per-request cost; the allocation work in this
 // ticket is what makes each request cheap enough for the bound to be generous.
+//
+// GO-053: the gate is searchSlot, in the search core, so REST, gRPC, GraphQL
+// and MCP queue behind the same slots and are refused the same way: 503 with
+// Retry-After over HTTP, RESOURCE_EXHAUSTED over gRPC, and a tool or GraphQL
+// error carrying the same detail (code SEARCH_BUSY, retryAfterSeconds).
 
-// ErrSearchBusy is returned when a query could not get a slot in time.
-var ErrSearchBusy = errors.New("search concurrency limit reached")
+// ErrSearchBusy is returned when a query could not get a slot in time. The
+// text is what gRPC and MCP callers read, so it says when to come back.
+var ErrSearchBusy = errors.New("server is at its search concurrency limit, retry after 1s (503)")
 
 // SearchLimiter admits a bounded number of concurrent heavy queries.
 // A nil limiter admits everything, so call sites need no special case.
@@ -91,30 +99,98 @@ func (l *SearchLimiter) Stats() (inUse, peak, rejected uint64, capacity int) {
 	return l.inUse.load(), l.peak.load(), l.rejects.load(), cap(l.slots)
 }
 
-// withSearchLimit wraps a handler so heavy queries queue instead of piling up.
-// A query that cannot get a slot in time gets 503 with Retry-After, which says
-// "come back" rather than "this failed".
+// searchSlotKey marks a context whose request already holds a slot.
+type searchSlotKey struct{}
+
+// searchRetryAfterSeconds is the wait a refused query is told to observe.
+const searchRetryAfterSeconds = 1
+
+// searchSlot is the one gate every surface's heavy query passes (GO-053):
+// REST through withSearchLimit, and gRPC, GraphQL and MCP through the search
+// core they share (shapedFTS, shapedListing, shapedCodeGraph, RunEval and the
+// direct client's vector, hybrid, cross-collection, symbol and aggregate
+// calls). The returned context carries the slot, so a request that passes the
+// gate again further down — a REST route that reaches the core, an evaluation
+// running its queries — holds one slot, not two. Callers pass the returned
+// context on and call release.
+func (s *Server) searchSlot(ctx context.Context) (context.Context, func(), error) {
+	if s.SearchLimiter == nil || ctx.Value(searchSlotKey{}) != nil {
+		return ctx, func() {}, nil
+	}
+	release, err := s.SearchLimiter.Acquire(ctx)
+	if err != nil {
+		if errors.Is(err, ErrSearchBusy) {
+			s.reportSearchBusy(ctx)
+		}
+		return ctx, release, err
+	}
+	return context.WithValue(ctx, searchSlotKey{}, true), release, nil
+}
+
+// reportSearchBusy logs and counts one refused query.
+func (s *Server) reportSearchBusy(ctx context.Context) {
+	inUse, _, rejected, capacity := s.SearchLimiter.Stats()
+	slog.Warn("search rejected: concurrency limit reached",
+		"inUse", inUse, "capacity", capacity, "rejectedTotal", rejected, "surface", shapeScopeOf(ctx).surface.String())
+	if s.Metrics != nil {
+		s.Metrics.IncOp("search_rejected", "concurrency")
+	}
+}
+
+// limitedSearch runs one heavy query holding a search slot, or refuses it
+// with ErrSearchBusy when none frees up in time.
+func limitedSearch[T any](ctx context.Context, s *Server, run func(context.Context) (T, error)) (T, error) {
+	ctx, release, err := s.searchSlot(ctx)
+	if err != nil {
+		var none T
+		return none, err
+	}
+	defer release()
+	return run(ctx)
+}
+
+// searchBusyDetail is the refusal as structured data: the REST body, the MCP
+// structured content and the GraphQL extensions. nil when err is not one.
+func searchBusyDetail(err error) map[string]any {
+	if !errors.Is(err, ErrSearchBusy) {
+		return nil
+	}
+	return map[string]any{
+		"error":             ErrSearchBusy.Error(),
+		"code":              "SEARCH_BUSY",
+		"status":            http.StatusServiceUnavailable,
+		"retryAfterSeconds": searchRetryAfterSeconds,
+	}
+}
+
+// writeSearchBusy answers a refused query over HTTP — 503 with Retry-After,
+// "come back" rather than "this failed" — and reports whether err was one.
+func writeSearchBusy(w http.ResponseWriter, err error) bool {
+	detail := searchBusyDetail(err)
+	if detail == nil {
+		return false
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", strconv.Itoa(searchRetryAfterSeconds))
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(detail)
+	return true
+}
+
+// withSearchLimit is the gate for the REST query routes, whose handlers do
+// not all run through the shared core. The request's context carries the
+// slot on, so the core does not take a second one.
 func (s *Server) withSearchLimit(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		release, err := s.SearchLimiter.Acquire(r.Context())
+		ctx, release, err := s.searchSlot(r.Context())
 		if err != nil {
-			if errors.Is(err, ErrSearchBusy) {
-				inUse, _, rejected, capacity := s.SearchLimiter.Stats()
-				slog.Warn("search rejected: concurrency limit reached",
-					"inUse", inUse, "capacity", capacity, "rejectedTotal", rejected, "path", r.URL.Path)
-				if s.Metrics != nil {
-					s.Metrics.IncOp("search_rejected", "concurrency")
-				}
-				w.Header().Set("Retry-After", "1")
-				http.Error(w, `{"error":"server is at its search concurrency limit, retry shortly"}`,
-					http.StatusServiceUnavailable)
-				return
+			if !writeSearchBusy(w, err) {
+				// The client's own context ended; nothing to report.
+				http.Error(w, `{"error":"request cancelled"}`, http.StatusRequestTimeout)
 			}
-			// The client's own context ended; nothing to report.
-			http.Error(w, `{"error":"request cancelled"}`, http.StatusRequestTimeout)
 			return
 		}
 		defer release()
-		next(w, r)
+		next(w, r.WithContext(ctx))
 	}
 }

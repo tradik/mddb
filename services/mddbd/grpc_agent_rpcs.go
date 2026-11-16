@@ -29,10 +29,11 @@ func (g *GRPCServer) CodeSymbol(ctx context.Context, req *proto.CodeSymbolReques
 	if err := g.permit(ctx, req.Collection, PermRead); err != nil {
 		return nil, err
 	}
-	res, err := g.server.LookupSymbol(SymbolRequest{Collection: req.Collection, Name: req.Name, Path: req.Path,
+	// The lookup MCP and GraphQL run, under the same search slot (GO-053).
+	res, err := NewDirectClient(g.server).CodeSymbol(ctx, &SymbolRequest{Collection: req.Collection, Name: req.Name, Path: req.Path,
 		Include: req.Include, Limit: int(req.Limit), IncludeContent: req.IncludeContent})
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, grpcError(codes.InvalidArgument, err)
 	}
 	out := &proto.CodeSymbolResponse{Collection: res.Collection, Symbol: res.Symbol,
 		Definitions: passagesToProto(res.Definitions), References: passagesToProto(res.References),
@@ -85,7 +86,7 @@ func (g *GRPCServer) RunEval(ctx context.Context, req *proto.RunEvalRequest) (*p
 	}
 	res, err := g.server.RunEval(ctx, er)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, grpcError(codes.InvalidArgument, err)
 	}
 	out := &proto.RunEvalResponse{Collection: res.Collection, K: safeInt32(res.K), Queries: safeInt32(res.Queries)}
 	for _, r := range res.Results {

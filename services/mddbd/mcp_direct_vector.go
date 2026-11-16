@@ -15,7 +15,9 @@ import (
 // MCP, gRPC and GraphQL all run it; every answer it gives, passages and image
 // queries included, reports a limit the server's cap lowered (#368).
 func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchRequest) (*MCPVectorSearchResponse, error) {
-	resp, err := c.vectorSearch(ctx, req)
+	resp, err := limitedSearch(ctx, c.server, func(ctx context.Context) (*MCPVectorSearchResponse, error) {
+		return c.vectorSearch(ctx, req) // GO-053: one search slot
+	})
 	if resp != nil {
 		resp.LimitReport = req.limitReport
 		if resp.Passages != nil {

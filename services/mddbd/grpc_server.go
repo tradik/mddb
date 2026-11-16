@@ -355,7 +355,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 	page, total, err := g.server.shapedListing(ctx, listingQuery{Collection: req.Collection, Filter: filter,
 		SortBy: sortField, Asc: req.Asc, Offset: int(req.Offset), Limit: limit}, limitReport)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(codes.Internal, err)
 	}
 	protoDocs := make([]*proto.Document, len(page))
 	for i := range page {

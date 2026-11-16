@@ -225,7 +225,9 @@ func (c *DirectClient) ListCollectionConfigs(ctx context.Context) (*MCPCollectio
 // CrossSearch searches across multiple collections via the direct client.
 // MCP and gRPC run it; every answer reports a limit the cap lowered (#368).
 func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchRequest) (*MCPCrossSearchResponse, error) {
-	resp, err := c.crossSearch(ctx, req)
+	resp, err := limitedSearch(ctx, c.server, func(ctx context.Context) (*MCPCrossSearchResponse, error) {
+		return c.crossSearch(ctx, req) // GO-053: one search slot for the fan-out
+	})
 	if resp != nil {
 		resp.LimitReport = req.limitReport
 		if resp.Passages != nil {
@@ -372,7 +374,8 @@ func (s *Server) crossQueryVector(ctx context.Context, req *MCPCrossSearchReques
 
 // --- Find Duplicates ---
 
-// FindDuplicates finds duplicate documents via the direct client.
+// FindDuplicates finds duplicate documents via the direct client, holding a
+// search slot (GO-053): the scan compares every embedded document.
 func (c *DirectClient) FindDuplicates(ctx context.Context, req *MCPFindDuplicatesRequest) (*MCPFindDuplicatesResponse, error) {
 	httpReq := FindDuplicatesRequest{
 		Collection:     req.Collection,
@@ -382,7 +385,9 @@ func (c *DirectClient) FindDuplicates(ctx context.Context, req *MCPFindDuplicate
 		DistanceMetric: req.DistanceMetric,
 		IncludeContent: req.IncludeContent,
 	}
-	return c.server.findDuplicates(httpReq)
+	return limitedSearch(ctx, c.server, func(context.Context) (*FindDuplicatesResponse, error) {
+		return c.server.findDuplicates(httpReq)
+	})
 }
 
 // Ingest bulk-imports documents via the direct client.
@@ -421,9 +426,12 @@ func (c *DirectClient) Ingest(ctx context.Context, req *MCPIngestRequest) (*MCPI
 	}, nil
 }
 
-// Aggregate performs aggregation queries via the direct client.
+// Aggregate performs aggregation queries via the direct client, holding a
+// search slot (GO-053).
 func (c *DirectClient) Aggregate(ctx context.Context, req *AggregateRequest) (*AggregateResponse, error) {
-	return c.server.aggregate(req)
+	return limitedSearch(ctx, c.server, func(context.Context) (*AggregateResponse, error) {
+		return c.server.aggregate(req)
+	})
 }
 
 // Close is a no-op for the direct client since the server manages its own lifecycle.

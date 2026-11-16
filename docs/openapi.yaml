@@ -867,6 +867,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503": {$ref: "#/components/responses/SearchBusy"}
 
   /v1/delete:
     post:
@@ -1266,11 +1267,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "503":
-          description: Vector index is still loading
+          description: >
+            Vector index is still loading, or (with Retry-After and the
+            SearchBusy body, code SEARCH_BUSY) the search concurrency limit
+            is reached
+          headers:
+            Retry-After:
+              schema: {type: integer}
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/ErrorResponse"
+                  - $ref: "#/components/schemas/SearchBusy"
 
   /v1/mcp/keys:
     post:
@@ -1906,6 +1915,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503": {$ref: "#/components/responses/SearchBusy"}
 
   /v1/fts-reindex:
     post:
@@ -2111,6 +2121,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503": {$ref: "#/components/responses/SearchBusy"}
 
   /v1/import-url:
     post:
@@ -4305,6 +4316,7 @@ paths:
           description: Forbidden
         "422":
           description: Unknown relation in include
+        "503": {$ref: "#/components/responses/SearchBusy"}
     post:
       tags:
         - Search
@@ -4327,6 +4339,7 @@ paths:
           description: Missing collection or name, or an unreadable body
         "422":
           description: Unknown relation in include
+        "503": {$ref: "#/components/responses/SearchBusy"}
 
   /v1/code-graph:
     get:
@@ -4403,6 +4416,7 @@ paths:
           description: Missing collection/key, or an unknown direction
         "404":
           description: No such document in the collection
+        "503": {$ref: "#/components/responses/SearchBusy"}
     post:
       tags:
         - Search
@@ -4457,6 +4471,7 @@ paths:
           description: Missing collection/key, or an unknown direction
         "404":
           description: No such document in the collection
+        "503": {$ref: "#/components/responses/SearchBusy"}
   /v1/meta-keys:
     get:
       tags:
@@ -6870,6 +6885,7 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "405":
           description: Method not allowed
+        "503": {$ref: "#/components/responses/SearchBusy"}
 
   /v1/eval-queries:
     get:
@@ -8036,6 +8052,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503": {$ref: "#/components/responses/SearchBusy"}
 
   /v1/cross-search:
     post:
@@ -8065,6 +8082,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503": {$ref: "#/components/responses/SearchBusy"}
 
   /v1/find-duplicates:
     post:
@@ -8097,6 +8115,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503": {$ref: "#/components/responses/SearchBusy"}
 
   /v1/memory/session:
     post:
@@ -8280,6 +8299,7 @@ paths:
                   query:
                     type: string
         "400": {$ref: "#/components/responses/BadRequest"}
+        "503": {$ref: "#/components/responses/SearchBusy"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "413": {$ref: "#/components/responses/PayloadTooLarge"}
@@ -8935,6 +8955,7 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/ESSearchResponse"}
         "400": {$ref: "#/components/responses/ESBadRequest"}
+        "503": {$ref: "#/components/responses/SearchBusy"}
     get:
       tags: [Elasticsearch Compatibility]
       summary: Search (GET with a body)
@@ -8947,6 +8968,7 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/ESSearchResponse"}
         "400": {$ref: "#/components/responses/ESBadRequest"}
+        "503": {$ref: "#/components/responses/SearchBusy"}
   /es/{index}/_count:
     post:
       tags: [Elasticsearch Compatibility]
@@ -8964,6 +8986,7 @@ paths:
                 properties:
                   count: {type: integer}
         "400": {$ref: "#/components/responses/ESBadRequest"}
+        "503": {$ref: "#/components/responses/SearchBusy"}
     get:
       tags: [Elasticsearch Compatibility]
       summary: Count every document
@@ -9473,6 +9496,15 @@ components:
         limit: { type: integer, format: int64 }
         used: { type: integer, format: int64, description: "Current use; for diskReserve, the bytes available" }
         retryAfterSeconds: { type: integer, description: Embedding budget only }
+    SearchBusy:
+      type: object
+      description: (v2.19.8, GO-053) A query refused at the search concurrency limit.
+      required: [error, code, status, retryAfterSeconds]
+      properties:
+        error: { type: string, example: "server is at its search concurrency limit, retry after 1s (503)" }
+        code: { type: string, enum: [SEARCH_BUSY] }
+        status: { type: integer, enum: [503] }
+        retryAfterSeconds: { type: integer, example: 1 }
     RevisionConflict:
       type: object
       properties:
@@ -15785,6 +15817,20 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/ErrorResponse"}
+    SearchBusy:
+      description: >
+        (v2.19.8, GO-053) Every search slot (MDDB_SEARCH_MAX_CONCURRENT) stayed
+        taken for MDDB_SEARCH_QUEUE_TIMEOUT_MS. The query did not run; retry
+        after Retry-After seconds. The same limit covers gRPC
+        (RESOURCE_EXHAUSTED), GraphQL (the body below in the error's
+        extensions) and MCP (a tool error with the body below as
+        structuredContent).
+      headers:
+        Retry-After:
+          schema: {type: integer, example: 1}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/SearchBusy"}
     InsufficientStorage:
       description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
       content:

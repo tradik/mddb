@@ -228,8 +228,16 @@ func (c *DirectClient) FTSLanguages(ctx context.Context) (*MCPFTSLanguagesRespon
 	}, nil
 }
 
-// HybridSearch performs a combined full-text and vector search via the direct client.
+// HybridSearch performs a combined full-text and vector search via the direct
+// client, holding one search slot for both halves (GO-053).
 func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchRequest) (*MCPHybridSearchResponse, error) {
+	return limitedSearch(ctx, c.server, func(ctx context.Context) (*MCPHybridSearchResponse, error) {
+		return c.hybridSearch(ctx, req)
+	})
+}
+
+// hybridSearch is HybridSearch under the slot its caller holds.
+func (c *DirectClient) hybridSearch(ctx context.Context, req *MCPHybridSearchRequest) (*MCPHybridSearchResponse, error) {
 	if req.Collection == "" || req.Query == "" {
 		return nil, errors.New("missing required fields: collection, query")
 	}
@@ -351,9 +359,12 @@ func (c *DirectClient) ExpandTargets(_ context.Context, targets []string) []stri
 	return c.server.expandTargets(targets)
 }
 
-// CodeSymbol looks a symbol up (CODE-008).
+// CodeSymbol looks a symbol up (CODE-008), holding a search slot (GO-053).
+// MCP, gRPC and GraphQL all run it.
 func (c *DirectClient) CodeSymbol(ctx context.Context, req *SymbolRequest) (*SymbolResult, error) {
-	return c.server.LookupSymbol(*req)
+	return limitedSearch(ctx, c.server, func(context.Context) (*SymbolResult, error) {
+		return c.server.LookupSymbol(*req)
+	})
 }
 
 // IndexingStatus reports queued indexing work for a collection, or for the

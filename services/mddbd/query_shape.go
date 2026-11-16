@@ -155,9 +155,15 @@ func filterShape(fm map[string][]string, f MetaFilter, ranges int) (metrics.Filt
 	return ops, conds
 }
 
-// shapedFTS is searchFTS, counted. Callers that serve a request use it;
-// measurement (eval) and cross-collection fan-out call searchFTS directly.
+// shapedFTS is searchFTS, counted, holding a search slot (GO-053). Callers
+// that serve a request use it; measurement (eval) and cross-collection fan-out
+// call searchFTS directly, under the slot their own request holds.
 func (s *Server) shapedFTS(ctx context.Context, req FTSSearchRequest, start time.Time) (*FTSSearchResponse, error) {
+	ctx, release, err := s.searchSlot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	resp, err := s.searchFTS(req, start)
 	if err != nil {
 		return nil, err
@@ -178,9 +184,14 @@ type listingQuery struct {
 	Limit      int
 }
 
-// shapedListing is searchDocuments for a metadata listing, counted; rep says
-// whether the server's cap lowered the page size.
+// shapedListing is searchDocuments for a metadata listing, counted, holding a
+// search slot (GO-053); rep says whether the server's cap lowered the page size.
 func (s *Server) shapedListing(ctx context.Context, q listingQuery, rep LimitReport) ([]DocResponse, int, error) {
+	ctx, release, err := s.searchSlot(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer release()
 	page, total, err := s.searchDocuments(q.Collection, q.Filter, q.SortBy, q.Asc, q.Offset, q.Limit)
 	if err != nil {
 		return nil, 0, err
@@ -220,8 +231,13 @@ func vectorShape(v vectorShapeInput) metrics.SearchShape {
 // shapedCodeGraph is CodeGraph, counted: REST, MCP and GraphQL all walk the
 // graph through it. A request without a start document is counted too — it
 // is the "show me the map" question CODE-007 asks about — and then refused
-// by CodeGraph.
+// by CodeGraph. The walk holds a search slot (GO-053).
 func (s *Server) shapedCodeGraph(ctx context.Context, req GraphRequest) (*GraphResult, error) {
+	ctx, release, err := s.searchSlot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	res, err := s.CodeGraph(req)
 	s.recordGraph(ctx, codeGraphShape(req.Collection, req.Key, req.Depth, req.MaxDegree, res))
 	return res, err

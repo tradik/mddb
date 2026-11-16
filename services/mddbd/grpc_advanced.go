@@ -685,9 +685,12 @@ func (g *GRPCServer) FindDuplicates(ctx context.Context, req *proto.FindDuplicat
 		IncludeContent: req.IncludeContent,
 	}
 
-	resp, err := g.server.findDuplicates(internalReq)
+	// GO-053: the scan holds a search slot, as over REST and MCP.
+	resp, err := limitedSearch(ctx, g.server, func(context.Context) (*FindDuplicatesResponse, error) {
+		return g.server.findDuplicates(internalReq)
+	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(codes.Internal, err)
 	}
 
 	convertGroup := func(groups []DuplicateGroup) []*proto.DuplicateGroupProto {
