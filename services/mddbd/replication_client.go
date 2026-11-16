@@ -307,7 +307,18 @@ func (rc *ReplicationClient) replicate(ctx context.Context) error {
 	if err != nil {
 		return rc.streamEnded(err)
 	}
-	go rc.ackLoop(ctx)
+	// The acknowledgements end with the stream, before the connection they
+	// use is closed (disconnect).
+	ackCtx, stopAcks := context.WithCancel(ctx)
+	acksDone := make(chan struct{})
+	go func() {
+		defer close(acksDone)
+		rc.ackLoop(ackCtx)
+	}()
+	defer func() {
+		stopAcks()
+		<-acksDone
+	}()
 
 	// The leader answers with its headers before the first entry, or with
 	// its refusal. One from before 2.19.8 sends headers with its first

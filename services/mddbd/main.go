@@ -93,7 +93,6 @@ type Server struct {
 	AsyncIO             *AsyncIO               // Async I/O
 	ZeroCopy            *ZeroCopyManager       // Zero-copy I/O
 	SIMD                *vector.SIMDProcessor  // Vectorized operations
-	ShardCluster        *ShardCluster          // Distributed sharding
 	finalBatchProcessor *FinalBatchProcessor   // Final optimized batch processor
 	UseExtreme          bool                   // Enable extreme performance features
 	// Vector search
@@ -189,6 +188,7 @@ type Server struct {
 	replServer      atomic.Pointer[ReplicationServer] // Leader-side gRPC replication service; set by the gRPC listener while HTTP may already serve status
 	replClient      *ReplicationClient                // Follower-side replication client
 	cluster         *clusterRuntime                   // the node's part in a cluster (GO-051); nil outside one
+	placement       *placementRuntime                 // the node's part in a placement (GO-052); nil outside one
 	// Readiness
 	Ready bool // Set to true after full initialization; health check returns "warming_up" until then
 }
@@ -472,6 +472,9 @@ func runServer(srvCfg ServerConfig) int {
 	defer s.startReplicationClient()()
 	if s.cluster != nil {
 		s.cluster.start() // the replication service listens: elections can run
+		if s.placement != nil {
+			s.placement.start() // GO-052: fetch the map, follow the groups
+		}
 	}
 
 	if s.ReplicationRole == "leader" {
@@ -571,7 +574,6 @@ func newServer(srvCfg ServerConfig, db *bolt.DB, persistence PersistenceStatus, 
 		AsyncIO:       NewAsyncIO(),                       // Async I/O
 		ZeroCopy:      NewZeroCopyManager(),               // Zero-copy I/O
 		SIMD:          vector.NewSIMDProcessor(),          // Vectorized operations
-		ShardCluster:  NewShardCluster(4, 2),              // 4 shards, 2x replication
 		// Extreme mode = HTTP/3 enabled (legacy MDDB_EXTREME mapped in config)
 		UseExtreme: srvCfg.HTTP3.Enabled,
 	}
@@ -692,7 +694,6 @@ func (s *Server) initExtreme() {
 	slog.Info("Async I/O enabled")
 	slog.Info("Zero-Copy I/O enabled")
 	slog.Info("Vectorized Operations (SIMD) enabled")
-	slog.Info("Distributed Sharding enabled (4 shards, 2x replication)")
 }
 
 // initSearchIndexes creates the document buckets and the vector and geo
@@ -1089,7 +1090,8 @@ func (s *Server) initEventsAndMetrics() {
 func (s *Server) initReplication() {
 	s.NodeID = env("MDDB_NODE_ID", "")
 	if s.initClusterFromEnv() {
-		return // the election decides the role (GO-051)
+		s.initPlacementFromEnv() // GO-052: groups of clusters, each holding whole collections
+		return                   // the election decides the role (GO-051)
 	}
 	s.ReplicationRole = env("MDDB_REPLICATION_ROLE", "") // "leader", "follower", ""
 	if s.NodeID == "" && s.ReplicationRole != "" {
@@ -1554,6 +1556,9 @@ func (s *Server) grpcServerOptions(authEnabled bool) ([]grpc.ServerOption, strin
 	// nothing from it.
 	unaryChain = append(unaryChain, s.featureUnaryInterceptor())
 	streamChain = append(streamChain, s.featureStreamInterceptor())
+	// GO-052: then a call for another node group's collections goes there.
+	unaryChain = append(unaryChain, s.placementUnaryInterceptor())
+	streamChain = append(streamChain, s.placementStreamInterceptor())
 	unaryChain = append(unaryChain, shapeUnaryInterceptor) // OPS-025: last, after auth
 	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryChain...))
 	if len(streamChain) > 0 {

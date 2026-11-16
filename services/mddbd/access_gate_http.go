@@ -36,7 +36,9 @@ func (s *Server) gated(mux routeMux) gatedMux { return gatedMux{mux: mux, s: s} 
 
 // Handle registers h behind the gate for pattern.
 func (g gatedMux) Handle(pattern string, h http.Handler) {
-	g.mux.Handle(pattern, g.s.httpGate(pattern, g.s.featureGate(pattern, h))) // GO-049: then the module switch
+	// GO-049: then the module switch; GO-052: the placement router sends the
+	// request to the node group holding its collections.
+	g.mux.Handle(pattern, g.s.httpGate(pattern, g.s.placementRoute(pattern, g.s.featureGate(pattern, h))))
 }
 
 // HandleFunc registers h behind the gate for pattern.

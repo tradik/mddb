@@ -4787,6 +4787,12 @@ const (
 	MDDBReplication_RequestVote_FullMethodName       = "/mddb.MDDBReplication/RequestVote"
 	MDDBReplication_Heartbeat_FullMethodName         = "/mddb.MDDBReplication/Heartbeat"
 	MDDBReplication_StepDown_FullMethodName          = "/mddb.MDDBReplication/StepDown"
+	MDDBReplication_GetPlacement_FullMethodName      = "/mddb.MDDBReplication/GetPlacement"
+	MDDBReplication_PushPlacement_FullMethodName     = "/mddb.MDDBReplication/PushPlacement"
+	MDDBReplication_PinCollections_FullMethodName    = "/mddb.MDDBReplication/PinCollections"
+	MDDBReplication_ExportKeys_FullMethodName        = "/mddb.MDDBReplication/ExportKeys"
+	MDDBReplication_ImportCollection_FullMethodName  = "/mddb.MDDBReplication/ImportCollection"
+	MDDBReplication_FenceCollection_FullMethodName   = "/mddb.MDDBReplication/FenceCollection"
 )
 
 // MDDBReplicationClient is the client API for MDDBReplication service.
@@ -4807,6 +4813,23 @@ type MDDBReplicationClient interface {
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
 	// Cluster: a promotion asks the leader to stop taking writes and hand over.
 	StepDown(ctx context.Context, in *StepDownRequest, opts ...grpc.CallOption) (*StepDownResponse, error)
+	// Placement (GO-052, MDDB_PLACEMENT_GROUPS): the map of which node group
+	// holds each collection, as this node knows it.
+	GetPlacement(ctx context.Context, in *GetPlacementRequest, opts ...grpc.CallOption) (*PlacementMap, error)
+	// Placement: the meta group's leader hands a node a newer map at once.
+	PushPlacement(ctx context.Context, in *PlacementMap, opts ...grpc.CallOption) (*PushPlacementResponse, error)
+	// Placement: a group's leader records the collections it holds that the
+	// map does not place yet (sent to the meta group's leader).
+	PinCollections(ctx context.Context, in *PinCollectionsRequest, opts ...grpc.CallOption) (*PlacementMap, error)
+	// Placement: a copy of one collection's keys (or of the global settings),
+	// then the log entries that change them, as they are written.
+	ExportKeys(ctx context.Context, in *ExportKeysRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportKeysChunk], error)
+	// Placement: the target group's leader copies a collection from the
+	// source group's leader and reports how far it is (a move).
+	ImportCollection(ctx context.Context, in *ImportCollectionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportProgress], error)
+	// Placement: the source group's leader stops taking writes to a
+	// collection being moved, or takes them again (release).
+	FenceCollection(ctx context.Context, in *FenceCollectionRequest, opts ...grpc.CallOption) (*FenceCollectionResponse, error)
 }
 
 type mDDBReplicationClient struct {
@@ -4905,6 +4928,84 @@ func (c *mDDBReplicationClient) StepDown(ctx context.Context, in *StepDownReques
 	return out, nil
 }
 
+func (c *mDDBReplicationClient) GetPlacement(ctx context.Context, in *GetPlacementRequest, opts ...grpc.CallOption) (*PlacementMap, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlacementMap)
+	err := c.cc.Invoke(ctx, MDDBReplication_GetPlacement_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBReplicationClient) PushPlacement(ctx context.Context, in *PlacementMap, opts ...grpc.CallOption) (*PushPlacementResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PushPlacementResponse)
+	err := c.cc.Invoke(ctx, MDDBReplication_PushPlacement_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBReplicationClient) PinCollections(ctx context.Context, in *PinCollectionsRequest, opts ...grpc.CallOption) (*PlacementMap, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlacementMap)
+	err := c.cc.Invoke(ctx, MDDBReplication_PinCollections_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBReplicationClient) ExportKeys(ctx context.Context, in *ExportKeysRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportKeysChunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &MDDBReplication_ServiceDesc.Streams[2], MDDBReplication_ExportKeys_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExportKeysRequest, ExportKeysChunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDBReplication_ExportKeysClient = grpc.ServerStreamingClient[ExportKeysChunk]
+
+func (c *mDDBReplicationClient) ImportCollection(ctx context.Context, in *ImportCollectionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportProgress], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &MDDBReplication_ServiceDesc.Streams[3], MDDBReplication_ImportCollection_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ImportCollectionRequest, ImportProgress]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDBReplication_ImportCollectionClient = grpc.ServerStreamingClient[ImportProgress]
+
+func (c *mDDBReplicationClient) FenceCollection(ctx context.Context, in *FenceCollectionRequest, opts ...grpc.CallOption) (*FenceCollectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FenceCollectionResponse)
+	err := c.cc.Invoke(ctx, MDDBReplication_FenceCollection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MDDBReplicationServer is the server API for MDDBReplication service.
 // All implementations must embed UnimplementedMDDBReplicationServer
 // for forward compatibility.
@@ -4923,6 +5024,23 @@ type MDDBReplicationServer interface {
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
 	// Cluster: a promotion asks the leader to stop taking writes and hand over.
 	StepDown(context.Context, *StepDownRequest) (*StepDownResponse, error)
+	// Placement (GO-052, MDDB_PLACEMENT_GROUPS): the map of which node group
+	// holds each collection, as this node knows it.
+	GetPlacement(context.Context, *GetPlacementRequest) (*PlacementMap, error)
+	// Placement: the meta group's leader hands a node a newer map at once.
+	PushPlacement(context.Context, *PlacementMap) (*PushPlacementResponse, error)
+	// Placement: a group's leader records the collections it holds that the
+	// map does not place yet (sent to the meta group's leader).
+	PinCollections(context.Context, *PinCollectionsRequest) (*PlacementMap, error)
+	// Placement: a copy of one collection's keys (or of the global settings),
+	// then the log entries that change them, as they are written.
+	ExportKeys(*ExportKeysRequest, grpc.ServerStreamingServer[ExportKeysChunk]) error
+	// Placement: the target group's leader copies a collection from the
+	// source group's leader and reports how far it is (a move).
+	ImportCollection(*ImportCollectionRequest, grpc.ServerStreamingServer[ImportProgress]) error
+	// Placement: the source group's leader stops taking writes to a
+	// collection being moved, or takes them again (release).
+	FenceCollection(context.Context, *FenceCollectionRequest) (*FenceCollectionResponse, error)
 	mustEmbedUnimplementedMDDBReplicationServer()
 }
 
@@ -4953,6 +5071,24 @@ func (UnimplementedMDDBReplicationServer) Heartbeat(context.Context, *HeartbeatR
 }
 func (UnimplementedMDDBReplicationServer) StepDown(context.Context, *StepDownRequest) (*StepDownResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StepDown not implemented")
+}
+func (UnimplementedMDDBReplicationServer) GetPlacement(context.Context, *GetPlacementRequest) (*PlacementMap, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPlacement not implemented")
+}
+func (UnimplementedMDDBReplicationServer) PushPlacement(context.Context, *PlacementMap) (*PushPlacementResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PushPlacement not implemented")
+}
+func (UnimplementedMDDBReplicationServer) PinCollections(context.Context, *PinCollectionsRequest) (*PlacementMap, error) {
+	return nil, status.Error(codes.Unimplemented, "method PinCollections not implemented")
+}
+func (UnimplementedMDDBReplicationServer) ExportKeys(*ExportKeysRequest, grpc.ServerStreamingServer[ExportKeysChunk]) error {
+	return status.Error(codes.Unimplemented, "method ExportKeys not implemented")
+}
+func (UnimplementedMDDBReplicationServer) ImportCollection(*ImportCollectionRequest, grpc.ServerStreamingServer[ImportProgress]) error {
+	return status.Error(codes.Unimplemented, "method ImportCollection not implemented")
+}
+func (UnimplementedMDDBReplicationServer) FenceCollection(context.Context, *FenceCollectionRequest) (*FenceCollectionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FenceCollection not implemented")
 }
 func (UnimplementedMDDBReplicationServer) mustEmbedUnimplementedMDDBReplicationServer() {}
 func (UnimplementedMDDBReplicationServer) testEmbeddedByValue()                         {}
@@ -5087,6 +5223,100 @@ func _MDDBReplication_StepDown_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDBReplication_GetPlacement_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlacementRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBReplicationServer).GetPlacement(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDBReplication_GetPlacement_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBReplicationServer).GetPlacement(ctx, req.(*GetPlacementRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDBReplication_PushPlacement_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PlacementMap)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBReplicationServer).PushPlacement(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDBReplication_PushPlacement_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBReplicationServer).PushPlacement(ctx, req.(*PlacementMap))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDBReplication_PinCollections_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PinCollectionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBReplicationServer).PinCollections(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDBReplication_PinCollections_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBReplicationServer).PinCollections(ctx, req.(*PinCollectionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDBReplication_ExportKeys_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportKeysRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(MDDBReplicationServer).ExportKeys(m, &grpc.GenericServerStream[ExportKeysRequest, ExportKeysChunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDBReplication_ExportKeysServer = grpc.ServerStreamingServer[ExportKeysChunk]
+
+func _MDDBReplication_ImportCollection_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ImportCollectionRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(MDDBReplicationServer).ImportCollection(m, &grpc.GenericServerStream[ImportCollectionRequest, ImportProgress]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDBReplication_ImportCollectionServer = grpc.ServerStreamingServer[ImportProgress]
+
+func _MDDBReplication_FenceCollection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FenceCollectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBReplicationServer).FenceCollection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDBReplication_FenceCollection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBReplicationServer).FenceCollection(ctx, req.(*FenceCollectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MDDBReplication_ServiceDesc is the grpc.ServiceDesc for MDDBReplication service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -5114,6 +5344,22 @@ var MDDBReplication_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "StepDown",
 			Handler:    _MDDBReplication_StepDown_Handler,
 		},
+		{
+			MethodName: "GetPlacement",
+			Handler:    _MDDBReplication_GetPlacement_Handler,
+		},
+		{
+			MethodName: "PushPlacement",
+			Handler:    _MDDBReplication_PushPlacement_Handler,
+		},
+		{
+			MethodName: "PinCollections",
+			Handler:    _MDDBReplication_PinCollections_Handler,
+		},
+		{
+			MethodName: "FenceCollection",
+			Handler:    _MDDBReplication_FenceCollection_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -5124,6 +5370,16 @@ var MDDBReplication_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "StreamBinlog",
 			Handler:       _MDDBReplication_StreamBinlog_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExportKeys",
+			Handler:       _MDDBReplication_ExportKeys_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ImportCollection",
+			Handler:       _MDDBReplication_ImportCollection_Handler,
 			ServerStreams: true,
 		},
 	},

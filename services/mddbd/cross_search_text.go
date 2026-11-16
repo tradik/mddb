@@ -89,6 +89,14 @@ type crossTextParams struct {
 // A target that cannot answer (no full-text index, no such collection) adds
 // nothing rather than failing the search.
 func (s *Server) crossTextItems(ctx context.Context, p crossTextParams) []CrossSearchResultItem {
+	return s.crossTextFinish(ctx, p, s.crossTextCandidates(ctx, p))
+}
+
+// crossTextCandidates is every target's ranked list, scored by reciprocal
+// rank and merged: what a node of another group returns for its targets in
+// a fan-out (GO-052). A target's rank is its own, so the parts merge into
+// the list one node would have made.
+func (s *Server) crossTextCandidates(ctx context.Context, p crossTextParams) []CrossSearchResultItem {
 	var fused []CrossSearchResultItem
 	for _, coll := range p.Targets {
 		for rank, it := range s.oneCollectionText(ctx, coll, p) {
@@ -97,6 +105,11 @@ func (s *Server) crossTextItems(ctx context.Context, p crossTextParams) []CrossS
 		}
 	}
 	sort.SliceStable(fused, func(i, j int) bool { return fused[i].Score > fused[j].Score })
+	return fused
+}
+
+// crossTextFinish reranks, groups and cuts the fused list and numbers it.
+func (s *Server) crossTextFinish(ctx context.Context, p crossTextParams, fused []CrossSearchResultItem) []CrossSearchResultItem {
 	fused = s.rerankCross(ctx, p.Rerank, fused) // RAG-011
 	if p.GroupBy != nil {
 		fused = groupTop(fused, p.GroupBy,
@@ -150,9 +163,15 @@ func (s *Server) respondCrossText(w http.ResponseWriter, r *http.Request, req Cr
 	waited := s.waitForIndexAll(r.Context(), req.TargetCollections, req.IndexWait)
 	topK, limitReport := s.crossTopK(req.TargetCollections, req.TopK)
 	rr := s.newRerankRun("", req.Query, req.Rerank, req.Explain) // RAG-011
-	items := s.crossTextItems(r.Context(), crossTextParams{SearchType: req.SearchType, Query: req.Query,
+	params := crossTextParams{SearchType: req.SearchType, Query: req.Query,
 		Targets: req.TargetCollections, TopK: topK, FilterMeta: req.FilterMeta, Filter: req.Filter,
-		GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages(), Rerank: rr})
+		GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages(), Rerank: rr}
+	if s.isPartial(r) { // GO-052: this group's part of a fan-out
+		s.writeCrossPart(w, crossPart{Items: s.crossTextCandidates(r.Context(), params), LimitReport: limitReport,
+			Algorithm: req.SearchType, Indexing: waited}, req.IncludeImages)
+		return
+	}
+	items := s.crossTextItems(r.Context(), params)
 	if s.Metrics != nil {
 		s.Metrics.IncOp("cross_search", req.SearchType)
 	}

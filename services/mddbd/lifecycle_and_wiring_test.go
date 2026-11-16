@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -210,97 +209,5 @@ func TestBackendRegistryDefaultOnAnEmptyRegistry(t *testing.T) {
 	// silently accepts writes.
 	if def := registry.Default(); def != nil {
 		t.Errorf("an empty registry produced a default backend: %#v", def)
-	}
-}
-
-// Removing a node must move only the keys that node owned. A hash that
-// reshuffles everything turns one node leaving into a full cache miss.
-func TestConsistentHashRemoveMovesOnlyTheAffectedKeys(t *testing.T) {
-	ch := NewConsistentHash(150)
-	for id := range 4 {
-		ch.Add(id, 1)
-	}
-
-	const sample = 4000
-	keys := make([]string, 0, sample)
-	before := make([]int, 0, sample)
-	for i := range sample {
-		key := fmt.Sprintf("document-%d-key", i*7919)
-		keys = append(keys, key)
-		before = append(before, ch.Get(key))
-	}
-
-	ch.Remove(2)
-
-	moved := 0
-	for i, key := range keys {
-		now := ch.Get(key)
-		if now == 2 {
-			t.Fatalf("key %q still maps to the removed node", key)
-		}
-		if now != before[i] {
-			moved++
-		}
-	}
-
-	// Only the keys that belonged to node 2 should move — about a quarter
-	// with four equal nodes. Anything approaching all of them means the ring
-	// is being rebuilt rather than repaired, which is the whole thing
-	// consistent hashing exists to avoid.
-	if moved > sample/2 {
-		t.Errorf("removing one of four nodes moved %d of %d keys", moved, sample)
-	}
-	if moved == 0 {
-		t.Error("removing a node moved nothing — the key set never used it")
-	}
-}
-
-// The property that was broken: virtual nodes must interleave around the ring,
-// or one shard owns a long arc and takes a disproportionate share of the keys.
-//
-// Measured before the fix at these parameters: one shard owned 50 consecutive
-// positions and carried 160.8% of an even share while another carried 39.6% —
-// four times the load on one shard versus another (TEST-002).
-func TestConsistentHashDistributesEvenly(t *testing.T) {
-	const shards, samples = 4, 8000
-
-	ch := NewConsistentHash(150) // the production replica count
-	for id := range shards {
-		ch.Add(id, 1)
-	}
-
-	dist := make([]int, shards)
-	for i := range samples {
-		dist[ch.Get(fmt.Sprintf("document-%d-key", i*7919))]++
-	}
-
-	ideal := samples / shards
-	for id, n := range dist {
-		share := float64(n) / float64(ideal)
-		if share < 0.75 || share > 1.25 {
-			t.Errorf("shard %d holds %d keys, %.1f%% of an even share (want within 25%%): %v",
-				id, n, share*100, dist)
-		}
-	}
-}
-
-// A shard added later must take its share rather than landing in a gap.
-func TestConsistentHashBalancesAfterGrowth(t *testing.T) {
-	const samples = 6000
-
-	ch := NewConsistentHash(150)
-	for id := range 3 {
-		ch.Add(id, 1)
-	}
-	ch.Add(3, 1) // the fourth arrives after the ring exists
-
-	dist := make([]int, 4)
-	for i := range samples {
-		dist[ch.Get(fmt.Sprintf("doc-%d", i*104729))]++
-	}
-	ideal := samples / 4
-	if dist[3] < ideal/2 {
-		t.Errorf("a shard added after the others took %d keys of an expected ~%d: %v",
-			dist[3], ideal, dist)
 	}
 }

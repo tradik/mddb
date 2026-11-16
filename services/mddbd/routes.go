@@ -193,6 +193,8 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/replication/status", s.handleReplicationStatus)
 	mux.HandleFunc("/v1/replication/promote", s.handleReplicationPromote) // GO-051
 	mux.HandleFunc("/v1/replication/demote", s.handleReplicationDemote)
+	mux.HandleFunc("/v1/placement", s.handlePlacement) // GO-052
+	mux.HandleFunc("/v1/placement/move", s.handlePlacementMove)
 
 	// System info and config endpoints
 	mux.HandleFunc("/v1/system/info", s.handleSystemInfo)

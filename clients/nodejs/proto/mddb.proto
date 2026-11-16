@@ -1800,6 +1800,29 @@ service MDDBReplication {
 
   // Cluster: a promotion asks the leader to stop taking writes and hand over.
   rpc StepDown(StepDownRequest) returns (StepDownResponse);
+
+  // Placement (GO-052, MDDB_PLACEMENT_GROUPS): the map of which node group
+  // holds each collection, as this node knows it.
+  rpc GetPlacement(GetPlacementRequest) returns (PlacementMap);
+
+  // Placement: the meta group's leader hands a node a newer map at once.
+  rpc PushPlacement(PlacementMap) returns (PushPlacementResponse);
+
+  // Placement: a group's leader records the collections it holds that the
+  // map does not place yet (sent to the meta group's leader).
+  rpc PinCollections(PinCollectionsRequest) returns (PlacementMap);
+
+  // Placement: a copy of one collection's keys (or of the global settings),
+  // then the log entries that change them, as they are written.
+  rpc ExportKeys(ExportKeysRequest) returns (stream ExportKeysChunk);
+
+  // Placement: the target group's leader copies a collection from the
+  // source group's leader and reports how far it is (a move).
+  rpc ImportCollection(ImportCollectionRequest) returns (stream ImportProgress);
+
+  // Placement: the source group's leader stops taking writes to a
+  // collection being moved, or takes them again (release).
+  rpc FenceCollection(FenceCollectionRequest) returns (FenceCollectionResponse);
 }
 
 // The replication messages are versioned by protocol_version, sent by the
@@ -1969,6 +1992,72 @@ message StepDownResponse {
   uint64 last_lsn = 3;      // the last LSN the leader wrote
   string reason = 4;
   uint64 last_term = 5;     // and its term
+}
+
+// ---- Placement (GO-052) ----
+//
+// With MDDB_PLACEMENT_GROUPS the nodes form several groups, each a cluster
+// of its own; every collection belongs as a whole to one group. The meta
+// group's leader keeps the map; every node asks it for the map and routes a
+// request for a collection to the group holding it.
+
+message PlacementEntry {
+  string collection = 1;
+  string group = 2;
+  string moving_to = 3;   // the group a move is copying it to, "" otherwise
+}
+
+message PlacementMap {
+  uint64 version = 1;
+  repeated PlacementEntry entries = 2;
+  string leader_id = 3;   // the meta group's leader, as the answering node knows it
+  uint64 term = 4;        // the meta group's term the map was written in
+}
+
+message GetPlacementRequest {
+  uint64 known_version = 1;
+}
+
+message PushPlacementResponse {
+  uint64 version = 1;     // the version the node holds now
+}
+
+message PinCollectionsRequest {
+  string group = 1;
+  repeated string collections = 2;
+}
+
+message ExportKeysRequest {
+  string collection = 1;  // the collection to copy; "" with global
+  bool global = 2;        // the meta group's global settings instead
+}
+
+message ExportKeysChunk {
+  repeated BinlogEntryProto entries = 1;  // snapshot entries carry LSN 0
+  bool snapshot_done = 2; // the copy is complete; log entries follow
+  uint64 through_lsn = 3; // the source's log has been read through this LSN
+  uint64 start_lsn = 4;   // the copy holds every write through this LSN
+}
+
+message ImportCollectionRequest {
+  string collection = 1;
+  string source_group = 2;
+}
+
+message ImportProgress {
+  uint64 keys_copied = 1;
+  bool snapshot_done = 2;
+  uint64 applied_lsn = 3; // the source's log is applied through this LSN
+  uint64 source_lsn = 4;  // the source's last LSN as last seen
+}
+
+message FenceCollectionRequest {
+  string collection = 1;
+  bool release = 2;
+}
+
+message FenceCollectionResponse {
+  uint64 through_lsn = 1; // no write to the collection follows this LSN
 }
 
 // --- Temporal tracking ---

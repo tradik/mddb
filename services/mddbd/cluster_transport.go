@@ -27,12 +27,23 @@ func newPeerTransport(tlsCfg *tls.Config) *peerTransport {
 	return &peerTransport{tls: tlsCfg, conns: map[string]*grpc.ClientConn{}}
 }
 
-// client is the replication client for addr, dialled once and kept.
+// client is the replication client for addr.
 func (t *peerTransport) client(addr string) (proto.MDDBReplicationClient, error) {
+	c, err := t.conn(addr)
+	if err != nil {
+		return nil, err
+	}
+	return proto.NewMDDBReplicationClient(c), nil
+}
+
+// conn is the connection to addr, dialled once and kept: the replication
+// service and, for a request routed to another node group (GO-052), the
+// rest of the API on the same listener.
+func (t *peerTransport) conn(addr string) (*grpc.ClientConn, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if c, ok := t.conns[addr]; ok {
-		return proto.NewMDDBReplicationClient(c), nil
+		return c, nil
 	}
 	creds := insecure.NewCredentials()
 	if t.tls != nil {
@@ -43,7 +54,7 @@ func (t *peerTransport) client(addr string) (proto.MDDBReplicationClient, error)
 		return nil, err
 	}
 	t.conns[addr] = c
-	return proto.NewMDDBReplicationClient(c), nil
+	return c, nil
 }
 
 // close drops every connection.

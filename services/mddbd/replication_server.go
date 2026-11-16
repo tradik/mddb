@@ -187,10 +187,17 @@ func peerAddr(ctx context.Context) string {
 	return ""
 }
 
+// binlogSink is where a tail sends entries: a follower's stream, or a
+// placement export that passes on the entries of one collection (GO-052).
+type binlogSink interface {
+	Send(*proto.BinlogEntryProto) error
+	Context() context.Context
+}
+
 // binlogTail sends one follower the log from where it is.
 type binlogTail struct {
 	log    *binlog.Binlog
-	stream proto.MDDBReplication_StreamBinlogServer
+	stream binlogSink
 	sent   uint64
 }
 

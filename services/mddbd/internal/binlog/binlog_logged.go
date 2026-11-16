@@ -45,6 +45,20 @@ func (b *Binlog) SetWriteGate(gate WriteGate) {
 	b.gate.Store(&gate)
 }
 
+// EntryGate says whether the node may log a write of these entries: nil
+// when it may. A node of a placement refuses writes to collections another
+// group holds, or that a move is switching over (GO-052).
+type EntryGate func(entries []*BinlogEntry) error
+
+// SetEntryGate installs gate; nil removes it.
+func (b *Binlog) SetEntryGate(gate EntryGate) {
+	if gate == nil {
+		b.entryGate.Store(nil)
+		return
+	}
+	b.entryGate.Store(&gate)
+}
+
 // SetAckWaiter installs wait; nil removes it.
 func (b *Binlog) SetAckWaiter(wait AckWaiter) {
 	if wait == nil {
@@ -98,6 +112,11 @@ func (bo *BinlogOps) stage(bl *Binlog) error {
 	defer bl.mu.Unlock()
 	if err := bl.checkGate(); err != nil {
 		return err
+	}
+	if g := bl.entryGate.Load(); g != nil {
+		if err := (*g)(bo.entries); err != nil {
+			return err
+		}
 	}
 	bl.number(bo.entries)
 	bo.staged = bl.writeLocked(bo.entries, false) == nil

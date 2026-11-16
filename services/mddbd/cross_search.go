@@ -96,6 +96,9 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.TargetCollections = s.expandTargets(req.TargetCollections)
+	if s.partialTargets(w, r, &req) {
+		return
+	}
 	if len(req.TargetCollections) == 0 {
 		bad(w, errors.New("no collection matches targetCollections"))
 		return
@@ -219,13 +222,19 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 
 	waited := s.waitForIndexAll(r.Context(), req.TargetCollections, req.IndexWait)
 	rr := s.newRerankRun("", req.Query, req.Rerank, req.Explain) // RAG-011
-	items := s.crossSearchItems(r.Context(), crossSearchParams{
+	params := crossSearchParams{
 		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
 		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs, Feedback: fb, Rerank: rr,
-	})
+	}
+	if s.isPartial(r) { // GO-052: this group's part of a fan-out
+		s.writeCrossPart(w, crossPart{Items: s.crossCandidates(params), LimitReport: limitReport,
+			Algorithm: algo, Plan: plan, Indexing: waited}, req.IncludeImages)
+		return
+	}
+	items := s.crossSearchItems(r.Context(), params)
 
 	// Track operation
 	if s.Metrics != nil {

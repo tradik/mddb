@@ -49,6 +49,9 @@ type Binlog struct {
 	// ackWait, when set, holds a logged write until enough followers have it.
 	gate    atomic.Pointer[WriteGate]
 	ackWait atomic.Pointer[AckWaiter]
+	// entryGate, when set, refuses a logged write by what it writes (a
+	// collection placed in another group, GO-052).
+	entryGate atomic.Pointer[EntryGate]
 	// pending holds the first LSN of each logged write whose transaction
 	// has not returned yet (StableLSN).
 	pending map[uint64]struct{}

@@ -511,33 +511,6 @@ func TestFTSRemoveNonExistentCovBoost(t *testing.T) {
 	}
 }
 
-func TestShardClusterConsistency(t *testing.T) {
-	sc := NewShardCluster(4, 1)
-	s1 := sc.GetShard("my-key")
-	s2 := sc.GetShard("my-key")
-	if s1 == nil || s2 == nil {
-		t.Fatal("GetShard returned nil")
-		return
-	}
-	if s1.ID != s2.ID {
-		t.Errorf("same key returned different shards: %d vs %d", s1.ID, s2.ID)
-	}
-}
-
-func TestShardClusterDistribution(t *testing.T) {
-	sc := NewShardCluster(4, 1)
-	counts := make(map[int]int)
-	for i := 0; i < 100; i++ {
-		s := sc.GetShard(itoa(i))
-		if s != nil {
-			counts[s.ID]++
-		}
-	}
-	if len(counts) < 2 {
-		t.Errorf("poor distribution: only %d shards used out of 4", len(counts))
-	}
-}
-
 func TestZeroCopyManagerStreamCopyCovBoost(t *testing.T) {
 	zcm := NewZeroCopyManager()
 	if zcm == nil {

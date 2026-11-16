@@ -63,6 +63,13 @@ type crossCandidate struct {
 // crossSearchItems searches every target collection, merges the hits by
 // score, applies groupBy (SRCH-016) and loads the top results.
 func (s *Server) crossSearchItems(ctx context.Context, p crossSearchParams) []CrossSearchResultItem {
+	return s.crossFinish(ctx, p, s.crossCandidates(p))
+}
+
+// crossCandidates searches every target and loads the merged hits, cut to
+// the reranking pool unless groupBy needs them all: what a node of another
+// group returns for its targets in a fan-out (GO-052).
+func (s *Server) crossCandidates(p crossSearchParams) []CrossSearchResultItem {
 	var cands []crossCandidate
 	for _, coll := range p.Targets {
 		allowedIDs, active := s.allowedDocIDs(coll, p.FilterMeta, p.Filter)
@@ -109,6 +116,11 @@ func (s *Server) crossSearchItems(ctx context.Context, p crossSearchParams) []Cr
 		items = append(items, CrossSearchResultItem{Collection: c.collection, Document: doc, Score: c.result.Score,
 			chunks: c.chunks, rerankText: text})
 	}
+	return items
+}
+
+// crossFinish reranks, groups and trims merged candidates and numbers them.
+func (s *Server) crossFinish(ctx context.Context, p crossSearchParams, items []CrossSearchResultItem) []CrossSearchResultItem {
 	items = s.rerankCross(ctx, p.Rerank, items)
 	if p.GroupBy != nil {
 		items = groupTop(items, p.GroupBy,
