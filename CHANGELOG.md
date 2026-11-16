@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Filtered vector search walks the HNSW graph with the filter (SRCH-024).** The filter is applied during the walk; excluded nodes are used for navigation but never returned, and the beam (`efSearch × √share`) counts admitted nodes only. A filter admitting too little for the walk to pay is scored exactly over the admitted documents. The whole-collection fallback is gone; a short walk is counted in `mddb_operations_total{operation="vector_filter_fallback"}`. At 200,000 vectors p95 dropped from 29.7 to 1.3 ms at a 10% filter and from 43.6 to 0.64 ms at 25%, with recall@10 of 0.98–1.000. `auto` now compares the measured costs of the exact scan, the HNSW walk and a trained IVF instead of a fixed 5% threshold.
 - The embedding queue and the metadata index queue are per tenant (`MDDB_EMBEDDING_QUEUE_SIZE` now bounds each tenant). A full embedding queue parks the job (still pending, retried within a second) instead of dropping it after `MDDB_EMBEDDING_QUEUE_WAIT`.
+- `make sonar-local` runs the SonarScanner CLI from `PATH` when Docker is not installed, and its `--dry-run` no longer needs either.
 - A follower applies replicated entries in batches of up to 1,024, one transaction per database file, and reloads each in-memory configuration once per batch instead of once per entry.
 
 ### Fixed

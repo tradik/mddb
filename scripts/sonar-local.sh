@@ -14,7 +14,9 @@
 #      adapter;
 #   2. every report rewritten to this checkout (scripts/sonar-coverage-paths.py);
 #   3. the scanner in Docker, with the repository mounted at its own path so
-#      the reports' absolute paths hold inside the container. With an open pull
+#      the reports' absolute paths hold inside the container — or, where there
+#      is no Docker (WSL without Docker Desktop, for one), a sonar-scanner CLI
+#      on PATH (the same 8.1.0 the image carries). With an open pull
 #      request for this branch it is analysed as that pull request, otherwise
 #      as the branch. sonar.qualitygate.wait makes the exit status the gate's.
 #
@@ -35,13 +37,27 @@ if (( ! DRY )) && [[ -z "${SONAR_TOKEN:-}" ]]; then
 	echo "sonar-local: SONAR_TOKEN is not set (SonarCloud → My Account → Security)" >&2
 	exit 2
 fi
-for tool in docker go npm python3; do
+for tool in go npm python3; do
 	command -v "${tool}" >/dev/null || { echo "sonar-local: ${tool} not found" >&2; exit 2; }
 done
 
 OUT="$(mktemp -d)"
 trap 'rm -rf "${OUT}"' EXIT
 mkdir -p "${OUT}/in" "${OUT}/reports"
+# The scanner: Docker when there is one, else a sonar-scanner CLI on PATH.
+# A dry run prints the Docker plan when neither is installed.
+docker_scanner=(docker run --rm -e SONAR_TOKEN -v "${REPO}:${REPO}" -v "${OUT}:${OUT}" -w "${REPO}"
+	--user "$(id -u):$(id -g)" "${SCANNER_IMAGE}")
+if command -v docker >/dev/null; then
+	scanner=("${docker_scanner[@]}")
+elif command -v sonar-scanner >/dev/null; then
+	scanner=(sonar-scanner)
+elif (( DRY )); then
+	scanner=("${docker_scanner[@]}")
+else
+	echo "sonar-local: neither docker nor sonar-scanner found" >&2
+	exit 2
+fi
 UV="$(command -v uv || echo "${HOME}/.local/bin/uv")"
 
 # 1. Coverage.
@@ -76,8 +92,7 @@ if [[ -n "${pr}" ]]; then
 	target=(-Dsonar.pullrequest.key="${pr%% *}" -Dsonar.pullrequest.branch="${branch}" -Dsonar.pullrequest.base="${pr##* }")
 fi
 R="${OUT}/reports"
-run docker run --rm -e SONAR_TOKEN -v "${REPO}:${REPO}" -v "${OUT}:${OUT}" -w "${REPO}" \
-	--user "$(id -u):$(id -g)" "${SCANNER_IMAGE}" \
+run "${scanner[@]}" \
 	-Dsonar.projectBaseDir="${REPO}" -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=600 \
 	"${target[@]}" \
 	-Dsonar.go.coverage.reportPaths="${R}/go-mddbd.out,${R}/go-cli.out,${R}/go-client.out" \
