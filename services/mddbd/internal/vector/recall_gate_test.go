@@ -85,6 +85,13 @@ func TestBQRecallOnAClusteredCorpus(t *testing.T) {
 // to be at least as good as PQ, so it is also held to PQ's recall, within the
 // run-to-run spread of the two. Measured: PQ 0.955–0.973, OPQ 0.944–0.969.
 func TestPQAndOPQRecallOnAClusteredCorpus(t *testing.T) {
+	// Training 8 subspaces × 256 centroids, then OPQ's rotations, is
+	// single-threaded arithmetic: the race detector finds nothing in it and
+	// made it run past ten minutes with coverage on CI. The gate runs in
+	// every test job without -race.
+	if raceEnabled {
+		t.Skip("numeric recall gate; runs without -race")
+	}
 	c := codebookGateCorpus()
 	pq := c.recall(t, NewPQIndex(prodPQSubspaces, prodPQCodebookSize, prodKMeansMaxIter))
 	opq := c.recall(t, NewOPQIndex(prodPQSubspaces, prodPQCodebookSize, prodKMeansMaxIter, prodOPQIterations))

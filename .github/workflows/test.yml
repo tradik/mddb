@@ -120,7 +120,9 @@ jobs:
       # in the test-core shards below. Here: every other package.
       - name: Run tests (packages other than the root)
         working-directory: services/mddbd
-        run: go test -v -race -coverprofile=coverage-packages.out $(go list ./... | grep -vx mddb)
+        # internal/vector alone takes ~9 min under -race with coverage on a
+        # desktop; Go's default 10 min per package left no margin on a runner.
+        run: go test -v -race -timeout 25m -coverprofile=coverage-packages.out $(go list ./... | grep -vx mddb)
 
       # #336: again with one file per collection, so the two storage layouts
       # cannot drift apart.
@@ -128,7 +130,7 @@ jobs:
         working-directory: services/mddbd
         env:
           MDDB_STORAGE_LAYOUT: per-collection
-        run: go test -race $(go list ./... | grep -vx mddb)
+        run: go test -race -timeout 25m $(go list ./... | grep -vx mddb)
 
       - name: Keep the package coverage for the merge
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

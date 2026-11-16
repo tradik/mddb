@@ -82,6 +82,9 @@ func (f filteredGate) fill(t *testing.T, idx VectorSearcher) {
 // exactly, so the walk is called directly. Measured: 1.000 at every
 // selectivity.
 func TestHNSWFilteredWalkRecall(t *testing.T) {
+	if raceEnabled {
+		t.Skip("numeric recall gate; runs without -race")
+	}
 	c := wideGateCorpus()
 	h := NewHNSWIndex(DefaultHNSWM, DefaultHNSWEfConstruction, DefaultHNSWEfSearch)
 	newFilteredGate(c, 100).fill(t, h)
@@ -104,6 +107,9 @@ func TestHNSWFilteredWalkRecall(t *testing.T) {
 // FilterSearch as the server calls it: the walk or the exact scan, whichever
 // it picks.
 func TestHNSWFilteredRecall(t *testing.T) {
+	if raceEnabled {
+		t.Skip("numeric recall gate; runs without -race")
+	}
 	c := wideGateCorpus()
 	h := NewHNSWIndex(DefaultHNSWM, DefaultHNSWEfConstruction, DefaultHNSWEfSearch)
 	newFilteredGate(c, 100).fill(t, h)
