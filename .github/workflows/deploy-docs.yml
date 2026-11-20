@@ -56,7 +56,7 @@ jobs:
         run: make openapi-lint
 
       - name: Generate site with SSG
-        uses: spagu/ssg@ca25f75ae4ab00767009ee6fe74d735b7316e21b # v1.9.6
+        uses: spagu/ssg@6aa91c9289873156df5bff0f21c18ee2ac70793d # v1.9.11
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19,
@@ -68,8 +68,11 @@ jobs:
           # the API reference at /docs/api/swagger/ can enter sitemap.xml, and,
           # from 1.8.66, the `listen:` button on blog posts (1.8.67 rebuilds
           # fully after an ssg upgrade, so it appears without a content
-          # change), and from 1.8.82 `heading_anchors:`, the section
-          # links on headings. The
+          # change), from 1.8.82 `heading_anchors:`, the section
+          # links on headings, and from 1.9.0/1.9.1 `og_cards:` and `.OGCard`,
+          # the per-post social cards the blog uses as covers (built locally
+          # on 1.9.11 while CI still fetched 1.8.82: the 2.19.8 site deploy
+          # failed on "unknown configuration key og_cards"). The
           # pin is also what made the last mismatch obvious rather than
           # intermittent.
           #
@@ -83,7 +86,7 @@ jobs:
           # not landed fails this job with a 404 on ssg-linux-amd64.tar.gz. The
           # check is one command:
           #   gh release view v1.8.58 --repo spagu/ssg --json assets
-          version: 'v1.8.82'
+          version: 'v1.9.11'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'
