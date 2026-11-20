@@ -429,6 +429,35 @@ Generate API key (authenticated users).
 }
 ```
 
+**What a key may do.** A key has no permissions of its own: it acts as the
+user who created it, with exactly that user's permissions at the time of each
+request (direct and through groups, and the user's tenant). It cannot be
+narrowed to read-only or to chosen collections. The request takes only
+`description` and `expiresAt`; any other field (`readOnly`, `collections`, …)
+is ignored without an error. Changing the user's permissions changes what
+every key of that user may do, from the next request on.
+
+For a key that only reads some collections, create a user that has `read` on
+those collections and nothing else, and create the key as that user:
+
+```bash
+# as an admin
+curl -X POST http://localhost:11023/v1/auth/register -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"username":"reader","password":"<password>"}'
+curl -X POST http://localhost:11023/v1/auth/permissions -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"username":"reader","collection":"docs","read":true,"write":false}'
+# as reader
+curl -X POST http://localhost:11023/v1/auth/api-key -H "Authorization: Bearer $READER_TOKEN" \
+  -d '{"description":"read-only, docs"}'
+```
+
+**Status codes on collection endpoints.** A request without credentials gets
+`401`. A request for a collection the caller may not use gets
+`403 {"error":"forbidden"}`, whether or not the collection exists: permission
+is checked before the collection is looked up, so `403` does not tell a caller
+that a collection is there. This holds for every endpoint that names a
+collection (`/v1/fts`, `/v1/vector-search`, `/v1/symbol`, `/v1/add`, …).
+
 #### GET /v1/auth/me
 Get current user information.
 

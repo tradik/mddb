@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Docs deploy:** the workflow's two ssg pins (the action and the binary it downloads) both move to v1.9.11; the binary had stayed at v1.8.82 behind a v1.9.6 action, so the first deploy of the new blog failed on `og_cards`. A test (`services/ssg-template/ssg-pin.test.mjs`) fails when the two differ.
 - **Website SEO:** the homepage title and social title match the new headline ("Knowledge Database and Code Intelligence for AI Agents"); the ignored `<meta name="keywords">` is gone; the hero background is preloaded. Blog posts are `og:type` article with `article:published_time`, `article:tag` and a `BlogPosting` JSON-LD block (headline, dates, card image, publisher); every `og:image` states its 1200×630 size.
 
+### Documentation
+
+- **API keys, `403` and limits spelled out.** docs/AUTHENTICATION.md and openapi.yaml now state that an API key acts with the permissions of the user who created it and cannot be narrowed to read-only or to chosen collections (a narrower key is a key of a narrower user), and that every collection endpoint answers `403` to a caller without the permission whether or not the collection exists. docs/API.md and openapi.yaml state what `/v1/fts` answers for a collection that does not exist (`200`, no results) and document its `401`/`403`; that `total` in search responses is the number of results returned, not of matches; and that `/v1/symbol`'s `limit` is per relation while `truncated` is one flag for the whole response, with no `total`. No behaviour changed.
+
 ## [2.19.8] - 2026-11-16
 
 ### Added
