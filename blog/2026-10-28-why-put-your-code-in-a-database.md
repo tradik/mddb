@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-10-28
 tags: [rag, search, embeddings, mcp, agents]
+categories: [Guides]
 excerpt: "Your repository already has grep. What storing code in MDDB adds: search by meaning, search by exact name and a graph of what depends on what, all reachable by an agent over MCP. Plus where it falls short."
 description: "What storing and embedding source code in MDDB is good for: semantic code search, exact identifiers, a dependency graph and agent context over MCP."
 ---

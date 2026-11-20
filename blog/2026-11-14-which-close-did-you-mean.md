@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-11-14
 tags: [search, agents, release, benchmarking]
+categories: [Releases]
 excerpt: "MDDB 2.19.3 lets a language server index your code. code_symbol then knows which of 21 Close methods a call means, lists the types that implement an interface, and says how sure it is."
 description: "MDDB 2.19.3: mddb-cli autoindex --semantic runs gopls, basedpyright or phpactor, so code_symbol answers with exact references and interface implementations."
 ---

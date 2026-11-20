@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-09-08
 tags: [release, mcp, rag, retrieval]
+categories: [Releases]
 excerpt: "MDDB 2.14 speaks the stateless MCP revision without dropping the old one, and fixes three ways retrieval was quietly returning the wrong document first."
 description: "MDDB 2.14: the stateless MCP 2026-07-28 revision served beside 2025-11-25, asymmetric embeddings, retrievalMode honoured, and readable MCP resources."
 ---

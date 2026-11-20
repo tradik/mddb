@@ -1,0 +1,58 @@
+{{define "index_rotate"}}
+<script>
+    /**
+     * Shows one item of `root` at a time, cross-fading every `intervalMs`:
+     * the word before "intelligence" in the hero, the entries of the "Powers"
+     * strip. The HTML lists every item and CSS shows only the first until
+     * this runs, so without JavaScript (and for crawlers) the page reads as
+     * written. Holds while `root` is hovered or focused; does nothing with a
+     * single item or prefers-reduced-motion. Returns the timer id, or null.
+     */
+    function startRotation(root, itemSelector, win, intervalMs) {
+        var items = root ? root.querySelectorAll(itemSelector) : [];
+        if (items.length < 2 || win.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            return null;
+        }
+        var current = 0;
+        var held = false;
+        root.classList.add('is-rotating');
+        items[0].classList.add('is-active');
+        root.addEventListener('mouseenter', function () { held = true; });
+        root.addEventListener('mouseleave', function () { held = false; });
+        root.addEventListener('focusin', function () { held = true; });
+        root.addEventListener('focusout', function () { held = false; });
+        return win.setInterval(function () {
+            if (held) {
+                return;
+            }
+            items[current].classList.remove('is-active');
+            current = (current + 1) % items.length;
+            items[current].classList.add('is-active');
+        }, intervalMs);
+    }
+    /**
+     * Adds the words named in `root`'s data-more attribute as further
+     * rotator items. The HTML carries only the first word, so the heading a
+     * crawler or a reader without JavaScript gets is "code intelligence", not
+     * five words run together. Returns how many words it added.
+     */
+    function addRotatorWords(root, doc) {
+        var words = root ? (root.getAttribute('data-more') || '').split(' ') : [];
+        var added = 0;
+        for (var i = 0; i < words.length; i++) {
+            if (words[i]) {
+                var span = doc.createElement('span');
+                span.className = 'hero-rotator-word';
+                span.textContent = words[i];
+                root.appendChild(span);
+                added++;
+            }
+        }
+        return added;
+    }
+    var heroRotator = document.querySelector('.hero-rotator');
+    addRotatorWords(heroRotator, document);
+    startRotation(heroRotator, '.hero-rotator-word', window, 2500);
+    startRotation(document.querySelector('.used-by-list'), '.used-by-text', window, 7000);
+</script>
+{{end}}

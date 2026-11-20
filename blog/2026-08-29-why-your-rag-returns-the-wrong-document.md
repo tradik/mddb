@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-08-29
 tags: [rag, retrieval, embeddings, search]
+categories: [Guides]
 excerpt: "A ten-document corpus, one ordinary question, and a semantic search that ranks the right answer nowhere. What actually fixed it was not a parameter."
 description: "A measured walk through RAG retrieval in MDDB: where semantic search fails, why no blend weight rescues it, and the one change that fixed it."
 ---

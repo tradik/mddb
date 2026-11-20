@@ -12,6 +12,30 @@
     <meta property="twitter:url" content="https://{{.Domain}}/{{.Post.Slug}}/" />
     <link rel="canonical" href="https://{{.Domain}}/{{.Post.Slug}}/" />
     <title>{{.Post.Title}} — MDDB</title>
+    {{if .Post.Date}}<meta property="article:published_time" content="{{.Post.Date.Format "2006-01-02"}}">{{end}}
+    {{range .Post.Tags}}<meta property="article:tag" content="{{.}}">
+    {{end}}
+    {{/* BlogPosting: what search engines read as the article's headline,
+         date, image and publisher. Values are JSON-escaped by html/template
+         inside the script element. */}}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": {{.Post.Title}},
+      "description": {{if .Post.Description}}{{.Post.Description}}{{else}}{{.Post.Excerpt}}{{end}},
+      "datePublished": {{.Post.Date.Format "2006-01-02"}},
+      {{/* Not .Post.Modified: without a frontmatter date it falls back to the
+           file's mtime, and a CI checkout makes every post "modified today". */}}
+      "dateModified": {{.Post.Date.Format "2006-01-02"}},
+      "image": {{printf "https://%s%s" .Domain (or .OGCard "/og-image.png")}},
+      "url": {{printf "https://%s/%s/" .Domain .Post.Slug}},
+      "mainEntityOfPage": {{printf "https://%s/%s/" .Domain .Post.Slug}},
+      "keywords": {{.Post.Tags}},
+      "author": { "@type": "Organization", "name": "MDDB Team", "url": "https://mddb.tradik.com/" },
+      "publisher": { "@type": "Organization", "name": "Tradik Limited", "url": "https://mddb.tradik.com/" }
+    }
+    </script>
 </head>
 <body>
 {{template "email_off" .}}

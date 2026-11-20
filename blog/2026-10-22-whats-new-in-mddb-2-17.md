@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-10-22
 tags: [release, search, performance]
+categories: [Releases]
 excerpt: "MDDB 2.17 makes metadata filters search every match instead of the top few, counts facets over the whole result set, and stops the embedding worker committing three times per document."
 description: "MDDB 2.17: filterMeta, rangeMeta and boost act on every match, facets over the whole result set, and one commit per embedded document."
 ---

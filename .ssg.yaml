@@ -8,7 +8,7 @@ pages_path: .
 
 # Blog posts live outside docs/ and are merged in as posts (slug prefix
 # "blog/" → URLs /blog/<name>/; the /blog/ index is docs/BLOG.md with
-# layout: blog).
+# layout: blog). "Blog" is only the fallback category: posts name their own.
 content_sources:
   - path: blog
     type: post
@@ -60,18 +60,19 @@ variables:
   # The release binary, measured the way release.yml builds it:
   #   cd services/mddbd && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
   #     go build -ldflags="-s -w" -o /tmp/mddbd . && ls -l /tmp/mddbd
-  # 2.18.10: 33,570,976 bytes = 32.0 MiB (linux/arm64 29.7 MiB). A plain
+  # 2.19.8: 37,245,088 bytes = 35.5 MiB. A plain
   # `go build` keeps the symbol table and DWARF and is larger still.
   # README.md, docs/README.md, docs/index.md, docs/FEATURES.md and
   # docs/COMPARISON.md state the same figures; TestSiteSizeClaimsInSync
   # (services/mddbd/site_claims_doc_test.go) fails when one of them differs.
-  mddbBinarySize: "~32MB"
-  # What a visitor downloads: the release .tar.gz (2.18.10: 11.3–12.9 MB per
-  # platform; `gh release view v<tag> --json assets`).
-  mddbDownloadSize: "~12MB"
-  # The compressed pull size of tradik/mddb:<tag> on Docker Hub (2.18.10
-  # amd64: 42,699,304 bytes): `curl -s https://hub.docker.com/v2/repositories/tradik/mddb/tags/<tag>`.
-  mddbDockerSize: "~43MB"
+  mddbBinarySize: "~36MB"
+  # What a visitor downloads: the release .tar.gz (2.19.8: 11.8–13.5 MiB per
+  # platform, linux/arm64 smallest, darwin/amd64 largest;
+  # `gh release view v<tag> --json assets`).
+  mddbDownloadSize: "~13MB"
+  # The compressed pull size of tradik/mddb:<tag> on Docker Hub (2.19.8
+  # amd64: 46.7 MB, arm64: 43.0 MB): `curl -s https://hub.docker.com/v2/repositories/tradik/mddb/tags/<tag>`.
+  mddbDockerSize: "~47MB"
 
 
 # Native mermaid rendering: ```mermaid fences become <pre class="mermaid">
@@ -92,15 +93,11 @@ listen:
   sections: [posts]
 
 
-# The only category is "Blog", and its archive at /category/blog/ listed the
-# same posts as /blog/ under a different URL: noindex, linked from nowhere,
-# and named in sitemap.xml anyway (the sitemap reads what was rendered, not
-# what the template's robots meta says). Not rendering it removes the
-# duplicate, the stray sitemap entry and the 404 canonical trail behind it.
-# Tags stay on: they are a real navigation layer with an archive per term.
-taxonomies:
-  category:
-    archive: false
+# Every post names one of three categories in its frontmatter (Releases,
+# Engineering, Guides); the content_sources default "Blog" only catches a post
+# that forgets. Each category has an indexable archive at /category/<slug>/,
+# linked from the category bar on /blog/ and on every archive. Tags stay the
+# topic layer, one archive per term at /tag/<slug>/.
 
 # Enable sitemap and robots.txt generation
 sitemap_off: false
@@ -167,6 +164,16 @@ content_exclude:
 # homepage. noindex pages are dropped from the sitemap unconditionally; this
 # opts into dropping the non-self-canonical one too.
 sitemap_prune_canonical: false
+
+# A 1200×630 card per blog post (title, "Blog" above it, site name below),
+# drawn at build time. It is the post's og:image when shared and the cover of
+# its card on /blog/. Brand ink-900 with white text is 17.9:1, the accent-200
+# bar and category line 9.6:1 (WCAG 2.2 AA needs 4.5:1).
+og_cards:
+  text_color: "#FFFFFF"
+  background: "#0F172A"
+  accent_color: "#99BFEB"
+  sections: [posts]
 
 # Feed for the blog, so readers can subscribe without polling the index.
 # Both formats, same posts. Readers accept either, but plenty of "paste your

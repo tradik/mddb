@@ -18,29 +18,23 @@
 {{template "navbar" .}}
 
 <div class="site-layout">
-    <main id="main-content" class="main-content">
-        <div class="doc-category">
-            <header class="doc-header">
-                <h1 class="doc-title">{{.Title}}</h1>
-                {{if .Description}}
-                <p class="doc-index-lead">{{.Description}}</p>
-                {{end}}
-                <p class="doc-index-lead">Subscribe: <a href="/feed.xml">Atom</a> · <a href="/rss.xml">RSS</a></p>
-            </header>
-            <ul class="post-list">
-                {{range .Site.Posts | sort "Date" "desc"}}
-                <li>
-                    <a class="post-card" href="/{{.Slug}}/">
-                        {{if .Date}}<time class="post-card-date" datetime="{{.Date.Format "2006-01-02"}}">{{.Date.Format "2 January 2006"}}</time>{{end}}
-                        <h2 class="post-card-title">{{.Title}}</h2>
-                        {{if .Description}}<p class="post-card-excerpt">{{.Description}}</p>
-                        {{else if .Excerpt}}<p class="post-card-excerpt">{{.Excerpt}}</p>{{end}}
-                        <span class="post-card-more" aria-hidden="true">Read the post →</span>
-                    </a>
-                </li>
-                {{end}}
-            </ul>
-        </div>
+    <main id="main-content" class="main-content blog-main">
+        <header class="doc-header blog-header">
+            <h1 class="doc-title">{{.Title}}</h1>
+            {{if .Description}}<p class="doc-index-lead">{{.Description}}</p>{{end}}
+        </header>
+        {{template "blog_nav" (dict "Current" "all")}}
+
+        {{$posts := .Site.Posts | sort "Date" "desc"}}
+        {{/* The newest post, large: cover beside the text on wide screens. */}}
+        <ul class="post-grid post-grid-featured">
+            {{range $posts | first 1}}{{template "post_card" .}}{{end}}
+        </ul>
+        <ul class="post-grid">
+            {{range $posts | offset 1}}{{template "post_card" .}}{{end}}
+        </ul>
+
+        {{template "blog_topics" .}}
     </main>
 </div>
 

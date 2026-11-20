@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-10-24
 tags: [search, mcp, agents]
+categories: [Engineering]
 excerpt: "MDDB 2.18 reads C, C++ and assembly: which file defines a function, what calls it, who includes a header. What it finds, how it was checked, and what every other language gets."
 description: "MDDB 2.18 extracts C, C++ and assembly symbols for code_graph: function definitions, calls and #include edges, checked against grep."
 ---

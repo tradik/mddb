@@ -1,18 +1,22 @@
 {{define "index_hero"}}
-<!-- Hero Section -->
-<header class="hero">
+<!-- Hero: headline, calls to action, then the product video underneath.
+     The video starts as a poster with a play button (a link to YouTube, so it
+     works without JavaScript); a click swaps in the player from
+     youtube-nocookie.com, which sets no cookies until playback. -->
+<header class="hero" id="hero">
     <div class="container">
         <div class="hero-content">
-            <p class="hero-eyebrow">MDDB · AI-native document database</p>
-            <h1>The Knowledge Base<br>Your AI Agent Needs</h1>
-            <p class="hero-subtitle">Built-in MCP server, vector search, RAG, and hybrid retrieval. Plugs into
-                Claude, ChatGPT, Cursor, Windsurf, and any MCP client — single {{$.Vars.mddbBinarySize}} binary, zero config</p>
+            <p class="hero-eyebrow">MDDB · for AI agents and the people who run them</p>
+            <h1>Knowledge database <br>and <span class="hero-rotator" data-more="content spatial visual temporal"><span class="hero-rotator-word">code</span></span> intelligence</h1>
+            <p class="hero-subtitle">Store Markdown, documents and source code, then search them by keyword, by
+                meaning or both. MDDB also knows which function calls which, and any MCP client can query it
+                through the built-in MCP server. One {{$.Vars.mddbBinarySize}} binary, no config file.</p>
             <div class="hero-badges">
                 <span class="badge">{{$.Vars.mcpTools}} MCP Tools</span>
                 <span class="badge">v{{$.Vars.mddbVersion}}</span>
-                <span class="badge">RAG-Ready</span>
+                <span class="badge">8 vector index types</span>
                 <span class="badge">UDS + mTLS</span>
-                <span class="badge">Docker Ready</span>
+                <span class="badge">Linux · macOS · FreeBSD</span>
             </div>
             <div class="hero-actions">
                 <a href="#download" class="btn btn-primary">Download v{{$.Vars.mddbVersion}}</a>
@@ -20,6 +24,47 @@
                     on GitHub</a>
             </div>
         </div>
+        <div class="hero-video">
+            <a class="hero-video-play" href="https://www.youtube.com/watch?v=Idg6NyNYQnU"
+                data-video-id="Idg6NyNYQnU"
+                data-video-title="MDDB - From Code to Intelligence | AI-Native Knowledge Engine"
+                aria-label="Play video: MDDB, from code to intelligence">
+                <img src="https://i.ytimg.com/vi/Idg6NyNYQnU/maxresdefault.jpg"
+                    alt="MDDB, from code to intelligence: video poster" width="1280" height="720"
+                    decoding="async">
+                <span class="hero-video-label">From code to intelligence</span>
+            </a>
+        </div>
     </div>
 </header>
+<script>
+    /**
+     * Replaces the video poster link with the YouTube player when clicked.
+     * Returns the iframe it inserted, or null when there was no poster.
+     */
+    function playHeroVideo(link, doc) {
+        if (!link || !link.parentNode) {
+            return null;
+        }
+        var frame = doc.createElement('iframe');
+        frame.src = 'https://www.youtube-nocookie.com/embed/' + link.getAttribute('data-video-id') +
+            '?autoplay=1&rel=0';
+        frame.title = link.getAttribute('data-video-title');
+        frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+        frame.referrerPolicy = 'strict-origin-when-cross-origin';
+        frame.allowFullscreen = true;
+        link.parentNode.replaceChild(frame, link);
+        frame.focus();
+        return frame;
+    }
+    (function () {
+        var link = document.querySelector('.hero-video-play');
+        if (link) {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                playHeroVideo(link, document);
+            });
+        }
+    })();
+</script>
 {{end}}

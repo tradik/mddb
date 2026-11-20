@@ -1,0 +1,54 @@
+{{/* Shared blog building blocks: the category bar, a post card and the topic
+     list. Used by layouts/blog.html (/blog/), category.html
+     (/category/<slug>/) and tag.html (/tag/<slug>/), so every listing looks
+     and navigates the same way. */}}
+
+{{/* Category bar. Call with (dict "Current" "<slug>"): "all" on /blog/, the
+     category slug on its archive, "" on a tag archive. */}}
+{{define "blog_nav"}}
+<nav class="blog-nav" aria-label="Blog categories">
+    <a href="/blog/"{{if eq .Current "all"}} aria-current="page"{{end}}>All posts</a>
+    <a href="{{termURL "category" "Releases"}}"{{if eq .Current "releases"}} aria-current="page"{{end}}>Releases</a>
+    <a href="{{termURL "category" "Engineering"}}"{{if eq .Current "engineering"}} aria-current="page"{{end}}>Engineering</a>
+    <a href="{{termURL "category" "Guides"}}"{{if eq .Current "guides"}} aria-current="page"{{end}}>Guides</a>
+    <span class="blog-nav-feeds">Subscribe: <a href="/feed.xml">Atom</a> · <a href="/rss.xml">RSS</a></span>
+</nav>
+{{end}}
+
+{{/* One post card. The cover is the post's social card (og_cards in
+     .ssg.yaml); it repeats the title, so its alt text is empty. Tags sit
+     outside the card's main link: a link inside a link is invalid HTML. */}}
+{{define "post_card"}}
+<li class="post-tile">
+    <a class="post-tile-link" href="/{{.Slug}}/">
+        {{with .OGCard}}<img class="post-tile-cover" src="{{.}}" alt="" width="1200" height="630" loading="lazy" decoding="async">{{end}}
+        <span class="post-tile-meta">
+            {{with .Categories}}<span class="post-tile-cat">{{getCategoryName (index . 0)}}</span>{{end}}
+            {{if .Date}}<time datetime="{{.Date.Format "2006-01-02"}}">{{.Date.Format "2 Jan 2006"}}</time>{{end}}
+            {{if .ReadingTime}}<span>{{.ReadingTime}} min read</span>{{end}}
+        </span>
+        <h2 class="post-tile-title">{{.Title}}</h2>
+        {{if .Excerpt}}<p class="post-tile-excerpt">{{.Excerpt}}</p>
+        {{else if .Description}}<p class="post-tile-excerpt">{{.Description}}</p>{{end}}
+    </a>
+    {{if .Tags}}
+    <ul class="post-tile-tags" aria-label="Tags">
+        {{range .Tags}}<li><a href="{{termURL "tag" .}}">{{.}}</a></li>{{end}}
+    </ul>
+    {{end}}
+</li>
+{{end}}
+
+{{/* Every tag with its post count, as links to the tag archives. */}}
+{{define "blog_topics"}}
+<section class="blog-topics" aria-labelledby="blog-topics-title">
+    <h2 id="blog-topics-title" class="blog-topics-title">Topics</h2>
+    <ul class="post-tile-tags">
+        {{range taxonomyTerms "tag"}}<li><a href="{{.URL}}">{{.Name}} <span class="blog-topic-count">{{.Count}}</span></a></li>{{end}}
+    </ul>
+</section>
+{{end}}
+
+{{/* What each category holds, for its archive's lead and meta description
+     (70–160 characters). Called with the category name. */}}
+{{define "blog_category_desc"}}{{if eq . "Releases"}}What changed in each MDDB release: new features, fixes and what to check when you upgrade, written for the people running it.{{else if eq . "Engineering"}}How MDDB works inside: investigations, benchmarks, bugs that hid well and the design choices behind search, storage and MCP.{{else if eq . "Guides"}}Hands-on MDDB guides: picking a search algorithm, fixing RAG that returns the wrong document, searching code and syncing WordPress.{{else}}Every MDDB article filed under {{.}}: release notes, engineering write-ups and guides from the team.{{end}}{{end}}

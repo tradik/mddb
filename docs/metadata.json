@@ -1,0 +1,9 @@
+{
+  "categories": [
+    {"id": 1, "name": "Releases", "slug": "releases", "description": ""},
+    {"id": 2, "name": "Engineering", "slug": "engineering", "description": ""},
+    {"id": 3, "name": "Guides", "slug": "guides", "description": ""}
+  ],
+  "media": [],
+  "users": []
+}

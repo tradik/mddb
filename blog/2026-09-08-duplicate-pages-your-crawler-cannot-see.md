@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-09-08
 tags: [search, retrieval, embeddings]
+categories: [Guides]
 excerpt: "A site audit finds copied pages by comparing words. The pages that actually compete with each other share an intent and almost no vocabulary, and word comparison is blind to them."
 description: "Three duplicate detectors — content hash, text overlap and embeddings — on one client site, with the thresholds measured rather than guessed."
 ---

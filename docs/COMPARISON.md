@@ -81,10 +81,10 @@ reproduces that against an indexed corpus of real prose; it is the shape of a
 figure measured with tiny documents and no meaningful index work. It has been
 removed rather than adjusted.
 
-**Binary and image:** the release binary is ~32 MB (33,570,976 bytes for
+**Binary and image:** the release binary is ~36 MB (33,570,976 bytes for
 linux/amd64 at 2.18.10, `CGO_ENABLED=0 go build -ldflags="-s -w"`; a plain
 `go build` is larger, because it keeps the symbol table and DWARF), and the
-release archive a visitor downloads is ~12 MB. The Docker image is ~43 MB
+release archive a visitor downloads is ~12 MB. The Docker image is ~47 MB
 compressed.
 
 ## Against other databases, measured
@@ -167,7 +167,7 @@ whole collections ([CLUSTER.md](CLUSTER.md#placing-collections-across-groups)).
 | Protocols | HTTP, gRPC, GraphQL, MCP | wire protocol | HTTP |
 | Change feed | webhooks, binlog replication | change streams | `_changes` |
 | Markdown-aware | yes | no | no |
-| Docker image | ~43 MB | ~400 MB | ~180 MB |
+| Docker image | ~47 MB | ~400 MB | ~180 MB |
 | Inserts/s, measured | 502 (no index) / 104 (indexed) | 2 358 | 202 |
 
 **Choose MongoDB when** you need automatic sharding at a scale one machine

@@ -32,7 +32,7 @@ Used for: `server.json` `description`, the Docker Hub short description
 
 ## Long description
 
-> AI-native embedded knowledge base with a built-in MCP server (114 tools), hybrid BM25+vector search and RAG. Single ~32 MB Go binary, zero config. In production behind daemonports.org (about 120,000 pages).
+> AI-native embedded knowledge base with a built-in MCP server (114 tools), hybrid BM25+vector search and RAG. Single ~36 MB Go binary, zero config. In production behind daemonports.org (about 120,000 pages).
 
 Used for: the Docker Hub overview (first paragraph of
 [DOCKER_HUB.md](DOCKER_HUB.md)), mcp.so, PulseMCP, the Docker MCP Catalog

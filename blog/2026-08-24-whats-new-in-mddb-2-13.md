@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-08-24
 tags: [release, performance, security, operations]
+categories: [Releases]
 excerpt: "MDDB 2.13 runs its test suite on Windows, makes vector comparison 3.7–6.3× faster on amd64, and fixes two ways a restore could destroy the database it was restoring."
 description: "MDDB 2.13: native Windows testing, AVX2 vector maths, two data-loss fixes in restore, and one breaking change to user deletion."
 ---

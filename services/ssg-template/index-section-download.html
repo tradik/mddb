@@ -38,43 +38,43 @@
                 <div class="package-links">
                     <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-{{$.Vars.mddbVersion}}-linux-amd64.deb"
                         class="package-link">
-                        📦 Debian/Ubuntu AMD64 (.deb)
+                        Debian/Ubuntu AMD64 (.deb)
                     </a>
                     <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-{{$.Vars.mddbVersion}}-linux-arm64.deb"
                         class="package-link">
-                        📦 Debian/Ubuntu ARM64 (.deb)
+                        Debian/Ubuntu ARM64 (.deb)
                     </a>
                     <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-{{$.Vars.mddbVersion}}-linux-amd64.rpm"
                         class="package-link">
-                        📦 RedHat/CentOS AMD64 (.rpm)
+                        RedHat/CentOS AMD64 (.rpm)
                     </a>
                     <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-{{$.Vars.mddbVersion}}-linux-arm64.rpm"
                         class="package-link">
-                        📦 RedHat/CentOS ARM64 (.rpm)
+                        RedHat/CentOS ARM64 (.rpm)
                     </a>
                     <a href="https://snapcraft.io/mddbd" class="package-link" target="_blank" rel="noopener">
-                        🐧 Snap (Linux)
+                        Snap (Linux)
                     </a>
                 </div>
             </div>
             <div class="download-card">
                 <h3>Package Managers</h3>
                 <div class="pkg-section">
-                    <p class="pkg-label">🍺 Homebrew <span class="pkg-platform">macOS &amp; Linux</span></p>
+                    <p class="pkg-label">Homebrew <span class="pkg-platform">macOS &amp; Linux</span></p>
                     <pre><code>brew tap tradik/tap
 brew install tradik/tap/mddb</code></pre>
                     <a href="https://github.com/tradik/homebrew-tap" class="package-link" target="_blank"
                         rel="noopener">View Tap on GitHub →</a>
                 </div>
                 <div class="pkg-section">
-                    <p class="pkg-label">🐧 Snap <span class="pkg-platform">Linux</span></p>
+                    <p class="pkg-label">Snap <span class="pkg-platform">Linux</span></p>
                     <pre><code>sudo snap install mddbd
 sudo snap install mddb-cli</code></pre>
                     <a href="https://snapcraft.io/mddbd" class="package-link" target="_blank" rel="noopener">View on
                         Snap Store →</a>
                 </div>
                 <div class="pkg-section">
-                    <p class="pkg-label">🐳 Docker <span class="pkg-platform">All platforms</span></p>
+                    <p class="pkg-label">Docker <span class="pkg-platform">All platforms</span></p>
                     <pre><code>docker pull tradik/mddb:latest
 docker pull tradik/mddb:{{$.Vars.mddbVersion}}</code></pre>
                     <a href="https://hub.docker.com/r/tradik/mddb" class="package-link" target="_blank"
@@ -83,38 +83,30 @@ docker pull tradik/mddb:{{$.Vars.mddbVersion}}</code></pre>
             </div>
         </div>
         <div class="release-notes">
-            <!-- Content mirrors CHANGELOG.md [2.18.10]: what a visitor upgrading to
-                 this release needs to know, not the whole section. TODO: replace
-                 with the native SSG changelog data source when spagu/ssg#69 ships. -->
+            <!-- Content mirrors CHANGELOG.md [2.19.8]: what a visitor upgrading to
+                 this release needs to know, not the whole section. Update it with
+                 every release, or the heading names one version and the list
+                 describes another. TODO: replace with the native SSG changelog data
+                 source when spagu/ssg#69 ships. -->
             <h3>What's New in v{{$.Vars.mddbVersion}}</h3>
             <ul>
-                <li><strong>One permission gate on every surface</strong>: with auth on, a key
-                    limited to one collection or one tenant can no longer read or write others
-                    over REST, gRPC, GraphQL or MCP, and <code>admin</code> on one collection no
-                    longer makes a global admin.
+                <li><strong>Automatic failover</strong>: with <code>MDDB_CLUSTER_PEERS</code> and
+                    three or more nodes, the nodes elect a leader and replace a failed one. In tests a
+                    new leader took writes 2.6–3.7 s after <code>kill -9</code> of the old one.
                 </li>
-                <li><strong>The real client IP behind a proxy</strong>:
-                    <code>MDDB_TRUSTED_PROXIES</code>, <code>MDDB_CLIENT_IP_HEADER</code> and PROXY
-                    protocol v1/v2. Behind a reverse proxy, set <code>MDDB_TRUSTED_PROXIES</code>
-                    when you upgrade, or every client shares the proxy's rate limit.
+                <li><strong>Collections across node groups</strong>:
+                    <code>MDDB_PLACEMENT_GROUPS</code> splits nodes into groups, each collection lives
+                    in one of them, and any node routes a request to the right group.
+                    <code>POST /v1/placement/move</code> moves a collection without losing a write.
                 </li>
-                <li><strong>A result cap</strong>: a search returns at most
-                    <code>MDDB_SEARCH_MAX_LIMIT</code> results (1000 by default) and says
-                    <code>"limitCapped": true</code> when it lowered a request.
+                <li><strong>Vector indexes load from disk</strong>: 200,000 vectors with HNSW were ready
+                    in 4–10 s instead of 117 s, and IVF, PQ, OPQ and SQ no longer retrain at startup.
                 </li>
-                <li><strong>Elasticsearch-compatible subset</strong>:
-                    <code>MDDB_ES_COMPAT=true</code> mounts <code>_search</code>, <code>_count</code>,
-                    <code>_doc</code> and <code>_bulk</code> under <code>/es</code>, and refuses an
-                    unsupported clause by name.
+                <li><strong>Reranking</strong>: an optional model reorders the best candidates of a
+                    search. If it times out or fails, the search returns its own order.
                 </li>
-                <li><strong>Corpus packs and synced sources</strong>: install a collection
-                    read-only without re-embedding it, or keep one in step with a sitemap, a URL
-                    list or an S3 prefix.
-                </li>
-                <li><strong>Query decomposition and <code>mddb-cli diagnose</code></strong>:
-                    <code>queryDecomposition: "auto"</code> searches a question with several needs
-                    part by part; the diagnose bundle is a tar.gz without user data to attach to
-                    an issue.
+                <li><strong>Tenant limits</strong>: quotas, rate limits and concurrency limits per
+                    tenant and per API key, with a Tenants page in the panel.
                 </li>
             </ul>
             <a href="https://github.com/tradik/mddb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">View

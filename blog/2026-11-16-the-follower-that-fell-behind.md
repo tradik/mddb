@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-11-16
 tags: [release, operations, performance, search]
+categories: [Releases]
 excerpt: "A benchmark we wrote for 2.19.8 caught a replica applying 20 documents a second and a checksum that could not tell 5,601 documents from 6,601. Both are fixed, and leader election came with them."
 description: "MDDB 2.19.8: replicas that keep up, a checksum that sees missing documents, leader election, vector indexes that start from disk, filtered HNSW."
 ---

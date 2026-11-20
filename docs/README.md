@@ -90,7 +90,7 @@ Welcome to the MDDB documentation! This guide will help you understand, deploy, 
 
 ## 📚 What is MDDB?
 
-MDDB (Markdown Database) is an **AI-native embedded document database** for markdown content. Single ~32MB binary, embedded BoltDB storage, zero external dependencies. Core capabilities at a glance (full list in [FEATURES.md](FEATURES.md) and the root [README.md](../README.md)):
+MDDB (Markdown Database) is an **AI-native embedded document database** for markdown content. Single ~36MB binary, embedded BoltDB storage, zero external dependencies. Core capabilities at a glance (full list in [FEATURES.md](FEATURES.md) and the root [README.md](../README.md)):
 
 - **Triple protocol** — HTTP/JSON REST, gRPC/Protobuf, GraphQL, all over TCP or Unix Domain Sockets
 - **Built-in [MCP server](MCP.md)** — 114 MCP tools, [MCP 2026-07-28 and 2025-11-25](MCP-REVISIONS.md) served side by side, stdio + Streamable HTTP + SSE transports for Claude / Cursor / Windsurf / ChatGPT / Ollama / DeepSeek

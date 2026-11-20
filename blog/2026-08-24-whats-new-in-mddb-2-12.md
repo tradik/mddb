@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-08-24
 tags: [release, search, rag, security, performance]
+categories: [Releases]
 excerpt: "MDDB 2.12 adds code-aware retrieval, collection search profiles, faster bulk indexing, safer defaults and clearer production diagnostics."
 description: "A practical overview of MDDB 2.12: search and RAG changes, measured performance gains, security fixes and the required upgrade steps."
 ---

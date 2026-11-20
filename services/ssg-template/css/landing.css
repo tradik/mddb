@@ -297,6 +297,180 @@ a:hover {
     text-underline-offset: 3px;
 }
 
+/* Without JS: one deployment per line */
+.used-by-list {
+    flex: 1 1 32rem;
+    max-width: 60rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+/* With JS: entries stack in one grid cell (height = tallest, no jump) and
+   take turns fading in */
+.used-by-list.is-rotating {
+    display: grid;
+}
+
+.used-by-list.is-rotating > .used-by-text {
+    grid-area: 1 / 1;
+    align-self: center;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px);
+    transition: opacity 0.6s ease, transform 0.6s ease, visibility 0.6s;
+}
+
+.used-by-list.is-rotating > .used-by-text.is-active {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .used-by-list.is-rotating > .used-by-text {
+        transition: none;
+    }
+}
+
+/* Hero video: under the call to action, as wide as the layout allows.
+   A poster and a play button stand in for the YouTube player until the
+   visitor clicks (the "facade" pattern): no third-party script, cookie or
+   ~1 MB of player code on first load. */
+.hero-video {
+    max-width: 1100px;
+    margin: var(--space-12) auto 0;
+    aspect-ratio: 16 / 9;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    background: #000;
+    position: relative;
+    text-shadow: none;
+}
+
+.hero-video-play,
+.hero-video iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    background: #000;
+    cursor: pointer;
+}
+
+.hero-video-play img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+    opacity: 0.9;
+}
+
+/* Play button: a red disc (white triangle, 4.6:1 contrast on it) */
+.hero-video-play::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: #d93025;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    transition: transform 0.2s ease;
+}
+
+.hero-video-play::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 0;
+    height: 0;
+    transform: translateX(4px);
+    border-style: solid;
+    border-width: 16px 0 16px 26px;
+    border-color: transparent transparent transparent #fff;
+    z-index: 1;
+}
+
+.hero-video-play:hover img,
+.hero-video-play:focus-visible img {
+    transform: scale(1.02);
+    opacity: 1;
+}
+
+.hero-video-play:hover::after,
+.hero-video-play:focus-visible::after {
+    transform: scale(1.08);
+}
+
+.hero-video-play:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: -3px;
+}
+
+.hero-video-label {
+    position: absolute;
+    left: var(--space-4);
+    bottom: var(--space-4);
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    z-index: 1;
+}
+
+@media (max-width: 640px) {
+    .hero-video {
+        margin-top: var(--space-8);
+        border-radius: 8px;
+    }
+
+    .hero-video-play::after {
+        width: 64px;
+        height: 64px;
+    }
+
+    .hero-video-play::before {
+        border-width: 12px 0 12px 20px;
+    }
+}
+
+/* The word before "intelligence" (startRotation, index-section-rotate.html).
+   The HTML holds only "code"; addRotatorWords adds the rest from data-more. Rotating, the words share one grid cell: the cell is as wide
+   as the longest word, so the line never jumps. Accent-200 on the hero's dark
+   overlay is above 7:1. */
+.hero-rotator {
+    display: inline-grid;
+    justify-items: center;
+    color: var(--color-palette-accent-200);
+}
+
+.hero-rotator-word:not(:first-child) {
+    display: none;
+}
+
+.hero-rotator.is-rotating > .hero-rotator-word {
+    display: inline;
+    grid-area: 1 / 1;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(0.25em);
+    transition: opacity 0.45s ease, transform 0.45s ease, visibility 0.45s;
+}
+
+.hero-rotator.is-rotating > .hero-rotator-word.is-active {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+
 .hero-content h1 {
     font-size: var(--font-size-5xl);
     margin-bottom: 1rem;
@@ -1188,53 +1362,6 @@ code {
     margin-bottom: 0;
 }
 
-/* Community Section */
-.community {
-    padding: 5rem 0;
-    background: var(--bg-color);
-}
-
-.community h2 {
-    text-align: center;
-    margin-bottom: 3rem;
-}
-
-.community-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
-    gap: 2rem;
-}
-
-.community-card {
-    padding: 2rem;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-color);
-    text-align: center;
-    transition: var(--transition);
-    display: block;
-}
-
-.community-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary-color);
-}
-
-.community-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-}
-
-.community-card h3 {
-    margin-bottom: 0.5rem;
-}
-
-.community-card p {
-    color: var(--text-secondary);
-    margin-bottom: 0;
-}
-
 /* Footer */
 .footer {
     background: var(--text-primary);
@@ -1378,8 +1505,7 @@ code {
     }
 
     .docs-columns,
-    .use-cases-grid,
-    .community-grid {
+    .use-cases-grid {
         grid-template-columns: 1fr;
     }
 

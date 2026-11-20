@@ -5,6 +5,7 @@ description: "MDDB Sync mirrors your WordPress posts into MDDB for semantic sear
 status: publish
 date: 2026-08-02
 tags: [mcp, search, rag]
+categories: [Guides]
 ---
 
 # Your WordPress just became AI-searchable: meet the MDDB Sync plugin

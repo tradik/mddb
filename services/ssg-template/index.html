@@ -9,37 +9,38 @@
          rest of the feature list reads as keyword stuffing rather than a
          summary. The full capability list belongs on the page, not in here. -->
     <meta name="description"
-        content="AI-native embedded document database with a built-in MCP server ({{$.Vars.mcpTools}} tools), vector and hybrid search, and RAG. One {{$.Vars.mddbBinarySize}} binary, zero config.">
-    <meta name="keywords"
-        content="MCP server, AI knowledge base, RAG, LLM integration, Claude MCP, embedding database, semantic search, vector search, code search, code graph, markdown database, document database, gRPC, protobuf, graphql, websocket, embedded database, BoltDB, Go, HNSW, BM25, PMISparse, hybrid search, zero-shot classification, document TTL, replication, automation, webhooks, Cursor MCP, Windsurf MCP, Ollama, DeepSeek, Docling, Langflow, LangChain, LangGraph, AI coding agents, geosearch, geohash, R-tree, unix domain socket, mTLS, mutual TLS">
+        content="Embedded document database with a built-in MCP server ({{$.Vars.mcpTools}} tools), vector and hybrid search, and RAG. One {{$.Vars.mddbBinarySize}} binary, no config file.">
     <meta name="author" content="MDDB Team">
     <meta name="robots" content="index, follow">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://{{.Domain}}/" />
-    <meta property="og:title" content="MDDB - AI-Native Knowledge Base with MCP">
+    <meta property="og:title" content="MDDB: Knowledge Database and Code Intelligence for AI Agents">
     <meta property="og:description"
-        content="Knowledge base for AI agents with built-in MCP server, vector search, RAG, and semantic retrieval. Single binary, zero config.">
+        content="Search Markdown, documents and source code by keyword or meaning, with a call graph and a built-in MCP server. One binary, no config file.">
     <meta property="og:image" content="https://mddb.tradik.com/og-image.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://mddb.tradik.com/">
-    <meta property="twitter:title" content="MDDB - AI-Native Knowledge Base with MCP">
+    <meta property="twitter:title" content="MDDB: Knowledge Database and Code Intelligence for AI Agents">
     <meta property="twitter:description"
-        content="Knowledge base for AI agents with built-in MCP server, vector search, RAG, and semantic retrieval. Single binary, zero config.">
+        content="Search Markdown, documents and source code by keyword or meaning, with a call graph and a built-in MCP server. One binary, no config file.">
     <meta property="twitter:image" content="https://mddb.tradik.com/og-image.png">
 
     <script>(function (w, d, s, l, i) { w[l] = w[l] || []; w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' }); var f = d.getElementsByTagName(s)[0], j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f); })(window, document, 'script', 'dataLayer', '{{template "gtm_id" .}}');</script>
 
-    <title>MDDB - AI-Native Knowledge Base with Built-in MCP Server</title>
+    <title>MDDB: Knowledge Database and Code Intelligence for AI Agents</title>
     <link rel="canonical" href="https://{{.Domain}}/" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/tradik-tokens.css">
     <link rel="stylesheet" href="/css/landing.css">
+    <!-- The hero background is the largest paint; set in CSS, the browser would
+         find it only after the stylesheet loads. -->
+    <link rel="preload" as="image" href="/images/hero.webp" type="image/webp">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
@@ -68,7 +69,7 @@
         "Hybrid search combining sparse BM25 + dense vector with alpha blending and Reciprocal Rank Fusion",
         "Full-text search with TF-IDF, BM25, BM25F, PMISparse scoring, 8 search modes (simple, boolean, phrase, wildcard, proximity, expression, range, fuzzy), multi-language stemming (17 languages), typo tolerance, per-query metadata boost/demote, and prefix autocomplete",
         "Inline facets (v2.9.14+): facetBy parameter on FTS and Hybrid search returns per-key value counts alongside results — no separate aggregate call",
-        "Curation rules (v2.9.14+): pin documents to fixed positions or hide others for specific queries — editorial overrides applied in FTS + Hybrid pipelines, inspired by Typesense",
+        "Curation rules (v2.9.14+): pin documents to fixed positions or hide others for specific queries — editorial overrides applied in FTS + Hybrid pipelines",
         "Per-collection revision retention (v2.9.14+): maxRevisions cap trims older revisions synchronously on every write so history stays bounded on high-churn collections",
         "Geospatial search: R-tree and geohash indexes for radius and bounding-box queries, composable with FTS and vector search, optional postcode lookup",
         "Async bulk ingest with job tracking: submit long imports that return a job ID, poll status, cancel pending, optional webhook callback on completion",
@@ -131,7 +132,6 @@
         {{template "index_documentation" .}}
         {{template "index_examples" .}}
         {{template "index_replication" .}}
-        {{template "index_community" .}}
     </main>
 
     <!-- Footer -->
@@ -140,7 +140,7 @@
             <div class="footer-content">
                 <div class="footer-section">
                     <h4>MDDB</h4>
-                    <p>AI-native knowledge base</p>
+                    <p>Document database and search for AI agents</p>
                     <p class="footer-version">Version {{$.Vars.mddbVersion}}</p>
                 </div>
                 <div class="footer-section">
@@ -162,6 +162,10 @@
                                 rel="noopener">Releases</a></li>
                         <li><a href="https://github.com/tradik/mddb/blob/main/CHANGELOG.md" target="_blank"
                                 rel="noopener">Changelog</a></li>
+                        <li><a href="https://github.com/tradik/mddb/issues" target="_blank"
+                                rel="noopener">Report an issue</a></li>
+                        <li><a href="https://github.com/tradik/mddb/discussions" target="_blank"
+                                rel="noopener">Discussions</a></li>
                     </ul>
                 </div>
                 <div class="footer-section">
@@ -648,6 +652,7 @@
             }
         })();
     </script>
+{{template "index_rotate" .}}
 {{template "email_on" .}}
 </body>
 

@@ -26,6 +26,7 @@ status: publish                  # draft keeps it out of publication
 type: post                       # explicit; drives URL and template behaviour
 date: 2026-08-23                 # ordering, and the date-based URL
 tags: [rag, retrieval, mcp]      # from the fixed vocabulary below
+categories: [Guides]             # one of Releases, Engineering, Guides
 excerpt: "What a reader sees in the listing and the feed."
 description: "SEO description; distinct from excerpt, 70–160 characters."
 mermaid: true                    # only on posts that contain a diagram
@@ -39,6 +40,13 @@ mermaid_background: "#ffffff"
   only one leaves the other empty, and every documentation page shipped an
   empty `<meta name="description">` for exactly that reason until 2.12.
 
+- **Every post names one category**: `Releases` (what shipped in a version),
+  `Engineering` (investigations, benchmarks, how the internals work) or
+  `Guides` (how to do something with MDDB). They are the bar at the top of
+  `/blog/`, each with an archive at `/category/<slug>/`, and the line above the
+  title on the post's social card. The three are defined in
+  `docs/metadata.json`; a category named only in a post's frontmatter is
+  ignored by the generator, so a fourth one starts there.
 - **Tags come from a fixed vocabulary**, written as lowercase slugs:
   `agents`, `benchmarking`, `embeddings`, `mcp`, `operations`, `performance`,
   `rag`, `release`, `retrieval`, `search`, `security`. Each one renders an
@@ -75,7 +83,6 @@ scripts/load-md-folder.sh --collection blog blog/
 ## Before publishing
 
 ```bash
-make docs-metadata        # the empty metadata.json the SSG expects
 make docs-build           # fails on a broken internal link or an orphan page
 ```
 

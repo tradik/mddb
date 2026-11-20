@@ -5,8 +5,9 @@ status: publish
 type: post
 date: 2026-10-30
 tags: [release, security, operations, search, interoperability]
+categories: [Releases]
 excerpt: "A database should know who is talking to it, how much it is willing to hand over, and what it is willing to say about itself. MDDB 2.18.10 got all three wrong in places, and this release is mostly about getting them right."
-description: "MDDB 2.18.10 fixes who a request comes from, what a credential may touch and how much one search may return, and adds an Elasticsearch-compatible subset, corpus packs and a diagnose bundle."
+description: "MDDB 2.18.10: the real client IP behind a proxy, one permission gate on every surface, a result cap, an Elasticsearch subset and corpus packs."
 ---
 
 Every request to a database carries three questions:

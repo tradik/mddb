@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-08-23
 tags: [search, rag, agents, mcp, benchmarking]
+categories: [Guides]
 excerpt: "MDDB now profiles a collection and recommends search settings from its document length, vocabulary, vector coverage and extracted symbols."
 description: "How the MDDB search advisor profiles a collection, recommends search settings and explains the limits of its vocabulary heuristic."
 mermaid: true

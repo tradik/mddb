@@ -3,12 +3,12 @@
 <section id="replication" class="replication" style="background-color: #f8fafc; padding: 80px 0;">
     <div class="container">
         <div style="text-align: center; margin-bottom: 40px;">
-            <h2 style="font-size: 2.5rem; margin-bottom: 20px;">🔄 Leader-Follower Replication <a
+            <h2 style="font-size: 2.5rem; margin-bottom: 20px;">Replication and failover <a
                     href="#replication" class="anchor-link" aria-label="Link to Replication section">#</a></h2>
             <p style="font-size: 1.2rem; max-width: 700px; margin: 0 auto;">
-                Scale reads horizontally with binlog-based streaming replication.
-                A single leader handles writes and streams transactions in real-time to read-only followers via
-                gRPC.
+                One leader takes the writes and streams its binlog over gRPC to read-only followers,
+                so you add followers to serve more reads. With three or more nodes, the followers elect
+                a new leader when the old one fails.
             </p>
         </div>
         <div style="max-width: 700px; margin: 0 auto; text-align: center;">

@@ -162,7 +162,6 @@ output-test2/
 .ssg-output/
 content/
 docs/pages/
-docs/metadata.json
 
 # Wrangler cache
 .wrangler/

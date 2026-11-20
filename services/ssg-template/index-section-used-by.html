@@ -1,15 +1,25 @@
 {{define "index_used_by"}}
-<!-- Projects running on mddb -->
-<div class="ai-strip used-by-strip">
+<!-- Projects running on mddb. With JavaScript the entries take turns
+     (startRotation in index-section-rotate.html); without it, or with
+     prefers-reduced-motion, all are listed. -->
+<div class="ai-strip used-by-strip" id="used-by">
     <div class="container">
         <span class="ai-strip-label">Powers</span>
-        <p class="used-by-text">
-            <a href="https://daemonports.org/" rel="noopener">daemonports.org</a>
-            — about 120,000 pages from the ports trees of five BSD systems in one collection,
-            refreshed every 30 minutes; its public full-text search and autocomplete are served
-            by MDDB on FreeBSD with ZFS.
-            See <a href="https://daemonports.org/stats/" rel="noopener">its live memory and disk figures</a>.
-        </p>
+        <div class="used-by-list">
+            <p class="used-by-text">
+                <a href="https://daemonports.org/" rel="noopener">daemonports.org</a>:
+                about 120,000 pages from the ports trees of five BSD systems in one collection,
+                refreshed every 30 minutes; its public full-text search and autocomplete are served
+                by MDDB on FreeBSD with ZFS.
+                See <a href="https://daemonports.org/stats/" rel="noopener">its live memory and disk figures</a>.
+            </p>
+            <p class="used-by-text">
+                <a href="https://versions.tradik.com/" rel="noopener">versions.tradik.com</a>:
+                a small MCP server that tracks 220+ packages (languages, databases, frameworks,
+                GitHub Actions) and tells AI agents their current versions, so they stop writing
+                stale ones; its lookups run on MDDB.
+            </p>
+        </div>
     </div>
 </div>
 {{end}}

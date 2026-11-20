@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-10-25
 tags: [release, storage, mcp, search]
+categories: [Releases]
 excerpt: "MDDB 2.18 reads C code, then spent two patch releases on what large databases taught it: restarts in milliseconds, reads during crash recovery, one file per collection, and OAuth for claude.ai connectors."
 description: "MDDB 2.18: C code in code_graph, restarts in milliseconds, reads during crash recovery, one file per collection, and OAuth for MCP."
 ---

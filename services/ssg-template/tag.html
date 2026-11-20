@@ -32,26 +32,17 @@
 {{template "navbar" .}}
 
 <div class="site-layout">
-    {{template "sidebar" .}}
-    <main id="main-content" class="main-content">
-        <div class="doc-category">
-            <header class="doc-header">
-                <h1 class="doc-title">Posts tagged {{.Category.Name}}</h1>
-                <p class="doc-index-lead">{{len .Posts}} article{{if ne (len .Posts) 1}}s{{end}} on {{.Category.Name}}, newest first. The full archive is on the <a href="/blog/">blog</a>.</p>
-            </header>
-            <ul class="doc-page-list">
-                {{range .Posts}}
-                <li>
-                    <a href="/{{.Slug}}/">{{.Title}}</a>
-                    {{if .Description}}<span class="doc-page-excerpt">{{.Description}}</span>
-                    {{else if .Excerpt}}<span class="doc-page-excerpt">{{.Excerpt}}</span>{{end}}
-                </li>
-                {{end}}
-            </ul>
-        </div>
+    <main id="main-content" class="main-content blog-main">
+        <header class="doc-header blog-header">
+            <h1 class="doc-title">Posts tagged {{.Category.Name}}</h1>
+            <p class="doc-index-lead">{{len .Posts}} article{{if ne (len .Posts) 1}}s{{end}} on {{.Category.Name}}, newest first.</p>
+        </header>
+        {{template "blog_nav" (dict "Current" "")}}
+        <ul class="post-grid">
+            {{range .Posts}}{{template "post_card" .}}{{end}}
+        </ul>
     </main>
 </div>
-
 {{template "footer" .}}
 {{template "email_on" .}}
 </body>

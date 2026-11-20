@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-10-22
 tags: [operations, search, performance]
+categories: [Engineering]
 excerpt: "Three releases, one pattern: a backup that could not be restored, a log where every call looked the same, and a filter that returned 7 of 100. None of them raised an error."
 description: "What MDDB 2.15.4 to 2.17 fixed: unrestorable backups, indistinguishable MCP logs, filters applied after the limit, and fsyncs hidden in the embedding worker."
 mermaid: true

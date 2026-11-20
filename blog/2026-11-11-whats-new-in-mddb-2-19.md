@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-11-11
 tags: [release, rag, mcp, security, agents]
+categories: [Releases]
 excerpt: "MDDB 2.19 turns the chat assistant into something you configure in the panel instead of a file: scenarios, skills, signed-in users with their own history, a log of what people ask, and read-only knowledge from other MCP servers. It also changes the licence, lets you switch off the modules you do not use, and makes the panel reach every server feature."
 description: "MDDB 2.19: chat scenarios and skills in the panel, per-user chat history, a conversation log, module switches, and a new licence."
 ---

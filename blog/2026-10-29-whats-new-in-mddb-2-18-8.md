@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-10-29
 tags: [release, agents, search, mcp, retrieval]
+categories: [Releases]
 excerpt: "MDDB 2.18.8 is about agents that work on code: passages instead of files, a repository indexed in one command, reference code to learn from, edits that cannot overwrite each other, and numbers for what search is worth."
 description: "MDDB 2.18.8: passages instead of files, a repository indexed in one command, safe concurrent edits, aliases, and measured search quality."
 ---

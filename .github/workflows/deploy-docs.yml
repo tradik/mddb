@@ -55,9 +55,6 @@ jobs:
       - name: Lint the OpenAPI spec (Redocly)
         run: make openapi-lint
 
-      - name: Prepare metadata
-        run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
-
       - name: Generate site with SSG
         uses: spagu/ssg@ca25f75ae4ab00767009ee6fe74d735b7316e21b # v1.9.6
         with:

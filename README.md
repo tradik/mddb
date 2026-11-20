@@ -13,7 +13,7 @@
 
 **AI-native document database with built-in MCP server, file upload (PDF/DOCX/XLSX/PPTX/EPUB/EML/HTML/ODT/RTF/TEX/YAML/Wikipedia XML to Markdown), vector search, RAG pipelines, and 114 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
 
-MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT). They are auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 114 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~32MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
+MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT). They are auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 114 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~36MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
 
 **MCP quick start:** MDDB is in the [MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/com.tradik%2Fmddb/versions/latest) as `com.tradik/mddb`, and the whole client configuration is one `docker run` line.
 The snippet for Claude, Cursor and Windsurf is in [Connect to Claude / Cursor / Windsurf (MCP)](#connect-to-claude--cursor--windsurf-mcp);
@@ -57,7 +57,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **Real-Time Events** - Server-Sent Events (SSE) for live document change notifications
 - **MCP Transports** - Streamable HTTP (`/mcp`, 2026-07-28 + 2025-11-25), legacy SSE (`/sse`), and stdio
 - **Built-in TLS** - Native HTTPS support, connection pooling, pprof profiling
-- **Zero Configuration** - Single ~32MB binary, embedded database, no dependencies
+- **Zero Configuration** - Single ~36MB binary, embedded database, no dependencies
 
 **Perfect for:** AI agent memory, RAG pipelines, knowledge bases for LLMs, documentation chatbots, semantic search APIs, document processing (PDF/DOCX to Markdown), static site generation, WordPress migration
 
@@ -348,7 +348,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 
 | Image | Size | Description |
 |-------|------|-------------|
-| `tradik/mddb:latest` | ~43MB | Database server with MCP built-in (Alpine) |
+| `tradik/mddb:latest` | ~47MB | Database server with MCP built-in (Alpine) |
 | `tradik/mddb:panel` | ~88MB | Web admin panel (Node Alpine) |
 
 There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.deb`, `.rpm`), Homebrew (`brew install tradik/tap/mddb-cli`) and snap (`snap install mddb-cli`). To run it in a container, build it from the repository root: `docker build -f services/mddb-cli/Dockerfile -t mddb-cli .`

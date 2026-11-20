@@ -5,6 +5,7 @@ status: publish
 type: post
 date: 2026-10-29
 tags: [release, agents, mcp, operations, search]
+categories: [Releases]
 excerpt: "An agent that can delete a collection should have to ask someone first. A tenant that fills the disk should be told no before the disk is full. A conversion that produced nothing should say so. And a benchmark that disagrees with you should win. Notes on MDDB 2.18.9."
 description: "MDDB 2.18.9 asks before deleting, refuses before the disk fills, flags bad conversions, and measures search before trusting it."
 ---

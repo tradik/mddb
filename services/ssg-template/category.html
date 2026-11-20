@@ -1,27 +1,24 @@
 {{define "page_slug"}}category/{{.Category.Slug}}{{end -}}
-{{/* A category page lists the same posts as the section index it mirrors
-     (/category/blog/ vs /blog/) and is linked from nowhere on the site. It
-     exists so the taxonomy URL resolves, not to rank — so keep it out of the
-     index while still letting crawlers follow through to the posts.
-
-     .CanonicalURL (SSG 1.8.56) is the path the archive was actually written
-     to. This template is also the fallback for every other archive kind, so
-     re-deriving the URL from .Category.Slug published /category/<slug>/ on 23
-     tag pages, each canonicalising to a 404. Never hardcode the base here. */ -}}
+{{/* A blog category archive: /category/releases/, /engineering/, /guides/,
+     linked from the category bar on /blog/. Indexable now that it is real
+     navigation (until the categories existed it duplicated /blog/ and was
+     noindex). .CanonicalURL (SSG 1.8.56) is the path the archive was actually
+     written to; this template is also the fallback for other archive kinds,
+     so never re-derive the URL from .Category.Slug. */ -}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     {{template "head_meta" .}}
-    <meta name="robots" content="noindex, follow">
-    <meta name="description" content="{{if .Category.Description}}{{.Category.Description}}{{else}}Every MDDB article filed under {{.Category.Name}} - release notes, engineering write-ups and guides from the team.{{end}}">
-    <meta property="og:title" content="{{.Category.Name}} — MDDB">
-    <meta property="og:description" content="{{if .Category.Description}}{{.Category.Description}}{{else}}Every MDDB article filed under {{.Category.Name}} - release notes, engineering write-ups and guides from the team.{{end}}">
-    <meta property="twitter:description" content="{{if .Category.Description}}{{.Category.Description}}{{else}}Every MDDB article filed under {{.Category.Name}} - release notes, engineering write-ups and guides from the team.{{end}}">
+    <meta name="robots" content="index, follow">
+    <meta name="description" content="{{if .Category.Description}}{{.Category.Description}}{{else}}{{template "blog_category_desc" .Category.Name}}{{end}}">
+    <meta property="og:title" content="{{.Category.Name}} from the MDDB blog">
+    <meta property="og:description" content="{{if .Category.Description}}{{.Category.Description}}{{else}}{{template "blog_category_desc" .Category.Name}}{{end}}">
+    <meta property="twitter:description" content="{{if .Category.Description}}{{.Category.Description}}{{else}}{{template "blog_category_desc" .Category.Name}}{{end}}">
     <meta property="og:url" content="{{.CanonicalURL}}" />
-    <meta property="twitter:title" content="{{.Category.Name}} — MDDB">
+    <meta property="twitter:title" content="{{.Category.Name}} from the MDDB blog">
     <meta property="twitter:url" content="{{.CanonicalURL}}" />
     <link rel="canonical" href="{{.CanonicalURL}}" />
-    <title>{{.Category.Name}} — MDDB</title>
+    <title>{{.Category.Name}} from the MDDB blog</title>
 </head>
 <body>
 {{template "email_off" .}}
@@ -29,27 +26,17 @@
 {{template "navbar" .}}
 
 <div class="site-layout">
-    {{template "sidebar" .}}
-    <main id="main-content" class="main-content">
-        <div class="doc-category">
-            <header class="doc-header">
-                <h1 class="doc-title">{{.Category.Name}}</h1>
-                {{if .Category.Description}}
-                <p class="doc-index-lead">{{.Category.Description}}</p>
-                {{end}}
-            </header>
-            <ul class="doc-page-list">
-                {{range .Posts}}
-                <li>
-                    <a href="/{{.Slug}}/">{{.Title}}</a>
-                    {{if .Excerpt}}<span class="doc-page-excerpt">{{.Excerpt}}</span>{{end}}
-                </li>
-                {{end}}
-            </ul>
-        </div>
+    <main id="main-content" class="main-content blog-main">
+        <header class="doc-header blog-header">
+            <h1 class="doc-title">{{.Category.Name}}</h1>
+            <p class="doc-index-lead">{{if .Category.Description}}{{.Category.Description}}{{else}}{{template "blog_category_desc" .Category.Name}}{{end}}</p>
+        </header>
+        {{template "blog_nav" (dict "Current" .Category.Slug)}}
+        <ul class="post-grid">
+            {{range .Posts}}{{template "post_card" .}}{{end}}
+        </ul>
     </main>
 </div>
-
 {{template "footer" .}}
 {{template "email_on" .}}
 </body>

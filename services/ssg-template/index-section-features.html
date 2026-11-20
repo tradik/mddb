@@ -2,8 +2,8 @@
 <!-- Features Section -->
 <section id="features" class="features" aria-label="MDDB features and capabilities">
     <div class="container">
-        <h2>Why MDDB? <a href="#features" class="anchor-link" aria-label="Link to Features section">#</a></h2>
-        <p class="section-lead">One binary. Every protocol. AI-native from day one.</p>
+        <h2>Why MDDB <a href="#features" class="anchor-link" aria-label="Link to Features section">#</a></h2>
+        <p class="section-lead">Full-text, vector and hybrid search, an MCP server for your agents, and REST, gRPC and GraphQL APIs, in one binary.</p>
 
         <!-- Machine-readable feature summary (visually hidden, for crawlers and screen readers) -->
         <div class="sr-only">
@@ -13,17 +13,17 @@
                 auto-converting everything to Markdown. All documents are stored with full revision history.</p>
             <h3>Core capabilities</h3>
             <ul>
-                <li>Built-in MCP server with {{$.Vars.mcpTools}} tools — connects to Claude, Cursor, Windsurf, ChatGPT, Ollama,
+                <li>Built-in MCP server with {{$.Vars.mcpTools}} tools; connects to Claude, Cursor, Windsurf, ChatGPT, Ollama,
                     DeepSeek, Manus via stdio and HTTP transport</li>
                 <li>Geospatial search: R-tree and geohash indexes, radius and bounding-box queries, composable
                     with full-text and vector search, optional postcode lookup</li>
                 <li>Transport options: TCP host:port or Unix Domain Socket (<code>unix:/path.sock</code>) for
-                    zero-network local deployments (PHP-FPM sidecars, cron, same-host panel)</li>
+                    clients on the same host (PHP-FPM sidecars, cron, the panel)</li>
                 <li>TLS and mutual TLS (mTLS): user-supplied server cert/key, optional client CA bundle for
                     certificate-based client authentication (MDDB_TLS_CLIENT_CA)</li>
                 <li>Vector/semantic search with 8 index algorithms: Flat (exact), HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ,
-                    or <code>algorithm: auto</code> to let the server choose — OpenAI, Ollama, Cohere,
-                    Voyage AI embeddings or the offline lexical provider, with per-collection int8/int4
+                    or <code>algorithm: auto</code> to let the server choose. Embeddings from OpenAI, Ollama, Cohere,
+                    Voyage AI or the offline lexical provider, with per-collection int8/int4
                     quantization (4-8x compression)</li>
                 <li>Full-text search with 8 modes (simple, boolean, phrase, wildcard, proximity, expression, range,
                     fuzzy), TF-IDF, BM25, BM25F, PMISparse scoring, multi-language stemming (17 languages), typo
@@ -55,9 +55,9 @@
                 <li>Multi-protocol: HTTP/JSON REST API, HTTP/3, gRPC/Protobuf, GraphQL, Server-Sent Events, WebSocket streaming (via mddb-chat), MCP (Streamable HTTP / SSE / stdio)</li>
                 <li>Elasticsearch-compatible subset under <code>/es</code> (<code>MDDB_ES_COMPAT=true</code>):
                     search, count, document and bulk calls for existing Elasticsearch clients</li>
-                <li>Multi-format upload: 20 file formats — .md, .txt, .html, .pdf, .docx, .odt, .rtf, .tex,
-                    .yaml, .xlsx, .ods, .csv, .tsv, .pptx, .odp, .epub, .eml, .mbox and more — with
-                    auto-conversion to Markdown</li>
+                <li>Multi-format upload: 20 file formats (.md, .txt, .html, .pdf, .docx, .odt, .rtf, .tex,
+                    .yaml, .xlsx, .ods, .csv, .tsv, .pptx, .odp, .epub, .eml, .mbox and more), converted
+                    to Markdown on upload</li>
                 <li>Corpus packs: a collection built once and installed read-only anywhere, without
                     re-embedding or reindexing</li>
                 <li>Synced sources: a cron rule keeps a collection in step with a sitemap, a URL list or an
@@ -68,7 +68,7 @@
                 <li>Document TTL with auto-expiry and background cleanup</li>
                 <li>Full revision history for every document</li>
                 <li>JWT authentication and RBAC authorization (opt-in)</li>
-                <li>Compliance-first (v2.9.15+): ISO 27001 / SOC 2 hardening built-in — audit log, AES-256-GCM at-rest encryption, HTTP+gRPC rate limiter, incident webhooks, and a single <code>MDDB_PRODUCTION=true</code> switch that refuses to boot without every control in place</li>
+                <li>Controls for ISO 27001 / SOC 2 audits (v2.9.15+): audit log, AES-256-GCM encryption at rest, an HTTP and gRPC rate limiter, incident webhooks, and <code>MDDB_PRODUCTION=true</code>, which refuses to start until every control is on</li>
                 <li>Leader-follower replication with binlog streaming</li>
                 <li>Scheduled backups with retention and an S3 target; per-collection quotas, disk reserve
                     and embedding budget</li>
@@ -83,8 +83,8 @@
                 <li>Docker image: {{$.Vars.mddbDockerSize}} compressed, Alpine-based, with health checks</li>
                 <li>Aggregations: metadata facets (value counts) and date histograms with optional pre-filtering
                 </li>
-                <li>Per-collection storage backends: BoltDB (default), in-memory (ephemeral), S3/MinIO —
-                    configurable via API and web panel</li>
+                <li>Per-collection storage backends: BoltDB (default), in-memory (ephemeral) or S3/MinIO,
+                    set through the API or the web panel</li>
                 <li>Web admin panel (React-based) with REST/GraphQL API toggle</li>
                 <li>PHP and Python client libraries</li>
             </ul>
@@ -105,9 +105,10 @@
                 </div>
                 <div class="feat-text">
                     <span class="feat-label">AI Integration</span>
-                    <h3>{{$.Vars.mcpTools}} Built-in MCP Tools</h3>
-                    <p>MCP 2026-07-28 and 2025-11-25 compliant. Tool annotations for auto-approve, 5 built-in prompts,
-                        completion, structured output, logging. Three transports: stdio, Streamable HTTP, SSE.
+                    <h3>{{$.Vars.mcpTools}} built-in MCP tools</h3>
+                    <p>MDDB speaks MCP 2026-07-28 and 2025-11-25 over stdio, Streamable HTTP or SSE. Tool
+                        annotations tell a client which tools are safe to approve automatically, and the server
+                        also ships 5 prompts, completion, structured output and logging.
                     </p>
                     <ul class="feat-tags">
                         <li>MCP 2026-07-28 + 2025-11-25</li>
@@ -134,13 +135,12 @@
                 </div>
                 <div class="feat-text">
                     <span class="feat-label">Search</span>
-                    <h3>Hybrid Search Engine</h3>
+                    <h3>Hybrid search</h3>
                     <p>Full-text with 8 search modes (simple, boolean, phrase, wildcard, proximity, expression,
                         range, fuzzy) + vector search with 8 index types, or <code>auto</code> to let the
-                        server pick one for the collection. Multi-language stemming for 17 languages.
-                        Combine with
-                        alpha blending or Reciprocal Rank Fusion. Metadata pre-filtering, typo tolerance.
-                        Source code is searched as code and linked into a graph of calls, includes and
+                        server pick one for the collection. Stemming covers 17 languages. The two result
+                        lists are merged by alpha blending or Reciprocal Rank Fusion, after metadata
+                        pre-filtering and with typo tolerance. Source code is searched as code and linked into a graph of calls, includes and
                         references, from C and Go to Terraform and Kubernetes manifests.
                         Alt text and captions of images are searchable; with Voyage or Cohere
                         embeddings you can search by picture.</p>
@@ -167,12 +167,12 @@
                 </div>
                 <div class="feat-text">
                     <span class="feat-label">Protocols</span>
-                    <h3>Multi-Protocol Access</h3>
+                    <h3>Multi-protocol access</h3>
                     <p>REST for easy debugging, gRPC for high-throughput pipelines, GraphQL for flexible
                         frontend queries, and WebSocket streaming via <code>mddb-chat</code> for LLM chat
                         pipelines. HTTP/3 when you turn it on, and an Elasticsearch-compatible subset
                         under <code>/es</code> so an existing Elasticsearch client can search and write
-                        without a rewrite. All endpoints, one stack.</p>
+                        without a rewrite.</p>
                     <ul class="feat-tags">
                         <li>REST API</li>
                         <li>gRPC</li>
@@ -208,13 +208,12 @@
                 </div>
                 <div class="feat-text">
                     <span class="feat-label">Ingestion</span>
-                    <h3>Multi-Format Pipeline</h3>
-                    <p>Upload 20 file formats — documents, spreadsheets, slides, e-books and mail (.pdf, .docx,
-                        .xlsx, .csv, .pptx, .epub, .eml, .mbox, .odt, .rtf, .tex, .yaml and more) — import
-                        from any URL, keep a collection synced with a sitemap or an S3 prefix,
-                        or stream Wikipedia XML dumps (.xml.bz2).
-                        Everything auto-converts to Markdown. Background embedding worker indexes documents as
-                        they arrive.</p>
+                    <h3>Any document in, Markdown out</h3>
+                    <p>Upload 20 file formats, from documents and spreadsheets to slides, e-books and mail
+                        (.pdf, .docx, .xlsx, .csv, .pptx, .epub, .eml, .mbox, .odt, .rtf, .tex, .yaml and more).
+                        You can also import from a URL, keep a collection in step with a sitemap or an S3
+                        prefix, or stream a Wikipedia XML dump (.xml.bz2). Everything is stored as Markdown,
+                        and a background worker embeds each document as it arrives.</p>
                     <ul class="feat-tags">
                         <li>20 File Formats</li>
                         <li>Wikipedia Import</li>
@@ -241,7 +240,7 @@
                 </div>
                 <div class="feat-text">
                     <span class="feat-label">Agents</span>
-                    <h3>Built for Coding Agents</h3>
+                    <h3>Built for coding agents</h3>
                     <p><code>mddb-cli autoindex .</code> indexes a repository in one command; a second
                         run rewrites only the files that changed. Give each agent or key only the tool
                         groups it needs: <code>search,code</code> sends less than half the schema bytes
@@ -269,7 +268,7 @@
         <!-- Compact feature strip -->
         <div class="feat-strip">
             <div class="feat-chip"><strong>Geosearch</strong> R-tree + geohash, radius/bbox</div>
-            <div class="feat-chip"><strong>Unix Socket</strong> Zero-network local transport</div>
+            <div class="feat-chip"><strong>Unix Socket</strong> Local clients without TCP</div>
             <div class="feat-chip"><strong>mTLS</strong> Mutual TLS with client CAs</div>
             <div class="feat-chip"><strong>Revisions</strong> Full document history</div>
                 <div class="feat-chip"><strong>Backups</strong> Scheduled, verified, S3 target</div>
@@ -283,7 +282,7 @@
             <div class="feat-chip"><strong>Aggregations</strong> Facets & histograms</div>
             <div class="feat-chip"><strong>Multi-Language</strong> Same key, many locales</div>
             <div class="feat-chip"><strong>Docker</strong> {{$.Vars.mddbDockerSize}} Alpine image (compressed)</div>
-            <div class="feat-chip"><strong>Zero Config</strong> Single binary, no deps</div>
+            <div class="feat-chip"><strong>No Config File</strong> Single binary, no dependencies</div>
             <div class="feat-chip"><strong>Storage Backends</strong> BoltDB, In-Memory, S3</div>
             <div class="feat-chip"><strong>Telemetry</strong> Prometheus, Grafana, OpenTelemetry</div>
             <div class="feat-chip"><strong>Diagnose</strong> Support bundle, no content, queries, keys or IPs</div>
