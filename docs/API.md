@@ -1371,6 +1371,27 @@ When `highlight: true`, each result gains a `highlights` array:
 }
 ```
 
+**Missing collection, and a collection the caller may not read.**
+
+| Case | Answer |
+|---|---|
+| The collection does not exist, auth off or the caller may read that name (admin, `*`, or a permission on the name) | `200` with `"results": []`, `"total": 0` — the same as a query that matches nothing. There is no `404`. |
+| Auth on, the caller has no `read` on the collection — existing or not | `403 {"error":"forbidden"}` |
+| Auth on, no credentials | `401` |
+| `collection` or `query` missing | `400` |
+
+Permission is checked before the search, so `403` says nothing about whether
+the collection exists. `/v1/vector-search`, `/v1/hybrid-search`,
+`/v1/cross-search` (the source and every target) and `/v1/symbol` answer `403`
+the same way.
+
+**`total`** is the number of results in this response (`len(results)`, or
+`len(passages)` with `"format": "passages"`), after `limit`, the server's cap
+and the context budget. It is not the number of documents that match. That
+number is `matched`, returned only with `"facetScope": "all"`. When the cap
+lowered `limit`, the response says so with `limit` and `limitCapped`; when
+`contextTokenBudget` dropped results, with `contextTruncated`.
+
 ---
 
 ### POST /v1/fts-reindex
@@ -5859,9 +5880,23 @@ curl -s "$MDDB/v1/symbol?collection=repo&name=SearchHybrid&include=definitions,c
 | `tests` | References in test files (`_test.go`, `test_*.py`, `*.spec.ts`, `*Test.java`, `_spec.rb`, `tests/` …) |
 | `siblings` | Other top-level definitions in the same directory |
 
-`include` limits the relations, `limit` caps each one (default 20, max 200;
-`truncated` says one was cut), and `includeContent=true` adds the text of
-definitions, callers and callees — references always carry their line.
+`include` limits the relations, `limit` caps each one (default 20, max 200),
+and `includeContent=true` adds the text of definitions, callers and callees —
+references always carry their line.
+
+`limit` applies to each relation separately, not to the response: `limit=20`
+with all seven relations returns up to 140 passages. `candidates` is cut to
+`limit` too. The response has no `total` and no per-relation counts.
+`truncated` is one flag for the whole response: `true` when at least one
+relation (or `candidates`) held more than `limit`, or when a lookup stopped at
+its scan bound of 500 documents or facts. It does not say which relation was
+cut or how many entries were dropped; a list exactly `limit` long may or may
+not be the cut one. It is left out when nothing was cut. To see more of one
+relation, ask for it alone (`include=references`) with a higher `limit`. When
+the server's cap (`MDDB_SEARCH_MAX_LIMIT`, the collection's `maxTopK`) lowered
+the requested `limit`, the response also carries `limit` (the per-relation
+limit used) and `limitCapped: true`; `truncated` is then judged against that
+lower limit.
 Candidates come from the metadata index (`defines`, `uses`) and, for uses the
 extractor cannot see such as `x.Method()`, from the full-text index; spans are
 computed from the documents at query time, so nothing is stored and a reindex

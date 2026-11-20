@@ -1956,7 +1956,10 @@ paths:
               $ref: "#/components/schemas/FTSSearchRequest"
       responses:
         "200":
-          description: Full-text search results
+          description: >
+            Full-text search results. A collection that does not exist answers
+            200 with no results and total 0, like a query that matches nothing;
+            there is no 404.
           content:
             application/json:
               schema:
@@ -1965,6 +1968,21 @@ paths:
                   - $ref: "#/components/schemas/PassagesResponse"
         "400":
           description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Auth is on and the request carries no valid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: >
+            Auth is on and the caller has no read permission on the collection,
+            whether or not the collection exists (permission is checked before
+            the search). Body `{"error":"forbidden"}`.
           content:
             application/json:
               schema:
@@ -3473,6 +3491,12 @@ paths:
       description: |
         Create a new API key for the authenticated user. The key is returned only once in the response.
         Use the `X-API-Key` header to authenticate with the key in subsequent requests.
+
+        A key has no permissions of its own: it acts as the user who created it, with that user's
+        permissions (direct and through groups) and tenant at the time of each request. It cannot be
+        narrowed to read-only or to chosen collections; fields other than `description` and `expiresAt`
+        are ignored. For a narrower key, create it as a user that holds only the permissions wanted
+        (see AUTHENTICATION.md).
       operationId: authCreateAPIKey
       security:
         - BearerAuth: []
@@ -4511,6 +4535,7 @@ paths:
         - name: limit
           in: query
           required: false
+          description: Most passages per relation (not per response); also caps candidates.
           schema: { type: integer, default: 20, maximum: 200 }
         - name: includeContent
           in: query
@@ -4526,7 +4551,7 @@ paths:
         "400":
           description: Missing collection or name, or an unreadable body
         "403":
-          description: Forbidden
+          description: No read permission on the collection, whether or not it exists
         "422":
           description: Unknown relation in include
         "503": {$ref: "#/components/responses/SearchBusy"}
@@ -10093,7 +10118,14 @@ components:
               path: { type: string }
               name: { type: string, description: 'Qualified, e.g. Conn.Close.' }
               kind: { type: string }
-        truncated: { type: boolean }
+        truncated:
+          type: boolean
+          description: >
+            One flag for the whole response: at least one relation (or
+            candidates) held more than limit, or a lookup stopped at its scan
+            bound of 500 documents or facts. It does not say which relation
+            was cut or by how much, and the response carries no total. Omitted
+            when nothing was cut.
     GraphExpandOptions:
       type: object
       description: Tunes retrievalMode "graph" (SRCH-006; graphKinds CODE-008).
@@ -12374,7 +12406,10 @@ components:
             $ref: "#/components/schemas/FTSResultItem"
         total:
           type: integer
-          description: Number of results returned
+          description: >
+            Number of results in this response, after limit, the server's cap
+            and the context budget. Not the number of matching documents; that
+            is matched, returned with facetScope "all".
           example: 3
         algorithm:
           type: string
