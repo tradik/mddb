@@ -2,7 +2,7 @@
 // Domain of LLM Connections — a domain, no domain, and the malformed address
 // servers before 2.19.6 generated for a bound listen address.
 import { describe, test, expect } from 'vitest';
-import { withServerDomain, urlOnHost } from './server-address.js';
+import { withServerDomain, urlOnHost, mcpBaseUrl, mcpEndpoint } from './server-address.js';
 
 const yaml = (grpc, rest) => `mcp:
   # listenAddress: "0.0.0.0:9000"
@@ -51,5 +51,43 @@ describe('urlOnHost', () => {
     ['127.0.0.1:18923', 'http://db.example.com:18923'],
   ])('%s on the domain is %s', (addr, url) => {
     expect(urlOnHost('db.example.com', addr)).toBe(url);
+  });
+
+  // #440: an instance behind a TLS proxy or tunnel has no port of its own.
+  test.each([
+    ['https://myserver.com', 'https://myserver.com'],
+    ['https://myserver.com/', 'https://myserver.com'],
+    ['HTTPS://myserver.com:8443/path', 'https://myserver.com:8443'],
+    ['http://10.0.0.5:8080', 'http://10.0.0.5:8080'],
+  ])('a Server Domain typed as the URL %s is used as %s', (domain, url) => {
+    expect(urlOnHost(domain, ':9000')).toBe(url);
+  });
+
+  test('a URL that does not parse is taken as a host name, as before', () => {
+    expect(urlOnHost('http://', ':9000')).toBe('http://http://:9000');
+  });
+});
+
+describe('withServerDomain with a URL', () => {
+  test('the host name of the URL goes in front of each port', () => {
+    const out = withServerDomain(yaml('localhost:11024', 'http://localhost:11023'), 'https://db.example.com:8443');
+    expect(out).toContain('grpcAddress: "db.example.com:11024"');
+    expect(out).toContain('restBaseUrl: "http://db.example.com:11023"');
+  });
+});
+
+describe('mcpEndpoint', () => {
+  test('the server public URL wins', () => {
+    const address = { publicUrl: 'https://mcp.example.com', domain: 'myserver.com', mcpAddr: ':9000' };
+    expect(mcpEndpoint(address)).toBe('https://mcp.example.com/mcp');
+    expect(mcpBaseUrl(address)).toBe('https://mcp.example.com');
+  });
+
+  test.each([
+    ['myserver.com', 'http://myserver.com:9000/mcp'],
+    ['https://myserver.com', 'https://myserver.com/mcp'],
+    ['https://myserver.com:8443', 'https://myserver.com:8443/mcp'],
+  ])('without one, the Server Domain %s gives %s', (domain, url) => {
+    expect(mcpEndpoint({ publicUrl: '', domain, mcpAddr: '0.0.0.0:9000' })).toBe(url);
   });
 });

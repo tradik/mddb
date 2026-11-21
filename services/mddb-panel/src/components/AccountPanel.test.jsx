@@ -159,6 +159,17 @@ describe('MCPAPIKeysPanel', () => {
     expect(mddbClient.deleteMCPAPIKey).toHaveBeenCalledTimes(1);
   });
 
+  // #440: LLM Connections puts a key created here into the Claude examples.
+  test('a created key is handed to onKeyCreated', async () => {
+    mddbClient.createMCPAPIKey.mockResolvedValueOnce({ key: 'mcp_handed_over' });
+    const onKeyCreated = vi.fn();
+    render(<MCPAPIKeysPanel onKeyCreated={onKeyCreated} />);
+    await act(async () => {});
+    fireEvent.change(screen.getByPlaceholderText('Key name (e.g. claude-prod)'), { target: { value: 'bot' } });
+    await act(async () => fireEvent.keyDown(screen.getByPlaceholderText('Key name (e.g. claude-prod)'), { key: 'Enter' }));
+    expect(onKeyCreated).toHaveBeenCalledWith('mcp_handed_over');
+  });
+
   test('failures are shown and can be dismissed; an empty list says so', async () => {
     mddbClient.listMCPAPIKeys.mockRejectedValueOnce(new Error('')).mockResolvedValue({});
     mddbClient.createMCPAPIKey.mockRejectedValueOnce(new Error('MCP API keys are disabled'));

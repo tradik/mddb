@@ -98,6 +98,10 @@ type MCPConfig struct {
 	Mode         AccessMode    `yaml:"mode" json:"mode"` // "read", "write", or "wr" (default: follows MDDB_MODE)
 	ServerInfo   MCPServerInfo `yaml:"serverInfo" json:"serverInfo"`
 	Instructions string        `yaml:"instructions" json:"instructions,omitempty"` // System prompt for LLM — how to use this server
+	// PublicURL is the base URL MCP clients dial (MDDB_MCP_PUBLIC_URL, #440):
+	// set when a proxy or tunnel publishes the listener under another
+	// scheme, host or port. Environment only.
+	PublicURL string `yaml:"-" json:"publicUrl,omitempty"`
 }
 
 // HTTP3Config controls the HTTP/3 (QUIC) server (extreme mode).
@@ -502,6 +506,7 @@ func applyEnvConfig(cfg *ServerConfig) {
 	if v := mcpInstructionsFromEnv(); v != "" {
 		cfg.MCP.Instructions = v
 	}
+	cfg.MCP.PublicURL = mcpPublicURLFromEnv()
 	if v := os.Getenv("MDDB_MCP_MODE"); v != "" {
 		cfg.MCP.Mode = AccessMode(v)
 	}

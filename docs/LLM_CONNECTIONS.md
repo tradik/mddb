@@ -41,7 +41,17 @@ docker run -d -p 11023:11023 -p 9000:9000 \
 MDDB_MCP_DOMAIN=myserver.com ./mddbd
 ```
 
-You can also change the domain directly in the Panel — the input field is above the config tabs on the LLM Connections page.
+You can also change the domain directly in the Panel — the input field is above the config tabs on the LLM Connections page. The field takes a host name (`myserver.com`) or, since v2.19.9, a full URL (`https://myserver.com`, `https://myserver.com:8443`) for a server behind a TLS proxy or tunnel: then its scheme, host and port are used as they are, without the listen port. The page shows the MCP URL the examples use under the field.
+
+### Public MCP URL (v2.19.9)
+
+Behind a reverse proxy or tunnel the listener is reached at another scheme, host or port than it listens on. Set `MDDB_MCP_PUBLIC_URL` to the base URL clients dial, without `/mcp`:
+
+| Env Var | Default | Example |
+|---------|---------|---------|
+| `MDDB_MCP_PUBLIC_URL` | _(unset: the OAuth issuer when OAuth is on, else empty)_ | `https://mcp.example.com` |
+
+It must be an absolute `http` or `https` URL; a trailing slash is removed, and any other value is logged and ignored. `GET /v1/config` reports it as `protocols.mcp.publicUrl`, next to `apiKeyEnabled` and `oauthEnabled`, and the Panel then builds every MCP example on `<publicUrl>/mcp` instead of the Server Domain.
 
 ## MCP Streamable HTTP Transport (Recommended)
 
@@ -93,18 +103,20 @@ curl -X POST http://localhost:9000/mcp \
 
 ### Client Configuration
 
-For MCP clients that support Streamable HTTP transport:
+For MCP clients that support Streamable HTTP transport (the `.mcp.json` form; other clients name the transport differently, see their documentation):
 
 ```json
 {
   "mcpServers": {
     "mddb": {
-      "transport": "streamable-http",
+      "type": "http",
       "url": "http://localhost:9000/mcp"
     }
   }
 }
 ```
+
+With `MDDB_MCP_API_KEY_ENABLED=true` add `"headers": { "X-API-Key": "mcp_…" }`.
 
 ## MCP-over-SSE Transport (Legacy)
 
@@ -281,9 +293,52 @@ MDDB implements both MCP revisions in full — see [Protocol revisions](MCP-REVI
 
 ## Claude Desktop / Claude Code
 
-MCP is built directly into the MDDB server — no separate service needed.
+MCP is built directly into the MDDB server — no separate service needed. The Panel's **LLM Connections → Claude** tab generates each of the configurations below for the server it is connected to, with the MCP URL resolved and, when MCP API keys are on, the key typed into its **API key** field (or one just created in the **API Keys** tab).
 
-### Docker (Recommended)
+The first three connect to a running server. Replace `https://mcp.example.com/mcp` with your MCP URL (`<MDDB_MCP_PUBLIC_URL>/mcp`, or `http://<host>:9000/mcp`). Leave out the key when `MDDB_MCP_API_KEY_ENABLED` is off.
+
+### Claude Code (command)
+
+```bash
+claude mcp add --transport http mddb https://mcp.example.com/mcp --header "X-API-Key: mcp_…"
+```
+
+`claude mcp list` then lists `mddb` as connected. The server is added for the current project only; add `--scope user` for all your projects, or `--scope project` to share it with the project through `.mcp.json`. A key or URL with shell characters is single-quoted by the Panel.
+
+### Project file (`.mcp.json`)
+
+Save in the root of the project:
+
+```json
+{
+  "mcpServers": {
+    "mddb": {
+      "type": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "X-API-Key": "${MDDB_MCP_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+Do not commit a real key: reference an environment variable as above (Claude Code expands `${VAR}` in `url` and `headers`) and set `MDDB_MCP_API_KEY` in your environment.
+
+### Custom connector (claude.ai, Claude Desktop)
+
+A custom connector needs OAuth on the server (`MDDB_MCP_API_KEY_ENABLED=true`, `MDDB_MCP_OAUTH_ENABLED=true`, `MDDB_MCP_OAUTH_ISSUER`, `MDDB_MCP_OAUTH_SECRET`; see [MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)). Claude connects to the URL from Anthropic's servers, so it must be an `https` address reachable from the internet. Then:
+
+1. Open **Customize → Connectors**, select **Add**, then **Add custom connector**.
+2. Enter a name (for example `mddb`) and the MCP URL, then click **Continue**.
+3. Keep the authentication settings marked **Detected** and click **Add**.
+4. Click **Connect**; on the page the server opens, paste an MCP API key.
+
+On Team and Enterprise plans an Owner adds the connector under **Organization settings → Connectors** (**Add**, then **Custom**), and members click **Connect**. When OAuth is off, the Panel's connector variant lists the missing settings instead of these steps.
+
+### Local stdio (Docker)
+
+This starts a separate local database on your computer; it does not connect to a running server. stdio suits one local client that owns its database file.
 
 Add to your Claude Desktop config:
 
@@ -308,9 +363,9 @@ Add to your Claude Desktop config:
 }
 ```
 
-### Local Binary
+### Local stdio (binary)
 
-Use the `mddbd` binary directly:
+Use the `mddbd` binary directly. Like the Docker variant, this starts a separate local database; it does not connect to a running server.
 
 ```json
 {
@@ -484,6 +539,8 @@ Add the same MCP config as Claude Desktop to your MCP client settings:
 }
 ```
 
+This starts a separate local database on your computer; it does not connect to a running server.
+
 Set DeepSeek as the LLM provider in your MCP client configuration.
 
 ## Manus
@@ -562,10 +619,11 @@ See the [REST API reference](/docs/api/reference/), generated from the OpenAPI s
 ## Panel Configuration
 
 The MDDB Panel includes an **LLM Connections** page (sidebar → LLM Connections) with:
-- **Server Domain** input field — set once, all configs update automatically
+- **Server Domain** input field — a host name or a full URL; set once, all configs update automatically. The MCP URL the examples use is shown under it (`MDDB_MCP_PUBLIC_URL` when the server reports one)
 - Ready-to-use configuration templates for each agent
-- Dynamic server address substitution
-- Copy & Download buttons
+- A **Claude** tab with five variants: Claude Code command (default), project `.mcp.json`, custom connector, local stdio (Docker) and local stdio (binary)
+- An **API key** field on the Claude tab when MCP API keys are on: empty, the examples show the placeholder `mcp_…` and a **Create a key** link; a key created in the **API Keys** tab fills it. The key stays in the page only (not stored, not in the URL) and is gone when you leave the page
+- Copy (exactly the shown variant) and Download (only for variants that are files)
 - Setup instructions per agent
 
 **[← Back to README](../README.md)**

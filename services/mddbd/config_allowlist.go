@@ -76,7 +76,7 @@ var configKeys = map[string]configClass{
 
 	// URLs.
 	"MDDB_EMBEDDING_API_URL": cfgURL, "MDDB_AUDIT_EXPORT_WEBHOOK_URL": cfgURL,
-	"MDDB_MCP_OAUTH_ISSUER": cfgURL, "MDDB_MCP_SERVER_HOMEPAGE": cfgURL,
+	"MDDB_MCP_OAUTH_ISSUER": cfgURL, "MDDB_MCP_SERVER_HOMEPAGE": cfgURL, "MDDB_MCP_PUBLIC_URL": cfgURL,
 	// Collector URLs: the origin. A path or query may carry a tenant token.
 	"MDDB_OTEL_ENDPOINT": cfgOrigin,
 

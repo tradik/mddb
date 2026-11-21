@@ -261,6 +261,11 @@ $db->collection('cache')->setTtl('temp', 'en', 3600);</code></pre>
     }
   }
 }
+# stdio starts a separate local database; it does not connect to a running server.
+
+# A running server - Claude Code (add the header when MCP API keys are on):
+claude mcp add --transport http mddb https://mcp.example.com/mcp \
+  --header "X-API-Key: mcp_…"
 
 # MCP provides {{$.Vars.mcpTools}} built-in tools including:
 # - add_document, search_documents, semantic_search

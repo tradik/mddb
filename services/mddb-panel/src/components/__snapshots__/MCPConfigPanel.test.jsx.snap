@@ -1,0 +1,724 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCPConfigPanel non-Claude examples > are unchanged since 2.19.8 (MCP config from the server) 1`] = `
+{
+  "Bielik.ai": {
+    "content": "#!/usr/bin/env python3
+"""Bielik.ai + MDDB Integration
+
+Connects Bielik Polish LLM to MDDB for RAG-powered responses.
+Bielik excels at Polish language tasks and understanding.
+
+Requirements:
+  pip install requests
+"""
+
+import requests
+
+MDDB_URL = "http://db.example.com:11023"
+BIELIK_API_URL = "https://api.bielik.ai/v1"
+BIELIK_API_KEY = "your-bielik-api-key"  # Get from https://bielik.ai
+BIELIK_MODEL = "Bielik-11B-v2.3-Instruct"
+
+def search_mddb(query, collection="docs", top_k=5):
+    """Semantic search via MDDB."""
+    resp = requests.post(f"{MDDB_URL}/v1/vector-search", json={
+        "collection": collection,
+        "query": query,
+        "topK": top_k,
+        "threshold": 0.6,
+        "includeContent": True,
+    })
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+def ask_bielik(question, collection="docs"):
+    """RAG: retrieve from MDDB, answer with Bielik."""
+    results = search_mddb(question, collection)
+    context = "\\n\\n---\\n\\n".join(
+        f"## {r.get('key', 'unknown')}\\n{r.get('contentMd', '')[:2000]}"
+        for r in results
+    )
+
+    resp = requests.post(
+        f"{BIELIK_API_URL}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {BIELIK_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": BIELIK_MODEL,
+            "messages": [
+                {"role": "system", "content": "Odpowiadaj na pytania korzystajac z podanego kontekstu. Jesli kontekst nie zawiera odpowiedzi, powiedz o tym."},
+                {"role": "user", "content": f"Kontekst:\\n{context}\\n\\nPytanie: {question}"},
+            ],
+            "temperature": 0.3,
+        },
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+if __name__ == "__main__":
+    import sys
+    question = " ".join(sys.argv[1:]) or "Czym jest MDDB?"
+    print(ask_bielik(question))
+",
+    "filename": "bielik_mddb_config.py",
+    "instructions": [
+      "Get your API key from https://bielik.ai",
+      "Install dependencies: pip install requests",
+      "Ensure MDDB is running at http://db.example.com:11023",
+      "Set your BIELIK_API_KEY in the script",
+      "Run: python bielik_mddb_config.py "Twoje pytanie tutaj"",
+    ],
+  },
+  "ChatGPT": {
+    "content": "{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MDDB API",
+    "version": "2.9.14",
+    "description": "AI-Native Document Database API"
+  },
+  "servers": [
+    {
+      "url": "http://db.example.com:11023"
+    }
+  ],
+  "paths": {
+    "/v1/search": {
+      "post": {
+        "operationId": "searchDocuments",
+        "summary": "Search documents by metadata",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "collection": {
+                    "type": "string"
+                  },
+                  "filterMeta": {
+                    "type": "object"
+                  },
+                  "sort": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vector-search": {
+      "post": {
+        "operationId": "semanticSearch",
+        "summary": "Semantic search using vector embeddings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "collection": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "topK": {
+                    "type": "integer",
+                    "default": 5
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "default": 0.7
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}",
+    "filename": "openai_actions.json",
+    "instructions": [
+      "Go to https://platform.openai.com/gpts and create or edit a Custom GPT",
+      "In "Configure" tab, scroll to "Actions" and click "Create new action"",
+      "Paste this OpenAPI schema into the schema editor",
+      "Make sure your MDDB server at http://db.example.com:11023 is publicly accessible",
+      "Save and test the GPT with prompts like "Search my docs for..."",
+    ],
+  },
+  "DeepSeek": {
+    "content": "{
+  "mcpServers": {
+    "mddb": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--network",
+        "host",
+        "-v",
+        "mddb-data:/app/data",
+        "-e",
+        "MDDB_MCP_STDIO=true",
+        "tradik/mddb:latest"
+      ],
+      "env": {}
+    }
+  }
+}",
+    "filename": "deepseek_mcp_config.json",
+    "instructions": [
+      "DeepSeek supports MCP via compatible clients (Cline, Continue, etc.)",
+      "Add this config to your MCP client settings (e.g., ~/.cline/mcp.json)",
+      "Use DeepSeek as the LLM provider in your MCP client",
+      "The MDDB tools will be available for document search and retrieval",
+    ],
+  },
+  "MCP Config": {
+    "content": "mddb:
+  grpcAddress: "db.example.com:18924"
+  restBaseUrl: "http://db.example.com:18923"
+",
+    "filename": "mcp_config.yaml",
+    "instructions": [
+      "MCP is now built into the MDDB server — no separate service needed",
+      "Custom tools are optional — save this file and set MDDB_MCP_CONFIG env var",
+      "For stdio mode (Claude Desktop): set MDDB_MCP_STDIO=true",
+      "For HTTP mode: MCP server runs on port 9000 by default (MDDB_MCP_ADDR)",
+      "Streamable HTTP (2025-11-25): POST/GET /mcp — new standard transport",
+      "Legacy SSE (2024-11-05): GET /sse + POST /message — still supported",
+    ],
+  },
+  "Manus": {
+    "content": "# Manus Agent - MDDB Tool Configuration
+# Add this to your Manus agent's tool definitions
+
+name: mddb_search
+description: "Search the MDDB knowledge base for relevant documents"
+type: api
+endpoint: "http://db.example.com:11023/v1/vector-search"
+method: POST
+headers:
+  Content-Type: "application/json"
+body:
+  collection: "docs"
+  query: "{{input}}"
+  topK: 5
+  threshold: 0.6
+  includeContent: true
+
+---
+
+name: mddb_fts
+description: "Full-text search in MDDB documents"
+type: api
+endpoint: "http://db.example.com:11023/v1/fts"
+method: POST
+headers:
+  Content-Type: "application/json"
+body:
+  collection: "docs"
+  query: "{{input}}"
+  limit: 10
+
+---
+
+name: mddb_get_document
+description: "Retrieve a specific document from MDDB"
+type: api
+endpoint: "http://db.example.com:11023/v1/get"
+method: POST
+headers:
+  Content-Type: "application/json"
+body:
+  collection: "{{collection}}"
+  key: "{{key}}"",
+    "filename": "manus_mddb_tool.yaml",
+    "instructions": [
+      "Add these tool definitions to your Manus agent configuration",
+      "Make sure MDDB is accessible at http://db.example.com:11023",
+      "The agent can use semantic search, full-text search, and document retrieval",
+      "Adjust collection names and parameters to match your data",
+    ],
+  },
+  "Ollama (Python)": {
+    "content": "#!/usr/bin/env python3
+"""MDDB + Ollama RAG Agent
+
+Uses Ollama for LLM inference and MDDB for document retrieval.
+Supports semantic search, full-text search, and metadata queries.
+
+Requirements:
+  pip install requests ollama
+"""
+
+import requests
+import ollama
+
+MDDB_URL = "http://db.example.com:11023"
+OLLAMA_MODEL = "llama3.2"  # or any model you have pulled
+
+def search_mddb(query, collection="docs", top_k=5):
+    """Semantic search via MDDB vector endpoint."""
+    resp = requests.post(f"{MDDB_URL}/v1/vector-search", json={
+        "collection": collection,
+        "query": query,
+        "topK": top_k,
+        "threshold": 0.6,
+        "includeContent": True,
+    })
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+def fts_search(query, collection="docs", limit=10):
+    """Full-text search via MDDB."""
+    resp = requests.post(f"{MDDB_URL}/v1/fts", json={
+        "collection": collection,
+        "query": query,
+        "limit": limit,
+    })
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+def ask(question, collection="docs"):
+    """RAG: retrieve context from MDDB, then answer with Ollama."""
+    results = search_mddb(question, collection)
+    context = "\\n\\n---\\n\\n".join(
+        f"## {r.get('key', 'unknown')}\\n{r.get('contentMd', '')[:2000]}"
+        for r in results
+    )
+    prompt = f"""Answer the question using ONLY the context below.
+If the context doesn't contain the answer, say so.
+
+Context:
+{context}
+
+Question: {question}
+Answer:"""
+
+    response = ollama.chat(model=OLLAMA_MODEL, messages=[
+        {"role": "user", "content": prompt},
+    ])
+    return response["message"]["content"]
+
+if __name__ == "__main__":
+    import sys
+    question = " ".join(sys.argv[1:]) or "What is MDDB?"
+    print(ask(question))
+",
+    "filename": "mddb_ollama_agent.py",
+    "instructions": [
+      "Install dependencies: pip install requests ollama",
+      "Make sure Ollama is running: ollama serve",
+      "Pull a model: ollama pull llama3.2",
+      "Ensure MDDB is running at http://db.example.com:11023",
+      "Run: python mddb_ollama_agent.py "your question here"",
+    ],
+  },
+  "Open WebUI": {
+    "content": "MDDB_URL = "http://db.example.com:9000"",
+    "filename": "mddb_model.py",
+    "instructions": [
+      "Go to Open WebUI → Admin → Functions → Add new function",
+      "Paste this script and save it",
+      "Configure the Valves (settings) to match your LLM provider",
+      "For Ollama: set llmApiUrl to your Ollama address",
+      "For OpenAI: set llmProvider=openai, llmApiUrl=https://api.openai.com, llmApiKey=sk-...",
+      "For DeepSeek: set llmProvider=deepseek, llmApiUrl=https://api.deepseek.com, llmApiKey=...",
+    ],
+  },
+}
+`;
+
+exports[`MCPConfigPanel non-Claude examples > are unchanged since 2.19.8 (MCP config generated) 1`] = `
+{
+  "Bielik.ai": {
+    "content": "#!/usr/bin/env python3
+"""Bielik.ai + MDDB Integration
+
+Connects Bielik Polish LLM to MDDB for RAG-powered responses.
+Bielik excels at Polish language tasks and understanding.
+
+Requirements:
+  pip install requests
+"""
+
+import requests
+
+MDDB_URL = "http://db.example.com:11023"
+BIELIK_API_URL = "https://api.bielik.ai/v1"
+BIELIK_API_KEY = "your-bielik-api-key"  # Get from https://bielik.ai
+BIELIK_MODEL = "Bielik-11B-v2.3-Instruct"
+
+def search_mddb(query, collection="docs", top_k=5):
+    """Semantic search via MDDB."""
+    resp = requests.post(f"{MDDB_URL}/v1/vector-search", json={
+        "collection": collection,
+        "query": query,
+        "topK": top_k,
+        "threshold": 0.6,
+        "includeContent": True,
+    })
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+def ask_bielik(question, collection="docs"):
+    """RAG: retrieve from MDDB, answer with Bielik."""
+    results = search_mddb(question, collection)
+    context = "\\n\\n---\\n\\n".join(
+        f"## {r.get('key', 'unknown')}\\n{r.get('contentMd', '')[:2000]}"
+        for r in results
+    )
+
+    resp = requests.post(
+        f"{BIELIK_API_URL}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {BIELIK_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": BIELIK_MODEL,
+            "messages": [
+                {"role": "system", "content": "Odpowiadaj na pytania korzystajac z podanego kontekstu. Jesli kontekst nie zawiera odpowiedzi, powiedz o tym."},
+                {"role": "user", "content": f"Kontekst:\\n{context}\\n\\nPytanie: {question}"},
+            ],
+            "temperature": 0.3,
+        },
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+if __name__ == "__main__":
+    import sys
+    question = " ".join(sys.argv[1:]) or "Czym jest MDDB?"
+    print(ask_bielik(question))
+",
+    "filename": "bielik_mddb_config.py",
+    "instructions": [
+      "Get your API key from https://bielik.ai",
+      "Install dependencies: pip install requests",
+      "Ensure MDDB is running at http://db.example.com:11023",
+      "Set your BIELIK_API_KEY in the script",
+      "Run: python bielik_mddb_config.py "Twoje pytanie tutaj"",
+    ],
+  },
+  "ChatGPT": {
+    "content": "{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MDDB API",
+    "version": "2.9.14",
+    "description": "AI-Native Document Database API"
+  },
+  "servers": [
+    {
+      "url": "http://db.example.com:11023"
+    }
+  ],
+  "paths": {
+    "/v1/search": {
+      "post": {
+        "operationId": "searchDocuments",
+        "summary": "Search documents by metadata",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "collection": {
+                    "type": "string"
+                  },
+                  "filterMeta": {
+                    "type": "object"
+                  },
+                  "sort": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vector-search": {
+      "post": {
+        "operationId": "semanticSearch",
+        "summary": "Semantic search using vector embeddings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "collection": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "topK": {
+                    "type": "integer",
+                    "default": 5
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "default": 0.7
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}",
+    "filename": "openai_actions.json",
+    "instructions": [
+      "Go to https://platform.openai.com/gpts and create or edit a Custom GPT",
+      "In "Configure" tab, scroll to "Actions" and click "Create new action"",
+      "Paste this OpenAPI schema into the schema editor",
+      "Make sure your MDDB server at http://db.example.com:11023 is publicly accessible",
+      "Save and test the GPT with prompts like "Search my docs for..."",
+    ],
+  },
+  "DeepSeek": {
+    "content": "{
+  "mcpServers": {
+    "mddb": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--network",
+        "host",
+        "-v",
+        "mddb-data:/app/data",
+        "-e",
+        "MDDB_MCP_STDIO=true",
+        "tradik/mddb:latest"
+      ],
+      "env": {}
+    }
+  }
+}",
+    "filename": "deepseek_mcp_config.json",
+    "instructions": [
+      "DeepSeek supports MCP via compatible clients (Cline, Continue, etc.)",
+      "Add this config to your MCP client settings (e.g., ~/.cline/mcp.json)",
+      "Use DeepSeek as the LLM provider in your MCP client",
+      "The MDDB tools will be available for document search and retrieval",
+    ],
+  },
+  "MCP Config": {
+    "content": "# MDDB MCP Custom Tools Configuration
+# Set MDDB_MCP_CONFIG=/path/to/this/file.yaml to load
+
+# Custom tools wrap built-in tools with preset defaults
+# They appear alongside built-in tools in the MCP tool list
+custom_tools:
+  - name: "kb_search"
+    description: "Search the knowledge base using semantic similarity"
+    action: "semantic_search"
+    defaults:
+      collection: "docs"
+      top_k: 5
+      threshold: 0.7
+      includeContent: true
+    parameters:
+      - name: "query"
+        type: "string"
+        description: "Search query"
+        required: true
+
+  - name: "kb_lookup"
+    description: "Full-text keyword search in the knowledge base"
+    action: "full_text_search"
+    defaults:
+      collection: "docs"
+      limit: 10
+      algorithm: "bm25"
+      # Token-saving projection (v2.10.2+): drop the body and return only
+      # the meta keys you need. includeContent defaults true; fields empty
+      # returns all meta. Both cut client token usage on narrow lookups.
+      includeContent: false
+      fields: ["title", "url", "category"]
+    parameters:
+      - name: "query"
+        type: "string"
+        description: "Search keywords"
+        required: true",
+    "filename": "mcp_config.yaml",
+    "instructions": [
+      "MCP is now built into the MDDB server — no separate service needed",
+      "Custom tools are optional — save this file and set MDDB_MCP_CONFIG env var",
+      "For stdio mode (Claude Desktop): set MDDB_MCP_STDIO=true",
+      "For HTTP mode: MCP server runs on port 9000 by default (MDDB_MCP_ADDR)",
+      "Streamable HTTP (2025-11-25): POST/GET /mcp — new standard transport",
+      "Legacy SSE (2024-11-05): GET /sse + POST /message — still supported",
+    ],
+  },
+  "Manus": {
+    "content": "# Manus Agent - MDDB Tool Configuration
+# Add this to your Manus agent's tool definitions
+
+name: mddb_search
+description: "Search the MDDB knowledge base for relevant documents"
+type: api
+endpoint: "http://db.example.com:11023/v1/vector-search"
+method: POST
+headers:
+  Content-Type: "application/json"
+body:
+  collection: "docs"
+  query: "{{input}}"
+  topK: 5
+  threshold: 0.6
+  includeContent: true
+
+---
+
+name: mddb_fts
+description: "Full-text search in MDDB documents"
+type: api
+endpoint: "http://db.example.com:11023/v1/fts"
+method: POST
+headers:
+  Content-Type: "application/json"
+body:
+  collection: "docs"
+  query: "{{input}}"
+  limit: 10
+
+---
+
+name: mddb_get_document
+description: "Retrieve a specific document from MDDB"
+type: api
+endpoint: "http://db.example.com:11023/v1/get"
+method: POST
+headers:
+  Content-Type: "application/json"
+body:
+  collection: "{{collection}}"
+  key: "{{key}}"",
+    "filename": "manus_mddb_tool.yaml",
+    "instructions": [
+      "Add these tool definitions to your Manus agent configuration",
+      "Make sure MDDB is accessible at http://db.example.com:11023",
+      "The agent can use semantic search, full-text search, and document retrieval",
+      "Adjust collection names and parameters to match your data",
+    ],
+  },
+  "Ollama (Python)": {
+    "content": "#!/usr/bin/env python3
+"""MDDB + Ollama RAG Agent
+
+Uses Ollama for LLM inference and MDDB for document retrieval.
+Supports semantic search, full-text search, and metadata queries.
+
+Requirements:
+  pip install requests ollama
+"""
+
+import requests
+import ollama
+
+MDDB_URL = "http://db.example.com:11023"
+OLLAMA_MODEL = "llama3.2"  # or any model you have pulled
+
+def search_mddb(query, collection="docs", top_k=5):
+    """Semantic search via MDDB vector endpoint."""
+    resp = requests.post(f"{MDDB_URL}/v1/vector-search", json={
+        "collection": collection,
+        "query": query,
+        "topK": top_k,
+        "threshold": 0.6,
+        "includeContent": True,
+    })
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+def fts_search(query, collection="docs", limit=10):
+    """Full-text search via MDDB."""
+    resp = requests.post(f"{MDDB_URL}/v1/fts", json={
+        "collection": collection,
+        "query": query,
+        "limit": limit,
+    })
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+def ask(question, collection="docs"):
+    """RAG: retrieve context from MDDB, then answer with Ollama."""
+    results = search_mddb(question, collection)
+    context = "\\n\\n---\\n\\n".join(
+        f"## {r.get('key', 'unknown')}\\n{r.get('contentMd', '')[:2000]}"
+        for r in results
+    )
+    prompt = f"""Answer the question using ONLY the context below.
+If the context doesn't contain the answer, say so.
+
+Context:
+{context}
+
+Question: {question}
+Answer:"""
+
+    response = ollama.chat(model=OLLAMA_MODEL, messages=[
+        {"role": "user", "content": prompt},
+    ])
+    return response["message"]["content"]
+
+if __name__ == "__main__":
+    import sys
+    question = " ".join(sys.argv[1:]) or "What is MDDB?"
+    print(ask(question))
+",
+    "filename": "mddb_ollama_agent.py",
+    "instructions": [
+      "Install dependencies: pip install requests ollama",
+      "Make sure Ollama is running: ollama serve",
+      "Pull a model: ollama pull llama3.2",
+      "Ensure MDDB is running at http://db.example.com:11023",
+      "Run: python mddb_ollama_agent.py "your question here"",
+    ],
+  },
+  "Open WebUI": {
+    "content": "MDDB_URL = "http://db.example.com:9000"",
+    "filename": "mddb_model.py",
+    "instructions": [
+      "Go to Open WebUI → Admin → Functions → Add new function",
+      "Paste this script and save it",
+      "Configure the Valves (settings) to match your LLM provider",
+      "For Ollama: set llmApiUrl to your Ollama address",
+      "For OpenAI: set llmProvider=openai, llmApiUrl=https://api.openai.com, llmApiKey=sk-...",
+      "For DeepSeek: set llmProvider=deepseek, llmApiUrl=https://api.deepseek.com, llmApiKey=...",
+    ],
+  },
+}
+`;

@@ -14746,6 +14746,27 @@ components:
                     Revision an `initialize` is answered with, absent when this
                     server serves no handshake revision at all.
                   example: "2025-11-25"
+                publicUrl:
+                  type: string
+                  description: >-
+                    (v2.19.9) Base URL MCP clients dial, without `/mcp` and
+                    without a trailing slash: `MDDB_MCP_PUBLIC_URL`; if unset,
+                    the OAuth issuer while OAuth runs; else empty. Credentials,
+                    query and fragment are dropped.
+                  example: "https://mcp.example.com"
+                apiKeyEnabled:
+                  type: boolean
+                  description: >-
+                    (v2.19.9) Whether `/mcp` asks for an MCP API key
+                    (`MDDB_MCP_API_KEY_ENABLED`). No key is ever reported.
+                  example: true
+                oauthEnabled:
+                  type: boolean
+                  description: >-
+                    (v2.19.9) Whether the MCP listener runs its OAuth 2.1
+                    server: on only when `MDDB_MCP_OAUTH_ENABLED=true`, API keys
+                    are on and the issuer is valid. No secret is reported.
+                  example: false
             http3:
               type: object
               properties:

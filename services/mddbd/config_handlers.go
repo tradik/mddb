@@ -104,6 +104,14 @@ type MCPProtocolStatus struct {
 	// handshake client can be served side by side, and an operator debugging
 	// one of them needs to know which of the two they are looking at.
 	HandshakeRevision string `json:"handshakeRevision,omitempty"`
+	// PublicURL is the base URL clients dial, without /mcp (#440):
+	// MDDB_MCP_PUBLIC_URL, else the OAuth issuer while OAuth runs, else
+	// empty. APIKeyEnabled is whether /mcp asks for an MCP API key, and
+	// OAuthEnabled whether the OAuth server runs (its issuer was valid), so
+	// a custom connector can authorize. No key or secret is ever reported.
+	PublicURL     string `json:"publicUrl"`
+	APIKeyEnabled bool   `json:"apiKeyEnabled"`
+	OAuthEnabled  bool   `json:"oauthEnabled"`
 }
 
 // HTTP3ProtocolStatus indicates whether the HTTP/3 protocol is enabled and its address.
@@ -171,6 +179,8 @@ func (s *Server) configResponse(aud configAudience) ConfigResponse {
 		ClientAddressing:      clientAddressingStatus(),
 	}
 
+	s.setMCPReach(&response.Protocols.MCP, aud)
+
 	response.VectorConfig = s.vectorConfig()
 	if response.VectorConfig != nil {
 		response.VectorConfig.APIURL = configValue("MDDB_EMBEDDING_API_URL", response.VectorConfig.APIURL, aud)
@@ -184,6 +194,21 @@ func (s *Server) configResponse(aud configAudience) ConfigResponse {
 		ChunkSize: chunkSize,
 	}
 	return response
+}
+
+// setMCPReach fills in how MCP clients reach this server (#440): the public
+// URL, rendered for aud through the configuration allowlist, and whether
+// MCP API keys and OAuth are on.
+func (s *Server) setMCPReach(st *MCPProtocolStatus, aud configAudience) {
+	st.APIKeyEnabled = os.Getenv("MDDB_MCP_API_KEY_ENABLED") == "true"
+	key, publicURL := "MDDB_MCP_PUBLIC_URL", s.Config.MCP.PublicURL
+	if oauth := s.mcpOAuth.Load(); oauth != nil {
+		st.OAuthEnabled = true
+		if publicURL == "" {
+			key, publicURL = "MDDB_MCP_OAUTH_ISSUER", oauth.issuer
+		}
+	}
+	st.PublicURL = configValue(key, publicURL, aud)
 }
 
 // telemetryStatus is trace export as MDDB_OTEL_ENDPOINT sets it (unset is

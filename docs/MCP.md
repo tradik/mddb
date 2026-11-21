@@ -142,12 +142,17 @@ curl -X POST http://localhost:9000/mcp \
 {
   "mcpServers": {
     "mddb": {
-      "transport": "streamable-http",
+      "type": "http",
       "url": "http://localhost:9000/mcp"
     }
   }
 }
 ```
+
+Claude Code: `claude mcp add --transport http mddb http://localhost:9000/mcp`
+(add `--header "X-API-Key: mcp_…"` when API keys are on). The Panel's
+LLM Connections → Claude tab generates both for your server; see
+[LLM Connections](LLM_CONNECTIONS.md#claude-desktop--claude-code).
 
 ## MDDB in the MCP Registry
 
@@ -236,7 +241,25 @@ which is why the DNS name was chosen first.
 | `MDDB_MCP_PORT` | `9000` | MCP HTTP port (alternative to ADDR) |
 | `MDDB_MCP_STDIO` | `false` | Run in MCP stdio mode (replaces HTTP/gRPC) |
 | `MDDB_MCP_DOMAIN` | — | Server hostname for Panel config generation |
+| `MDDB_MCP_PUBLIC_URL` | — | (v2.19.9) Base URL clients dial behind a proxy or tunnel, without `/mcp`, e.g. `https://mcp.example.com`. See [How clients reach MCP](#how-clients-reach-mcp-v2199) |
 | `MDDB_MCP_MODE` | — | Access mode override: `read`, `write`, or `wr` (inherits `MDDB_MODE`) |
+
+### How clients reach MCP (v2.19.9)
+
+`GET /v1/config` reports under `protocols.mcp` what a client needs to connect,
+and the Panel's LLM Connections page builds its examples from it:
+
+| Field | Source | Meaning |
+|-------|--------|---------|
+| `publicUrl` | `MDDB_MCP_PUBLIC_URL`; if unset, `MDDB_MCP_OAUTH_ISSUER` while OAuth runs; else empty | The base URL clients dial, without `/mcp` and without a trailing slash |
+| `apiKeyEnabled` | `MDDB_MCP_API_KEY_ENABLED` | Whether `/mcp` asks for an MCP API key |
+| `oauthEnabled` | The OAuth server the listener runs | `true` only when OAuth is on and could start (API keys on, valid issuer); a custom connector can then authorize |
+
+`MDDB_MCP_PUBLIC_URL` must be an absolute `http` or `https` URL, like the
+OAuth issuer; any other value is logged and ignored. The report carries no
+key, no key list and no secret. A Panel older than v2.19.9 ignores the three
+fields; a newer Panel against an older server treats them as empty and off,
+and shows its API key field as optional.
 
 ### Server Info
 

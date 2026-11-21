@@ -162,6 +162,7 @@ type Server struct {
 	MCPInstructions string                    // System prompt for LLM — how to use this server
 	mcpKeyStore     *mcpAPIKeyStore           // BoltDB-backed MCP API key store
 	mcpAuth         *MCPAPIKeyMiddleware      // MCP API key middleware (for cache invalidation)
+	mcpOAuth        atomic.Pointer[mcpOAuth]  // #440: the MCP OAuth server once the listener runs it; nil when OAuth is off
 	freelistLoad    *backgroundFreelist       // #333: set while writes wait for the freelist
 	collMu          sync.Mutex                // #336: guards collFiles
 	collFiles       *collectionFiles          // #336: per-collection files, nil in the single-file layout
@@ -1435,7 +1436,9 @@ func (s *Server) serveMCP(mcpSSE *MCPSSETransport, mcpStreamable *MCPStreamableT
 
 	// #322: OAuth 2.1 for clients that cannot send an API key
 	// (claude.ai connectors). Off unless MDDB_MCP_OAUTH_ENABLED=true.
-	mcpHandler = newMCPOAuthFromEnv(mcpAuth).Wrap(mcpHandler)
+	oauth := newMCPOAuthFromEnv(mcpAuth)
+	s.mcpOAuth.Store(oauth)
+	mcpHandler = oauth.Wrap(mcpHandler)
 	mcpHandler = s.withTracing(mcpHandler) // OPS-024
 
 	if panelMode != "external" {

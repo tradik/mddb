@@ -507,6 +507,37 @@ administrators can read it; redaction replaces e-mail addresses, tokens and
 card-like numbers with `[redacted]` before anything is stored. A scenario
 saved before 2.19.0 loads with the log off and redaction on.
 
+### LLM Connections: connecting Claude to this server (2.19.9)
+
+*Chat → LLM Connections* builds every example on the server the panel shows.
+The *Server Domain* field takes a host name (`myserver.com`) or a full URL
+(`https://myserver.com`, `https://myserver.com:8443`) for a server behind a
+TLS proxy or tunnel; the MCP URL the examples use is shown under it. When the
+server reports a public URL (`MDDB_MCP_PUBLIC_URL`, or the OAuth issuer while
+OAuth runs; `GET /v1/config` → `protocols.mcp.publicUrl`), the MCP URL is
+`<publicUrl>/mcp`; otherwise `http://<domain>:<MCP port>/mcp`.
+
+The **Claude** tab has five variants; the first is shown when the tab opens:
+
+| Variant | What it shows | Download |
+|---|---|---|
+| Claude Code (command) | `claude mcp add --transport http mddb <MCP URL>`, with `--header "X-API-Key: …"` when MCP API keys are on | — |
+| Project file | `.mcp.json` with `type`, `url` and, when keys are on, `headers` | `.mcp.json` |
+| Custom connector | The MCP URL to paste in *Customize → Connectors → Add custom connector*; when OAuth is off, the server settings it needs instead | — |
+| Local stdio (Docker) | `claude_desktop_config.json` that runs `tradik/mddb` over stdio | `claude_desktop_config.json` |
+| Local stdio (binary) | The same for a local `mddbd` binary | `claude_desktop_config.json` |
+
+Both stdio variants, and the DeepSeek tab, say that they start a separate
+local database and do not connect to this server.
+
+When MCP API keys are on, an *API key* field sits above the example. Empty,
+the examples carry the placeholder `mcp_…` and a *Create a key* link opens
+the *API Keys* tab; a key created there during the visit fills the field. The
+key is kept in the page's memory only — not in local storage, the store or
+the URL — and is gone when you leave the page; *Show key* reveals it. Against
+a server before 2.19.9, which does not report `apiKeyEnabled`, the field is
+shown as optional. *Copy* copies exactly the variant shown.
+
 ### Module switches: the Features page (2.19.0)
 
 "Features" in the menu's System group lists the server's optional modules

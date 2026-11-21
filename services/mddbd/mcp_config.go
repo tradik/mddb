@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,4 +92,21 @@ func mcpInstructionsFromEnv() string {
 		return ""
 	}
 	return strings.TrimSpace(string(data))
+}
+
+// mcpPublicURLFromEnv is MDDB_MCP_PUBLIC_URL, the base URL MCP clients dial
+// when the listener sits behind a proxy or tunnel (#440), e.g.
+// https://mcp.example.com, without a trailing slash. Like the OAuth issuer
+// it must be an absolute http or https URL; any other value is reported and
+// left unset.
+func mcpPublicURLFromEnv() string {
+	raw := strings.TrimRight(strings.TrimSpace(os.Getenv("MDDB_MCP_PUBLIC_URL")), "/")
+	if raw == "" {
+		return ""
+	}
+	if u, err := url.Parse(raw); err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
+		slog.Error("MDDB_MCP_PUBLIC_URL is ignored: it must be an absolute http or https URL, e.g. https://mcp.example.com", "value", raw)
+		return ""
+	}
+	return raw
 }

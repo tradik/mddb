@@ -13,6 +13,15 @@
  * Only the scheme and the port are kept from the server's value, which also
  * repairs what servers before 2.19.6 sent for a bound listen address
  * (`"localhost127.0.0.1:18924"`).
+ *
+ * The Server Domain is a host name (`myserver.com`) or, since 2.19.9, a full
+ * URL (`https://myserver.com`, `https://myserver.com:8443`) for an instance
+ * behind a TLS proxy or tunnel: then its scheme, host and port are used as
+ * they are, for the HTTP and the MCP examples alike (#440).
+ *
+ * mcpEndpoint: the MCP URL every example names — the server's public URL
+ * (`MDDB_MCP_PUBLIC_URL`) when it reports one, else the MCP port on the
+ * Server Domain — followed by `/mcp`.
  */
 
 const ADDRESS_KEYS = ['grpcAddress:', 'restBaseUrl:'];
@@ -32,16 +41,43 @@ function rehost(line, host) {
   return `${line.slice(0, open + 1)}${scheme}${host}:${port}${line.slice(close)}`;
 }
 
-/** withServerDomain returns `yaml` with both addresses on `host`; no host, no change. */
+/** domainUrl is a Server Domain typed as an http(s) URL, parsed; else null. */
+function domainUrl(domain) {
+  if (!/^https?:\/\//i.test(domain)) return null;
+  try {
+    return new URL(domain);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * withServerDomain returns `yaml` with both addresses on `host` (the host
+ * name of a URL); no host, no change.
+ */
 export function withServerDomain(yaml, host) {
   if (!host) return yaml;
+  const name = domainUrl(host)?.hostname ?? host;
   return yaml
     .split('\n')
-    .map((line) => rehost(line, host))
+    .map((line) => rehost(line, name))
     .join('\n');
 }
 
-/** urlOnHost returns `http://host:port` for the port of the listen address `addr`. */
+/**
+ * urlOnHost returns `http://host:port` for the port of the listen address
+ * `addr`, or the origin of `host` when it is a URL.
+ */
 export function urlOnHost(host, addr) {
-  return `http://${host}:${addr.slice(addr.lastIndexOf(':') + 1)}`;
+  return domainUrl(host)?.origin ?? `http://${host}:${addr.slice(addr.lastIndexOf(':') + 1)}`;
+}
+
+/** mcpBaseUrl is the URL MCP clients dial, without `/mcp`. */
+export function mcpBaseUrl({ publicUrl, domain, mcpAddr }) {
+  return publicUrl || urlOnHost(domain, mcpAddr);
+}
+
+/** mcpEndpoint is the full MCP endpoint: mcpBaseUrl followed by `/mcp`. */
+export function mcpEndpoint(address) {
+  return `${mcpBaseUrl(address)}/mcp`;
 }

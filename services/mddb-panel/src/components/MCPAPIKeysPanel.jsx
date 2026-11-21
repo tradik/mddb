@@ -63,7 +63,13 @@ function KeyRow({ apiKey, onDisable, onDelete }) {
   );
 }
 
-export default function MCPAPIKeysPanel() {
+/**
+ * MCPAPIKeysPanel lists, creates, disables and deletes MCP API keys.
+ * onKeyCreated, when given, receives the plaintext of a key just created
+ * (#440: LLM Connections puts it into the Claude examples); the server shows
+ * it in that response only.
+ */
+export default function MCPAPIKeysPanel({ onKeyCreated }) {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -91,6 +97,7 @@ export default function MCPAPIKeysPanel() {
     try {
       const data = await mddbClient.createMCPAPIKey(newKeyName.trim());
       setCreatedKey(data.key);
+      onKeyCreated?.(data.key);
       setNewKeyName('');
       loadKeys();
     } catch (err) {

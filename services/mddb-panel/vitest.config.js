@@ -282,6 +282,9 @@ const coverageFiles = [
   'src/components/TenantsTable.jsx',
   'src/components/TenantDetail.jsx',
   'src/components/TenantForm.jsx',
+  // 2.19.9: the Claude tab of LLM Connections connects to this server (#440).
+  'src/lib/llm-connection-templates.js',
+  'src/lib/claude-connection.js',
 ];
 
 export default mergeConfig(

@@ -155,6 +155,14 @@ MDDB has a built-in MCP server, so no extra service is needed. Add to your MCP c
 
 That is it. Your AI agent now has full access to your knowledge base with 114 built-in tools (add, search, vector search, classify, and more).
 
+The stdio config above starts a separate local database; it does not connect to a running server. To connect Claude Code to a running server, use its MCP URL (`MDDB_MCP_PUBLIC_URL` + `/mcp`, or `http://<host>:9000/mcp`), with the header when `MDDB_MCP_API_KEY_ENABLED=true`:
+
+```bash
+claude mcp add --transport http mddb https://mcp.example.com/mcp --header "X-API-Key: mcp_…"
+```
+
+The panel's *LLM Connections → Claude* tab generates this command, a project `.mcp.json` and the custom connector steps for your server.
+
 **[Full MCP setup guide](docs/LLM_CONNECTIONS.md)** | **[MCP server config](docs/MCP.md)** | **[Custom MCP tools](docs/CUSTOM-TOOLS.md)**
 
 ### Docker - Individual Services
