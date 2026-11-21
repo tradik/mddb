@@ -365,7 +365,7 @@ if __name__ == "__main__":
           'Paste this script and save it',
           'Configure the Valves (settings) to match your LLM provider',
           'For Ollama: set llmApiUrl to your Ollama address',
-          'For OpenAI: set llmProvider=openai, llmApiUrl=https://api.openai.com, llmApiKey=sk-...',
+          'For OpenAI: set llmProvider=openai, llmApiUrl=https://api.openai.com, llmApiKey=<your API key>',
           'For DeepSeek: set llmProvider=deepseek, llmApiUrl=https://api.deepseek.com, llmApiKey=...',
         ],
       };
