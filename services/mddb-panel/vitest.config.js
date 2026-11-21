@@ -46,6 +46,7 @@ const coverageFiles = [
   'src/components/PermissionScopeHint.jsx',
   'src/components/UsersPanel.jsx',
   'src/components/GroupsPanel.jsx',
+  'src/components/PermissionList.jsx', // #438: shared by the two permission modals
   // 2.18.10: the last server/panel gaps (config report, quota usage, a11y).
   'src/lib/abort-slot.js',
   'src/lib/quota-usage.js',

@@ -52,6 +52,8 @@ describe('users and groups', () => {
     ['deleteGroup', (c) => c.deleteGroup(odd), `/v1/auth/groups/${oddEnc}`, DELETE],
     ['setGroupPermission', (c) => c.setGroupPermission({ groupName: 'g', collection: 'c', read: true, write: true, admin: false }), '/v1/auth/group-permissions', POST, { groupName: 'g', collection: 'c', read: true, write: true, admin: false }],
     ['getGroupPermissions', (c) => c.getGroupPermissions(odd), `/v1/auth/group-permissions?group=${oddEnc}`, GET],
+    ['deleteUserPermission encodes', (c) => c.deleteUserPermission('a&admin=1', '*'), '/v1/auth/permissions?username=a%26admin%3D1&collection=*', DELETE],
+    ['deleteGroupPermission encodes', (c) => c.deleteGroupPermission(odd, 'c&x=1'), `/v1/auth/group-permissions?group=${oddEnc}&collection=c%26x%3D1`, DELETE],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });
 

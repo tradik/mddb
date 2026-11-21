@@ -22,6 +22,16 @@ var (
 	bucketAuthGroupPerms = []byte("auth_group_perms")
 )
 
+// Permission removal errors (#438).
+var (
+	// ErrPermissionNotFound: there is no grant for that user or group on
+	// that collection.
+	ErrPermissionNotFound = errors.New("permission not found")
+	// ErrOwnGlobalAdmin refuses an admin removing their own admin grant on
+	// "*": nothing else makes them a global admin, so it would lock them out.
+	ErrOwnGlobalAdmin = errors.New("cannot remove your own global admin")
+)
+
 // AuthManager manages authentication and authorization
 type AuthManager struct {
 	db      *bolt.DB
@@ -92,81 +102,11 @@ func (am *AuthManager) LoadAll() error {
 	var groupPermissions []*GroupPermission
 
 	err := am.handle().View(func(tx *bolt.Tx) error {
-		// Load users
-		b := tx.Bucket(bucketAuthUsers)
-		if b != nil {
-			if err := b.ForEach(func(k, v []byte) error {
-				var u User
-				if err := json.Unmarshal(v, &u); err != nil {
-					return nil // skip corrupt entries
-				}
-				users = append(users, &u)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-
-		// Load API keys
-		b = tx.Bucket(bucketAuthAPIKeys)
-		if b != nil {
-			if err := b.ForEach(func(k, v []byte) error {
-				var key APIKey
-				if err := json.Unmarshal(v, &key); err != nil {
-					return nil // skip corrupt entries
-				}
-				apiKeys = append(apiKeys, &key)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-
-		// Load permissions
-		b = tx.Bucket(bucketAuthPerms)
-		if b != nil {
-			if err := b.ForEach(func(k, v []byte) error {
-				var perm Permission
-				if err := json.Unmarshal(v, &perm); err != nil {
-					return nil // skip corrupt entries
-				}
-				permissions = append(permissions, &perm)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-
-		// Load groups
-		b = tx.Bucket(bucketAuthGroups)
-		if b != nil {
-			if err := b.ForEach(func(k, v []byte) error {
-				var g Group
-				if err := json.Unmarshal(v, &g); err != nil {
-					return nil // skip corrupt entries
-				}
-				groups = append(groups, &g)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-
-		// Load group permissions
-		b = tx.Bucket(bucketAuthGroupPerms)
-		if b != nil {
-			if err := b.ForEach(func(k, v []byte) error {
-				var gp GroupPermission
-				if err := json.Unmarshal(v, &gp); err != nil {
-					return nil // skip corrupt entries
-				}
-				groupPermissions = append(groupPermissions, &gp)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-
+		users = loadAuthBucket[User](tx, bucketAuthUsers)
+		apiKeys = loadAuthBucket[APIKey](tx, bucketAuthAPIKeys)
+		permissions = loadAuthBucket[Permission](tx, bucketAuthPerms)
+		groups = loadAuthBucket[Group](tx, bucketAuthGroups)
+		groupPermissions = loadAuthBucket[GroupPermission](tx, bucketAuthGroupPerms)
 		return nil
 	})
 
@@ -204,6 +144,24 @@ func (am *AuthManager) LoadAll() error {
 
 	am.mu.Unlock()
 	return nil
+}
+
+// loadAuthBucket decodes every value of bucket, skipping corrupt entries; a
+// missing bucket holds nothing.
+func loadAuthBucket[T any](tx *bolt.Tx, bucket []byte) []*T {
+	b := tx.Bucket(bucket)
+	if b == nil {
+		return nil
+	}
+	var out []*T
+	_ = b.ForEach(func(_, v []byte) error { // the callback never fails
+		var item T
+		if json.Unmarshal(v, &item) == nil {
+			out = append(out, &item)
+		}
+		return nil
+	})
+	return out
 }
 
 // BootstrapAdmin creates initial admin user if it doesn't exist
@@ -609,6 +567,67 @@ func (am *AuthManager) SetPermission(perm *Permission) error {
 	return nil
 }
 
+// DeletePermission removes a user's grant on one collection (#438).
+//
+// The user's other grants stay. CheckPermission and IsAdmin read the
+// in-memory map on every request, so tokens already issued lose the grant on
+// their next request; the Admin flag a token carries is narrowed the same way
+// by refreshClaims. It answers ErrPermissionNotFound when there is no such
+// grant.
+func (am *AuthManager) DeletePermission(username, collection string) error {
+	if username == "" || collection == "" {
+		return errors.New("username and collection are required")
+	}
+	if err := am.deleteGrantKey(bucketAuthPerms, fmt.Sprintf("perm|%s|%s", username, collection)); err != nil {
+		return err
+	}
+
+	am.mu.Lock()
+	kept := make([]*Permission, 0, len(am.permissions[username]))
+	for _, p := range am.permissions[username] {
+		if p.Collection != collection {
+			kept = append(kept, p)
+		}
+	}
+	am.permissions[username] = kept
+	am.mu.Unlock()
+
+	slog.Info("permission deleted", "username", username, "collection", collection) // #nosec G706 -- internal operational log
+	return nil
+}
+
+// deleteGrantKey deletes one grant's key from bucket in one transaction, or
+// answers ErrPermissionNotFound when the key is not there.
+func (am *AuthManager) deleteGrantKey(bucket []byte, key string) error {
+	return am.handle().Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucket)
+		if b.Get([]byte(key)) == nil {
+			return ErrPermissionNotFound
+		}
+		return b.Delete([]byte(key))
+	})
+}
+
+// GuardPermissionRemoval refuses, with ErrOwnGlobalAdmin, the actor removing
+// their own admin grant on "*" — the one grant that makes them a global admin
+// (IsAdmin), so removing it would leave them unable to undo the change. Any
+// other removal passes.
+func (am *AuthManager) GuardPermissionRemoval(actor, username, collection string) error {
+	if actor == username && collection == "*" && am.IsAdmin(actor) {
+		return ErrOwnGlobalAdmin
+	}
+	return nil
+}
+
+// refreshClaims narrows a validated token's Admin flag to what its user holds
+// now. A login token records IsAdmin at login and CheckPermission lets an
+// Admin token through everywhere, so without this a global admin grant
+// removed or turned off after login kept working until the token expired. It
+// only ever takes the flag away: a grant added later needs a new login.
+func (am *AuthManager) refreshClaims(claims *JWTClaims) {
+	claims.Admin = claims.Admin && am.IsAdmin(claims.Username)
+}
+
 // GetPermissions returns all permissions for a user
 func (am *AuthManager) GetPermissions(username string) []*Permission {
 	am.mu.RLock()
@@ -923,6 +942,34 @@ func (am *AuthManager) SetGroupPermission(gp *GroupPermission) error {
 	slog.Info("group permission set",
 		"group", gp.GroupName, "collection", gp.Collection,
 		"read", gp.Read, "write", gp.Write, "admin", gp.Admin)
+	return nil
+}
+
+// DeleteGroupPermission removes a group's grant on one collection (#438).
+//
+// The group's other grants stay, and so does the group. Its members lose the
+// grant on their next request, tokens already issued included: CheckPermission
+// reads the in-memory map. It answers ErrPermissionNotFound when there is no
+// such grant.
+func (am *AuthManager) DeleteGroupPermission(groupName, collection string) error {
+	if groupName == "" || collection == "" {
+		return errors.New("group name and collection are required")
+	}
+	if err := am.deleteGrantKey(bucketAuthGroupPerms, fmt.Sprintf("%s|%s", groupName, collection)); err != nil {
+		return err
+	}
+
+	am.mu.Lock()
+	kept := make([]*GroupPermission, 0, len(am.groupPermissions[groupName]))
+	for _, gp := range am.groupPermissions[groupName] {
+		if gp.Collection != collection {
+			kept = append(kept, gp)
+		}
+	}
+	am.groupPermissions[groupName] = kept
+	am.mu.Unlock()
+
+	slog.Info("group permission deleted", "group", groupName, "collection", collection) // #nosec G706 -- internal operational log
 	return nil
 }
 

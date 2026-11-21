@@ -917,6 +917,20 @@ mutation {
 }
 ```
 
+### Remove a Permission (2.19.9+)
+
+```graphql
+mutation {
+  deletePermission(username: "john", collection: "blog")
+  deleteGroupPermission(groupName: "editors", collection: "blog")
+}
+```
+
+Both return `true`, or an error: `permission not found` when there is no such
+grant, and for `deletePermission`, `cannot remove your own global admin` when
+an admin removes their own admin on `"*"`. Admin only, like the REST
+endpoints ([AUTHENTICATION.md](AUTHENTICATION.md#removing-permissions-2199)).
+
 ## Advanced Usage
 
 ### Combining Multiple Queries

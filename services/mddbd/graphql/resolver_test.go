@@ -140,6 +140,9 @@ func (s *stubServer) CreateAPIKey(_ context.Context, _ CreateAPIKeyInput) (*APIK
 func (s *stubServer) SetPermission(_ context.Context, _ SetPermissionInput) error {
 	return errors.New("not implemented")
 }
+func (s *stubServer) DeletePermission(_ context.Context, _, _ string) error {
+	return errors.New("not implemented")
+}
 func (s *stubServer) UserPermissionsList(_ context.Context, _ string) ([]*UserPermission, error) {
 	return nil, errors.New("not implemented")
 }
@@ -159,6 +162,9 @@ func (s *stubServer) DeleteGroup(_ context.Context, _ string) error {
 	return errors.New("not implemented")
 }
 func (s *stubServer) SetGroupPermission(_ context.Context, _ SetGroupPermissionInput) error {
+	return errors.New("not implemented")
+}
+func (s *stubServer) DeleteGroupPermission(_ context.Context, _, _ string) error {
 	return errors.New("not implemented")
 }
 

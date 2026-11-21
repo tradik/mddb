@@ -142,6 +142,7 @@ func (am *AuthManager) sessionClaims(w http.ResponseWriter, r *http.Request, tok
 		http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
 		return nil, false
 	}
+	am.refreshClaims(claims)
 	return claims, true
 }
 

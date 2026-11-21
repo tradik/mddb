@@ -87,7 +87,9 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 			{Method: "GET", Path: "/v1/auth/api-keys", Description: "List API keys", RequiresAuth: true},
 			{Method: "DELETE", Path: "/v1/auth/api-keys/{keyHash}", Description: "Delete API key", RequiresAuth: true},
 			{Method: "POST", Path: "/v1/auth/me", Description: "Get current user info", RequiresAuth: true},
-			{Method: "POST", Path: "/v1/auth/permissions", Description: "Get user permissions", RequiresAuth: true},
+			{Method: "GET", Path: "/v1/auth/permissions", Description: "Get user permissions", RequiresAuth: true},
+			{Method: "POST", Path: "/v1/auth/permissions", Description: "Set user permission", RequiresAuth: true},
+			{Method: "DELETE", Path: "/v1/auth/permissions", Description: "Delete user permission", RequiresAuth: true},
 			{Method: "GET", Path: "/v1/auth/users", Description: "List all users", RequiresAuth: true},
 			{Method: "DELETE", Path: "/v1/auth/users/{username}", Description: "Delete user", RequiresAuth: true},
 			{Method: "GET", Path: "/v1/auth/groups", Description: "List all groups", RequiresAuth: true},
@@ -97,6 +99,7 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 			{Method: "DELETE", Path: "/v1/auth/groups/{name}", Description: "Delete group", RequiresAuth: true},
 			{Method: "GET", Path: "/v1/auth/group-permissions", Description: "Get group permissions", RequiresAuth: true},
 			{Method: "POST", Path: "/v1/auth/group-permissions", Description: "Set group permission", RequiresAuth: true},
+			{Method: "DELETE", Path: "/v1/auth/group-permissions", Description: "Delete group permission", RequiresAuth: true},
 		}
 		httpEndpoints = append(httpEndpoints, authEndpoints...)
 	}

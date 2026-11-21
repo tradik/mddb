@@ -15,6 +15,7 @@ vi.mock('../lib/mddb-client', () => ({
     deleteGroup: vi.fn(),
     getGroupPermissions: vi.fn(),
     setGroupPermission: vi.fn(),
+    deleteGroupPermission: vi.fn(),
   },
 }));
 
@@ -448,5 +449,64 @@ describe('GroupsPanel permissions modal', () => {
     fireEvent.click(button(modal('Group Permissions: empty')));
     expect(screen.queryByRole('heading', { name: 'Group Permissions: empty' })).toBeNull();
     expect(mddbClient.getGroupPermissions).toHaveBeenCalledWith('empty');
+  });
+});
+
+describe('GroupsPanel remove a permission (#438)', () => {
+  const grants = [
+    { collection: 'blog', read: true, write: true, admin: false },
+    { collection: 'docs', read: true, write: false, admin: false },
+  ];
+
+  /** Opens the ops group's permissions with `grants` and returns the modal. */
+  async function openWithGrants() {
+    await renderWith();
+    vi.mocked(mddbClient.getGroupPermissions).mockResolvedValue({ permissions: grants });
+    await openPermissions();
+    await screen.findByRole('button', { name: 'Remove permission on docs' });
+    return modal('Group Permissions: ops');
+  }
+
+  test('every grant has its own remove button', async () => {
+    const dialog = await openWithGrants();
+    for (const name of ['Remove permission on blog', 'Remove permission on docs']) {
+      expect(within(dialog).getByRole('button', { name }).title).toBe(name);
+    }
+  });
+
+  test('Cancel in the confirmation removes nothing', async () => {
+    await openWithGrants();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove permission on docs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(mddbClient.deleteGroupPermission).not.toHaveBeenCalled();
+  });
+
+  test('confirming removes that grant and reloads the list', async () => {
+    const dialog = await openWithGrants();
+    vi.mocked(mddbClient.deleteGroupPermission).mockResolvedValue({ status: 'ok' });
+    vi.mocked(mddbClient.getGroupPermissions).mockResolvedValue({ permissions: [grants[0]] });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove permission on docs' }));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Remove' })));
+
+    expect(mddbClient.deleteGroupPermission).toHaveBeenCalledWith('ops', 'docs');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Remove permission on docs' })).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Remove permission on blog' })).toBeTruthy();
+    expect(mddbClient.getGroupPermissions).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([
+    ['the server message', new Error('API Error (404): permission not found'), 'API Error (404): permission not found'],
+    ['a fallback for an empty message', new Error(''), 'Failed to remove permission'],
+  ])('shows %s when the removal fails', async (_label, failure, shown) => {
+    const dialog = await openWithGrants();
+    vi.mocked(mddbClient.deleteGroupPermission).mockRejectedValue(failure);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove permission on blog' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    expect(await within(dialog).findByText(shown)).toBeTruthy();
+    expect(console.error).toHaveBeenCalledWith('Permission error:', failure);
+    expect(mddbClient.getGroupPermissions).toHaveBeenCalledTimes(1);
   });
 });

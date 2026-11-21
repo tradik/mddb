@@ -68,6 +68,7 @@ type ServerInterface interface {
 	Register(ctx context.Context, username, password string) (*User, error)
 	CreateAPIKey(ctx context.Context, input CreateAPIKeyInput) (*APIKey, error)
 	SetPermission(ctx context.Context, input SetPermissionInput) error
+	DeletePermission(ctx context.Context, username, collection string) error
 	UserPermissionsList(ctx context.Context, username string) ([]*UserPermission, error)
 	ListGroups(ctx context.Context) ([]*Group, error)
 	GroupPermissionsList(ctx context.Context, groupName string) ([]*GroupPermission, error)
@@ -75,6 +76,7 @@ type ServerInterface interface {
 	UpdateGroup(ctx context.Context, name, description string, members []string) (*Group, error)
 	DeleteGroup(ctx context.Context, name string) error
 	SetGroupPermission(ctx context.Context, input SetGroupPermissionInput) error
+	DeleteGroupPermission(ctx context.Context, groupName, collection string) error
 }
 
 // Claims represents JWT token claims passed across the package boundary.

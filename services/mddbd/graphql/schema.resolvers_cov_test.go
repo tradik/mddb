@@ -99,6 +99,12 @@ func (s *covFServer) CreateAPIKey(_ context.Context, in CreateAPIKeyInput) (*API
 func (s *covFServer) SetPermission(_ context.Context, in SetPermissionInput) error {
 	return covFErr(s, "SetPermission", in.Username)
 }
+func (s *covFServer) DeletePermission(_ context.Context, u, c string) error {
+	return covFErr(s, "DeletePermission", u, c)
+}
+func (s *covFServer) DeleteGroupPermission(_ context.Context, g, c string) error {
+	return covFErr(s, "DeleteGroupPermission", g, c)
+}
 func (s *covFServer) CreateGroup(_ context.Context, in CreateGroupInput) (*Group, error) {
 	return covFReply(s, &Group{Name: in.Name}, "CreateGroup", in.Name)
 }
@@ -227,6 +233,12 @@ func covFCases() []covFCase {
 		}},
 		{"SetPermission", "SetPermission alice", func(ctx context.Context, m MutationResolver, _ QueryResolver) (any, error) {
 			return m.SetPermission(ctx, SetPermissionInput{Username: "alice"})
+		}},
+		{"DeletePermission", "DeletePermission alice blog", func(ctx context.Context, m MutationResolver, _ QueryResolver) (any, error) {
+			return m.DeletePermission(ctx, "alice", "blog")
+		}},
+		{"DeleteGroupPermission", "DeleteGroupPermission eds blog", func(ctx context.Context, m MutationResolver, _ QueryResolver) (any, error) {
+			return m.DeleteGroupPermission(ctx, "eds", "blog")
 		}},
 		{"CreateGroup", "CreateGroup eds", func(ctx context.Context, m MutationResolver, _ QueryResolver) (any, error) {
 			return m.CreateGroup(ctx, CreateGroupInput{Name: "eds"})

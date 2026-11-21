@@ -96,12 +96,12 @@ status: publish
   - [GET /health](#get-health)
   - [POST /v1/auth/register](#post-v1authregister)
   - [GET /v1/auth/me](#get-v1authme)
-  - [GET/POST /v1/auth/permissions](#getpost-v1authpermissions)
+  - [GET/POST/DELETE /v1/auth/permissions](#getpostdelete-v1authpermissions)
   - [GET /v1/auth/users](#get-v1authusers)
   - [DELETE /v1/auth/users/:username](#delete-v1authusersusername)
   - [GET/POST /v1/auth/groups](#getpost-v1authgroups)
   - [GET/PUT/DELETE /v1/auth/groups/:name](#getputdelete-v1authgroupsname)
-  - [GET/POST /v1/auth/group-permissions](#getpost-v1authgroup-permissions)
+  - [GET/POST/DELETE /v1/auth/group-permissions](#getpostdelete-v1authgroup-permissions)
 - [Data Models](#data-models)
 - [Error Handling](#error-handling)
 
@@ -5233,9 +5233,9 @@ Get current authenticated user information.
 
 ---
 
-### GET/POST /v1/auth/permissions
+### GET/POST/DELETE /v1/auth/permissions
 
-Get or set user permissions on collections.
+Get, set or remove user permissions on collections. Requires admin privileges.
 
 **GET** — Query parameter `username`:
 ```bash
@@ -5254,6 +5254,18 @@ curl "http://localhost:11023/v1/auth/permissions?username=john"
 ```
 
 **Response** (POST): `{ "status": "ok" }`
+
+**DELETE** (2.19.9+) — remove one grant; query parameters `username` and
+`collection` (`*` for the wildcard grant). The user's other grants stay, and
+tokens issued before the removal lose the grant on their next request:
+```bash
+curl -X DELETE "http://localhost:11023/v1/auth/permissions?username=john&collection=blog"
+```
+
+**Response** (DELETE): `{ "status": "ok" }`; `400` without both parameters,
+`404` `permission not found`, `409` `cannot remove your own global admin` when
+an admin removes their own admin on `*`
+([AUTHENTICATION.md](AUTHENTICATION.md#removing-permissions-2199)).
 
 ---
 
@@ -5318,9 +5330,9 @@ Manage a specific group. Requires admin privileges.
 
 ---
 
-### GET/POST /v1/auth/group-permissions
+### GET/POST/DELETE /v1/auth/group-permissions
 
-Get or set permissions for a group on collections.
+Get, set or remove permissions for a group on collections. Requires admin privileges.
 
 **GET** — Query parameter `group`:
 ```bash
@@ -5330,7 +5342,7 @@ curl "http://localhost:11023/v1/auth/group-permissions?group=editors"
 **POST** — Set group permission:
 ```json
 {
-  "group": "editors",
+  "groupName": "editors",
   "collection": "blog",
   "read": true,
   "write": true,
@@ -5339,6 +5351,15 @@ curl "http://localhost:11023/v1/auth/group-permissions?group=editors"
 ```
 
 **Response** (POST): `{ "status": "permission set" }`
+
+**DELETE** (2.19.9+) — remove one grant; query parameters `group` and
+`collection`. The group and its other grants stay:
+```bash
+curl -X DELETE "http://localhost:11023/v1/auth/group-permissions?group=editors&collection=blog"
+```
+
+**Response** (DELETE): `{ "status": "ok" }`; `400` without both parameters,
+`404` `permission not found`.
 
 ---
 

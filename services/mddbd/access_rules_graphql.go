@@ -45,19 +45,21 @@ var graphqlAccessRules = map[string]accessRule{
 	"Mutation.importURL":        ruleWrite,
 	"Mutation.validateDocument": ruleRead,
 	// Deleting a collection has always needed admin on it here.
-	"Mutation.deleteCollection":   {class: accessCollection, op: PermAdmin},
-	"Mutation.login":              rulePublic,
-	"Mutation.createAPIKey":       ruleAuthenticated, // the caller's own key
-	"Mutation.registerWebhook":    ruleAdmin,
-	"Mutation.deleteWebhook":      ruleAdmin,
-	"Mutation.setSchema":          ruleAdmin,
-	"Mutation.deleteSchema":       ruleAdmin,
-	"Mutation.register":           ruleAdmin,
-	"Mutation.setPermission":      ruleAdmin,
-	"Mutation.createGroup":        ruleAdmin,
-	"Mutation.updateGroup":        ruleAdmin,
-	"Mutation.deleteGroup":        ruleAdmin,
-	"Mutation.setGroupPermission": ruleAdmin,
+	"Mutation.deleteCollection":      {class: accessCollection, op: PermAdmin},
+	"Mutation.login":                 rulePublic,
+	"Mutation.createAPIKey":          ruleAuthenticated, // the caller's own key
+	"Mutation.registerWebhook":       ruleAdmin,
+	"Mutation.deleteWebhook":         ruleAdmin,
+	"Mutation.setSchema":             ruleAdmin,
+	"Mutation.deleteSchema":          ruleAdmin,
+	"Mutation.register":              ruleAdmin,
+	"Mutation.setPermission":         ruleAdmin,
+	"Mutation.deletePermission":      ruleAdmin,
+	"Mutation.createGroup":           ruleAdmin,
+	"Mutation.updateGroup":           ruleAdmin,
+	"Mutation.deleteGroup":           ruleAdmin,
+	"Mutation.setGroupPermission":    ruleAdmin,
+	"Mutation.deleteGroupPermission": ruleAdmin,
 }
 
 // accessFieldMiddleware gates the root fields of an operation. Fields below

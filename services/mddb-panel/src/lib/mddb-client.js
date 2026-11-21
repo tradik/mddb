@@ -771,6 +771,14 @@ class MDDBClient {
     });
   }
 
+  /**
+   * Remove a user's permission on one collection (#438)
+   */
+  async deleteUserPermission(username, collection) {
+    const query = `username=${encodeURIComponent(username)}&collection=${encodeURIComponent(collection)}`;
+    return this.request(`/auth/permissions?${query}`, { method: 'DELETE' });
+  }
+
   // ---- Group Management Methods ----
 
   /**
@@ -831,6 +839,14 @@ class MDDBClient {
     return this.request(`/auth/group-permissions?group=${encodeURIComponent(groupName)}`, {
       method: 'GET',
     });
+  }
+
+  /**
+   * Remove a group's permission on one collection (#438)
+   */
+  async deleteGroupPermission(groupName, collection) {
+    const query = `group=${encodeURIComponent(groupName)}&collection=${encodeURIComponent(collection)}`;
+    return this.request(`/auth/group-permissions?${query}`, { method: 'DELETE' });
   }
 
   /**

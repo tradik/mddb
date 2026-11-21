@@ -48,6 +48,7 @@ func (am *AuthManager) authenticateContext(ctx context.Context) (context.Context
 	if err != nil || user.Disabled {
 		return nil, status.Error(codes.Unauthenticated, "user disabled or not found")
 	}
+	am.refreshClaims(claims)
 
 	// Inject claims into context
 	return context.WithValue(ctx, authContextKey, claims), nil

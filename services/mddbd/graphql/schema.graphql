@@ -722,12 +722,16 @@ type Mutation {
 
   # Permissions
   setPermission(input: SetPermissionInput!): Boolean! @auth @hasRole(role: ADMIN)
+  """Removes a user's grant on one collection; an admin cannot remove their own admin on "*"."""
+  deletePermission(username: String!, collection: String!): Boolean! @auth @hasRole(role: ADMIN)
 
   # Groups
   createGroup(input: CreateGroupInput!): Group! @auth @hasRole(role: ADMIN)
   updateGroup(name: String!, description: String!, members: [String!]!): Group! @auth @hasRole(role: ADMIN)
   deleteGroup(name: String!): Boolean! @auth @hasRole(role: ADMIN)
   setGroupPermission(input: SetGroupPermissionInput!): Boolean! @auth @hasRole(role: ADMIN)
+  """Removes a group's grant on one collection; the group and its other grants stay."""
+  deleteGroupPermission(groupName: String!, collection: String!): Boolean! @auth @hasRole(role: ADMIN)
 }
 
 # Code connection graph (CODE-005). Edges are derived from the defines/uses/

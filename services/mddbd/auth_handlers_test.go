@@ -704,7 +704,7 @@ func TestHandleAuthPermissions_MethodNotAllowed(t *testing.T) {
 	s, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
-	req := httptest.NewRequest("DELETE", "/v1/auth/permissions", nil)
+	req := httptest.NewRequest("PUT", "/v1/auth/permissions", nil)
 	req = req.WithContext(authenticatedContext("admin", true))
 	w := httptest.NewRecorder()
 
@@ -1384,7 +1384,7 @@ func TestHandleAuthGroupPermissions_MethodNotAllowed(t *testing.T) {
 	s, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
-	req := httptest.NewRequest("DELETE", "/v1/auth/group-permissions", nil)
+	req := httptest.NewRequest("PUT", "/v1/auth/group-permissions", nil)
 	req = req.WithContext(authenticatedContext("admin", true))
 	w := httptest.NewRecorder()
 

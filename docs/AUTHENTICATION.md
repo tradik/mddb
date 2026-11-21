@@ -206,6 +206,44 @@ curl -H "Authorization: Bearer ADMIN_TOKEN" \
   }'
 ```
 
+### Removing Permissions (2.19.9+)
+
+A grant is removed with `DELETE`, the user and collection as query
+parameters (a body on `DELETE` does not reliably survive proxies):
+
+```bash
+curl -X DELETE -H "Authorization: Bearer ADMIN_TOKEN" \
+  "http://localhost:11023/v1/auth/permissions?username=alice&collection=blog"
+# {"status":"ok"}
+
+# a group's grant
+curl -X DELETE -H "Authorization: Bearer ADMIN_TOKEN" \
+  "http://localhost:11023/v1/auth/group-permissions?group=editors&collection=blog"
+```
+
+Only that grant goes; the user's or group's other grants stay. It stops
+applying on the next request, also to login tokens and API keys issued before
+the removal. That holds for removing admin on `"*"` as well: the `admin` flag
+a login token carries is checked against the user's grants on every request
+and dropped when the grant is gone, so the token keeps working with whatever
+grants remain. (A flag is only ever taken away this way; a global admin grant
+given after login needs a new login.)
+
+| Status | When |
+|---|---|
+| `200` | Removed |
+| `400` | `username` / `group` or `collection` missing |
+| `403` | The caller is not a global admin |
+| `404` | No such grant — `permission not found` (also for an unknown user or group) |
+| `409` | `cannot remove your own global admin`: the caller tried to remove their own admin on `"*"`, which would lock them out. Another admin can remove it |
+
+Before 2.19.9 there was no delete: a grant could only be overwritten with
+read, write and admin all false, and the empty row stayed in the list. Such
+rows can now be removed too. GraphQL has the same operations as
+`deletePermission(username, collection)` and
+`deleteGroupPermission(groupName, collection)`, and the panel's permission
+modals have a remove button on every row.
+
 ### Wildcard Collection
 
 Use `"*"` to grant database-wide permissions:
@@ -512,6 +550,13 @@ Get user permissions.
   }
 ]
 ```
+
+#### DELETE /v1/auth/permissions?username=alice&collection=blog
+Remove one user permission (2.19.9+). `200 {"status":"ok"}`; `400` without
+both parameters, `404` when there is no such grant, `409` when an admin
+removes their own admin on `"*"`. The group counterpart is
+`DELETE /v1/auth/group-permissions?group=editors&collection=blog`. See
+[Removing Permissions](#removing-permissions-2199).
 
 #### DELETE /v1/auth/users/:username
 Delete user (admin only).

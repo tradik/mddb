@@ -226,28 +226,30 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddBatch           func(childComplexity int, collection string, documents []*AddBatchDocumentInput) int
-		AddDocument        func(childComplexity int, input AddDocumentInput) int
-		CreateAPIKey       func(childComplexity int, input CreateAPIKeyInput) int
-		CreateGroup        func(childComplexity int, input CreateGroupInput) int
-		DeleteCollection   func(childComplexity int, collection string) int
-		DeleteDocument     func(childComplexity int, collection string, key string, lang string, expectedRevision *string) int
-		DeleteGroup        func(childComplexity int, name string) int
-		DeleteSchema       func(childComplexity int, collection string) int
-		DeleteWebhook      func(childComplexity int, id string) int
-		ImportURL          func(childComplexity int, collection string, url string, key *string, lang string, meta []*MetaInput, ttl *int) int
-		IngestDocuments    func(childComplexity int, collection string, documents []*IngestDocumentInput, options *IngestOptionsInput) int
-		Login              func(childComplexity int, username string, password string) int
-		Register           func(childComplexity int, username string, password string) int
-		RegisterWebhook    func(childComplexity int, input RegisterWebhookInput) int
-		SetGroupPermission func(childComplexity int, input SetGroupPermissionInput) int
-		SetPermission      func(childComplexity int, input SetPermissionInput) int
-		SetSchema          func(childComplexity int, input SetSchemaInput) int
-		SetTTL             func(childComplexity int, collection string, key string, lang string, ttl int) int
-		UpdateDocument     func(childComplexity int, input UpdateDocumentInput) int
-		UpdateGroup        func(childComplexity int, name string, description string, members []string) int
-		ValidateDocument   func(childComplexity int, collection string, meta []*MetaInput) int
-		VectorReindex      func(childComplexity int, collection string, force *bool) int
+		AddBatch              func(childComplexity int, collection string, documents []*AddBatchDocumentInput) int
+		AddDocument           func(childComplexity int, input AddDocumentInput) int
+		CreateAPIKey          func(childComplexity int, input CreateAPIKeyInput) int
+		CreateGroup           func(childComplexity int, input CreateGroupInput) int
+		DeleteCollection      func(childComplexity int, collection string) int
+		DeleteDocument        func(childComplexity int, collection string, key string, lang string, expectedRevision *string) int
+		DeleteGroup           func(childComplexity int, name string) int
+		DeleteGroupPermission func(childComplexity int, groupName string, collection string) int
+		DeletePermission      func(childComplexity int, username string, collection string) int
+		DeleteSchema          func(childComplexity int, collection string) int
+		DeleteWebhook         func(childComplexity int, id string) int
+		ImportURL             func(childComplexity int, collection string, url string, key *string, lang string, meta []*MetaInput, ttl *int) int
+		IngestDocuments       func(childComplexity int, collection string, documents []*IngestDocumentInput, options *IngestOptionsInput) int
+		Login                 func(childComplexity int, username string, password string) int
+		Register              func(childComplexity int, username string, password string) int
+		RegisterWebhook       func(childComplexity int, input RegisterWebhookInput) int
+		SetGroupPermission    func(childComplexity int, input SetGroupPermissionInput) int
+		SetPermission         func(childComplexity int, input SetPermissionInput) int
+		SetSchema             func(childComplexity int, input SetSchemaInput) int
+		SetTTL                func(childComplexity int, collection string, key string, lang string, ttl int) int
+		UpdateDocument        func(childComplexity int, input UpdateDocumentInput) int
+		UpdateGroup           func(childComplexity int, name string, description string, members []string) int
+		ValidateDocument      func(childComplexity int, collection string, meta []*MetaInput) int
+		VectorReindex         func(childComplexity int, collection string, force *bool) int
 	}
 
 	PageInfo struct {
@@ -443,10 +445,12 @@ type MutationResolver interface {
 	Register(ctx context.Context, username string, password string) (*User, error)
 	CreateAPIKey(ctx context.Context, input CreateAPIKeyInput) (*APIKey, error)
 	SetPermission(ctx context.Context, input SetPermissionInput) (bool, error)
+	DeletePermission(ctx context.Context, username string, collection string) (bool, error)
 	CreateGroup(ctx context.Context, input CreateGroupInput) (*Group, error)
 	UpdateGroup(ctx context.Context, name string, description string, members []string) (*Group, error)
 	DeleteGroup(ctx context.Context, name string) (bool, error)
 	SetGroupPermission(ctx context.Context, input SetGroupPermissionInput) (bool, error)
+	DeleteGroupPermission(ctx context.Context, groupName string, collection string) (bool, error)
 }
 type QueryResolver interface {
 	Document(ctx context.Context, collection string, key string, lang string, env map[string]any) (*Document, error)
@@ -1345,6 +1349,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteGroup(childComplexity, args["name"].(string)), true
+	case "Mutation.deleteGroupPermission":
+		if e.ComplexityRoot.Mutation.DeleteGroupPermission == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteGroupPermission_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteGroupPermission(childComplexity, args["groupName"].(string), args["collection"].(string)), true
+	case "Mutation.deletePermission":
+		if e.ComplexityRoot.Mutation.DeletePermission == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deletePermission_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeletePermission(childComplexity, args["username"].(string), args["collection"].(string)), true
 	case "Mutation.deleteSchema":
 		if e.ComplexityRoot.Mutation.DeleteSchema == nil {
 			break
@@ -3301,6 +3327,28 @@ func (ec *executionContext) field_Mutation_deleteDocument_args(ctx context.Conte
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteGroupPermission_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "groupName",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["groupName"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "collection",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["collection"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteGroup_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3312,6 +3360,28 @@ func (ec *executionContext) field_Mutation_deleteGroup_args(ctx context.Context,
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deletePermission_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "username",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["username"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "collection",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["collection"] = arg1
 	return args, nil
 }
 
@@ -8096,6 +8166,75 @@ func (ec *executionContext) fieldContext_Mutation_setPermission(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_deletePermission(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deletePermission(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeletePermission(ctx, fc.Args["username"].(string), fc.Args["collection"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+			directive2 := func(ctx context.Context) (any, error) {
+				role, err := ec.unmarshalNRole2mddbᚋgraphqlᚐRole(ctx, "ADMIN")
+				if err != nil {
+					var zeroVal bool
+					return zeroVal, err
+				}
+				if ec.Directives.HasRole == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive hasRole is not implemented")
+				}
+				return ec.Directives.HasRole(ctx, nil, directive1, role)
+			}
+
+			next = directive2
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deletePermission(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deletePermission_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createGroup(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8366,6 +8505,75 @@ func (ec *executionContext) fieldContext_Mutation_setGroupPermission(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_setGroupPermission_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteGroupPermission(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteGroupPermission(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteGroupPermission(ctx, fc.Args["groupName"].(string), fc.Args["collection"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+			directive2 := func(ctx context.Context) (any, error) {
+				role, err := ec.unmarshalNRole2mddbᚋgraphqlᚐRole(ctx, "ADMIN")
+				if err != nil {
+					var zeroVal bool
+					return zeroVal, err
+				}
+				if ec.Directives.HasRole == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive hasRole is not implemented")
+				}
+				return ec.Directives.HasRole(ctx, nil, directive1, role)
+			}
+
+			next = directive2
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteGroupPermission(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteGroupPermission_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -15698,6 +15906,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "deletePermission":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deletePermission(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createGroup":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createGroup(ctx, field)
@@ -15722,6 +15937,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "setGroupPermission":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_setGroupPermission(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteGroupPermission":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteGroupPermission(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

@@ -249,6 +249,22 @@ func (a *GraphQLAdapter) SetPermission(ctx context.Context, input gql.SetPermiss
 	})
 }
 
+// DeletePermission removes a user's grant on one collection (#438), with the
+// REST endpoint's guard: an admin cannot remove their own admin on "*".
+func (a *GraphQLAdapter) DeletePermission(ctx context.Context, username, collection string) error {
+	if err := a.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if !a.IsAuthEnabled() {
+		return ErrAuthNotEnabled
+	}
+	claims, _ := GetClaimsFromContext(ctx) // requireAdmin found them
+	if err := a.server.AuthManager.GuardPermissionRemoval(claims.Username, username, collection); err != nil {
+		return err
+	}
+	return a.server.AuthManager.DeletePermission(username, collection)
+}
+
 func (a *GraphQLAdapter) UserPermissionsList(ctx context.Context, username string) ([]*gql.UserPermission, error) {
 	if err := a.requireAdmin(ctx); err != nil {
 		return nil, err
@@ -363,4 +379,15 @@ func (a *GraphQLAdapter) SetGroupPermission(ctx context.Context, input gql.SetGr
 		Write:      input.Write,
 		Admin:      input.Admin,
 	})
+}
+
+// DeleteGroupPermission removes a group's grant on one collection (#438).
+func (a *GraphQLAdapter) DeleteGroupPermission(ctx context.Context, groupName, collection string) error {
+	if err := a.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if !a.IsAuthEnabled() {
+		return ErrAuthNotEnabled
+	}
+	return a.server.AuthManager.DeleteGroupPermission(groupName, collection)
 }

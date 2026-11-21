@@ -122,6 +122,14 @@ func (r *mutationResolver) SetPermission(ctx context.Context, input SetPermissio
 	return true, nil
 }
 
+// DeletePermission is the resolver for the deletePermission field.
+func (r *mutationResolver) DeletePermission(ctx context.Context, username string, collection string) (bool, error) {
+	if err := r.server.DeletePermission(ctx, username, collection); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // CreateGroup is the resolver for the createGroup field.
 func (r *mutationResolver) CreateGroup(ctx context.Context, input CreateGroupInput) (*Group, error) {
 	return r.server.CreateGroup(ctx, input)
@@ -143,6 +151,14 @@ func (r *mutationResolver) DeleteGroup(ctx context.Context, name string) (bool, 
 // SetGroupPermission is the resolver for the setGroupPermission field.
 func (r *mutationResolver) SetGroupPermission(ctx context.Context, input SetGroupPermissionInput) (bool, error) {
 	if err := r.server.SetGroupPermission(ctx, input); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// DeleteGroupPermission is the resolver for the deleteGroupPermission field.
+func (r *mutationResolver) DeleteGroupPermission(ctx context.Context, groupName string, collection string) (bool, error) {
+	if err := r.server.DeleteGroupPermission(ctx, groupName, collection); err != nil {
 		return false, err
 	}
 	return true, nil

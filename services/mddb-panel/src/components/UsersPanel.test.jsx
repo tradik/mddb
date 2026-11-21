@@ -13,6 +13,7 @@ vi.mock('../lib/mddb-client', () => ({
     deleteUser: vi.fn(),
     getUserPermissions: vi.fn(),
     setUserPermission: vi.fn(),
+    deleteUserPermission: vi.fn(),
   },
 }));
 
@@ -336,5 +337,72 @@ describe('UsersPanel permissions modal', () => {
     fireEvent.click(button(modal('Manage Permissions: bob')));
     expect(screen.queryByText('Manage Permissions: bob')).toBeNull();
     expect(mddbClient.getUserPermissions).toHaveBeenCalledWith('bob');
+  });
+});
+
+describe('UsersPanel remove a permission (#438)', () => {
+  const grants = [
+    { collection: '*', read: true, write: true, admin: true },
+    { collection: 'blog', read: true, write: false, admin: false },
+  ];
+
+  /** Opens alice's permissions with `grants` and returns the modal. */
+  async function openWithGrants() {
+    await renderWith();
+    vi.mocked(mddbClient.getUserPermissions).mockResolvedValue(grants);
+    await openPermissions();
+    await screen.findByRole('button', { name: 'Remove permission on blog' });
+    return modal('Manage Permissions: alice');
+  }
+
+  test('every grant has its own remove button', async () => {
+    const dialog = await openWithGrants();
+    for (const name of ['Remove permission on *', 'Remove permission on blog']) {
+      const button = within(dialog).getByRole('button', { name });
+      expect(button.title).toBe(name);
+    }
+  });
+
+  test('Cancel in the confirmation removes nothing', async () => {
+    await openWithGrants();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove permission on blog' }));
+    expect(screen.getByRole('alertdialog').textContent).toContain('"blog"');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(mddbClient.deleteUserPermission).not.toHaveBeenCalled();
+  });
+
+  test('confirming removes that grant and reloads the list', async () => {
+    const dialog = await openWithGrants();
+    let finish;
+    vi.mocked(mddbClient.deleteUserPermission).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove permission on blog' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    expect(mddbClient.deleteUserPermission).toHaveBeenCalledWith('alice', 'blog');
+    expect(screen.getByRole('button', { name: 'Working…' }).disabled).toBe(true);
+    expect(within(dialog).getByRole('button', { name: 'Remove permission on *' }).disabled).toBe(true);
+
+    vi.mocked(mddbClient.getUserPermissions).mockResolvedValue([grants[0]]);
+    await act(async () => finish({ status: 'ok' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Remove permission on blog' })).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Remove permission on *' }).disabled).toBe(false);
+    expect(mddbClient.getUserPermissions).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([
+    ['the server message', new Error('API Error (409): cannot remove your own global admin'), 'API Error (409): cannot remove your own global admin'],
+    ['a fallback for an empty message', new Error(''), 'Failed to remove permission'],
+  ])('shows %s when the removal fails', async (_label, failure, shown) => {
+    const dialog = await openWithGrants();
+    vi.mocked(mddbClient.deleteUserPermission).mockRejectedValue(failure);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove permission on *' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    expect(await within(dialog).findByText(shown)).toBeTruthy();
+    expect(console.error).toHaveBeenCalledWith('Permission error:', failure);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(mddbClient.getUserPermissions).toHaveBeenCalledTimes(1);
   });
 });

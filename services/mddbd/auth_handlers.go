@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"mddb/internal/audit"
 	"net/http"
@@ -151,10 +152,7 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: expiresAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	writeJSONStatus(w, http.StatusOK, resp)
 }
 
 // handleAuthRegister handles POST /v1/auth/register (admin only)
@@ -197,10 +195,7 @@ func (s *Server) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
 		Tenant:    user.Tenant,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	writeJSONStatus(w, http.StatusOK, resp)
 }
 
 // handleAuthAPIKey handles POST /v1/auth/api-key
@@ -237,10 +232,7 @@ func (s *Server) handleAuthAPIKey(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:   time.Now().Unix(),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	writeJSONStatus(w, http.StatusOK, resp)
 }
 
 // handleAuthAPIKeysList handles GET /v1/auth/api-keys
@@ -277,10 +269,7 @@ func (s *Server) handleAuthAPIKeysList(w http.ResponseWriter, r *http.Request) {
 
 	resp := ListAPIKeysResponse{Keys: items}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	writeJSONStatus(w, http.StatusOK, resp)
 }
 
 // handleAuthAPIKeyDelete handles DELETE /v1/auth/api-keys/:keyHash
@@ -319,10 +308,7 @@ func (s *Server) handleAuthAPIKeyDelete(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": "deleted"}); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	writeJSONStatus(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 // handleAuthMe handles GET /v1/auth/me
@@ -351,13 +337,10 @@ func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		Tenant:    user.Tenant,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	writeJSONStatus(w, http.StatusOK, resp)
 }
 
-// handleAuthPermissions handles POST /v1/auth/permissions and GET /v1/auth/permissions
+// handleAuthPermissions handles POST, GET and DELETE /v1/auth/permissions
 func (s *Server) handleAuthPermissions(w http.ResponseWriter, r *http.Request) {
 	// Check admin permission
 	claims, ok := GetClaimsFromContext(r.Context())
@@ -389,10 +372,7 @@ func (s *Server) handleAuthPermissions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		resp := SetPermissionResponse{Status: "ok"}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-		}
+		writeJSONStatus(w, http.StatusOK, resp)
 
 	case "GET":
 		// Get permissions
@@ -403,13 +383,48 @@ func (s *Server) handleAuthPermissions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		perms := s.AuthManager.GetPermissions(username)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(perms); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-		}
+		writeJSONStatus(w, http.StatusOK, perms)
+
+	case http.MethodDelete:
+		s.handleDeletePermission(w, r, claims.Username)
 
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+	}
+}
+
+// handleDeletePermission handles DELETE
+// /v1/auth/permissions?username=<u>&collection=<c> (#438). The values come as
+// query parameters, as GET's do: a DELETE body does not reliably survive
+// proxies. actor is the admin making the request, who may not remove their
+// own global admin (409).
+func (s *Server) handleDeletePermission(w http.ResponseWriter, r *http.Request, actor string) {
+	q := r.URL.Query()
+	username, collection := q.Get("username"), q.Get("collection")
+	if username == "" || collection == "" {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "username and collection parameters required"})
+		return
+	}
+	err := s.AuthManager.GuardPermissionRemoval(actor, username, collection)
+	if err == nil {
+		err = s.AuthManager.DeletePermission(username, collection)
+	}
+	writePermissionRemoval(w, err)
+}
+
+// writePermissionRemoval answers a user or group permission removal:
+// 200 {"status":"ok"}, 404 when there was no such grant, 409 when it was the
+// admin's own global admin, 500 for anything else.
+func writePermissionRemoval(w http.ResponseWriter, err error) {
+	switch {
+	case err == nil:
+		writeJSONStatus(w, http.StatusOK, SetPermissionResponse{Status: "ok"})
+	case errors.Is(err, ErrPermissionNotFound):
+		writeJSONStatus(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+	case errors.Is(err, ErrOwnGlobalAdmin):
+		writeJSONStatus(w, http.StatusConflict, map[string]string{"error": err.Error()})
+	default:
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "failed to delete permission"})
 	}
 }
 
@@ -443,10 +458,7 @@ func (s *Server) handleAuthDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": "deleted"}); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	writeJSONStatus(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 // ---- Users List Handler ----
@@ -494,10 +506,7 @@ func (s *Server) handleAuthUsersList(w http.ResponseWriter, r *http.Request) {
 
 	response := UsersListResponse{Users: userInfos}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	writeJSONStatus(w, http.StatusOK, response)
 }
 
 // ---- Group Handlers ----
@@ -535,10 +544,7 @@ func (s *Server) handleAuthGroups(w http.ResponseWriter, r *http.Request) {
 		groups := s.AuthManager.ListGroups()
 		response := GroupsListResponse{Groups: groups}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-		}
+		writeJSONStatus(w, http.StatusOK, response)
 
 	case http.MethodPost:
 		// Create new group
@@ -559,11 +565,7 @@ func (s *Server) handleAuthGroups(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(group); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-		}
+		writeJSONStatus(w, http.StatusCreated, group)
 
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -595,10 +597,7 @@ func (s *Server) handleAuthGroupDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(group); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-		}
+		writeJSONStatus(w, http.StatusOK, group)
 
 	case http.MethodPut:
 		// Update group
@@ -618,10 +617,7 @@ func (s *Server) handleAuthGroupDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(group); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-		}
+		writeJSONStatus(w, http.StatusOK, group)
 
 	case http.MethodDelete:
 		// Delete group
@@ -634,17 +630,14 @@ func (s *Server) handleAuthGroupDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "deleted"}); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-		}
+		writeJSONStatus(w, http.StatusOK, map[string]string{"status": "deleted"})
 
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 	}
 }
 
-// handleAuthGroupPermissions handles GET and POST for group permissions
+// handleAuthGroupPermissions handles GET, POST and DELETE for group permissions
 func (s *Server) handleAuthGroupPermissions(w http.ResponseWriter, r *http.Request) {
 	// Check admin permission
 	claims, ok := GetClaimsFromContext(r.Context())
@@ -664,10 +657,7 @@ func (s *Server) handleAuthGroupPermissions(w http.ResponseWriter, r *http.Reque
 
 		perms := s.AuthManager.GetGroupPermissions(groupName)
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"permissions": perms}); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-		}
+		writeJSONStatus(w, http.StatusOK, map[string]interface{}{"permissions": perms})
 
 	case http.MethodPost:
 		// Set group permission
@@ -682,10 +672,17 @@ func (s *Server) handleAuthGroupPermissions(w http.ResponseWriter, r *http.Reque
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "permission set"}); err != nil {
-			http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
+		writeJSONStatus(w, http.StatusOK, map[string]string{"status": "permission set"})
+
+	case http.MethodDelete:
+		// DELETE /v1/auth/group-permissions?group=<g>&collection=<c> (#438)
+		q := r.URL.Query()
+		groupName, collection := q.Get("group"), q.Get("collection")
+		if groupName == "" || collection == "" {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "group and collection parameters required"})
+			return
 		}
+		writePermissionRemoval(w, s.AuthManager.DeleteGroupPermission(groupName, collection))
 
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)

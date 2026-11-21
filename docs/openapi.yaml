@@ -3734,6 +3734,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags:
+        - Users
+      summary: Delete user permission
+      description: >-
+        Remove a user's grant on one collection. The user's other grants stay.
+        The grant stops applying on the next request, also to login tokens and
+        API keys issued before the removal; removing admin on `*` also takes
+        the global admin flag away from those tokens. An admin cannot remove
+        their own admin grant on `*` (409). Requires admin authentication.
+        The values are query parameters, not a body.
+      operationId: authDeletePermission
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: username
+          in: query
+          required: true
+          description: User whose grant is removed
+          schema:
+            type: string
+            example: alice
+        - name: collection
+          in: query
+          required: true
+          description: Collection of the grant, `*` for the wildcard grant
+          schema:
+            type: string
+            example: blog
+      responses:
+        "200":
+          description: Permission removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetPermissionResponse"
+        "400":
+          description: username or collection parameter missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The user has no grant on that collection (or there is no such user)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The request would remove the caller's own global admin (`cannot remove your own global admin`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/auth/users:
     get:
@@ -4074,6 +4134,58 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags:
+        - Groups
+      summary: Delete group permission
+      description: >-
+        Remove a group's grant on one collection. The group and its other
+        grants stay. Members lose the grant on their next request, tokens
+        issued before the removal included. Requires admin authentication.
+        The values are query parameters, not a body.
+      operationId: authDeleteGroupPermission
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: group
+          in: query
+          required: true
+          description: Group name
+          schema:
+            type: string
+            example: developers
+        - name: collection
+          in: query
+          required: true
+          description: Collection of the grant, `*` for the wildcard grant
+          schema:
+            type: string
+            example: blog
+      responses:
+        "200":
+          description: Permission removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetPermissionResponse"
+        "400":
+          description: group or collection parameter missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The group has no grant on that collection (or there is no such group)
           content:
             application/json:
               schema:

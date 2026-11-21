@@ -3,8 +3,8 @@ import { Users, Clock, Plus, Edit2, Trash2, Key, X } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import { formatDistanceToNow } from 'date-fns';
-import { adminScopeLabel } from '../lib/permissions';
 import PermissionScopeHint from './PermissionScopeHint';
+import PermissionList from './PermissionList';
 
 export default function GroupsPanel() {
   const {
@@ -53,8 +53,8 @@ export default function GroupsPanel() {
     }
   };
 
+  // Only the confirmation calls it, and that renders only with a group selected.
   const handleDeleteGroup = async () => {
-    if (!selectedGroup) return;
     try {
       await mddbClient.deleteGroup(selectedGroup.name);
       setShowDeleteModal(false);
@@ -605,6 +605,18 @@ function GroupPermissionsModal({ group, onClose }) {
     }
   };
 
+  // Removes one grant (#438), then lists what is left.
+  const handleRemovePermission = async (permCollection) => {
+    setError(null);
+    try {
+      await mddbClient.deleteGroupPermission(group.name, permCollection);
+      await loadPermissions();
+    } catch (error) {
+      console.error('Permission error:', error);
+      setError(error.message || 'Failed to remove permission');
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-surface rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
@@ -620,40 +632,7 @@ function GroupPermissionsModal({ group, onClose }) {
         {/* Existing Permissions */}
         <div className="mb-6">
           <h3 className="text-sm font-medium text-fg-muted mb-2">Current Permissions</h3>
-          {loading ? (
-            <div className="text-center py-4">Loading...</div>
-          ) : permissions.length === 0 ? (
-            <div className="text-sm text-fg-faint bg-surface-muted rounded p-4">
-              No permissions set
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {permissions.map((perm, idx) => (
-                <div key={idx} className="bg-surface-muted rounded p-3">
-                  <div>
-                    <span className="font-medium text-fg">{perm.collection}</span>
-                    <div className="flex gap-2 mt-1">
-                      {perm.read && (
-                        <span className="px-2 py-0.5 text-xs bg-success-muted text-success-strong rounded">
-                          Read
-                        </span>
-                      )}
-                      {perm.write && (
-                        <span className="px-2 py-0.5 text-xs bg-info-muted text-info-strong rounded">
-                          Write
-                        </span>
-                      )}
-                      {perm.admin && (
-                        <span className="px-2 py-0.5 text-xs bg-note-muted text-note-strong rounded">
-                          {adminScopeLabel(perm.collection)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <PermissionList permissions={permissions} loading={loading} onRemove={handleRemovePermission} />
         </div>
 
         {/* Add New Permission */}
