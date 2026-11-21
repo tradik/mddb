@@ -96,11 +96,13 @@ func mcpInstructionsFromEnv() string {
 
 // mcpPublicURLFromEnv is MDDB_MCP_PUBLIC_URL, the base URL MCP clients dial
 // when the listener sits behind a proxy or tunnel (#440), e.g.
-// https://mcp.example.com, without a trailing slash. Like the OAuth issuer
-// it must be an absolute http or https URL; any other value is reported and
-// left unset.
+// https://mcp.example.com, without a trailing slash. A value given with the
+// endpoint itself (…/mcp) loses it, since clients append /mcp. Like the OAuth
+// issuer it must be an absolute http or https URL; any other value is
+// reported and left unset.
 func mcpPublicURLFromEnv() string {
 	raw := strings.TrimRight(strings.TrimSpace(os.Getenv("MDDB_MCP_PUBLIC_URL")), "/")
+	raw = strings.TrimRight(strings.TrimSuffix(raw, "/mcp"), "/")
 	if raw == "" {
 		return ""
 	}

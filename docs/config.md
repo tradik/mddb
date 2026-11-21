@@ -112,7 +112,7 @@ Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is s
 | `MDDB_MCP_PORT` | — | string | — | Plain port number (converted to `":PORT"`) |
 | `MDDB_MCP_STDIO` | `false` | bool | `--mcp-stdio` | Run MCP in stdio mode (for Claude Desktop) |
 | `MDDB_MCP_DOMAIN` | `""` | string | — | MCP server domain |
-| `MDDB_MCP_PUBLIC_URL` | `""` | string | — | Base URL clients dial behind a proxy or tunnel, without `/mcp` (v2.19.9): an absolute `http`/`https` URL, trailing slash removed, other values ignored. Reported as `protocols.mcp.publicUrl` in `GET /v1/config`; unset, the OAuth issuer is reported while OAuth runs |
+| `MDDB_MCP_PUBLIC_URL` | `""` | string | — | Base URL clients dial behind a proxy or tunnel, without `/mcp` (v2.19.9): an absolute `http`/`https` URL, trailing slash and a trailing `/mcp` removed, other values ignored. Reported as `protocols.mcp.publicUrl` in `GET /v1/config`; unset, the OAuth issuer is reported while OAuth runs |
 | `MDDB_MCP_CONFIG` | `""` | string | — | Path to YAML with custom MCP tool definitions |
 | `MDDB_MCP_BUILTIN_TOOLS` | `true` | bool | — | Set to `false` to expose only custom YAML tools |
 | `MDDB_MCP_TOOLSETS` | `all` | list | `search`, `code`, `documents`, `ingest`, `memory`, `schema`, `admin`, `geo`, `automation`, `webhooks`, `wordpress`, `all` | Built-in tool groups to expose (v2.18.8, MCP-003); tools outside them are neither listed nor callable |

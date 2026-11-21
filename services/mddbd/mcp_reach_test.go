@@ -23,10 +23,13 @@ func TestMCPPublicURLFromEnv(t *testing.T) {
 		{"https://mcp.example.com/", "https://mcp.example.com"},
 		{"  http://10.0.0.5:9000//  ", "http://10.0.0.5:9000"},
 		{"https://example.com/mddb/", "https://example.com/mddb"},
-		{"mcp.example.com", ""},       // not absolute
-		{"ftp://mcp.example.com", ""}, // not http or https
-		{"https://", ""},              // no host
-		{"http://[::1", ""},           // does not parse
+		{"https://mcp.example.com/mcp", "https://mcp.example.com"},    // the endpoint itself
+		{"https://example.com/mddb/mcp/", "https://example.com/mddb"}, // the same under a path
+		{"https://example.com/mcpx", "https://example.com/mcpx"},      // not the endpoint
+		{"mcp.example.com", ""},                                       // not absolute
+		{"ftp://mcp.example.com", ""},                                 // not http or https
+		{"https://", ""},                                              // no host
+		{"http://[::1", ""},                                           // does not parse
 	} {
 		t.Setenv("MDDB_MCP_PUBLIC_URL", tc.in)
 		if got := mcpPublicURLFromEnv(); got != tc.want {

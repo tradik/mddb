@@ -443,6 +443,9 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **Leader-Follower Replication** - Binlog streaming over gRPC for read scaling
 - ✅ **Leader Election (2.19.8)** - With `MDDB_CLUSTER_PEERS` three or more nodes elect the leader by majority, replace a failed one, answer writes on other nodes with the leader's address, and set aside writes a returning old leader alone had; optional quorum acknowledgements ([CLUSTER.md](docs/CLUSTER.md))
 - ✅ **Collection Placement (2.19.8)** - With `MDDB_PLACEMENT_GROUPS` several clusters (node groups) share the collections, each group holding whole collections; any node routes a request to the group holding its collection, cross-search and stats ask every group, and `mddb-cli placement move` moves a collection to another group while it takes writes. One collection is never split across groups, and nothing rebalances on its own ([CLUSTER.md](docs/CLUSTER.md#placing-collections-across-groups))
+- ✅ **Scoped MCP API Keys (2.19.9)** - An MCP API key can be limited to chosen collections, to reads, or to one chat scenario (its collections, read-only, with the scenario's prompt as the MCP `instructions`); OAuth tokens carry the scope of their key ([MCP.md](docs/MCP.md))
+- ✅ **Removing Permissions (2.19.9)** - `DELETE /v1/auth/permissions` and `/v1/auth/group-permissions`, GraphQL `deletePermission` / `deleteGroupPermission`, and a remove button in the panel ([AUTHENTICATION.md](docs/AUTHENTICATION.md))
+- ✅ **Connecting an MCP Client to a Running Server (2.19.9)** - `MDDB_MCP_PUBLIC_URL` and `/v1/config` report how MCP is reached; the panel's Claude tab builds the command, the project file and the connector steps for this server ([LLM_CONNECTIONS.md](docs/LLM_CONNECTIONS.md))
 - ✅ **Automatic Catch-up** - Followers pull missing transactions
 - ✅ **Zero-Downtime Snapshots** - Full sync for new followers
 - ✅ **Cluster Monitoring** - Web panel with health and lag metrics

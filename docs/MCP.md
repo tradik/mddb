@@ -251,7 +251,7 @@ and the Panel's LLM Connections page builds its examples from it:
 
 | Field | Source | Meaning |
 |-------|--------|---------|
-| `publicUrl` | `MDDB_MCP_PUBLIC_URL`; if unset, `MDDB_MCP_OAUTH_ISSUER` while OAuth runs; else empty | The base URL clients dial, without `/mcp` and without a trailing slash |
+| `publicUrl` | `MDDB_MCP_PUBLIC_URL`; if unset, `MDDB_MCP_OAUTH_ISSUER` while OAuth runs; else empty | The base URL clients dial, without `/mcp` and without a trailing slash (both are removed from the setting when present) |
 | `apiKeyEnabled` | `MDDB_MCP_API_KEY_ENABLED` | Whether `/mcp` asks for an MCP API key |
 | `oauthEnabled` | The OAuth server the listener runs | `true` only when OAuth is on and could start (API keys on, valid issuer); a custom connector can then authorize |
 
