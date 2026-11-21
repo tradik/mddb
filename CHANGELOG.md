@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **docs/API.md:** the group-permission example sent `group`; the field is `groupName`.
 - **docs/MCP.md, docs/LLM_CONNECTIONS.md:** the HTTP client configuration example uses `"type": "http"`.
 - **Panel layout scrolled past the viewport.** The main row had a hard-coded height of `100vh - 64px`, so the compliance banner pushed it below the fold: the page got a second scrollbar and the sidebar scrolled on its own. The shell is now a full-viewport flex column; the banner and header keep their natural height and the sidebar and views take the rest.
+- **Secret scan on `main`:** the Open WebUI step of *LLM Connections* showed `llmApiKey=sk-...`, which the secret scanner reads as a key since the templates moved to `src/lib/llm-connection-templates.js`; it now reads `llmApiKey=<your API key>`.
 
 ### Security
 
