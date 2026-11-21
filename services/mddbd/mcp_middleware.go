@@ -17,7 +17,8 @@ import (
 
 // MCPAPIKeyMiddleware validates API keys for MCP HTTP endpoints.
 // Two sources:
-//   - Static keys from env: MDDB_MCP_API_KEYS=key1:name1,key2:name2
+//   - Static keys from env: MDDB_MCP_API_KEYS=key1:name1,key2:name2, each
+//     optionally key:name:toolsets:collections:ro (see parseStaticMCPKey)
 //   - Dynamic keys from BoltDB store: managed via REST API (POST/GET/DELETE /v1/mcp/keys)
 //
 // Enable with MDDB_MCP_API_KEY_ENABLED=true.
@@ -27,17 +28,27 @@ type MCPAPIKeyMiddleware struct {
 	// keyToolsets: static key → toolsets, from an optional third field in
 	// MDDB_MCP_API_KEYS ("key:name:search|code"). MCP-003.
 	keyToolsets map[string]map[string]bool
-	keyStore    *mcpAPIKeyStore // dynamic: BoltDB-backed store
-	cacheTTL    time.Duration
-	cacheMu     sync.RWMutex
-	cache       map[string]*apiKeyCacheEntry
+	// keyScopes: static key → scope, from the optional fourth field and the
+	// trailing ":ro" (#439).
+	keyScopes map[string]mcpKeyScope
+	keyStore  *mcpAPIKeyStore // dynamic: BoltDB-backed store
+	cacheTTL  time.Duration
+	cacheMu   sync.RWMutex
+	cache     map[string]*apiKeyCacheEntry
+}
+
+// mcpKeyGrant is what a valid key gives a request: its name for the logs,
+// its toolsets (nil = all) and its scope.
+type mcpKeyGrant struct {
+	name     string
+	toolsets map[string]bool
+	scope    mcpKeyScope
 }
 
 type apiKeyCacheEntry struct {
-	name     string
-	toolsets map[string]bool
-	valid    bool
-	expires  time.Time
+	grant   mcpKeyGrant
+	valid   bool
+	expires time.Time
 }
 
 // NewMCPAPIKeyMiddleware creates API key middleware from environment variables.
@@ -46,6 +57,7 @@ func NewMCPAPIKeyMiddleware() *MCPAPIKeyMiddleware {
 		enabled:     os.Getenv("MDDB_MCP_API_KEY_ENABLED") == "true",
 		keys:        make(map[string]string),
 		keyToolsets: make(map[string]map[string]bool),
+		keyScopes:   make(map[string]mcpKeyScope),
 		cache:       make(map[string]*apiKeyCacheEntry),
 	}
 	if !m.enabled {
@@ -59,26 +71,13 @@ func NewMCPAPIKeyMiddleware() *MCPAPIKeyMiddleware {
 		if entry == "" {
 			continue
 		}
-		parts := strings.SplitN(entry, ":", 3)
-		key := parts[0]
-		name := key
-		if len(name) > 8 {
-			name = name[:8] + "..."
+		key, grant := parseStaticMCPKey(entry)
+		m.keys[key] = grant.name
+		if grant.toolsets != nil {
+			m.keyToolsets[key] = grant.toolsets
 		}
-		if len(parts) >= 2 && parts[1] != "" {
-			name = parts[1]
-		}
-		m.keys[key] = name
-		if len(parts) == 3 {
-			sets, err := parseToolsets(strings.Split(parts[2], "|"))
-			if err != nil {
-				// Fail closed: a key whose limits cannot be read gets no tools.
-				slog.Warn("MDDB_MCP_API_KEYS: invalid toolsets; the key is limited to none", "name", name, "err", err)
-				sets = map[string]bool{}
-			}
-			if sets != nil {
-				m.keyToolsets[key] = sets
-			}
+		if grant.scope.scoped() {
+			m.keyScopes[key] = grant.scope
 		}
 	}
 
@@ -89,6 +88,49 @@ func NewMCPAPIKeyMiddleware() *MCPAPIKeyMiddleware {
 	m.cacheTTL = ttl
 
 	return m
+}
+
+// staticKeyReadOnly is the suffix that makes a static key read-only.
+const staticKeyReadOnly = ":ro"
+
+// parseStaticMCPKey reads one MDDB_MCP_API_KEYS entry:
+//
+//	key[:name[:toolsets[:collections[:ro]]]]
+//
+// toolsets and collections are '|'-separated, and either may be empty
+// ("key:name::docs" is every toolset on one collection). collections is the
+// rest of the entry, so it may hold "role:" targets; a trailing ":ro" makes
+// the key read-only. An entry of the older forms — key, key:name,
+// key:name:toolsets — reads as it always did. Invalid toolsets fail closed:
+// the key gets no tools.
+func parseStaticMCPKey(entry string) (string, mcpKeyGrant) {
+	parts := strings.SplitN(entry, ":", 4)
+	key := parts[0]
+	g := mcpKeyGrant{name: key}
+	if len(g.name) > 8 {
+		g.name = g.name[:8] + "..."
+	}
+	if len(parts) >= 2 && parts[1] != "" {
+		g.name = parts[1]
+	}
+	if len(parts) >= 3 {
+		sets, err := parseToolsets(strings.Split(parts[2], "|"))
+		if err != nil {
+			slog.Warn("MDDB_MCP_API_KEYS: invalid toolsets; the key is limited to none", "name", g.name, "err", err)
+			sets = map[string]bool{}
+		}
+		g.toolsets = sets
+	}
+	if len(parts) == 4 {
+		rest, ro := strings.CutSuffix(parts[3], staticKeyReadOnly)
+		g.scope.readOnly = ro
+		for _, c := range strings.Split(rest, "|") {
+			if c = strings.TrimSpace(c); c != "" {
+				g.scope.collections = append(g.scope.collections, c)
+			}
+		}
+	}
+	return key, g
 }
 
 // SetKeyStore attaches the BoltDB key store for dynamic key validation.
@@ -116,7 +158,7 @@ func (m *MCPAPIKeyMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		name, toolsets, ok := m.validateKey(key)
+		grant, ok := m.validateKey(key)
 		if !ok {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
@@ -125,24 +167,25 @@ func (m *MCPAPIKeyMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		// Store key name in header for downstream logging
-		r.Header.Set("X-MCP-Key-Name", name)
-		// MCP-003: the key's toolsets travel in the context, where a client
-		// header cannot reach them.
-		next.ServeHTTP(w, r.WithContext(withKeyToolsets(r.Context(), toolsets)))
+		r.Header.Set("X-MCP-Key-Name", grant.name)
+		// MCP-003, #439: the key's toolsets and scope travel in the context,
+		// where a client header cannot reach them.
+		ctx := withKeyScope(withKeyToolsets(r.Context(), grant.toolsets), grant.scope)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func (m *MCPAPIKeyMiddleware) validateKey(provided string) (string, map[string]bool, bool) {
+func (m *MCPAPIKeyMiddleware) validateKey(provided string) (mcpKeyGrant, bool) {
 	// 1. Check static keys (constant-time comparison)
 	for key, name := range m.keys {
 		if subtle.ConstantTimeCompare([]byte(provided), []byte(key)) == 1 {
-			return name, m.keyToolsets[key], true
+			return mcpKeyGrant{name: name, toolsets: m.keyToolsets[key], scope: m.keyScopes[key]}, true
 		}
 	}
 
 	// 2. Check dynamic keys from BoltDB store
 	if m.keyStore == nil {
-		return "", nil, false
+		return mcpKeyGrant{}, false
 	}
 	return m.validateFromStore(provided)
 }

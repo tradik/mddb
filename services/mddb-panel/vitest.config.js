@@ -285,6 +285,11 @@ const coverageFiles = [
   // 2.19.9: the Claude tab of LLM Connections connects to this server (#440).
   'src/lib/llm-connection-templates.js',
   'src/lib/claude-connection.js',
+  // 2.19.9 (#439): MCP API keys scoped to collections and bound to a scenario.
+  'src/lib/mcp-key-scope.js',
+  'src/components/CollectionChecklist.jsx',
+  'src/components/MCPKeyScopeFields.jsx',
+  'src/components/ChatScenarioMcpKeys.jsx',
 ];
 
 export default mergeConfig(

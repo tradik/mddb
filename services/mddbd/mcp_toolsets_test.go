@@ -116,11 +116,11 @@ func TestToolsets_PerKey(t *testing.T) {
 	m := NewMCPAPIKeyMiddleware()
 	store := newMCPAPIKeyStore(s.DB)
 	m.SetKeyStore(store)
-	_, stored, err := store.Create("stored-code", 0, "code")
+	_, stored, err := store.Create(MCPAPIKey{Name: "stored-code", Toolsets: []string{"code"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := store.Create("x", 0, "bogus"); err == nil {
+	if _, _, err := store.Create(MCPAPIKey{Name: "x", Toolsets: []string{"bogus"}}); err == nil {
 		t.Fatal("creating a key with an unknown toolset must fail")
 	}
 	h := NewMCPHandlerWithConfig(NewDirectClient(s), nil, MCPServerInfo{}, "", ModeRW, "")

@@ -1340,6 +1340,29 @@ paths:
                     omit for every toolset the server exposes. A call outside
                     them is answered with JSON-RPC -32601. An unknown name is a 400.
                   example: [ search, code ]
+                collections:
+                  type: array
+                  items:
+                    type: string
+                  description: |
+                    Collections the key may reach (v2.19.9): names, aliases or
+                    `role:` targets, stored as given and resolved on every call
+                    as RBAC resolves them. Omit for every collection. A call
+                    naming another collection, or none, answers `tool "…": forbidden`.
+                    An empty name is a 400.
+                  example: [ philkonieczny ]
+                readOnly:
+                  type: boolean
+                  description: The key may call only the tools read-only mode allows (v2.19.9).
+                scenario:
+                  type: string
+                  description: |
+                    Binds the key to a chat scenario (v2.19.9): its scope is the
+                    scenario's allowedCollections, read-only, intersected with
+                    `collections` when both are set, and `initialize` returns
+                    the scenario's composed prompt as instructions. A name no
+                    scenario has is a 400.
+                  example: support
       responses:
         "200":
           description: Key created (plaintext returned once)
@@ -1364,8 +1387,15 @@ paths:
                   toolsets:
                     type: array
                     items: { type: string }
+                  collections:
+                    type: array
+                    items: { type: string }
+                  readOnly:
+                    type: boolean
+                  scenario:
+                    type: string
         "400":
-          description: Invalid request body, key name or toolset
+          description: Invalid request body, key name, toolset, collection name or scenario
         "403":
           description: Admin permission required
         "503":
@@ -10373,6 +10403,16 @@ components:
           description: Unix timestamp; absent when the key never expires.
         disabled:
           type: boolean
+        collections:
+          type: array
+          items: { type: string }
+          description: The key's collection scope (v2.19.9), as stored; absent means every collection.
+        readOnly:
+          type: boolean
+          description: The key may only read (v2.19.9).
+        scenario:
+          type: string
+          description: The chat scenario the key is bound to (v2.19.9).
 
     MCPAPIKeyRef:
       type: object

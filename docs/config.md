@@ -125,7 +125,7 @@ Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is s
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
 | `MDDB_MCP_API_KEY_ENABLED` | `false` | bool | Enable API key authentication for MCP endpoints |
-| `MDDB_MCP_API_KEYS` | `""` | string | Static API keys: `key1:name1,key2:name2` |
+| `MDDB_MCP_API_KEYS` | `""` | string | Static API keys: `key1:name1,key2:name2`; each entry is `key[:name[:toolsets[:collections[:ro]]]]` (toolsets and collections `|`-separated; see [MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)) |
 | `MDDB_MCP_API_KEY_CACHE_TTL` | `"5m"` | duration | Cache TTL for dynamic API key lookups |
 
 ### MCP OAuth 2.1 (v2.18.1+)

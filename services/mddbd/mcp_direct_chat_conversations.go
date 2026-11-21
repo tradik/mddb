@@ -5,11 +5,12 @@ import "context"
 // Chat conversations through the direct client (#405): the functions the
 // REST handlers call, after the same read permission on the chat collection
 // of the caller's tenant. A call on an MCP API key carries no claims and is
-// scoped by the key's toolsets instead (authorizeMCP).
+// scoped by the key's toolsets instead (authorizeMCP); a scoped key (#439)
+// never reaches here, since its gate refuses the handler-class tools.
 
 // chatReadAccess admits a read of the caller's chat collection.
 func (c *DirectClient) chatReadAccess(ctx context.Context) error {
-	return c.server.authorizeMCP(ctx, chatRule(false), []string{chatCollection(ctx)})
+	return c.server.authorizeMCP(ctx, "", chatRule(false), []string{chatCollection(ctx)})
 }
 
 // ChatConversationList is one page of a user's conversations, newest first.

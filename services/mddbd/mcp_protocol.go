@@ -216,9 +216,13 @@ func mcpCompleteCollection(ctx context.Context, client MCPClient, prefix string)
 		return nil, 0, false
 	}
 
+	// #439: a scoped MCP API key is offered only the collections it may read.
+	dc, _ := client.(*DirectClient)
 	var names []string
 	for _, c := range stats.Collections {
-		names = append(names, c.Name)
+		if dc == nil || dc.server == nil || dc.server.keyScopeReads(ctx, []string{c.Name}) == nil {
+			names = append(names, c.Name)
+		}
 	}
 	sort.Strings(names)
 
@@ -295,6 +299,10 @@ func mcpShouldLog(level, minLevel MCPLogLevel) bool {
 // the request.
 func collectionResponsePrompt(ctx context.Context, client MCPClient, collection string) string {
 	if client == nil || collection == "" {
+		return ""
+	}
+	// #439: a scoped MCP API key reads no collection outside its scope.
+	if dc, ok := client.(*DirectClient); ok && dc.server != nil && dc.server.keyScopeReads(ctx, []string{collection}) != nil {
 		return ""
 	}
 	resp, err := client.GetCollectionConfig(ctx, collection)

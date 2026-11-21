@@ -7,6 +7,7 @@ import { secretsEncryptionReady } from '../lib/chat-mcp';
 import ChatScenarioForm from './ChatScenarioForm';
 import ChatScenarioList from './ChatScenarioList';
 import ChatScenarioPreview from './ChatScenarioPreview';
+import ChatScenarioMcpKeys from './ChatScenarioMcpKeys';
 import ChatSkillsPanel from './ChatSkillsPanel';
 import ChatTabs from './ChatTabs';
 import ChatMcpSecretsCard from './ChatMcpSecretsCard';
@@ -20,6 +21,7 @@ import ChatLogPanel from './ChatLogPanel';
 // #404: the page has tabs, the scenarios and the skills they attach;
 // #406 adds the conversation log.
 // MCP-005: a scenario's external MCP servers, and a card for their secrets.
+// #439: the MCP API keys bound to a scenario, beside its preview.
 
 export default function ChatScenariosPanel() {
   const [tab, setTab] = useState('scenarios');
@@ -162,7 +164,10 @@ function ScenariosView() {
             {stored === null ? (
               <p className="rounded-lg bg-surface p-6 text-sm text-fg-muted shadow">Save the scenario to see its composed prompt.</p>
             ) : (
-              <ChatScenarioPreview name={stored} version={version} />
+              <div className="space-y-4">
+                <ChatScenarioPreview name={stored} version={version} />
+                <ChatScenarioMcpKeys key={stored} scenario={stored} />
+              </div>
             )}
           </div>
         )}

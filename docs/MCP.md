@@ -286,7 +286,7 @@ and shows its API key field as optional.
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_API_KEY_ENABLED` | `false` | Require API key for MCP HTTP access |
-| `MDDB_MCP_API_KEYS` | — | Static keys: `key1:name1,key2:name2` (defined at startup) |
+| `MDDB_MCP_API_KEYS` | — | Static keys: `key1:name1,key2:name2` (defined at startup); each may add `:toolsets:collections:ro` ([Scoped keys](#scoped-keys-collections-read-only-a-chat-scenario-v2199)) |
 | `MDDB_MCP_API_KEY_CACHE_TTL` | `60s` | Cache TTL for dynamic key lookups |
 
 > **⚠️ MCP exposure vs. main auth (SEC-002).** The MCP listener (default `:9000`)
@@ -357,9 +357,89 @@ Key features:
 - **TTL support** — `expiresAt` Unix timestamp (0 = never expires)
 - **Disable without delete** — revoke instantly, keep for audit
 - **Cache** — lookups cached for `MDDB_MCP_API_KEY_CACHE_TTL` (default 60s), auto-invalidated on create/delete/disable
-- **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab); each key is listed as `mcp_… · <fingerprint>`, and its Disable and Delete buttons name it by that fingerprint
+- **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab); each key is listed as `mcp_… · <fingerprint>` with its scope, and its Disable and Delete buttons name it by that fingerprint. The create form takes an optional scope (collections, read-only, chat scenario); Chat → a scenario lists the keys bound to it, with create and delete
 
   ![LLM Connections page, API Keys tab: a new key shown once with a copy button, and the stored key docs-agent](panel-mcp-api-keys.png)
+
+#### Scoped keys: collections, read-only, a chat scenario (v2.19.9)
+
+A key can be confined to some collections, to reads, or to the reach of one
+chat scenario. All three fields are optional; a key with none of them —
+every key stored before 2.19.9 and every static key in an older format —
+behaves exactly as before: limited by its toolsets only.
+
+```bash
+# Reads of one collection only
+curl -X POST http://localhost:11023/v1/mcp/keys \
+  -H "Authorization: Bearer <admin-token>" \
+  -d '{"name": "site-reader", "collections": ["philkonieczny"], "readOnly": true}'
+
+# The reach of the chat scenario "support": its allowed collections, read-only,
+# and its composed prompt as the MCP instructions
+curl -X POST http://localhost:11023/v1/mcp/keys \
+  -H "Authorization: Bearer <admin-token>" \
+  -d '{"name": "support-widget", "scenario": "support"}'
+```
+
+| Field | Meaning |
+|---|---|
+| `collections` | Collections, aliases or `role:` targets (e.g. `role:reference`) the key may reach. Stored as given and resolved on every call, the way RBAC resolves them: an alias reaches its collection now, a `role:` target every collection that holds the role now. Empty = every collection. |
+| `readOnly` | The key may call only the tools read-only mode (`MDDB_MCP_MODE=read`) allows. |
+| `scenario` | Binds the key to a chat scenario (`400` when no scenario has that name). The key's collections are the scenario's `allowedCollections`, read from the stored scenario on every call — editing the scenario changes the key's reach — intersected with `collections` when both are set. A bound key is always read-only. |
+
+What a scoped key may call, by the tool's access class (`mcpToolAccessRules`):
+
+| Class | Verdict for a scoped key |
+|---|---|
+| Collection read or write | For a key limited to collections or a scenario: allowed when every collection the call names, after alias and `role:` resolution, is in the scope; a call that names no collection is refused, unless the tool's default targets are in the scope (`reference_*` with `role:reference` in the scope). A write is refused to a read-only key. |
+| Every collection at once (`get_stats`, `vector_stats`, `list_schemas`, `bulk_ingest_status`, …) | Refused when the key is limited to collections or a scenario; allowed to a key that is only read-only, when the tool reads. |
+| Administration (`create_backup`, `chat_skill_*`, automations, …) | Refused. |
+| Handled inside the tool (`chat_scenario_get`, `chat_conversation_*`) | Refused. |
+| Memory store (`memory_*`) | Refused: it holds every user's sessions, whatever the collections. |
+| No collection data (`fts_languages`, `geo_encode`, `feature_list`, …) | Allowed; to a read-only key only when read-only mode allows the tool. |
+
+The same check covers `resources/read` (`mddb://{collection}/{key}` and
+`mddb-search://{collection}` must be in the scope; `mddb://stats` is every
+collection), the `/tools/call` and `/resources/read` endpoints, custom tools
+(gated as the built-in action they wrap, so a custom tool pinned to another
+collection is refused), `completion/complete` (offers only the collections in
+the scope), the `rag-pipeline` prompt (reads the response prompt of an in-scope
+collection only), `chat_scenario_list` (lists the scenarios whose collections
+are all in the scope) and `/events` (a scoped key must name an in-scope
+`?collection=`). A refused call answers `tool "<name>": forbidden`.
+`tools/list` leaves out the tools a key can never call: writes for a read-only
+key, and the every-collection, administration, handler and memory tools.
+
+A scenario-bound key follows the scenario: while it is disabled or deleted, or
+the `chat` module is off, every `tools/call` and `resources/read` of the key is
+refused, and `initialize` (and `server/discover`) answer with the server's own
+instructions. While the scenario is served, the `instructions` are its composed
+prompt — the text of `GET /v1/chat/scenarios/{name}/prompt`, skills and
+guardrails included. An empty `allowedCollections` reaches no collection:
+mddb-chat falls back to its own `default_collection`, which mddbd does not
+know, so the key fails closed. The scenario's external MCP servers are not
+proxied to the key.
+
+An OAuth token minted from a scoped key has the key's scope: the token stands
+for the key, which is validated on every request, so disabling or deleting the
+key stops the token too (within `MDDB_MCP_API_KEY_CACHE_TTL` for a token
+presented to another replica; at once on the replica that made the change).
+
+A static key takes the same scope as a fourth field and a trailing `:ro`:
+
+```
+MDDB_MCP_API_KEYS=key:name:toolsets:collections:ro
+# one collection, read-only, every toolset
+MDDB_MCP_API_KEYS=sk-site:site-reader::philkonieczny:ro
+# the reference collections, with the code toolset
+MDDB_MCP_API_KEYS=sk-ref:ref-reader:code:role:reference
+```
+
+Toolsets and collections are `|`-separated and either may be empty. The
+collections field runs to the end of the entry (so it may hold `role:`
+targets); `:ro` at the end makes the key read-only — `key:name:search::ro` is
+read-only on every collection. `key`, `key:name` and `key:name:toolsets` read
+as they always did. Static keys cannot be bound to a scenario.
 
 ### OAuth 2.1 for claude.ai connectors (v2.18.1)
 
@@ -679,7 +759,13 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
   sees the intersection of its toolsets and the server's.
 - A tool outside the caller's toolsets is not listed, and calling it anyway is
   answered with JSON-RPC `-32601` — the list is not the authorisation.
-- Custom tools are never filtered: they are the operator's explicit choice.
+- Custom tools are never filtered by toolset: they are the operator's explicit
+  choice.
+- A [scoped key](#scoped-keys-collections-read-only-a-chat-scenario-v2199)
+  (v2.19.9) also does not list the tools its scope can never call — writes for a
+  read-only key; every-collection, administration, handler and memory tools for
+  a key limited to collections or a scenario — and a custom tool by the action
+  it wraps. Calling one anyway is answered `tool "<name>": forbidden`.
 
 Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (114 since 2.19.0) take about
 94 KB (≈23 600 tokens) per turn. The 22 tools of `search,code` take about 43 KB

@@ -46,7 +46,7 @@ func TestCovDKeyStoreWithoutBucket(t *testing.T) {
 	}
 
 	// Create recreates the bucket instead of dereferencing a nil one.
-	_, key, err := store.Create("after-restore", 0)
+	_, key, err := store.Create(MCPAPIKey{Name: "after-restore"})
 	if err != nil {
 		t.Fatalf("Create without bucket: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestCovDKeyStoreErrors(t *testing.T) {
 	db := testDB(t)
 	store := newMCPAPIKeyStore(db)
 
-	if _, _, err := store.Create("", 0); err == nil || err.Error() != "name is required" {
+	if _, _, err := store.Create(MCPAPIKey{Name: ""}); err == nil || err.Error() != "name is required" {
 		t.Errorf("Create without name = %v", err)
 	}
 	if err := store.Delete("mcp_missing"); err == nil {
@@ -75,7 +75,7 @@ func TestCovDKeyStoreErrors(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := store.Create("good", 0); err != nil {
+	if _, _, err := store.Create(MCPAPIKey{Name: "good"}); err != nil {
 		t.Fatal(err)
 	}
 	keys, err := store.List()
@@ -88,7 +88,7 @@ func TestCovDKeyStoreErrors(t *testing.T) {
 
 	// A closed database fails the write.
 	_ = db.Close()
-	if _, _, err := store.Create("closed", 0); err == nil {
+	if _, _, err := store.Create(MCPAPIKey{Name: "closed"}); err == nil {
 		t.Error("Create on a closed database must fail")
 	}
 }
@@ -134,8 +134,8 @@ func TestCovDKeyHandlersLifecycle(t *testing.T) {
 		t.Errorf("list = %d %s", rec.Code, rec.Body)
 	}
 
-	if name, _, ok := mw.validateKey(created.Key); !ok || name != "ci" {
-		t.Errorf("stored key not accepted: %q %v", name, ok)
+	if g, ok := mw.validateKey(created.Key); !ok || g.name != "ci" {
+		t.Errorf("stored key not accepted: %q %v", g.name, ok)
 	}
 
 	rec = covDKeyRequest(s, s.handleMCPAPIKeyDisable, http.MethodPost, `{"key":"`+created.Key+`"}`, ctx)
@@ -145,7 +145,7 @@ func TestCovDKeyHandlersLifecycle(t *testing.T) {
 	if len(mw.cache) != 0 {
 		t.Error("disable must invalidate the middleware cache")
 	}
-	if _, _, ok := mw.validateKey(created.Key); ok {
+	if _, ok := mw.validateKey(created.Key); ok {
 		t.Error("disabled key still accepted")
 	}
 
@@ -255,28 +255,28 @@ func TestCovDValidateFromStoreCache(t *testing.T) {
 	nilMW.InvalidateCache() // must not panic
 
 	mw := &MCPAPIKeyMiddleware{cache: map[string]*apiKeyCacheEntry{}, cacheTTL: time.Hour}
-	if _, _, ok := mw.validateFromStore("mcp_x"); ok {
+	if _, ok := mw.validateFromStore("mcp_x"); ok {
 		t.Error("no store must reject")
 	}
 
 	store := newMCPAPIKeyStore(testDB(t))
 	mw.keyStore = store
-	_, key, err := store.Create("cached", 0)
+	_, key, err := store.Create(MCPAPIKey{Name: "cached"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if name, _, ok := mw.validateFromStore(key); !ok || name != "cached" {
-		t.Fatalf("first lookup = %q %v", name, ok)
+	if g, ok := mw.validateFromStore(key); !ok || g.name != "cached" {
+		t.Fatalf("first lookup = %q %v", g.name, ok)
 	}
 	// Deleting the key without invalidating: the cache still answers.
 	if err := store.Delete(key); err != nil {
 		t.Fatal(err)
 	}
-	if name, _, ok := mw.validateFromStore(key); !ok || name != "cached" {
-		t.Errorf("cached lookup = %q %v", name, ok)
+	if g, ok := mw.validateFromStore(key); !ok || g.name != "cached" {
+		t.Errorf("cached lookup = %q %v", g.name, ok)
 	}
 	mw.InvalidateCache()
-	if _, _, ok := mw.validateFromStore(key); ok {
+	if _, ok := mw.validateFromStore(key); ok {
 		t.Error("after invalidation the deleted key must be rejected")
 	}
 }
@@ -284,7 +284,7 @@ func TestCovDValidateFromStoreCache(t *testing.T) {
 func TestCovDKeyToolsets(t *testing.T) {
 	s, mw := covDKeyServer(t)
 
-	if _, _, err := s.mcpKeyStore.Create("bad", 0, "nope"); err == nil || !strings.Contains(err.Error(), "unknown MCP toolset") {
+	if _, _, err := s.mcpKeyStore.Create(MCPAPIKey{Name: "bad", Toolsets: []string{"nope"}}); err == nil || !strings.Contains(err.Error(), "unknown MCP toolset") {
 		t.Errorf("Create with unknown toolset = %v", err)
 	}
 	rec := covDKeyRequest(s, s.handleMCPAPIKeyCreate, http.MethodPost, `{"name":"bad","toolsets":["nope"]}`, context.Background())
@@ -301,7 +301,8 @@ func TestCovDKeyToolsets(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil || len(created.Toolsets) != 2 {
 		t.Fatalf("create with toolsets = %d %s", rec.Code, rec.Body)
 	}
-	_, sets, ok := mw.validateKey(created.Key)
+	g, ok := mw.validateKey(created.Key)
+	sets := g.toolsets
 	if !ok || !sets[ToolsetSearch] || !sets[ToolsetCode] || len(sets) != 2 {
 		t.Errorf("stored toolsets = %v %v", sets, ok)
 	}
@@ -317,7 +318,8 @@ func TestCovDKeyToolsets(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	name, sets, ok := mw.validateFromStore("mcp_legacy")
+	g, ok = mw.validateFromStore("mcp_legacy")
+	name, sets := g.name, g.toolsets
 	if !ok || name != "legacy" || sets == nil || len(sets) != 0 {
 		t.Errorf("retired toolset = %q %v %v; want valid key limited to nothing", name, sets, ok)
 	}
@@ -329,7 +331,7 @@ func TestCovDKeyToolsets(t *testing.T) {
 func TestCovDKeyByFingerprint(t *testing.T) {
 	s, mw := covDKeyServer(t)
 	ctx := context.Background()
-	_, key, err := s.mcpKeyStore.Create("by-fp", 0)
+	_, key, err := s.mcpKeyStore.Create(MCPAPIKey{Name: "by-fp"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +341,7 @@ func TestCovDKeyByFingerprint(t *testing.T) {
 	if rec.Code != http.StatusOK || rec.Body.String() != `{"status":"disabled"}` {
 		t.Fatalf("disable by fingerprint = %d %s", rec.Code, rec.Body)
 	}
-	if _, _, ok := mw.validateKey(key); ok {
+	if _, ok := mw.validateKey(key); ok {
 		t.Error("key disabled by fingerprint still accepted")
 	}
 	rec = covDKeyRequest(s, s.handleMCPAPIKeys, http.MethodDelete, `{"fingerprint":"`+fp+`"}`, ctx)

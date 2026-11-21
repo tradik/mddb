@@ -62,7 +62,7 @@ func TestManagersFollowTheDatabaseAcrossARestore(t *testing.T) {
 	if s.AutomationManager.handle() != s.DB || s.AutomationManager.LoadAll() != nil {
 		t.Error("the automation manager still uses the old handle")
 	}
-	if _, _, err := keys.Create("k", 0); err != nil {
+	if _, _, err := keys.Create(MCPAPIKey{Name: "k"}); err != nil {
 		t.Errorf("MCP key write after restore: %v", err)
 	}
 

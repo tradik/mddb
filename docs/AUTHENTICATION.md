@@ -129,6 +129,8 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 > The MCP listener has its own keys (`MDDB_MCP_API_KEYS`, `/v1/mcp/keys`)
 > and, since v2.18.1, OAuth 2.1 for clients that cannot send a key, such as
 > claude.ai connectors. See [MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181).
+> Since v2.19.9 an MCP key can be scoped to collections, to reads, or to a chat
+> scenario ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)).
 
 Create an API key:
 
@@ -285,9 +287,18 @@ or field cannot ship without a rule. With `MDDB_AUTH_ENABLED=false` the gates
 do nothing.
 
 MCP calls authenticated by an **MCP API key** (`MDDB_MCP_API_KEY_ENABLED=true`)
-or arriving over stdio carry no user and are scoped by the key's toolsets, not
-by collections, as before; with main auth on and MCP keys off, the MCP
-listener requires the main credentials and every tool call is gated.
+or arriving over stdio carry no user. Over stdio and on a key without a scope
+they are limited by the key's toolsets only, as before. Since v2.19.9 a key can
+carry a scope — `collections` (aliases and `role:` targets resolved as RBAC
+resolves them), `readOnly`, or a chat `scenario` whose `allowedCollections`
+it reaches, read-only — and every `tools/call` and `resources/read` on it is
+checked against that scope, also with main auth off: a collection outside it,
+a call naming no collection, a write on a read-only key, and the
+every-collection, administration, handler and memory tools are refused with
+`tool "…": forbidden`. An OAuth token minted from the key has its scope. See
+[MCP.md — Scoped keys](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199).
+With main auth on and MCP keys off, the MCP listener requires the main
+credentials and every tool call is gated by RBAC.
 
 ### Example Scenarios
 

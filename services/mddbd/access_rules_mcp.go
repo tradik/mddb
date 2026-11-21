@@ -155,9 +155,10 @@ var mcpToolAccessRules = map[string]accessRule{
 var referenceRule = accessRule{class: accessCollection, op: PermRead, fallback: []string{rolePrefix + CodeRoleReference}}
 
 // authorizeTool applies a tool's rule to its arguments. A custom tool passes
-// here and is gated as the action it calls. A call without the main auth's
-// claims came in on an MCP API key or over stdio, whose scope is the key's
-// toolsets (MCP-003), not collections: it is left as it was.
+// here and is gated as the action it calls, in the same context — so under
+// the same key scope. A call without the main auth's claims came in on an MCP
+// API key or over stdio: an unscoped key and stdio are limited by toolsets
+// only (MCP-003), a scoped key by its scope as well (#439, mcp_key_scope.go).
 func (s *Server) authorizeTool(ctx context.Context, name string, args map[string]any) error {
 	rule, builtin := mcpToolAccessRules[name]
 	if !builtin {
@@ -165,7 +166,7 @@ func (s *Server) authorizeTool(ctx context.Context, name string, args map[string
 			return nil // a custom tool, or an unknown one the dispatcher refuses
 		}
 	}
-	return s.authorizeMCP(ctx, rule, collectionsFromArgs(args))
+	return s.authorizeMCP(ctx, name, rule, collectionsFromArgs(args))
 }
 
 // authorizeResource applies the rule of a resource URI: a document or a
@@ -174,11 +175,11 @@ func (s *Server) authorizeResource(ctx context.Context, u *url.URL) error {
 	path := mcpResourcePath(u)
 	switch {
 	case u.Scheme == "mddb" && path == "health":
-		return s.authorizeMCP(ctx, ruleAuthenticated, nil)
+		return s.authorizeMCP(ctx, "", ruleAuthenticated, nil)
 	case u.Scheme == "mddb" && path == "stats":
-		return s.authorizeMCP(ctx, ruleAllRead, nil)
+		return s.authorizeMCP(ctx, "", ruleAllRead, nil)
 	case u.Scheme == "mddb" || u.Scheme == "mddb-search":
-		return s.authorizeMCP(ctx, ruleRead, []string{strings.SplitN(path, "/", 2)[0]})
+		return s.authorizeMCP(ctx, "", ruleRead, []string{strings.SplitN(path, "/", 2)[0]})
 	}
 	return nil // an unsupported scheme, refused by the reader
 }
@@ -198,11 +199,13 @@ func (s *MCPToolServer) admitTool(ctx context.Context, name string) (context.Con
 	return ctx, release, nil
 }
 
-// authorizeMCP applies a rule to an MCP call that carries the main auth's
-// claims, and lets one without them through (see authorizeTool).
-func (s *Server) authorizeMCP(ctx context.Context, rule accessRule, names []string) error {
+// authorizeMCP applies a rule to an MCP call: by RBAC when it carries the
+// main auth's claims, by the key's scope when it came on a scoped MCP API key,
+// and not at all otherwise (see authorizeTool). tool names the built-in tool,
+// "" for a resource or a handler's own check.
+func (s *Server) authorizeMCP(ctx context.Context, tool string, rule accessRule, names []string) error {
 	if _, ok := GetClaimsFromContext(ctx); !ok {
-		return nil
+		return s.authorizeKeyScope(ctx, tool, rule, names)
 	}
 	return s.authorize(ctx, rule, names)
 }

@@ -27,6 +27,8 @@ describe('system and MCP', () => {
     ['getMCPConfig', (c) => c.getMCPConfig(), '/v1/mcp/config', GET],
     ['listMCPAPIKeys', (c) => c.listMCPAPIKeys(), '/v1/mcp/keys', GET],
     ['createMCPAPIKey default expiry', (c) => c.createMCPAPIKey('ci'), '/v1/mcp/keys', POST, { name: 'ci', expiresAt: 0 }],
+    ['createMCPAPIKey with a scope (#439)', (c) => c.createMCPAPIKey('bot', 0, { collections: ['a'], readOnly: true, scenario: 's' }), '/v1/mcp/keys', POST,
+      { name: 'bot', expiresAt: 0, collections: ['a'], readOnly: true, scenario: 's' }],
     ['deleteMCPAPIKey', (c) => c.deleteMCPAPIKey('k'), '/v1/mcp/keys', DELETE, { key: 'k' }],
     ['disableMCPAPIKey', (c) => c.disableMCPAPIKey('k'), '/v1/mcp/keys/disable', POST, { key: 'k' }],
     ['deleteMCPAPIKey by fingerprint', (c) => c.deleteMCPAPIKey({ fingerprint: '9f2a41c7' }), '/v1/mcp/keys', DELETE, { fingerprint: '9f2a41c7' }],

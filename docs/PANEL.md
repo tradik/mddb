@@ -333,6 +333,14 @@ up a saved scenario without a restart.
   approximate tokens (bytes ÷ 4), the server's warning past 75% of
   `MDDB_CHAT_PROMPT_MAX_BYTES`, and the skill names it skipped because no
   such skill is stored. It reloads after a save and on *Reload*.
+- **MCP keys** (2.19.9): below the composed prompt, the MCP API keys bound to
+  the saved scenario. *Create key* makes one bound to it and shows the key
+  once; each key can be disabled or deleted. A bound key gives an MCP client
+  the scenario's limits — its allowed collections, read-only — and its
+  composed prompt as the MCP instructions; while the scenario is disabled, or
+  chat is off, the key's calls are refused
+  ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)).
+  Listing and creating keys need admin; a refusal is shown.
 - **Try it**: a placeholder. Talking to a scenario from the panel needs the
   chat service connected to it, which a later release adds.
 - **Permissions**: saving and deleting need admin on `"*"`; the server's 403

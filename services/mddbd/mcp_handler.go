@@ -92,7 +92,7 @@ func (h *MCPHandler) HandleContext(ctx context.Context, req map[string]interface
 
 	switch method {
 	case "initialize":
-		return h.handleInitialize(req)
+		return h.handleInitialize(ctx, req)
 
 	// Resources
 	case "resources/list":
@@ -150,7 +150,7 @@ func (h *MCPHandler) HandleContext(ctx context.Context, req map[string]interface
 	return response
 }
 
-func (h *MCPHandler) handleInitialize(req map[string]interface{}) map[string]interface{} {
+func (h *MCPHandler) handleInitialize(ctx context.Context, req map[string]interface{}) map[string]interface{} {
 	id := req["id"]
 
 	// A legacy client has no way to fall forward, so the refusal has to say
@@ -180,8 +180,8 @@ func (h *MCPHandler) handleInitialize(req map[string]interface{}) map[string]int
 		},
 		"serverInfo": h.buildServerInfo(),
 	}
-	if h.instructions != "" {
-		result["instructions"] = h.instructions
+	if instructions := h.instructionsFor(ctx); instructions != "" {
+		result["instructions"] = instructions
 	}
 
 	return map[string]interface{}{
@@ -189,6 +189,18 @@ func (h *MCPHandler) handleInitialize(req map[string]interface{}) map[string]int
 		"id":      id,
 		"result":  result,
 	}
+}
+
+// instructionsFor is what initialize and server/discover send as
+// instructions: the composed prompt of the chat scenario the request's MCP
+// API key is bound to (#439), else the server's own.
+func (h *MCPHandler) instructionsFor(ctx context.Context) string {
+	if dc, ok := h.client.(*DirectClient); ok && dc.server != nil {
+		if prompt, bound := dc.server.keyScenarioInstructions(ctx); bound {
+			return prompt
+		}
+	}
+	return h.instructions
 }
 
 // buildServerInfo constructs the serverInfo object for MCP initialize response.

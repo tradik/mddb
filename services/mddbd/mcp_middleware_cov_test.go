@@ -46,12 +46,12 @@ func TestCovDAPIKeyMiddlewareFromEnv(t *testing.T) {
 func TestCovDAPIKeyMiddlewareStoreKeys(t *testing.T) {
 	m := &MCPAPIKeyMiddleware{enabled: true, keys: map[string]string{}, cache: map[string]*apiKeyCacheEntry{}, cacheTTL: time.Minute}
 	m.SetKeyStore(nil)
-	if _, _, ok := m.validateKey("mcp_anything"); ok {
+	if _, ok := m.validateKey("mcp_anything"); ok {
 		t.Error("no store and no static keys must reject")
 	}
 
 	store := newMCPAPIKeyStore(testDB(t))
-	_, key, err := store.Create("dyn", 0)
+	_, key, err := store.Create(MCPAPIKey{Name: "dyn"})
 	if err != nil {
 		t.Fatal(err)
 	}

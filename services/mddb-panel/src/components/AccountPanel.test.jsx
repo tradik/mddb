@@ -9,7 +9,7 @@ import { render, screen, cleanup, fireEvent, act, within } from '@testing-librar
 vi.mock('../lib/mddb-client', () => ({
   default: {
     getMe: vi.fn(), listApiKeys: vi.fn(), createApiKey: vi.fn(), deleteApiKey: vi.fn(),
-    listMCPAPIKeys: vi.fn(), createMCPAPIKey: vi.fn(), deleteMCPAPIKey: vi.fn(), disableMCPAPIKey: vi.fn(),
+    listMCPAPIKeys: vi.fn(), createMCPAPIKey: vi.fn(), deleteMCPAPIKey: vi.fn(), disableMCPAPIKey: vi.fn(), listChatScenarios: vi.fn(),
   },
 }));
 
@@ -17,6 +17,7 @@ const { default: mddbClient } = await import('../lib/mddb-client');
 const { default: AccountPanel } = await import('./AccountPanel');
 const { default: IdentityBadge } = await import('./IdentityBadge');
 const { default: MCPAPIKeysPanel } = await import('./MCPAPIKeysPanel');
+const { useStore } = await import('../lib/store');
 
 const apiError = (status, text) => Object.assign(new Error(`API Error (${status}): ${text}`), { status, body: { error: text } });
 const key = { keyHash: '292c986b954dd625957e2f83986a9805', description: 'ci', createdAt: 100, expiresAt: 0 };
@@ -124,6 +125,47 @@ describe('MCPAPIKeysPanel', () => {
   beforeEach(() => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     mddbClient.listMCPAPIKeys.mockResolvedValue({ keys: [mcpKey, { name: 'old', keyPrefix: 'mk_old...', disabled: true, expiresAt: 1800000000 }] });
+    mddbClient.listChatScenarios.mockRejectedValue(new Error('admin only'));
+  });
+
+  test('#439: a key is created with a scope, and each key shows its scope', async () => {
+    useStore.setState({ stats: { collections: [{ name: 'a' }, { name: 'b' }] } });
+    mddbClient.listChatScenarios.mockResolvedValue({ scenarios: [{ name: 'support' }] });
+    mddbClient.listMCPAPIKeys.mockResolvedValue({ keys: [
+      mcpKey,
+      { name: 'reader', fingerprint: '11', collections: ['a', 'role:reference'], readOnly: true },
+      { name: 'widget', fingerprint: '22', scenario: 'support' },
+    ] });
+    mddbClient.createMCPAPIKey.mockResolvedValueOnce({ key: 'mcp_scoped_secret' });
+    render(<MCPAPIKeysPanel />);
+    await act(async () => {});
+    expect(screen.getByText('all collections')).toBeTruthy();
+    expect(screen.getByText('a, role:reference · read-only')).toBeTruthy();
+    expect(screen.getByText('scenario support · read-only')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'a' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Read-only/ }));
+    fireEvent.change(screen.getByLabelText('Chat scenario'), { target: { value: 'support' } });
+    fireEvent.change(screen.getByPlaceholderText('Key name (e.g. claude-prod)'), { target: { value: 'bot' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Create Key/ })));
+    expect(mddbClient.createMCPAPIKey).toHaveBeenCalledWith('bot', 0, { collections: ['a'], readOnly: true, scenario: 'support' });
+    expect(screen.getByText('mcp_scoped_secret')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'a' }).checked).toBe(false);
+    useStore.setState({ stats: null });
+  });
+
+  test('without scenarios to pick there is no scenario select', async () => {
+    render(<MCPAPIKeysPanel />);
+    await act(async () => {});
+    expect(screen.queryByLabelText('Chat scenario')).toBeNull();
+    expect(screen.getByText('This server has no collections yet.')).toBeTruthy();
+  });
+
+  test('a scenario list without scenarios offers none', async () => {
+    mddbClient.listChatScenarios.mockResolvedValue({});
+    render(<MCPAPIKeysPanel />);
+    await act(async () => {});
+    expect(screen.queryByLabelText('Chat scenario')).toBeNull();
   });
 
   test('lists keys, creates one with the one-time secret, disables and deletes', async () => {
@@ -146,7 +188,7 @@ describe('MCPAPIKeysPanel', () => {
     fireEvent.change(name, { target: { value: 'bot' } });
     await act(async () => fireEvent.keyDown(name, { key: 'a' }));
     await act(async () => fireEvent.keyDown(name, { key: 'Enter' }));
-    expect(mddbClient.createMCPAPIKey).toHaveBeenCalledWith('bot');
+    expect(mddbClient.createMCPAPIKey).toHaveBeenCalledWith('bot', 0, {});
     expect(screen.getByText('mk_full_secret')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
 

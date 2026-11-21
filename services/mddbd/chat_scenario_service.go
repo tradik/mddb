@@ -83,8 +83,13 @@ func (s *Server) ListChatScenarios(ctx context.Context) []*ChatScenario {
 }
 
 // chatScenarioReadable is nil when the caller may read every collection the
-// scenario allows. With auth off, everything is readable.
+// scenario allows. With auth off, everything is readable — except to a scoped
+// MCP API key (#439), which reads a scenario only when its scope reaches
+// every collection the scenario allows.
 func (s *Server) chatScenarioReadable(ctx context.Context, sc *ChatScenario) error {
+	if err := s.keyScopeReads(ctx, sc.AllowedCollections); err != nil {
+		return err
+	}
 	if s.AuthManager == nil {
 		return nil
 	}

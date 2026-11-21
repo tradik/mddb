@@ -690,8 +690,13 @@ class MDDBClient {
     return this.request('/mcp/keys', { method: 'GET' });
   }
 
-  async createMCPAPIKey(name, expiresAt = 0) {
-    return this.request('/mcp/keys', { method: 'POST', body: JSON.stringify({ name, expiresAt }) });
+  /**
+   * Creates an MCP API key. `scope` (#439) may hold `collections`, `readOnly`
+   * and `scenario`; build it with scopeBody (lib/mcp-key-scope.js), which
+   * leaves the empty ones out.
+   */
+  async createMCPAPIKey(name, expiresAt = 0, scope = {}) {
+    return this.request('/mcp/keys', { method: 'POST', body: JSON.stringify({ name, expiresAt, ...scope }) });
   }
 
   /**

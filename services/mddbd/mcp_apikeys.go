@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"mddb/internal/boltx"
 	"net/http"
+	"strings"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -43,6 +44,19 @@ type MCPAPIKey struct {
 	// Toolsets limits the key to these MCP toolsets (MCP-003); empty = all
 	// the server exposes. A key for a coding agent might carry ["search","code"].
 	Toolsets []string `json:"toolsets,omitempty"`
+	// Collections, ReadOnly and Scenario are the key's scope (#439,
+	// mcp_key_scope.go). Collections may name aliases and "role:" targets,
+	// resolved when a call is checked; empty = every collection. Scenario
+	// binds the key to a chat scenario's allowedCollections, read-only. A
+	// key stored before 2.19.9 has none of them and is not scoped.
+	Collections []string `json:"collections,omitempty"`
+	ReadOnly    bool     `json:"readOnly,omitempty"`
+	Scenario    string   `json:"scenario,omitempty"`
+}
+
+// scope is the key's scope as the middleware carries it.
+func (k *MCPAPIKey) scope() mcpKeyScope {
+	return mcpKeyScope{collections: k.Collections, readOnly: k.ReadOnly, scenario: k.Scenario}
 }
 
 // mcpAPIKeyStore provides CRUD for MCP API keys in BoltDB.
@@ -63,33 +77,32 @@ func newMCPAPIKeyStore(db *bolt.DB) *mcpAPIKeyStore {
 	return &mcpAPIKeyStore{db: db}
 }
 
-// Create generates a new API key and stores it.
-// toolsets, when given, limit what the key can list and call (MCP-003).
-func (s *mcpAPIKeyStore) Create(name string, expiresAt int64, toolsets ...string) (*MCPAPIKey, string, error) {
-	if name == "" {
+// Create generates a new API key from spec — its name, expiry, toolsets
+// (MCP-003) and scope (#439) — and stores it. spec.Key and spec.CreatedAt
+// are set here.
+func (s *mcpAPIKeyStore) Create(spec MCPAPIKey) (*MCPAPIKey, string, error) {
+	if spec.Name == "" {
 		return nil, "", fmt.Errorf("name is required")
 	}
-	if _, err := parseToolsets(toolsets); err != nil {
+	if _, err := parseToolsets(spec.Toolsets); err != nil {
 		return nil, "", err
+	}
+	for _, c := range spec.Collections {
+		if strings.TrimSpace(c) == "" {
+			return nil, "", fmt.Errorf("collections may not hold an empty name")
+		}
 	}
 
 	// Generate key: mcp_ + 32 random hex chars
 	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return nil, "", fmt.Errorf("failed to generate key: %w", err)
-	}
+	_, _ = rand.Read(b) // crypto/rand.Read never returns an error (Go 1.24+)
 	key := mcpKeySchemePrefix + hex.EncodeToString(b)
 
-	apiKey := MCPAPIKey{
-		Key:       key,
-		Name:      name,
-		CreatedAt: time.Now().Unix(),
-		ExpiresAt: expiresAt,
-		Toolsets:  toolsets,
-	}
+	apiKey := spec
+	apiKey.Key, apiKey.CreatedAt, apiKey.Disabled = key, time.Now().Unix(), false
 
-	// Marshal cannot fail on a struct of strings, numbers, a bool and a
-	// string slice.
+	// Marshal cannot fail on a struct of strings, numbers, bools and string
+	// slices.
 	data, _ := json.Marshal(apiKey)
 
 	err := s.handle().Update(func(tx *bolt.Tx) error {
@@ -98,16 +111,16 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64, toolsets ...string
 		// methods treat that as "no keys", so Create recreates it rather than
 		// writing into a nil bucket.
 		b, err := tx.CreateBucketIfNotExists([]byte(mcpAPIKeyBucket))
-		if err != nil {
-			return err
+		if err == nil {
+			err = b.Put([]byte(key), data)
 		}
-		return b.Put([]byte(key), data)
+		return err
 	})
 	if err != nil {
 		return nil, "", err
 	}
 
-	slog.Info("MCP API key created", "name", name, "keyFingerprint", keyFingerprint(key))
+	slog.Info("MCP API key created", "name", apiKey.Name, "keyFingerprint", keyFingerprint(key))
 	return &apiKey, key, nil
 }
 
@@ -164,6 +177,9 @@ func (s *mcpAPIKeyStore) List() ([]MCPAPIKeySummary, error) {
 				ExpiresAt:   ak.ExpiresAt,
 				Disabled:    ak.Disabled,
 				Toolsets:    ak.Toolsets,
+				Collections: ak.Collections,
+				ReadOnly:    ak.ReadOnly,
+				Scenario:    ak.Scenario,
 			})
 			return nil
 		})
@@ -235,6 +251,10 @@ type MCPAPIKeySummary struct {
 	Disabled    bool   `json:"disabled,omitempty"`
 	// Toolsets the key is limited to (MCP-003); absent = all.
 	Toolsets []string `json:"toolsets,omitempty"`
+	// The key's scope (#439), as stored; absent = not scoped.
+	Collections []string `json:"collections,omitempty"`
+	ReadOnly    bool     `json:"readOnly,omitempty"`
+	Scenario    string   `json:"scenario,omitempty"`
 }
 
 // ---- HTTP Handlers (mounted on main HTTP port, requires admin auth) ----
@@ -265,17 +285,15 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var req struct {
-		Name      string   `json:"name"`
-		ExpiresAt int64    `json:"expiresAt,omitempty"`
-		Toolsets  []string `json:"toolsets,omitempty"` // MCP-003
-	}
+	// name, expiresAt, toolsets (MCP-003), collections, readOnly and
+	// scenario (#439); the key itself and the dates are the server's.
+	var req MCPAPIKey
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 		return
 	}
 
-	apiKey, fullKey, err := s.mcpKeyStore.Create(req.Name, req.ExpiresAt, req.Toolsets...)
+	apiKey, fullKey, err := s.createMCPAPIKey(req)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -290,12 +308,30 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"key":       fullKey, // Full key shown only once
-		"name":      apiKey.Name,
-		"createdAt": apiKey.CreatedAt,
-		"expiresAt": apiKey.ExpiresAt,
-		"toolsets":  apiKey.Toolsets,
+		"key":         fullKey, // Full key shown only once
+		"name":        apiKey.Name,
+		"createdAt":   apiKey.CreatedAt,
+		"expiresAt":   apiKey.ExpiresAt,
+		"toolsets":    apiKey.Toolsets,
+		"collections": apiKey.Collections,
+		"readOnly":    apiKey.ReadOnly,
+		"scenario":    apiKey.Scenario,
 	})
+}
+
+// createMCPAPIKey stores a key after checking the scenario it is bound to
+// names a stored scenario (#439). Its collections are kept as given: an alias
+// or a "role:" target is resolved when a call is checked.
+func (s *Server) createMCPAPIKey(spec MCPAPIKey) (*MCPAPIKey, string, error) {
+	if spec.Scenario != "" {
+		if s.ChatScenarios == nil {
+			return nil, "", errChatScenariosUnavailable
+		}
+		if _, ok := s.ChatScenarios.Get(spec.Scenario); !ok {
+			return nil, "", fmt.Errorf("%w: %q", errChatScenarioNotFound, spec.Scenario)
+		}
+	}
+	return s.mcpKeyStore.Create(spec)
 }
 
 func (s *Server) handleMCPAPIKeyList(w http.ResponseWriter, r *http.Request) {
@@ -424,36 +460,35 @@ func (m *MCPAPIKeyMiddleware) InvalidateCache() {
 }
 
 // validateFromStore checks a key against the BoltDB store.
-func (m *MCPAPIKeyMiddleware) validateFromStore(provided string) (string, map[string]bool, bool) {
+func (m *MCPAPIKeyMiddleware) validateFromStore(provided string) (mcpKeyGrant, bool) {
 	if m.keyStore == nil {
-		return "", nil, false
+		return mcpKeyGrant{}, false
 	}
 
 	// Check cache
 	m.cacheMu.RLock()
 	if entry, ok := m.cache[provided]; ok && time.Now().Before(entry.expires) {
 		m.cacheMu.RUnlock()
-		return entry.name, entry.toolsets, entry.valid
+		return entry.grant, entry.valid
 	}
 	m.cacheMu.RUnlock()
 
 	ak, err := m.keyStore.Get(provided)
 	valid := err == nil && ak != nil
-	name := ""
-	var toolsets map[string]bool
+	var grant mcpKeyGrant
 	if valid {
-		name = ak.Name
+		grant = mcpKeyGrant{name: ak.Name, scope: ak.scope()}
 		// Stored toolsets were validated on create; a name a later version
 		// removed would fail here, and fails closed: the key gets nothing.
-		if toolsets, err = parseToolsets(ak.Toolsets); err != nil {
-			toolsets = map[string]bool{}
+		if grant.toolsets, err = parseToolsets(ak.Toolsets); err != nil {
+			grant.toolsets = map[string]bool{}
 		}
 	}
 
 	// Cache result
 	m.cacheMu.Lock()
-	m.cache[provided] = &apiKeyCacheEntry{name: name, toolsets: toolsets, valid: valid, expires: time.Now().Add(m.cacheTTL)}
+	m.cache[provided] = &apiKeyCacheEntry{grant: grant, valid: valid, expires: time.Now().Add(m.cacheTTL)}
 	m.cacheMu.Unlock()
 
-	return name, toolsets, valid
+	return grant, valid
 }

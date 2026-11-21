@@ -109,16 +109,20 @@ func mcpAllTools(customDefs []MCPCustomToolConfig) []MCPTool {
 }
 
 // mcpToolsFor is mcpAllTools as one request sees it: also narrowed to the
-// toolsets of the MCP API key that authenticated it (MCP-003).
+// toolsets of the MCP API key that authenticated it (MCP-003), and without the
+// tools its scope can never call (#439) — a custom tool by the action it
+// wraps.
 func mcpToolsFor(ctx context.Context, customDefs []MCPCustomToolConfig) []MCPTool {
 	var tools []MCPTool
 	for _, t := range mcpBuiltinTools() {
-		if builtinToolAllowed(ctx, t.Name) {
+		if builtinToolAllowed(ctx, t.Name) && keyScopeMayList(ctx, t.Name) {
 			tools = append(tools, t)
 		}
 	}
 	for _, ct := range customDefs {
-		tools = append(tools, mcpCustomToolToMCPTool(ct))
+		if keyScopeMayList(ctx, ct.Action) {
+			tools = append(tools, mcpCustomToolToMCPTool(ct))
+		}
 	}
 	tools = annotateTools(tools)
 	tools = applyOutputSchemas(tools)

@@ -54,6 +54,11 @@ curl -X POST http://localhost:11023/v1/mcp/keys \
 # or a static key: MDDB_MCP_API_KEYS=key:code-reviewer:search|code
 ```
 
+A key can also be confined to collections, to reads, or to a chat scenario
+(v2.19.9): `{"name": "docs-reader", "collections": ["docs"], "readOnly": true}`,
+or `MDDB_MCP_API_KEYS=key:docs-reader::docs:ro`. Tools such a key can never
+call are left out of `tools/list` ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)).
+
 With `search,code` the 22 tool schemas take about 43 KB per turn, against
 94 KB for all 93 tools of 2.18.10 (114 since 2.19.0). A tool outside the caller's toolsets is not listed,
 and calling it returns JSON-RPC `-32601` ([MCP.md](MCP.md#toolsets-v2188)).

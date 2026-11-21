@@ -92,7 +92,7 @@ func (h *MCPHandler) dispatchModern(ctx context.Context, method string,
 
 	switch method {
 	case "server/discover":
-		result = h.handleDiscover()
+		result = h.handleDiscover(ctx)
 	case "subscriptions/listen":
 		result = h.handleSubscriptionsListen(req)
 	case "resources/list":

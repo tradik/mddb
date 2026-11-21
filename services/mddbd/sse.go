@@ -202,6 +202,13 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	jobID := r.URL.Query().Get("job")
 	ip := ClientIP(r)
 
+	// #439: on a scoped MCP API key the stream is one collection the key may
+	// read, named in ?collection=.
+	if err := s.keyScopeReads(r.Context(), []string{collection}); err != nil {
+		http.Error(w, `{"error":"no read permission on collection"}`, http.StatusForbidden)
+		return
+	}
+
 	// Resolve auth: extract claims from context (injected by auth middleware).
 	// When auth is enabled, the middleware already rejects unauthenticated requests (401).
 	// So if we get here with auth enabled, the user is always authenticated.

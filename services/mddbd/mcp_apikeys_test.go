@@ -31,7 +31,7 @@ func testDB(t *testing.T) *bolt.DB {
 func TestMCPAPIKeyStoreCreateAndGet(t *testing.T) {
 	store := newMCPAPIKeyStore(testDB(t))
 
-	ak, fullKey, err := store.Create("test-app", 0)
+	ak, fullKey, err := store.Create(MCPAPIKey{Name: "test-app"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +55,8 @@ func TestMCPAPIKeyStoreCreateAndGet(t *testing.T) {
 func TestMCPAPIKeyStoreList(t *testing.T) {
 	store := newMCPAPIKeyStore(testDB(t))
 
-	_, _, _ = store.Create("app1", 0)
-	_, _, _ = store.Create("app2", 0)
+	_, _, _ = store.Create(MCPAPIKey{Name: "app1"})
+	_, _, _ = store.Create(MCPAPIKey{Name: "app2"})
 
 	keys, err := store.List()
 	if err != nil {
@@ -76,7 +76,7 @@ func TestMCPAPIKeyStoreList(t *testing.T) {
 func TestMCPAPIKeyStoreDelete(t *testing.T) {
 	store := newMCPAPIKeyStore(testDB(t))
 
-	_, fullKey, _ := store.Create("to-delete", 0)
+	_, fullKey, _ := store.Create(MCPAPIKey{Name: "to-delete"})
 
 	err := store.Delete(fullKey)
 	if err != nil {
@@ -92,7 +92,7 @@ func TestMCPAPIKeyStoreDelete(t *testing.T) {
 func TestMCPAPIKeyStoreDisable(t *testing.T) {
 	store := newMCPAPIKeyStore(testDB(t))
 
-	_, fullKey, _ := store.Create("to-disable", 0)
+	_, fullKey, _ := store.Create(MCPAPIKey{Name: "to-disable"})
 
 	err := store.Disable(fullKey)
 	if err != nil {
@@ -109,7 +109,7 @@ func TestMCPAPIKeyStoreExpiry(t *testing.T) {
 	store := newMCPAPIKeyStore(testDB(t))
 
 	// Create with expiry in the past
-	_, fullKey, _ := store.Create("expired", 1) // Unix timestamp 1 = 1970
+	_, fullKey, _ := store.Create(MCPAPIKey{Name: "expired", ExpiresAt: 1}) // Unix timestamp 1 = 1970
 
 	_, err := store.Get(fullKey)
 	if err == nil {
@@ -124,8 +124,8 @@ func TestMCPAPIKeyStoreCount(t *testing.T) {
 		t.Errorf("expected 0, got %d", store.Count())
 	}
 
-	_, _, _ = store.Create("a", 0)
-	_, _, _ = store.Create("b", 0)
+	_, _, _ = store.Create(MCPAPIKey{Name: "a"})
+	_, _, _ = store.Create(MCPAPIKey{Name: "b"})
 
 	if store.Count() != 2 {
 		t.Errorf("expected 2, got %d", store.Count())
@@ -134,7 +134,7 @@ func TestMCPAPIKeyStoreCount(t *testing.T) {
 
 func TestMCPAPIKeyMiddlewareWithStore(t *testing.T) {
 	store := newMCPAPIKeyStore(testDB(t))
-	_, fullKey, _ := store.Create("dynamic-app", 0)
+	_, fullKey, _ := store.Create(MCPAPIKey{Name: "dynamic-app"})
 
 	m := &MCPAPIKeyMiddleware{
 		enabled:  true,
@@ -145,13 +145,14 @@ func TestMCPAPIKeyMiddlewareWithStore(t *testing.T) {
 	}
 
 	// Static key should fail
-	_, _, ok := m.validateKey("sk-nonexistent")
+	_, ok := m.validateKey("sk-nonexistent")
 	if ok {
 		t.Error("nonexistent key should fail")
 	}
 
 	// Dynamic key should succeed
-	name, _, ok := m.validateKey(fullKey)
+	g, ok := m.validateKey(fullKey)
+	name := g.name
 	if !ok {
 		t.Error("dynamic key should succeed")
 	}
@@ -171,8 +172,8 @@ func TestMCPAPIKeyMiddlewareWithStore(t *testing.T) {
 func TestMCPAPIKeyMiddlewareInvalidateCache(t *testing.T) {
 	m := &MCPAPIKeyMiddleware{
 		cache: map[string]*apiKeyCacheEntry{
-			"key1": {name: "a", valid: true},
-			"key2": {name: "b", valid: true},
+			"key1": {grant: mcpKeyGrant{name: "a"}, valid: true},
+			"key2": {grant: mcpKeyGrant{name: "b"}, valid: true},
 		},
 	}
 
@@ -194,7 +195,7 @@ func TestMCPAPIKeyNoKeyMaterialInLogs(t *testing.T) {
 	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 	store := newMCPAPIKeyStore(testDB(t))
-	_, fullKey, err := store.Create("leak-check", 0)
+	_, fullKey, err := store.Create(MCPAPIKey{Name: "leak-check"})
 	if err != nil {
 		t.Fatal(err)
 	}

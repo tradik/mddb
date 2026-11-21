@@ -15,6 +15,10 @@ vi.mock('../lib/mddb-client', () => ({
     listChatMcpSecrets: vi.fn(),
     putChatMcpSecret: vi.fn(),
     chatLog: vi.fn(),
+    listMCPAPIKeys: vi.fn(),
+    createMCPAPIKey: vi.fn(),
+    deleteMCPAPIKey: vi.fn(),
+    disableMCPAPIKey: vi.fn(),
   },
 }));
 
@@ -54,6 +58,7 @@ beforeEach(() => {
   vi.mocked(mddbClient.getChatScenarioPrompt).mockResolvedValue({ name: 'support', prompt: 'You are Ada.\n\nDo not use emoji.', version: 4 });
   vi.mocked(mddbClient.putChatScenario).mockResolvedValue({});
   vi.mocked(mddbClient.deleteChatScenario).mockResolvedValue({ deleted: true });
+  vi.mocked(mddbClient.listMCPAPIKeys).mockResolvedValue({ keys: [] });
   vi.mocked(mddbClient.listChatMcpSecrets).mockResolvedValue({ secrets: [{ name: 'wiki', set: true }] });
   vi.mocked(mddbClient.putChatMcpSecret).mockResolvedValue({ set: true });
   vi.mocked(mddbClient.listChatSkills).mockResolvedValue({ skills: [{ name: 'triage' }, { name: 'refunds', description: 'Money back' }], version: 4 });

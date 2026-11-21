@@ -1,5 +1,7 @@
 package main
 
+import "context"
+
 // server/discover — the one RPC MCP 2026-07-28 requires every server to
 // implement (MCP-001).
 //
@@ -53,13 +55,13 @@ func mcpModernCapabilities() map[string]interface{} {
 // operator's pin applied — a pinned server must not advertise revisions it has
 // been told to refuse, or a client will select one and be rejected by the next
 // call it makes.
-func (h *MCPHandler) handleDiscover() map[string]interface{} {
+func (h *MCPHandler) handleDiscover(ctx context.Context) map[string]interface{} {
 	result := map[string]interface{}{
 		"supportedVersions": activeMCPVersions(),
 		"capabilities":      mcpModernCapabilities(),
 	}
-	if h.instructions != "" {
-		result["instructions"] = h.instructions
+	if instructions := h.instructionsFor(ctx); instructions != "" {
+		result["instructions"] = instructions // a bound scenario's prompt (#439)
 	}
 	return result
 }

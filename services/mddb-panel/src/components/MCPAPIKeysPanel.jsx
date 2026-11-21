@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Key, Plus, Trash2, Ban, AlertCircle } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
+import { useStore } from '../lib/store';
+import { emptyScope, scopeBody, scopeLabel } from '../lib/mcp-key-scope';
 import OneTimeSecret from './OneTimeSecret';
+import MCPKeyScopeFields from './MCPKeyScopeFields';
 
 /**
  * KeyId tells keys apart without showing key material: the scheme marker and
@@ -23,13 +26,14 @@ function KeyId({ apiKey }) {
   );
 }
 
-/** One listed key: its name, identifier, state, and the disable and delete buttons. */
-function KeyRow({ apiKey, onDisable, onDelete }) {
+/** One listed key: its name, identifier, scope, state, and the disable and delete buttons. */
+export function KeyRow({ apiKey, onDisable, onDelete }) {
   return (
     <div className="flex items-center justify-between px-4 py-3">
       <div className="flex-1 min-w-0">
         <span className="font-medium text-sm">{apiKey.name}</span>
         <KeyId apiKey={apiKey} />
+        <span className="ml-2 text-xs text-fg-muted">{scopeLabel(apiKey)}</span>
         {apiKey.disabled && (
           <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-danger-muted text-danger">DISABLED</span>
         )}
@@ -76,6 +80,18 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
   const [newKeyName, setNewKeyName] = useState('');
   const [createdKey, setCreatedKey] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [scope, setScope] = useState(emptyScope); // #439
+  const [scenarios, setScenarios] = useState([]);
+  const { stats } = useStore();
+  const collections = (stats?.collections || []).map((c) => c.name);
+
+  // Scenarios to bind a key to; none offered when the list is refused.
+  useEffect(() => {
+    mddbClient.listChatScenarios().then(
+      (data) => setScenarios((data.scenarios || []).map((s) => s.name)),
+      () => setScenarios([]),
+    );
+  }, []);
 
   // A promise chain: its state updates land in callbacks, after the request.
   const loadKeys = useCallback(() => mddbClient.listMCPAPIKeys()
@@ -95,10 +111,11 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
     if (!newKeyName.trim()) return;
     setCreating(true);
     try {
-      const data = await mddbClient.createMCPAPIKey(newKeyName.trim());
+      const data = await mddbClient.createMCPAPIKey(newKeyName.trim(), 0, scopeBody(scope));
       setCreatedKey(data.key);
       onKeyCreated?.(data.key);
       setNewKeyName('');
+      setScope(emptyScope);
       loadKeys();
     } catch (err) {
       setError(err.message);
@@ -165,6 +182,8 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
         </button>
       </div>
 
+      <MCPKeyScopeFields scope={scope} onChange={setScope} collections={collections} scenarios={scenarios} />
+
       {/* Show newly created key (one-time) */}
       {createdKey && <OneTimeSecret secret={createdKey} onDismiss={() => setCreatedKey(null)} />}
 
@@ -175,8 +194,8 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
       )}
       {!loading && keys.length > 0 && (
         <div className="border rounded-lg divide-y">
-          {keys.map((k, i) => (
-            <KeyRow key={k.fingerprint || i} apiKey={k} onDisable={handleDisable} onDelete={handleDelete} />
+          {keys.map((k) => (
+            <KeyRow key={k.fingerprint || k.name} apiKey={k} onDisable={handleDisable} onDelete={handleDelete} />
           ))}
         </div>
       )}
