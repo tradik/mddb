@@ -10,7 +10,7 @@ export default function Header({ onRefresh }) {
   const isAuthenticated = authManager.isAuthenticated();
 
   return (
-    <header className="bg-surface border-b border-line h-16">
+    <header className="bg-surface border-b border-line h-16 flex-shrink-0">
       <div className="h-full px-6 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Database className="w-8 h-8 text-accent" />

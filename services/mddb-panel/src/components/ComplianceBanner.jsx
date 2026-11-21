@@ -46,7 +46,7 @@ export default function ComplianceBanner() {
   if (status.production && status.compliant) return null;
 
   return (
-    <div className="bg-warning-muted border-b border-warning-line text-warning-strong">
+    <div className="flex-shrink-0 bg-warning-muted border-b border-warning-line text-warning-strong">
       <div className="px-4 py-2 flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-warning" />
         <div className="flex-1 text-sm">

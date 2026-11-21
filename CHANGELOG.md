@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`GET /v1/endpoints`** described `POST /v1/auth/permissions` as "Get user permissions"; it sets one.
 - **docs/API.md:** the group-permission example sent `group`; the field is `groupName`.
 - **docs/MCP.md, docs/LLM_CONNECTIONS.md:** the HTTP client configuration example uses `"type": "http"`.
+- **Panel layout scrolled past the viewport.** The main row had a hard-coded height of `100vh - 64px`, so the compliance banner pushed it below the fold: the page got a second scrollbar and the sidebar scrolled on its own. The shell is now a full-viewport flex column; the banner and header keep their natural height and the sidebar and views take the rest.
 
 ### Security
 

@@ -169,12 +169,15 @@ function App() {
   const effectiveWidth = sidebarCollapsed ? 0 : sidebarWidth;
 
   return (
-    <div className="min-h-screen bg-surface-muted">
+    // Fixed viewport shell: the banner and header take their natural height and
+    // the row below gets the rest (flex-1 min-h-0), so neither the page nor the
+    // sidebar scrolls because of a hard-coded header height.
+    <div className="h-dvh flex flex-col overflow-hidden bg-surface-muted">
       <ComplianceBanner />
       <GlobalShortcuts />
       <Header onRefresh={loadStats} />
 
-      <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
+      <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <div
           className="relative flex-shrink-0 transition-[width] duration-150"
