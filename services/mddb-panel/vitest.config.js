@@ -293,6 +293,8 @@ const coverageFiles = [
   'src/components/CollectionChecklist.jsx',
   'src/components/MCPKeyScopeFields.jsx',
   'src/components/ChatScenarioMcpKeys.jsx',
+  // 2.19.11 (FE-021): plain texts with a help control, one page scroll.
+  'src/components/HelpPopover.jsx',
   // 2.19.11 (INT-023): issues as a synced source, a collection's repository,
   // default forge tokens and the pick-or-paste secret control.
   'src/lib/use-stored-secrets.js',
