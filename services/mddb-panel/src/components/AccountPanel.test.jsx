@@ -154,6 +154,32 @@ describe('MCPAPIKeysPanel', () => {
     useStore.setState({ stats: null });
   });
 
+  test('AGT-007, AGT-008: read-only collections and a memory namespace for a limited key', async () => {
+    useStore.setState({ stats: { collections: [{ name: 'a' }, { name: 'b' }] } });
+    render(<MCPAPIKeysPanel />);
+    await act(async () => {});
+    expect(screen.queryByLabelText('Memory namespace')).toBeNull();
+    expect(screen.queryByText('Read-only collections')).toBeNull();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'a' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'b' }));
+    const readOnlyGroup = screen.getByRole('group', { name: 'Read-only collections' });
+    fireEvent.click(within(readOnlyGroup).getByRole('checkbox', { name: 'b' }));
+    fireEvent.change(screen.getByLabelText('Memory namespace'), { target: { value: 'shop' } });
+    fireEvent.change(screen.getByPlaceholderText('Key name (e.g. claude-prod)'), { target: { value: 'agent' } });
+    mddbClient.createMCPAPIKey.mockResolvedValueOnce({ key: 'mcp_project_secret' });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Create Key/ })));
+    expect(mddbClient.createMCPAPIKey).toHaveBeenCalledWith('agent', 0,
+      { collections: ['a', 'b'], readOnlyCollections: ['b'], memoryNamespace: 'shop' });
+
+    // A key read-only as a whole has no per-collection choice.
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'a' })[0]);
+    expect(screen.getByRole('group', { name: 'Read-only collections' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Read-only —/ }));
+    expect(screen.queryByRole('group', { name: 'Read-only collections' })).toBeNull();
+    useStore.setState({ stats: null });
+  });
+
   test('without scenarios to pick there is no scenario select', async () => {
     render(<MCPAPIKeysPanel />);
     await act(async () => {});
