@@ -106,6 +106,7 @@ describe('MCPConfigPanel tabs', () => {
 
     const tabs = {
       Claude: 'claude mcp add --transport http mddb http://db.example.com:9000/mcp',
+      'VS Code': '"url": "http://db.example.com:9000/mcp"',
       ChatGPT: 'openai_actions.json',
       'Ollama (Python)': 'http://db.example.com:11023',
       DeepSeek: 'deepseek_mcp_config.json',
@@ -122,6 +123,16 @@ describe('MCPConfigPanel tabs', () => {
     fireEvent.click(screen.getByRole('button', { name: 'API Keys' }));
     expect(screen.getByText('api keys panel')).toBeTruthy();
     expect(screen.queryByText('Setup Instructions:')).toBeNull();
+  });
+
+  test('VS Code: the key field fills the command; the workspace file never holds the key', async () => {
+    await renderWith({ protocols: { mcp: { domain: 'db.example.com', addr: ':9000', apiKeyEnabled: true } } });
+    fireEvent.click(screen.getByRole('button', { name: 'VS Code' }));
+    fireEvent.change(screen.getByLabelText(/^API key/), { target: { value: 'mcp_secret' } });
+    expect(code()).toContain('${input:mddbMcpKey}');
+    expect(code()).not.toContain('mcp_secret');
+    fireEvent.click(screen.getByRole('button', { name: 'User profile (command)' }));
+    expect(code()).toContain('"X-API-Key":"mcp_secret"');
   });
 
   test('the DeepSeek stdio config says it starts a separate local database', async () => {

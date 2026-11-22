@@ -556,6 +556,13 @@ The **Claude** tab has five variants; the first is shown when the tab opens:
 Both stdio variants, and the DeepSeek tab, say that they start a separate
 local database and do not connect to this server.
 
+The **VS Code** tab (2.19.10) connects the chat built into VS Code (agent
+mode) to the same MCP URL. *Workspace file* is a `.vscode/mcp.json` that
+declares a password input instead of holding the key: VS Code asks for it once
+and keeps it in its secret storage, so the file can be committed. *User profile
+(command)* is `code --add-mcp '…'`, which adds the server to every workspace
+and stores the typed key (or `mcp_…`) in the user profile.
+
 When MCP API keys are on, an *API key* field sits above the example. Empty,
 the examples carry the placeholder `mcp_…` and a *Create a key* link opens
 the *API Keys* tab; a key created there during the visit fills the field. The

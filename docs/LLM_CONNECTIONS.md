@@ -1,7 +1,7 @@
 ---
 title: "LLM Connections"
 slug: "docs/llm-connections"
-description: "Connect MDDB to Claude, Cursor, Windsurf, ChatGPT and Ollama for RAG and knowledge-base workflows through the built-in MCP server."
+description: "Connect MDDB to Claude, VS Code, Cursor, Windsurf, ChatGPT and Ollama for RAG and knowledge-base workflows through the built-in MCP server."
 status: publish
 ---
 
@@ -381,6 +381,37 @@ Use the `mddbd` binary directly. Like the Docker variant, this starts a separate
   }
 }
 ```
+
+## VS Code (v2.19.10)
+
+The chat built into VS Code (agent mode) uses MCP servers declared in
+`.vscode/mcp.json`. The panel's *LLM Connections → VS Code* tab builds this
+file for the server it shows:
+
+```json
+{
+  "inputs": [
+    { "type": "promptString", "id": "mddbMcpKey", "description": "MDDB MCP API key", "password": true }
+  ],
+  "servers": {
+    "mddb": {
+      "type": "http",
+      "url": "https://db.example.com/mcp",
+      "headers": { "X-API-Key": "${input:mddbMcpKey}" }
+    }
+  }
+}
+```
+
+VS Code asks for the key on first use and keeps it in its secret storage, so
+the file holds no key and can be committed. Without MCP API keys
+(`MDDB_MCP_API_KEY_ENABLED` off) the `inputs` and `headers` are left out. To
+add the server to every workspace instead, run
+`code --add-mcp '{"name":"mddb","type":"http","url":"https://db.example.com/mcp","headers":{"X-API-Key":"mcp_…"}}'`;
+this stores the key in the user profile. In the Chat view, switch to Agent
+mode and pick the mddb tools under *Configure Tools*. A key bound to a chat
+scenario or scoped to collections limits what the chat can read
+([MCP.md](MCP.md)).
 
 ### Available MCP Tools (114)
 

@@ -7,11 +7,13 @@ import MCPAPIKeysPanel from './MCPAPIKeysPanel';
 import { withServerDomain, urlOnHost, mcpBaseUrl, mcpEndpoint } from '../lib/server-address';
 import { connectionTemplate } from '../lib/llm-connection-templates';
 import { claudeVariants, MCP_DOCS } from '../lib/claude-connection';
+import { vscodeVariants } from '../lib/vscode-connection';
 
 const TABS = [
   { id: 'mcp', label: 'MCP Config', desc: 'Custom MCP tools configuration (YAML)' },
   { id: 'api-keys', label: 'API Keys', desc: 'Manage MCP API keys' },
   { id: 'claude', label: 'Claude', desc: 'Claude Code, claude.ai and Claude Desktop' },
+  { id: 'vscode', label: 'VS Code', desc: 'The chat built into VS Code (agent mode) over MCP' },
   { id: 'chatgpt', label: 'ChatGPT', desc: 'OpenAI ChatGPT with MCP bridge' },
   { id: 'ollama', label: 'Ollama (Python)', desc: 'Local Ollama with Python MCP client' },
   { id: 'deepseek', label: 'DeepSeek', desc: 'DeepSeek AI agent connection' },
@@ -24,12 +26,12 @@ const smallButton = 'flex items-center px-3 py-1.5 text-sm rounded transition-co
 const variantButton = (active) => `px-2 py-1 text-xs rounded focus:outline-none focus:ring-2 focus:ring-focus ${active ? 'bg-primary-700 text-white' : 'text-fg-soft hover:bg-surface-subtle'}`;
 
 /**
- * ClaudeKeyField is the MCP API key the Claude examples carry. It lives in
+ * McpKeyField is the MCP API key the Claude and VS Code examples carry. It lives in
  * the page's state only — never in storage or the URL — and is gone when the
  * page closes. Optional when the server does not say whether keys are on
  * (before 2.19.9).
  */
-function ClaudeKeyField({ value, onChange, optional, onCreate }) {
+function McpKeyField({ value, onChange, optional, onCreate }) {
   const [shown, setShown] = useState(false);
   return (
     <div className="px-4 py-3 border-b border-line-soft">
@@ -124,11 +126,13 @@ export default function MCPConfigPanel() {
   const mcpUrl = mcpEndpoint(address);
   // A server before 2.19.9 does not say whether keys are on: the key is optional.
   const apiKeyEnabled = mcpKeyAuthEnabled(config);
-  const keyField = activeTab === 'claude' && apiKeyEnabled !== false;
+  const keyField = (activeTab === 'claude' || activeTab === 'vscode') && apiKeyEnabled !== false;
+  const keyOptions = { mcpUrl, apiKey: keyField ? apiKey : '', apiKeyEnabled: apiKeyEnabled === true };
 
-  const variants = activeTab === 'claude'
-    ? claudeVariants({ mcpUrl, apiKey: keyField ? apiKey : '', apiKeyEnabled: apiKeyEnabled === true, oauthEnabled: mcp.oauthEnabled === true })
-    : [connectionTemplate(activeTab, urlOnHost(host, httpAddr), mcpBaseUrl(address))];
+  let variants;
+  if (activeTab === 'claude') variants = claudeVariants({ ...keyOptions, oauthEnabled: mcp.oauthEnabled === true });
+  else if (activeTab === 'vscode') variants = vscodeVariants(keyOptions);
+  else variants = [connectionTemplate(activeTab, urlOnHost(host, httpAddr), mcpBaseUrl(address))];
   const variant = variants.find((v) => v.id === variantId) ?? variants[0];
 
   // The MCP tab prefers the server's live config, with its addresses on the
@@ -264,7 +268,7 @@ export default function MCPConfigPanel() {
               )}
 
               {keyField && (
-                <ClaudeKeyField value={apiKey} onChange={setApiKey} optional={apiKeyEnabled === undefined} onCreate={() => selectTab('api-keys')} />
+                <McpKeyField value={apiKey} onChange={setApiKey} optional={apiKeyEnabled === undefined} onCreate={() => selectTab('api-keys')} />
               )}
 
               {/* Code Block */}
