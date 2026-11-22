@@ -36,6 +36,7 @@ func (s *MCPToolServer) toolMemoryStartSession(ctx context.Context, args map[str
 			meta[k] = v
 		}
 	}
+	stampMemoryNamespace(ctx, meta) // AGT-008: after the caller's meta, so it wins
 
 	content := fmt.Sprintf("# Session: %s\n\nUser: %s\nScenario: %s", title, userID, scenario)
 
@@ -75,6 +76,9 @@ func (s *MCPToolServer) toolMemoryAddMessage(ctx context.Context, args map[strin
 	if !validRoles[role] {
 		return "", fmt.Errorf("invalid role: must be user, assistant, system, or tool")
 	}
+	if err := s.checkMemorySession(ctx, sessionID); err != nil {
+		return "", err
+	}
 
 	msgID := generateMemoryMessageID()
 	created := time.Now()
@@ -91,6 +95,7 @@ func (s *MCPToolServer) toolMemoryAddMessage(ctx context.Context, args map[strin
 			meta[k] = v
 		}
 	}
+	stampMemoryNamespace(ctx, meta)
 
 	msgKey := memoryMessageKey(sessionID, created, msgID) // the key REST writes
 
@@ -144,6 +149,7 @@ func (s *MCPToolServer) toolMemoryRecall(ctx context.Context, args map[string]in
 	if role := mcpGetString(args, "role"); role != "" {
 		filterMeta["role"] = []string{role}
 	}
+	stampMemoryNamespace(ctx, filterMeta) // a namespaced key recalls only its own
 
 	includeContent := false
 	if v, ok := args["include_content"].(bool); ok {
@@ -286,6 +292,9 @@ func (s *MCPToolServer) toolMemorySummarize(ctx context.Context, args map[string
 	if sessionID == "" {
 		return "", fmt.Errorf("session_id is required")
 	}
+	if err := s.checkMemorySession(ctx, sessionID); err != nil {
+		return "", err
+	}
 
 	// Fetch session messages
 	resp, err := s.client.Search(ctx, &MCPSearchRequest{
@@ -328,6 +337,7 @@ func (s *MCPToolServer) toolMemorySummarize(ctx context.Context, args map[string
 	if userID := mcpGetString(args, "user_id"); userID != "" {
 		meta["userId"] = []string{userID}
 	}
+	stampMemoryNamespace(ctx, meta)
 
 	doc, err := s.client.Add(ctx, &MCPAddRequest{
 		Collection: memorySummariesCollection,
@@ -362,6 +372,7 @@ func (s *MCPToolServer) toolMemoryListSessions(ctx context.Context, args map[str
 	if scenario := mcpGetString(args, "scenario"); scenario != "" {
 		filterMeta["scenario"] = []string{scenario}
 	}
+	stampMemoryNamespace(ctx, filterMeta)
 
 	limit := mcpGetInt(args, "limit")
 	if limit <= 0 {
@@ -410,6 +421,9 @@ func (s *MCPToolServer) toolMemorySessionHistory(ctx context.Context, args map[s
 	sessionID := mcpGetString(args, "session_id")
 	if sessionID == "" {
 		return "", fmt.Errorf("session_id is required")
+	}
+	if err := s.checkMemorySession(ctx, sessionID); err != nil {
+		return "", err
 	}
 
 	limit := mcpGetInt(args, "limit")

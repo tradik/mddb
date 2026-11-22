@@ -107,6 +107,7 @@ func parseStaticMCPKey(entry string) (string, mcpKeyGrant) {
 	parts := strings.SplitN(entry, ":", 4)
 	key := parts[0]
 	g := mcpKeyGrant{name: key}
+	g.scope.memoryNamespace = keyMemoryNamespace(key, "") // used once the key is limited (AGT-008)
 	if len(g.name) > 8 {
 		g.name = g.name[:8] + "..."
 	}
