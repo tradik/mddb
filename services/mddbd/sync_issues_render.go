@@ -74,36 +74,56 @@ var (
 // issueLinks are the numbers of the issues and pull requests the text names,
 // the item's own number left out.
 func issueLinks(text string, repo gitRepo, self issueItem) (issues, pulls []string) {
-	add := func(list *[]string, kind, n string) {
-		if (kind != self.kind || n != strconv.Itoa(self.number)) && !slices.Contains(*list, n) {
-			*list = append(*list, n)
+	refs := itemRefs{selfKind: self.kind, selfNumber: strconv.Itoa(self.number)}
+	refs.addLinks(text, repo.web)
+	plain := urlInText.ReplaceAllString(text, " ")
+	for _, m := range issueHashRef.FindAllStringSubmatch(plain, -1) {
+		refs.add(issueKindIssue, m[1])
+	}
+	if repo.forge == forgeGitLab {
+		for _, m := range mergeBangRef.FindAllStringSubmatch(plain, -1) {
+			refs.add(issueKindPull, m[1])
 		}
 	}
+	sortNumeric(refs.issues)
+	sortNumeric(refs.pulls)
+	return refs.issues, refs.pulls
+}
+
+// itemRefs gathers the item numbers a text names, once each, leaving out
+// the item's own.
+type itemRefs struct {
+	selfKind, selfNumber string
+	issues, pulls        []string
+}
+
+// add records number n of a kind.
+func (r *itemRefs) add(kind, n string) {
+	list := &r.pulls
+	if kind == issueKindIssue {
+		list = &r.issues
+	}
+	if (kind != r.selfKind || n != r.selfNumber) && !slices.Contains(*list, n) {
+		*list = append(*list, n)
+	}
+}
+
+// addLinks records the links to the repository's own items, web being the
+// repository's web address.
+func (r *itemRefs) addLinks(text, web string) {
 	for _, u := range urlInText.FindAllString(text, -1) {
-		rest, ok := strings.CutPrefix(u, repo.web)
+		rest, ok := strings.CutPrefix(u, web)
 		if !ok {
 			continue
 		}
 		if m := issueURLRef.FindStringSubmatch(rest); m != nil {
+			kind := issueKindPull
 			if m[2] == "issues" {
-				add(&issues, issueKindIssue, m[3])
-			} else {
-				add(&pulls, issueKindPull, m[3])
+				kind = issueKindIssue
 			}
+			r.add(kind, m[3])
 		}
 	}
-	plain := urlInText.ReplaceAllString(text, " ")
-	for _, m := range issueHashRef.FindAllStringSubmatch(plain, -1) {
-		add(&issues, issueKindIssue, m[1])
-	}
-	if repo.forge == forgeGitLab {
-		for _, m := range mergeBangRef.FindAllStringSubmatch(plain, -1) {
-			add(&pulls, issueKindPull, m[1])
-		}
-	}
-	sortNumeric(issues)
-	sortNumeric(pulls)
-	return issues, pulls
 }
 
 // sortNumeric sorts numbers given as text.

@@ -1,14 +1,10 @@
 package main
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"regexp"
 	"strings"
-
-	"mddb/internal/storage"
 )
 
 // Training datasets: the text of one or several collections as JSON Lines,
@@ -180,125 +176,6 @@ func (s *Server) checkLicences(req *datasetRequest) ([]string, error) {
 			errDatasetLicence, strings.Join(unlicensed, ", "))
 	}
 	return unlicensed, nil
-}
-
-// datasetRecords reads the collections and returns the records of the
-// dataset in their final order, and what each collection gave.
-func (s *Server) datasetRecords(req *datasetRequest) ([]datasetRecord, []collectionSummary, error) {
-	client := NewDirectClient(s)
-	seen := map[[32]byte]bool{}
-	var records []datasetRecord
-	summaries := make([]collectionSummary, 0, len(req.Collections))
-	for _, c := range req.Collections {
-		docs, err := client.collectExportDocs(&MCPExportRequest{Collection: c, FilterMeta: req.FilterMeta})
-		if err != nil {
-			return nil, nil, fmt.Errorf("collection %s: %w", c, err)
-		}
-		sum := collectionSummary{Name: c, License: s.collectionLicence(c)}
-		for i := range docs {
-			if req.Lang != "" && !strings.EqualFold(docs[i].Lang, req.Lang) {
-				continue
-			}
-			sum.Documents++
-			rec, ok := buildRecord(req, c, sum.License, &docs[i])
-			if !ok {
-				sum.Skipped++
-				continue
-			}
-			if req.dedupe() {
-				h := rec.hash()
-				if seen[h] {
-					sum.Duplicates++
-					continue
-				}
-				seen[h] = true
-			}
-			records = append(records, rec)
-		}
-		summaries = append(summaries, sum)
-	}
-	if req.Shuffle {
-		// #nosec G404 G115 -- a reproducible shuffle for a seed the caller chose, not a secret; a negative
-		// seed wrapping to a large one is still a seed
-		rng := rand.New(rand.NewPCG(uint64(req.Seed), 0)) // NOSONAR -- reproducible order, not security
-		rng.Shuffle(len(records), func(i, j int) { records[i], records[j] = records[j], records[i] })
-	}
-	limit := req.MaxRecords
-	if limit == 0 {
-		limit = maxDatasetRecords
-	}
-	if len(records) > limit {
-		records = records[:limit]
-	}
-	for i := range summaries {
-		for j := range records {
-			if records[j].Meta.Collection == summaries[i].Name {
-				summaries[i].Records++
-			}
-		}
-	}
-	return records, summaries, nil
-}
-
-// buildRecord turns a document into a record; false when its text, or a
-// field a template names, is empty.
-func buildRecord(req *datasetRequest, collection, licence string, d *storage.Doc) (datasetRecord, bool) {
-	rec := datasetRecord{Meta: recordMeta{Collection: collection, Key: d.Key, Lang: d.Lang, License: licence}}
-	if req.Format == datasetText {
-		rec.Text = strings.TrimSpace(d.ContentMD)
-		return rec, rec.Text != ""
-	}
-	var ok bool
-	if rec.Input, ok = renderTemplate(req.Pairs.Input, collection, d); !ok {
-		return rec, false
-	}
-	if rec.Output, ok = renderTemplate(req.Pairs.Output, collection, d); !ok {
-		return rec, false
-	}
-	if req.Pairs.System != "" {
-		if rec.System, ok = renderTemplate(req.Pairs.System, collection, d); !ok {
-			return rec, false
-		}
-	}
-	return rec, true
-}
-
-// renderTemplate fills a template from a document; false when a field it
-// names is empty.
-func renderTemplate(t, collection string, d *storage.Doc) (string, bool) {
-	complete := true
-	out := fieldPattern.ReplaceAllStringFunc(t, func(ph string) string {
-		v := fieldValue(ph[1:len(ph)-1], collection, d)
-		if v == "" {
-			complete = false
-		}
-		return v
-	})
-	out = strings.TrimSpace(out)
-	return out, complete && out != ""
-}
-
-// fieldValue is one field of a document; several metadata values are joined
-// with ", ".
-func fieldValue(field, collection string, d *storage.Doc) string {
-	switch field {
-	case "content":
-		return strings.TrimSpace(d.ContentMD)
-	case "key":
-		return d.Key
-	case "lang":
-		return d.Lang
-	case "collection":
-		return collection
-	default:
-		return strings.Join(d.Meta[strings.TrimPrefix(field, "meta.")], ", ")
-	}
-}
-
-// hash identifies a record's content for duplicate removal; where it came
-// from does not count.
-func (r *datasetRecord) hash() [32]byte {
-	return sha256.Sum256([]byte(r.Text + "\x00" + r.System + "\x00" + r.Input + "\x00" + r.Output))
 }
 
 // splitRecords cuts the validation part off the end: ratio of the records,

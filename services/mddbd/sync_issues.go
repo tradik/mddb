@@ -142,38 +142,60 @@ func (g *issuesSyncSource) since() string {
 func (g *issuesSyncSource) readListing(ctx context.Context, l issueListing, have int) ([]syncItem, bool, error) {
 	var items []syncItem
 	for next, n := l.url, 0; next != "" && n < maxIssuesPages; n++ {
-		pageURL := next
-		prev, cached := g.lastPages()[pageURL]
-		etag := ""
-		if cached && g.incremental() {
-			etag = prev.ETag
-		}
-		page, err := g.get(ctx, pageURL, etag)
+		listed, pageNext, err := g.readListingPage(ctx, next)
 		if err != nil {
-			return items, false, fmt.Errorf("listing %s: %w", pageURL, err)
+			return items, false, err
 		}
-		if page.notModified { // nothing on it changed since the last run
-			g.pages[pageURL], next = prev, prev.Next
-			continue
+		var truncated bool
+		if items, truncated = g.keepListed(listed, l.kind, have, items); truncated {
+			return items, true, nil
 		}
-		if page.etag != "" && g.incremental() {
-			g.pages[pageURL] = automationlog.SyncPage{ETag: page.etag, Next: page.next}
-		}
-		var listed []forgeIssue
-		if err := json.Unmarshal(page.body, &listed); err != nil {
-			return items, false, fmt.Errorf("listing %s: %w", pageURL, err)
-		}
-		for i := range listed {
-			if have+len(items) == g.action.MaxDocuments {
-				return items, true, nil
-			}
-			if it, ok := g.keep(listed[i].item(l.kind)); ok {
-				items = append(items, it)
-			}
-		}
-		next = page.next
+		next = pageNext
 	}
 	return items, false, nil
+}
+
+// readListingPage reads one page of a listing, sending the ETag the last
+// run kept, and returns its issues and the next page's URL. A page nothing
+// on changed since the last run gives no issues and the next page that run
+// saw.
+func (g *issuesSyncSource) readListingPage(ctx context.Context, pageURL string) ([]forgeIssue, string, error) {
+	prev, cached := g.lastPages()[pageURL]
+	etag := ""
+	if cached && g.incremental() {
+		etag = prev.ETag
+	}
+	page, err := g.get(ctx, pageURL, etag)
+	if err != nil {
+		return nil, "", fmt.Errorf("listing %s: %w", pageURL, err)
+	}
+	if page.notModified {
+		g.pages[pageURL] = prev
+		return nil, prev.Next, nil
+	}
+	if page.etag != "" && g.incremental() {
+		g.pages[pageURL] = automationlog.SyncPage{ETag: page.etag, Next: page.next}
+	}
+	var listed []forgeIssue
+	if err := json.Unmarshal(page.body, &listed); err != nil {
+		return nil, "", fmt.Errorf("listing %s: %w", pageURL, err)
+	}
+	return listed, page.next, nil
+}
+
+// keepListed adds the listed issues the rule keeps to items; true when the
+// run reached maxDocuments (have is how many it had before this listing)
+// with issues left.
+func (g *issuesSyncSource) keepListed(listed []forgeIssue, kind string, have int, items []syncItem) ([]syncItem, bool) {
+	for i := range listed {
+		if have+len(items) == g.action.MaxDocuments {
+			return items, true
+		}
+		if it, ok := g.keep(listed[i].item(kind)); ok {
+			items = append(items, it)
+		}
+	}
+	return items, false
 }
 
 // keep records an item of an included kind and state, and moves the cursor.

@@ -58,7 +58,7 @@ func (c *MetaCondition) UnmarshalJSON(data []byte) error {
 	// A bare value or a list is "equals one of": {"state": "open"} reads as
 	// {"state": {"in": ["open"]}}. It is what a caller writes first, and it
 	// used to be refused (2.19.11).
-	if t := bytes.TrimSpace(data); len(t) > 0 && t[0] != '{' && string(t) != "null" {
+	if bareCondition(data) {
 		in, err := stringList(data)
 		if err != nil {
 			return fmt.Errorf("filter condition must be a value, a list of values or an object of operators: %w", err)
@@ -100,6 +100,13 @@ func (c *MetaCondition) UnmarshalJSON(data []byte) error {
 		}
 	}
 	return nil
+}
+
+// bareCondition reports a condition given as a value or a list rather than
+// an object of operators; null is left to the object path.
+func bareCondition(data []byte) bool {
+	t := bytes.TrimSpace(data)
+	return len(t) > 0 && t[0] != '{' && string(t) != "null"
 }
 
 // MarshalJSON keeps an explicit empty "in", which matches nothing, distinct
