@@ -188,7 +188,7 @@ resembles what you will ask for.
 runner's chat to MDDB as described in [LLM connections](LLM_CONNECTIONS.md),
 so the model can look real recipes up while it writes new ones.
 
-**The same in the panel.** Open **Data → Model Training**. In *Build a
+**The same in the panel.** Open **Collections → Model Training**. In *Build a
 dataset* pick **Collections**, keep **Format** on *Pairs*, fill **Input**,
 **Output** and **System text**, set **Validation share**, tick the licence
 box if asked, and press **Build dataset**; the dataset appears under
