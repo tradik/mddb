@@ -124,6 +124,24 @@ model or chunking; without one, the old configuration is copied. It waits
 until `docs-v2` is indexed, then moves the alias. The old collection is
 kept, so you can roll back with `alias set`.
 
+#### corpus - Packs of collections to install elsewhere
+
+```bash
+mddb-cli corpus build k8s-docs --license CC-BY-4.0 --version 1.31 \
+  --source CC-BY-4.0=https://github.com/kubernetes/website@release-1.31
+mddb-cli corpus build --name handbook -c policies -c faq=CC-BY-4.0 --license MIT
+mddb-cli corpus install ./k8s-docs-1.31.mddbpack [--sha256 <sum>]
+mddb-cli corpus list
+mddb-cli corpus remove k8s-docs
+```
+
+A pack is a snapshot of one collection or several, installed read-only on
+another server without re-embedding or reindexing. `build` refuses without
+`--license`. With `-c` for each collection a pack holds several: it needs a
+`--name`, a collection may carry its own licence (`-c NAME=LICENSE`), and each
+installs under its own name; `remove` takes the pack's name and removes all of
+them. See [docs/CORPUS-PACKS.md](../../docs/CORPUS-PACKS.md).
+
 #### autoindex - Index a directory or repository
 
 ```bash
