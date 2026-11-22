@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -171,7 +172,7 @@ func TestMetaFilter_FilterMetaUnchangedAndANDed(t *testing.T) {
 func TestMetaCondition_UnmarshalErrors(t *testing.T) {
 	bad := map[string]string{
 		`{"path":{"startsWith":"x"}}`: `unsupported filter operator "startsWith"`,
-		`{"path":"x"}`:                "must be an object",
+		`{"path":[{"a":1}]}`:          "must be a value, a list of values or an object",
 		`{"path":{"gt":{"a":1}}}`:     `filter operator "gt"`,
 		`{"path":{"in":[{"a":1}]}}`:   `filter operator "in"`,
 		`{"path":{"exists":"yes"}}`:   `filter operator "exists"`,
@@ -183,6 +184,21 @@ func TestMetaCondition_UnmarshalErrors(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: err=%v, want containing %q", raw, err, want)
 		}
+	}
+	// An "in" that was given but holds nothing still marshals as a list.
+	if out, err := json.Marshal(MetaCondition{hasIn: true}); err != nil || string(out) != `{"in":[]}` {
+		t.Fatalf("empty in: %s %v", out, err)
+	}
+	// Called directly with what is not JSON, as no decoder would.
+	if err := new(MetaCondition).UnmarshalJSON([]byte(`{bad`)); err == nil || !strings.Contains(err.Error(), "object of operators") {
+		t.Fatalf("not JSON: %v", err)
+	}
+	// A bare value or list is "equals one of" (2.19.11); null is still the
+	// zero condition.
+	short := parseFilter(t, `{"state":"open","n":7,"labels":["bug","docs"],"any":null}`)
+	if !reflect.DeepEqual(short["state"].In, []string{"open"}) || !reflect.DeepEqual(short["n"].In, []string{"7"}) ||
+		!reflect.DeepEqual(short["labels"].In, []string{"bug", "docs"}) || !short["state"].hasIn || short["any"].hasIn {
+		t.Fatalf("shorthand: %+v", short)
 	}
 	f := parseFilter(t, `{"n":{"gte":true,"lt":"5"}}`)
 	if *f["n"].Gte != "true" || *f["n"].Lt != "5" {

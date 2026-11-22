@@ -221,7 +221,7 @@ is yours to do.
 ## API
 
 All routes are admin only, REST only (no gRPC, GraphQL or MCP tool), and
-under the module switch. See [openapi.yaml](openapi.yaml), tag *Model Training*.
+under the module switch. See the [REST API reference](/docs/api/reference/), generated from `openapi.yaml`, tag *Model Training*.
 
 | Route | What it does |
 |---|---|

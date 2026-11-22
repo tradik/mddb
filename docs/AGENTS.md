@@ -91,7 +91,7 @@ They cover choosing between `full_text_search`, `semantic_search` and
 waiting for an embedding after a write, conditional writes, the memory
 tools, and work tracking: the next backlog row, issues from a mirror and a
 hand-over note, from the project's `-work` and `-issues` collections
-(Work Tracking for Agents, v2.19.11). Measured on this engine, the same `full_text_search` over five 12 KB
+([Work Tracking for Agents](WORK-TRACKING.md), v2.19.11). Measured on this engine, the same `full_text_search` over five 12 KB
 documents returns about 19 700 tokens with its defaults and about 327 with
 `fields: ["key"]`. In this repository, edit `AGENTS.md` and run
 `make agent-instructions`; CI fails if a variant was edited by hand or names a
@@ -225,9 +225,14 @@ vectors — so another machine installs it without re-embedding or reindexing
 
 ```bash
 mddb-cli corpus build k8s-docs --license CC-BY-4.0 --version 1.31
+mddb-cli corpus build --name handbook -c policies -c faq=CC-BY-4.0 --license MIT   # several collections (2.19.11)
 mddb-cli corpus install k8s-docs-1.31.mddbpack --sha256 <sum>
 mddb-cli corpus list
 ```
+
+A pack of several collections installs each one back under its own name,
+read-only; the panel's **Corpus Packs** page, next to the collections, does
+the same with a file upload.
 
 An agent does the same over MCP (v2.19.0, `admin` toolset): `corpus_list`
 lists the installed packs, `corpus_install` installs one the server downloads
