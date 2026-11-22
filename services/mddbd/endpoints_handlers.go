@@ -276,6 +276,8 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 		{Method: "POST", Path: "/v1/export", Description: "Export collection (NDJSON/ZIP)", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/backup", Description: "Create database backup", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/restore", Description: restoreFromBackupDescription, RequiresAuth: authEnabled},
+		{Method: "GET", Path: "/v1/backups", Description: "List the backup files in the backup directory", RequiresAuth: authEnabled},
+		{Method: "GET", Path: "/v1/backups/{name}/download", Description: "Download one backup file", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/truncate", Description: "Truncate revision history", RequiresAuth: authEnabled},
 		{Method: "GET", Path: "/v1/admin/diagnose", Description: "Diagnose bundle without user data (tar.gz, admin)", RequiresAuth: authEnabled},
 

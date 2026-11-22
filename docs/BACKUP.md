@@ -140,6 +140,57 @@ A run still going when its next one is due makes that one skip (logged as
 `skipped`). A run that stored its backup but could not prune reports an
 error and still sets the metric: the backup is there.
 
+## Listing and downloading backups
+
+From 2.19.11 the server lists the backup files in `MDDB_BACKUP_DIR` and hands
+one out for download. The panel's Backup & Restore page uses both.
+
+```bash
+curl "http://localhost:11023/v1/backups?limit=50&offset=0"
+curl -OJ "http://localhost:11023/v1/backups/nightly.db/download"
+```
+
+`GET /v1/backups` answers `{backups, total, limit, offset, note}`, newest
+first. `limit` defaults to 100 and is capped at 1000. Each row carries:
+
+| Field | Meaning |
+|---|---|
+| `name` | The file name, the one a download and `POST /v1/restore` take. |
+| `path` | Its full path on the server, as `GET /v1/backup` answers it and a scheduled run logs it as its `target`. |
+| `bytes` | Size of the main file. |
+| `modifiedAt` | When the file was last written (RFC 3339, UTC). |
+| `state` | `checksummed` when a `<name>.sha256` checksum file lies beside it: a scheduled run writes one only after the backup passed the integrity check. `unknown` otherwise. `GET /v1/backup` checks every copy before it keeps it, but records nothing on disk. The list never re-checks a file. |
+| `collectionFiles` | How many collection files are in `<name>.d/` (per-collection layout). |
+
+What the list holds:
+
+- Only the backup directory itself. Backups in a folder inside it (a
+  scheduled rule's `path`) are not listed, and neither are backups a
+  scheduled rule stores in object storage. The `note` field says so.
+- Only regular files whose name ends in `.db`. A file named with another
+  extension (`GET /v1/backup?to=snap.bak`), a checksum file, a half-written
+  `.tmp-` file, a directory and a symlink are left out. The live database is
+  left out too when the backup directory holds it.
+
+`GET /v1/backups/{name}/download` sends one listed file with its
+`Content-Length` and `Content-Disposition: attachment`. Range requests
+work, so `curl -C -` can resume a download. In the per-collection layout the
+download is the main file only; the collection files stay on the server, so
+copy `<name>.d/` with it when you move a backup by hand. Each download, served
+or refused, is written to the audit log (`backup.download`, with the user and
+the file) and the server log.
+
+Both calls are administration, like taking and restoring a backup: admin on
+`*`, never reachable with an MCP key, open in read-only mode because they
+write nothing. The name must be a single file name: a path separator, `..`,
+an absolute path or a NUL is refused. The file is opened through the backup
+directory, so a symlink cannot lead out of it. Every name that is not a listed
+backup gets the same `404 {"error":"backup not found"}`, so the answer tells
+nothing about other files.
+
+The server has no call that deletes a backup file. Scheduled backups delete
+their oldest ones through their `keep`; remove other files on the server.
+
 ## Restoring
 
 ```bash
