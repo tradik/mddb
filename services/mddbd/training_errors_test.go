@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -89,9 +90,43 @@ func TestTrainingDir(t *testing.T) {
 	if got := (&Server{}).trainingDir(); got != filepath.Join(wd, "jobs") {
 		t.Errorf("relative MDDB_TRAINING_DIR: %s", got)
 	}
+	// Without a database path: a new private directory each time, never a
+	// fixed name in the shared temporary directory.
 	t.Setenv(trainingDirEnv, "")
-	if got := (&Server{}).trainingDir(); got != filepath.Join(os.TempDir(), "mddb-training") {
-		t.Errorf("no database path: %s", got)
+	setTempDir(t, t.TempDir())
+	first, second := (&Server{}).trainingDir(), (&Server{}).trainingDir()
+	if first == second || filepath.Dir(first) != os.TempDir() || !strings.HasPrefix(filepath.Base(first), "mddb-training-") {
+		t.Errorf("no database path: %s %s", first, second)
+	}
+	if info, err := os.Stat(first); err != nil || !info.IsDir() || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o700) {
+		t.Errorf("private directory: %v %v", info, err)
+	}
+	// One that cannot be created is the empty root.
+	setTempDir(t, filepath.Join(t.TempDir(), "missing"))
+	if got := (&Server{}).trainingDir(); got != "" {
+		t.Errorf("no temporary directory: %q", got)
+	}
+}
+
+func TestTrainingLaunchAfterStop(t *testing.T) {
+	f := newTrainingFixture(t, "")
+	f.m.stop()
+	// A job launched once the server is stopping starts cancelled with the
+	// stop's cause, as it does while running.
+	cause := make(chan error, 1)
+	f.m.launch("ds_00000000000000aa", func(ctx context.Context) { <-ctx.Done(); cause <- context.Cause(ctx) })
+	if err := <-cause; !errors.Is(err, errServerStopping) {
+		t.Errorf("cause: %v", err)
+	}
+	f.m.stop() // a second stop is harmless
+}
+
+// setTempDir points os.TempDir at dir: TMPDIR on Unix, TMP and TEMP on
+// Windows.
+func setTempDir(t *testing.T, dir string) {
+	t.Helper()
+	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(name, dir)
 	}
 }
 

@@ -109,15 +109,29 @@ func newTrainingID(kind string) string {
 // trainingDir is MDDB_TRAINING_DIR, or "training" beside the database, as
 // an absolute path: a command runs in its job directory, so a relative path
 // handed to it would point somewhere else. (Abs fails only without a working
-// directory; the empty root then fails every job with a clear error.)
+// directory; the empty root then fails every job with a clear error.) A
+// server without a database file gets a private directory of its own.
 func (s *Server) trainingDir() string {
 	dir := os.Getenv(trainingDirEnv)
 	switch {
 	case dir != "":
 	case s.Path == "":
-		dir = filepath.Join(os.TempDir(), "mddb-training")
+		return privateTrainingDir()
 	default:
 		dir = filepath.Join(filepath.Dir(s.Path), "training")
+	}
+	abs, _ := filepath.Abs(dir)
+	return abs
+}
+
+// privateTrainingDir creates a training root only this process uses: a
+// fixed name in the shared temporary directory could be created first, or
+// linked elsewhere, by another user, so the name is random and the mode
+// 0700. "" when it cannot be created: every job then fails with the error.
+func privateTrainingDir() string {
+	dir, err := os.MkdirTemp("", "mddb-training-*")
+	if err != nil {
+		return ""
 	}
 	abs, _ := filepath.Abs(dir)
 	return abs
