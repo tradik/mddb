@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Blog:** "MDDB as Your Knowledge Base" — loading folders, sites and repositories, who reads what, and the four ways to connect (MCP, External Knowledge, the web search engine, a scenario as a model), with a measured question: 380 tokens for three passages against about 71,800 for the three documents.
 - **Blog:** "Keep Your Agent's Code Index Live" — `autoindex --watch` and `hook install` on a local checkout, a project skill that makes the agent search first, measured delays (1.5–2.1 s from save to searchable, 0.16–0.22 s per commit) and token estimates per lookup.
 
 ### Fixed
