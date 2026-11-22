@@ -27,7 +27,7 @@ var httpFeatureRoutes = map[string]string{
 	"/v1/memory/summarize": FeatureMemory, "/v1/memory/sessions": FeatureMemory, "/v1/memory/history": FeatureMemory,
 	"/v1/code-graph": FeatureCodeIntel, "/v1/symbol": FeatureCodeIntel, "/v1/code-languages": FeatureCodeIntel,
 	"/v1/eval": FeatureEval, "/v1/eval-queries": FeatureEval,
-	"/v1/corpus": FeatureCorpus, "/v1/corpus/build": FeatureCorpus, "/v1/corpus/install": FeatureCorpus, "/v1/corpus/remove": FeatureCorpus,
+	"/v1/corpus": FeatureCorpus, "/v1/corpus/build": FeatureCorpus, "/v1/corpus/install": FeatureCorpus, "/v1/corpus/inspect": FeatureCorpus, "/v1/corpus/remove": FeatureCorpus,
 	"/v1/classify":        FeatureClassify,
 	"/v1/find-duplicates": FeatureDuplicates,
 	"/v1/image":           FeatureImages,

@@ -191,6 +191,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/automation-logs":               ruleAdmin,
 	"/v1/corpus/build":                  ruleAdmin,
 	"/v1/corpus/install":                ruleAdmin,
+	"/v1/corpus/inspect":                ruleAdmin, // FE-022
 	"/v1/corpus/remove":                 ruleAdmin,
 	"/v1/mcp/keys":                      ruleAdmin,
 	"/v1/mcp/keys/disable":              ruleAdmin,

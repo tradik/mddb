@@ -146,6 +146,7 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/corpus", s.handleCorpusList)
 	mux.HandleFunc("/v1/corpus/build", s.handleCorpusBuild)
 	mux.HandleFunc("/v1/corpus/install", s.guardWrite(s.handleCorpusInstall))
+	mux.HandleFunc("/v1/corpus/inspect", s.handleCorpusInspect) // FE-022
 	mux.HandleFunc("/v1/corpus/remove", s.guardWrite(s.handleCorpusRemove))
 	mux.HandleFunc("/v1/curation", s.handleCuration)
 	mux.HandleFunc("/v1/events", s.handleSSE)

@@ -167,12 +167,31 @@ func corpusInfoToProto(c *CorpusInfo) *proto.CorpusInfoProto {
 	out := &proto.CorpusInfoProto{
 		Name: c.Name, Version: c.Version, License: c.License, MddbVersion: c.MddbVersion,
 		DocCount: int64(c.DocCount), Sha256: c.SHA256, VectorsDisabled: c.VectorsDisabled,
+		Description: c.Description, Sources: corpusSourcesToProto(c.Sources),
+		PackLicense: c.PackLicense, Collections: c.Collections, Bytes: c.Bytes,
 	}
 	if !c.InstalledAt.IsZero() {
 		out.InstalledAt = c.InstalledAt.Unix()
 	}
 	if e := c.Embedding; e != nil {
 		out.EmbeddingProvider, out.EmbeddingModel, out.EmbeddingDims = e.Provider, e.Model, safeInt32(e.Dims)
+	}
+	return out
+}
+
+// corpusSourcesToProto and corpusSourcesFromProto carry a pack's sources.
+func corpusSourcesToProto(in []corpusSource) []*proto.CorpusSourceProto {
+	var out []*proto.CorpusSourceProto
+	for _, src := range in {
+		out = append(out, &proto.CorpusSourceProto{Repo: src.Repo, Commit: src.Commit, License: src.License})
+	}
+	return out
+}
+
+func corpusSourcesFromProto(in []*proto.CorpusSourceProto) []corpusSource {
+	var out []corpusSource
+	for _, src := range in {
+		out = append(out, corpusSource{Repo: src.GetRepo(), Commit: src.GetCommit(), License: src.GetLicense()})
 	}
 	return out
 }

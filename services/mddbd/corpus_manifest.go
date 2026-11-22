@@ -6,24 +6,32 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"mddb/internal/migrate"
 )
 
 // Corpus packs (AGT-005): a collection built once — documents, full-text
 // index, vectors, geo points — shipped as one file and installed read-only
 // on any server without re-embedding or reindexing. See docs/CORPUS-PACKS.md.
 //
-// A pack is a zstd-compressed tar holding two files, in this order:
+// A pack is a zstd-compressed tar holding, in this order:
 //
 //	manifest.json  what the pack is, where it came from, under which licence
 //	collection.db  the collection's bbolt file, as the per-collection layout
 //	               keeps it: every collection bucket, only this collection's keys
+//
+// A pack of several collections (format 2, FE-022) holds collection-1.db …
+// collection-N.db instead, one per entry of the manifest's "collections", in
+// that order (corpus_parts.go).
 
-// corpusFormat is the version of the pack layout this build reads and writes.
-const corpusFormat = 1
+// The pack layouts this build reads: format 1 holds one collection, format 2
+// several. A build writes format 1 whenever the pack holds one collection, so
+// such a pack still installs on a server that reads format 1 only.
+const (
+	corpusFormat      = 1
+	corpusFormatMulti = 2
+)
 
-// The two members of a pack, by name.
+// The members of a pack, by name: the manifest, and the one collection file
+// of a format-1 pack.
 const (
 	corpusManifestName = "manifest.json"
 	corpusDataName     = "collection.db"
@@ -32,8 +40,9 @@ const (
 // corpusManifest is manifest.json.
 type corpusManifest struct {
 	Format int `json:"format"`
-	// Name is the collection the pack installs as. Keys inside the file
-	// carry it, so it cannot be renamed on install.
+	// Name is the collection a format-1 pack installs as. Keys inside the
+	// file carry it, so it cannot be renamed on install. A format-2 pack's
+	// collections are named in Collections; Name is then the pack's own.
 	Name        string `json:"name"`
 	Version     string `json:"version,omitempty"`
 	Description string `json:"description,omitempty"`
@@ -47,10 +56,13 @@ type corpusManifest struct {
 	// are mandatory: a pack is only for what may be redistributed.
 	License   string           `json:"license"`
 	Sources   []corpusSource   `json:"sources,omitempty"`
-	Embedding *corpusEmbedding `json:"embedding"` // null: full-text only
-	DocCount  int              `json:"docCount"`
-	SHA256    string           `json:"sha256"` // of collection.db
-	Bytes     int64            `json:"bytes"`  // of collection.db
+	Embedding *corpusEmbedding `json:"embedding"`        // null: full-text only, or format 2
+	DocCount  int              `json:"docCount"`         // format 2: of every collection
+	SHA256    string           `json:"sha256,omitempty"` // of collection.db; format 2: per collection
+	Bytes     int64            `json:"bytes"`            // of collection.db; format 2: of every file
+	// Collections are the collections of a format-2 pack, in the order their
+	// files follow the manifest; each carries its own licence and checksum.
+	Collections []corpusPart `json:"collections,omitempty"`
 }
 
 // corpusSource is one origin of a pack's documents.
@@ -84,6 +96,16 @@ type CorpusInfo struct {
 	// full-text half.
 	VectorsDisabled bool             `json:"vectorsDisabled,omitempty"`
 	Embedding       *corpusEmbedding `json:"embedding,omitempty"`
+	// Description and Sources are the manifest's (a collection of a format-2
+	// pack keeps its own sources), so the pack can be built again as it was.
+	Description string         `json:"description,omitempty"`
+	Sources     []corpusSource `json:"sources,omitempty"`
+	// Bytes is the size of the collection's file in the pack.
+	Bytes int64 `json:"bytes,omitempty"`
+	// PackLicense and Collections are set for a pack of several collections:
+	// the licence of the pack as a whole and every collection it installed.
+	PackLicense string   `json:"packLicense,omitempty"`
+	Collections []string `json:"collections,omitempty"`
 }
 
 // packNamePattern is a pack name: a collection name that is also a safe,
@@ -117,8 +139,8 @@ func (m *corpusManifest) validateLicenses() error {
 
 // validate checks a manifest read from a pack before anything is installed.
 func (m *corpusManifest) validate() error {
-	if m.Format != corpusFormat {
-		return fmt.Errorf("unsupported pack format %d: this server reads format %d", m.Format, corpusFormat)
+	if m.Format != corpusFormat && m.Format != corpusFormatMulti {
+		return fmt.Errorf("unsupported pack format %d: this server reads formats %d and %d", m.Format, corpusFormat, corpusFormatMulti)
 	}
 	if err := validPackName(m.Name); err != nil {
 		return err
@@ -126,30 +148,41 @@ func (m *corpusManifest) validate() error {
 	if err := m.validateLicenses(); err != nil {
 		return err
 	}
-	if m.SchemaVersion > migrate.Latest() {
-		return fmt.Errorf("the pack was built by mddb %s with storage format %d; this server knows format %d — upgrade it first",
-			m.MddbVersion, m.SchemaVersion, migrate.Latest())
+	if m.Format == corpusFormatMulti {
+		if err := validPartList(m.Collections); err != nil {
+			return err
+		}
 	}
-	if len(m.SHA256) != 64 {
-		return errors.New("the manifest has no sha256 of collection.db")
+	for i, p := range m.parts() {
+		if err := p.validate(corpusMemberName(m.Format, i), m.MddbVersion); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// info is the part of a manifest a collection config keeps.
-func (m *corpusManifest) info(vectorsDisabled bool, now time.Time) *CorpusInfo {
-	return &CorpusInfo{
-		Name: m.Name, Version: m.Version, License: m.License, MddbVersion: m.MddbVersion,
-		DocCount: m.DocCount, SHA256: m.SHA256, InstalledAt: now.UTC(),
-		VectorsDisabled: vectorsDisabled, Embedding: m.Embedding,
+// info is the part of a manifest a collection config keeps for one of its
+// collections.
+func (m *corpusManifest) info(p corpusPart, vectorsDisabled bool, now time.Time) *CorpusInfo {
+	info := &CorpusInfo{
+		Name: m.Name, Version: m.Version, License: p.License, MddbVersion: m.MddbVersion,
+		DocCount: p.DocCount, SHA256: p.SHA256, InstalledAt: now.UTC(),
+		VectorsDisabled: vectorsDisabled, Embedding: p.Embedding,
+		Description: m.Description, Sources: p.Sources, Bytes: p.Bytes,
 	}
+	if m.Format == corpusFormatMulti {
+		info.PackLicense = m.License
+		for _, c := range m.Collections {
+			info.Collections = append(info.Collections, c.Name)
+		}
+	}
+	return info
 }
 
-// embeddingMismatch says why the pack's vectors cannot be searched with the
-// server's provider, or "" when they can (or the pack has none). model and
+// embeddingMismatch says why the vectors of e cannot be searched with the
+// server's provider, or "" when they can (or there are none). model and
 // dims describe the server's provider; model "" means it has none.
-func (m *corpusManifest) embeddingMismatch(model string, dims int) string {
-	e := m.Embedding
+func (e *corpusEmbedding) mismatch(model string, dims int) string {
 	switch {
 	case e == nil:
 		return ""

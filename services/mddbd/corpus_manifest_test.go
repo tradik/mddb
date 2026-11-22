@@ -23,7 +23,7 @@ func TestManifestValidation(t *testing.T) {
 		want   string
 	}{
 		{"valid", func(*corpusManifest) {}, ""},
-		{"format", func(m *corpusManifest) { m.Format = 2 }, "unsupported pack format"},
+		{"format", func(m *corpusManifest) { m.Format = 3 }, "unsupported pack format"},
 		{"name", func(m *corpusManifest) { m.Name = "../etc" }, "invalid pack name"},
 		{"no licence", func(m *corpusManifest) { m.License = " " }, "needs a licence"},
 		{"source without repo", func(m *corpusManifest) { m.Sources[0].Repo = "" }, "has no repo"},
@@ -45,7 +45,7 @@ func TestManifestValidation(t *testing.T) {
 
 func TestEmbeddingMismatch(t *testing.T) {
 	m := validManifest()
-	if why := m.embeddingMismatch("any", 3); why != "" {
+	if why := m.Embedding.mismatch("any", 3); why != "" {
 		t.Fatalf("a full-text pack mismatches: %s", why)
 	}
 	m.Embedding = &corpusEmbedding{Model: "m1", Dims: 3}
@@ -59,11 +59,11 @@ func TestEmbeddingMismatch(t *testing.T) {
 		{"m1", 4, "3 dimensions"},
 		{"m2", 3, "made with m1"},
 	} {
-		if why := m.embeddingMismatch(tc.model, tc.dims); tc.want == "" && why != "" || !strings.Contains(why, tc.want) {
+		if why := m.Embedding.mismatch(tc.model, tc.dims); tc.want == "" && why != "" || !strings.Contains(why, tc.want) {
 			t.Fatalf("embeddingMismatch(%q, %d) = %q, want %q", tc.model, tc.dims, why, tc.want)
 		}
 	}
-	info := m.info(true, time.Unix(0, 0))
+	info := m.info(m.parts()[0], true, time.Unix(0, 0))
 	if !info.VectorsDisabled || info.Name != "docs" || info.Embedding == nil {
 		t.Fatalf("info = %+v", info)
 	}

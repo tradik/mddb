@@ -281,8 +281,9 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 
 		// Corpus packs (AGT-005)
 		{Method: "GET", Path: "/v1/corpus", Description: "List installed corpus packs", RequiresAuth: authEnabled},
-		{Method: "POST", Path: "/v1/corpus/build", Description: "Build a corpus pack of a collection (tar.zst stream)", RequiresAuth: authEnabled},
-		{Method: "POST", Path: "/v1/corpus/install", Description: "Install an uploaded corpus pack as a read-only collection", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/corpus/build", Description: "Build a corpus pack of one or several collections (tar.zst stream)", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/corpus/install", Description: "Install an uploaded corpus pack: its collections, read-only", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/corpus/inspect", Description: "Read an uploaded corpus pack's manifest without installing it", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/corpus/remove", Description: "Remove an installed corpus pack", RequiresAuth: authEnabled},
 
 		// Vector search
