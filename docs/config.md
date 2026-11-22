@@ -60,7 +60,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
 | `MDDB_METRICS_PUBLIC` | `"false"` | bool | With `MDDB_AUTH_ENABLED=true`, serve `/metrics` without credentials (SEC-009). No effect when auth is off ([TELEMETRY.md](TELEMETRY.md)) |
 | `MDDB_SEARCH_STATS` | `"true"` | bool | Include `searchStats` in search responses |
-| `MDDB_FEATURES_FORCE_OFF` | `""` | list | Optional modules kept off whatever the panel says (v2.19.0, GO-049), comma-separated, e.g. `geo,chat`: `chat`, `chatExternalMcp`, `geo`, `temporal`, `spell`, `curation`, `automation`, `memory`, `codeIntel`, `eval`, `corpus`, `classify`, `duplicates`, `images`, `webhooks`, `schemas`, `aliases`, `crossSearch`, `searchTuning`, `ftsTuning`. Such a module is shown as locked and `PUT /v1/features/{name}` answers `409`. Unknown names are ignored. See [API.md](API.md#features-v1features) |
+| `MDDB_FEATURES_FORCE_OFF` | `""` | list | Optional modules kept off whatever the panel says (v2.19.0, GO-049), comma-separated, e.g. `geo,chat`: `chat`, `chatExternalMcp`, `geo`, `temporal`, `spell`, `curation`, `automation`, `memory`, `codeIntel`, `eval`, `corpus`, `classify`, `duplicates`, `images`, `webhooks`, `schemas`, `aliases`, `crossSearch`, `searchTuning`, `ftsTuning`, `webSearch`, `rerankApi`, `extractApi`. Such a module is shown as locked and `PUT /v1/features/{name}` answers `409`. Unknown names are ignored. See [API.md](API.md#features-v1features) |
 
 ---
 
@@ -814,6 +814,12 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
 | `MDDB_QDRANT_COMPAT` | `false` | bool | `true` mounts the Qdrant REST requests `qdrant-client`'s `query_points` makes under `/qdrant` on the HTTP listener (`GET /qdrant`, `POST /qdrant/collections/{name}/points/query`), so Open WebUI's External Knowledge Source with the Qdrant provider can search a collection. The vector goes to `/v1/vector-search` (chunk mode) behind the same auth, permissions, rate limiter and body cap; the `api-key` header is accepted as an MDDB API key. See [QDRANT_COMPAT.md](QDRANT_COMPAT.md) |
+
+## Open WebUI Engines (v2.19.10+)
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_WEBSEARCH_COLLECTIONS` | `""` | list | Collections `POST /v1/web-search` searches when the URL names none (#449), comma-separated; aliases and `role:<role>` resolve. Empty: every collection the caller may read. Each is still kept only when the caller may read it. The endpoint itself is the `webSearch` module, off by default. See [OPENWEBUI.md](OPENWEBUI.md) |
 
 ---
 

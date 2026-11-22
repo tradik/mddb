@@ -33,11 +33,13 @@ func featureManager(t *testing.T, forceOff string) (*FeatureManager, *bolt.DB) {
 func TestFeatureRegistryDefaults(t *testing.T) {
 	f, _ := featureManager(t, "")
 	list := f.List()
-	if len(list) != len(featureRegistry) || len(list) != 20 {
+	if len(list) != len(featureRegistry) || len(list) != 23 {
 		t.Fatalf("registry: %d modules", len(list))
 	}
+	// The modules that open a new way in start off (#449-#451).
+	off := map[string]bool{FeatureChatExternalMCP: true, FeatureWebSearch: true, FeatureRerankAPI: true, FeatureExtractAPI: true}
 	for _, st := range list {
-		want := st.Name != FeatureChatExternalMCP
+		want := !off[st.Name]
 		if st.Enabled != want || st.Configured != want || st.Default != want || st.LockedBy != "" || st.UpdatedAt != nil {
 			t.Errorf("%s by default: %+v", st.Name, st)
 		}

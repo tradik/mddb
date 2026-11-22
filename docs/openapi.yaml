@@ -197,6 +197,10 @@ tags:
     description: The Qdrant REST requests qdrant-client's query_points makes,
       under /qdrant, run through MDDB's vector search (requires
       MDDB_QDRANT_COMPAT=true; v2.19.10+). See QDRANT_COMPAT.md.
+  - name: Open WebUI Engines
+    description: The request shapes Open WebUI sends to an external web search
+      engine, reranker and document loader (v2.19.10, issues 449-451). Each is a
+      feature module that starts off. See OPENWEBUI.md.
 
 paths:
   /health:
@@ -9944,8 +9948,224 @@ paths:
         "429": {$ref: "#/components/responses/RateLimited"}
         "503": {$ref: "#/components/responses/SearchBusy"}
 
+  # --- Open WebUI engine endpoints (#449, #450, #451) -----------------------
+  # Request and response shapes of the external engines Open WebUI calls; each
+  # route is a feature module that starts off. See docs/OPENWEBUI.md.
+  /v1/web-search:
+    post:
+      tags: [Open WebUI Engines]
+      summary: Search readable collections (external web search shape)
+      description: |
+        v2.19.10 (#449), module `webSearch` (off by default). Runs the
+        cross-collection full-text search (`searchType=hybrid` for hybrid)
+        over every collection the caller may read, tenant-scoped, skipping
+        the server's own memory and chat stores; `collections` on the URL or
+        MDDB_WEBSEARCH_COLLECTIONS narrows that. Each hit becomes `link` (the
+        document's `url`, `source_url` or `link` metadata when it is
+        http(s), else its `/v1/doc-meta` URL on the address the request
+        reached), `title` (`meta.title`, else the key) and `snippet` (the
+        passage around the query's words, at most 4096 characters).
+      operationId: webSearch
+      parameters:
+        - name: collections
+          in: query
+          required: false
+          description: Collections to search, comma-separated or repeated; aliases and `role:<role>` are resolved. Every one must be readable.
+          schema: {type: string}
+          example: docs,kb
+        - name: searchType
+          in: query
+          required: false
+          description: fts (default) or hybrid
+          schema: {type: string, enum: [fts, hybrid], default: fts}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: {type: string, description: What to search for}
+                count: {type: integer, description: "Results wanted; 10 when absent, under the server's limit cap"}
+            example: {query: how do I reset the pump, count: 3}
+      responses:
+        "200":
+          description: The hits, best first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [link, title, snippet]
+                  properties:
+                    link: {type: string, description: "The document's own URL, else its REST URL"}
+                    title: {type: string}
+                    snippet: {type: string, description: The best passage}
+              example:
+                - link: http://mddb:11023/v1/doc-meta?collection=kb&key=pump&lang=en
+                  title: Pump maintenance
+                  snippet: To reset the pump, hold the button for five seconds.
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
+        "405": {$ref: "#/components/responses/OpenWebUIMethodNotAllowed"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503":
+          description: The collection list is still being computed, or every search slot is busy; retry
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+
+  /v1/rerank:
+    post:
+      tags: [Open WebUI Engines]
+      summary: Score texts against a query (external reranker shape)
+      description: |
+        v2.19.10 (#450), module `rerankApi` (off by default). Scores the
+        documents with the reranking model the search rerank stage uses
+        (a stored configuration of kind `rerank`, else MDDB_RERANK_*), with
+        its cache. The server runs one model, so `model` does not choose
+        one: `reranker`, empty or any other name use it, and the answer
+        names it. Every document gets a result; one the model did not score
+        gets a score below all the others. Each document is read up to 2048
+        characters; at most 200 documents and 2 MiB of text per call.
+      operationId: rerankTexts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query, documents]
+              properties:
+                model: {type: string, description: Accepted and ignored}
+                query: {type: string}
+                documents:
+                  type: array
+                  maxItems: 200
+                  items: {type: string}
+                top_n: {type: integer, minimum: 0, description: Results to return; 0 or absent returns one per document}
+            example: {model: reranker, query: pump reset, documents: [Hold the button., Oil monthly.], top_n: 2}
+      responses:
+        "200":
+          description: The scores, best first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [model, results]
+                properties:
+                  model: {type: string, description: The model that scored}
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [index, relevance_score]
+                      properties:
+                        index: {type: integer, description: Position in documents}
+                        relevance_score: {type: number, format: double}
+              example: {model: my-reranker, results: [{index: 0, relevance_score: 0.92}, {index: 1, relevance_score: 0.11}]}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
+        "405": {$ref: "#/components/responses/OpenWebUIMethodNotAllowed"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "502":
+          description: The reranking model failed (timeout, invalidResponse or error)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+              example: {error: "the reranking model failed: timeout"}
+        "503":
+          description: No reranking model is configured
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+
+  /v1/extract/process:
+    put:
+      tags: [Open WebUI Engines]
+      summary: Convert a file to Markdown without storing it (external document loader shape)
+      description: |
+        v2.19.10 (#451), module `extractApi` (off by default). The converters
+        of /v1/upload, without the write. The format comes from
+        `Content-Type`, then the `X-Filename` extension; PDF and the zip
+        formats are also recognised by content. One document answers an
+        object; a mailbox or an email with attachments answers a list, the
+        file first. Metadata values are strings, `conversionConfidence` a
+        number.
+      operationId: extractDocument
+      parameters:
+        - name: X-Filename
+          in: header
+          required: false
+          description: The file's name, URL-quoted; a directory part is dropped
+          schema: {type: string}
+          example: Report%20Q1.pdf
+        - name: maxSize
+          in: query
+          required: false
+          description: Size limit in bytes; 10 MB when absent, at most 100 MB (MDDB_MAX_BODY_BYTES still applies)
+          schema: {type: integer, minimum: 1}
+      requestBody:
+        required: true
+        description: The file's bytes
+        content:
+          application/octet-stream:
+            schema: {type: string, format: binary}
+      responses:
+        "200":
+          description: The document, or the documents the file holds
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ExtractedDocument"
+                  - type: array
+                    items: {$ref: "#/components/schemas/ExtractedDocument"}
+              example:
+                page_content: "# Report\n\nWater level 4.2 m."
+                metadata: {source: Report Q1.pdf, mime: application/pdf, converter: pdf, conversionConfidence: 1}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
+        "405": {$ref: "#/components/responses/OpenWebUIMethodNotAllowed"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "415":
+          description: No converter reads this format; the message lists the supported ones
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+        "422":
+          description: The file is of a supported format but could not be converted
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  # --- end of Open WebUI engine endpoints -----------------------------------
+
 components:
   schemas:
+    ExtractedDocument:
+      type: object
+      description: One document /v1/extract/process made of a file (issue 451).
+      required: [page_content, metadata]
+      properties:
+        page_content: {type: string, description: The Markdown}
+        metadata:
+          type: object
+          description: >
+            source (the file name, plus the part's suffix for a part),
+            converter (the format), mime (the request's Content-Type, when
+            sent), conversionConfidence (a number, converted formats only),
+            conversionWarnings, parent (for a part), and what the file says
+            about itself (email headers), each a string.
+          additionalProperties: true
     Feature:
       type: object
       description: One switchable module (v2.19.0, GO-049).
@@ -17113,6 +17333,16 @@ components:
         application/json:
           schema: {type: object}
   responses:
+    OpenWebUIMethodNotAllowed:
+      description: The route answers one method only (issues 449-451); the Allow header names it.
+      headers:
+        Allow:
+          description: The one method the route answers
+          schema: {type: string}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+          example: {error: "method not allowed: use POST"}
     NotLeader:
       description: >
         (v2.19.8, GO-051) This cluster node does not lead; send the write to

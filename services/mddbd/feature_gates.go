@@ -37,6 +37,7 @@ var httpFeatureRoutes = map[string]string{
 	"/v1/cross-search":   FeatureCrossSearch,
 	"/v1/search-advisor": FeatureSearchTuning, "/v1/vector-projection": FeatureSearchTuning,
 	"/v1/synonyms": FeatureFTSTuning, "/v1/stopwords": FeatureFTSTuning,
+	"/v1/web-search": FeatureWebSearch, "/v1/rerank": FeatureRerankAPI, "/v1/extract/process": FeatureExtractAPI,
 }
 
 // routeFeature is the module of a route pattern, "" for core.
