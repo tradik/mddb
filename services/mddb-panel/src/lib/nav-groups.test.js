@@ -8,8 +8,8 @@ const plain = { features: {}, authEnabled: false, clusterEnabled: false, automat
 const modes = (groups) => groups.flatMap((g) => g.items.map((i) => i.mode));
 
 describe('the menu data', () => {
-  test('six groups in order, every page once, each with an icon and a label', () => {
-    expect(NAV_GROUPS.map((g) => g.label)).toEqual(['Search', 'Data', 'Chat', 'Integrations', 'Security', 'System']);
+  test('seven groups in order, every page once, each with an icon and a label', () => {
+    expect(NAV_GROUPS.map((g) => g.label)).toEqual(['Collections', 'Search', 'Search Tuning', 'Chat', 'Integrations', 'Security', 'System']);
     const all = modes(NAV_GROUPS);
     expect(all).toHaveLength(35);
     expect(new Set(all).size).toBe(all.length);
@@ -44,7 +44,7 @@ describe('helpers', () => {
   });
 
   test('the search matches labels, case and diacritics aside, and drops empty groups', () => {
-    expect(visibleGroups(everything, '  stop ').map((g) => g.id)).toEqual(['search']);
+    expect(visibleGroups(everything, '  stop ').map((g) => g.id)).toEqual(['tuning']);
     expect(modes(visibleGroups(everything, 'SEARCH'))).toEqual(['vectors', 'crossSearch', 'geo', 'searchAdvisor']);
     expect(modes(visibleGroups(everything, 'ÉNCRŸPTIÓN'.replace('Ÿ', 'Y')))).toEqual(['encryption']);
     expect(visibleGroups(everything, 'nothing like this')).toEqual([]);
@@ -59,7 +59,8 @@ describe('helpers', () => {
   });
 
   test('groupOfView finds the group of a page', () => {
-    expect(groupOfView('stopwords')).toBe('search');
+    expect(groupOfView('stopwords')).toBe('tuning');
+    expect(groupOfView('import')).toBe('data');
     expect(groupOfView('cluster')).toBe('system');
     expect(groupOfView('documents')).toBeNull();
   });

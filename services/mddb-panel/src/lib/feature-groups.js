@@ -13,8 +13,9 @@
 
 /** Category id, heading and the modules in it, in display order. */
 export const FEATURE_GROUPS = [
-  { id: 'search', label: 'Search', features: ['crossSearch', 'geo', 'searchTuning', 'eval', 'codeIntel', 'ftsTuning', 'curation', 'spell'] },
-  { id: 'data', label: 'Data', features: ['aliases', 'schemas', 'duplicates', 'temporal', 'classify', 'images', 'corpus'] },
+  { id: 'data', label: 'Collections', features: ['corpus', 'aliases', 'schemas', 'duplicates', 'temporal', 'classify', 'images'] },
+  { id: 'search', label: 'Search', features: ['crossSearch', 'geo', 'codeIntel'] },
+  { id: 'tuning', label: 'Search Tuning', features: ['searchTuning', 'eval', 'ftsTuning', 'curation', 'spell'] },
   { id: 'chat', label: 'Chat', features: ['chat', 'chatExternalMcp', 'memory'] },
   { id: 'integrations', label: 'Integrations', features: ['automation', 'webhooks', 'webSearch', 'rerankApi', 'extractApi', 'vectorStores', 'esCompat', 'qdrantCompat'] },
 ];

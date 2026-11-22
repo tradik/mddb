@@ -26,7 +26,7 @@ const list = [
 async function renderPanel(features = list) {
   vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features, version: 7 });
   render(<FeaturesPanel />);
-  await screen.findByText('version 7');
+  await screen.findByText('Switches saved: version 7.');
   await screen.findByRole('region', { name: 'Modules' });
 }
 
@@ -48,7 +48,7 @@ describe('categories', () => {
   test('modules sit under their category headings, each with its own list', async () => {
     await renderPanel();
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Search', 'Data', 'Chat', 'Integrations',
+      'Collections', 'Search', 'Chat', 'Integrations',
     ]);
     const chatList = screen.getByRole('list', { name: 'Chat modules' });
     expect(within(chatList).getAllByRole('switch')).toHaveLength(2);
@@ -60,8 +60,8 @@ describe('turn on all / turn off all', () => {
     await renderPanel();
     fireEvent.click(screen.getByRole('button', { name: 'Turn on all' }));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog.textContent).toContain('Cross search, Chat, Chat: external MCP servers will be turned on.');
-    expect(dialog.textContent).toContain('Skipped, forced off by the operator: Temporal analytics.');
+    expect(dialog.textContent).toContain('Search across collections, Chat assistants, Tools from other MCP servers will be turned on.');
+    expect(dialog.textContent).toContain('Skipped, forced off by the operator: Activity over time.');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on' }));
     await screen.findByText('3 modules turned on.');
     expect(vi.mocked(mddbClient.setFeature).mock.calls).toEqual([
@@ -98,7 +98,7 @@ describe('turn on all / turn off all', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(mddbClient.setFeature).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Turn on all in Data' }).disabled).toBe(true);
-    expect(screen.getByRole('button', { name: 'Turn off all in Data' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Turn on all in Collections' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Turn off all in Collections' }).disabled).toBe(true);
   });
 });
