@@ -60,23 +60,76 @@ func defaultPackFile(collection, version string) string {
 	return collection + "-" + version + ".mddbpack"
 }
 
+// parseCorpusCollection reads -c NAME[=LICENSE]: a collection of the pack,
+// with a licence of its own. A collection name holds no '='.
+func parseCorpusCollection(s string) (map[string]any, error) {
+	name, license, hasLicense := strings.Cut(s, "=")
+	if strings.TrimSpace(name) == "" || hasLicense && strings.TrimSpace(license) == "" {
+		return nil, fmt.Errorf("-c %q: want NAME or NAME=LICENSE, e.g. -c notes=MIT", s)
+	}
+	c := map[string]any{"name": name}
+	if hasLicense {
+		c["license"] = license
+	}
+	return c, nil
+}
+
+// corpusBuildBody is the body of POST /v1/corpus/build: one collection named
+// as the argument, or the -c collections of a pack called name.
+func corpusBuildBody(args, collections []string, name string) (map[string]any, string, error) {
+	switch {
+	case len(args) == 1 && len(collections) > 0:
+		return nil, "", errors.New("name the collection as the argument or with -c, not both")
+	case len(args) == 1:
+		return map[string]any{"collection": args[0]}, args[0], nil
+	case len(collections) == 0:
+		return nil, "", errors.New("name a collection: corpus build <collection>, or -c for each collection of the pack")
+	}
+	var cols []map[string]any
+	for _, c := range collections {
+		col, err := parseCorpusCollection(c)
+		if err != nil {
+			return nil, "", err
+		}
+		cols = append(cols, col)
+	}
+	body := map[string]any{"collections": cols}
+	file := name
+	if name != "" {
+		body["name"] = name
+	} else {
+		file = cols[0]["name"].(string)
+	}
+	return body, file, nil
+}
+
 func newCorpusBuildCmd() *cobra.Command {
-	var output, license, version, description string
-	var sources []string
+	var output, license, version, description, name string
+	var sources, collections []string
 	cmd := &cobra.Command{
-		Use:   "build <collection>",
-		Short: "Build a pack of a collection",
+		Use:   "build [<collection>] [-c <collection>[=LICENSE]]...",
+		Short: "Build a pack of one collection or several",
 		Long: `Ask the server for a consistent snapshot of the collection and save it as a
 pack. The pack installs under the collection's name.
 
   mddb-cli corpus build k8s-docs --license CC-BY-4.0 --version 1.31 \
-    --source CC-BY-4.0=https://github.com/kubernetes/website@release-1.31 -o k8s-docs-1.31.mddbpack`,
-		Args: cobra.ExactArgs(1),
+    --source CC-BY-4.0=https://github.com/kubernetes/website@release-1.31 -o k8s-docs-1.31.mddbpack
+
+With -c for each collection, one pack holds several; it needs a --name of its
+own and installs each collection under its own name. A collection may carry a
+licence of its own (-c NAME=LICENSE); the others are under --license.
+
+  mddb-cli corpus build --name handbook -c policies -c faq=CC-BY-4.0 --license MIT`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if strings.TrimSpace(license) == "" {
 				return errors.New("build refuses without --license: pack only what may be redistributed, and say under which terms")
 			}
-			body := map[string]any{"collection": args[0], "version": version, "description": description, "license": license}
+			body, file, err := corpusBuildBody(args, collections, name)
+			if err != nil {
+				return err
+			}
+			body["version"], body["description"], body["license"] = version, description, license
 			var parsed []corpusSource
 			for _, s := range sources {
 				src, err := parseCorpusSource(s)
@@ -87,9 +140,9 @@ pack. The pack installs under the collection's name.
 			}
 			body["sources"] = parsed
 			if output == "" {
-				output = defaultPackFile(args[0], version)
+				output = defaultPackFile(file, version)
 			}
-			raw, _ := json.Marshal(body) // strings and a slice of them: always encodes
+			raw, _ := json.Marshal(body) // strings, maps and slices of them: always encodes
 			rc, err := newClient().DoStream(context.Background(), "POST", "/v1/corpus/build", "application/json", bytes.NewReader(raw))
 			if err != nil {
 				return err
@@ -103,11 +156,13 @@ pack. The pack installs under the collection's name.
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&output, "output", "o", "", "Pack file to write (default <collection>[-<version>].mddbpack)")
+	cmd.Flags().StringVarP(&output, "output", "o", "", "Pack file to write (default <collection or name>[-<version>].mddbpack)")
 	cmd.Flags().StringVar(&license, "license", "", "Licence of the pack as a whole, e.g. CC-BY-4.0 (required)")
 	cmd.Flags().StringVar(&version, "version", "", "Pack version, e.g. 1.31")
 	cmd.Flags().StringVar(&description, "description", "", "What the pack holds")
 	cmd.Flags().StringArrayVar(&sources, "source", nil, "A source of the documents: LICENSE=REPO[@COMMIT] (repeatable)")
+	cmd.Flags().StringArrayVarP(&collections, "collection", "c", nil, "A collection of the pack, NAME or NAME=LICENSE (repeatable; instead of the argument)")
+	cmd.Flags().StringVar(&name, "name", "", "The pack's name, required for several collections")
 	return cmd
 }
 
@@ -153,7 +208,7 @@ func newCorpusListCmd() *cobra.Command {
 func newCorpusRemoveCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove <name>",
-		Short: "Remove an installed pack: its collection, file and config",
+		Short: "Remove an installed pack: its collections, files and configs",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			raw, err := newClient().Do(context.Background(), "POST", "/v1/corpus/remove", map[string]string{"name": args[0]})
