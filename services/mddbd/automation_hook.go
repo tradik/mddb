@@ -6,7 +6,6 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
-	"hash"
 	"io"
 	"net/http"
 	"strings"
@@ -15,7 +14,9 @@ import (
 )
 
 // POST /v1/automation/{id}/hook (#421): a forge's push or release webhook
-// runs a git sync at once, through the code its schedule fires (RunNow). The
+// runs a git sync at once, through the code its schedule fires (RunNow); an
+// issue, comment or pull request event refreshes the one document of an
+// issues sync (INT-023, sync_issues_hook.go). The
 // forge has no mddb credentials, so the route is open (isAutomationHookPath)
 // and the request proves itself instead, against the stored secret the rule
 // names in hookSecretRef: GitHub's X-Hub-Signature-256 (also sent by Gitea
@@ -64,7 +65,8 @@ func (s *Server) automationHook(r *http.Request, id string) (int, any) {
 		}
 		return http.StatusServiceUnavailable, hookError("the hook's secret cannot be opened")
 	}
-	if err := verifyHook(r, secret); err != nil {
+	body, err := verifyHook(r, secret)
+	if err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
 			return http.StatusRequestEntityTooLarge, hookError("the webhook body is too large")
@@ -73,6 +75,11 @@ func (s *Server) automationHook(r *http.Request, id string) (int, any) {
 	}
 	if r.Header.Get("X-GitHub-Event") == "ping" {
 		return http.StatusOK, map[string]string{"status": "pong"}
+	}
+	if rule := s.AutomationManager.stored(id); rule != nil && rule.Sync.Source == SyncSourceIssues {
+		if target, ok := issueTargetFromHook(body); ok {
+			return s.issueHook(*rule, target)
+		}
 	}
 	run, err := s.runAutomationNow(id)
 	if err != nil {
@@ -101,38 +108,41 @@ var hookSignatures = []struct{ header, prefix string }{
 	{"X-Forgejo-Signature", ""},
 }
 
-// verifyHook checks the request against the secret: a GitLab token, or an
-// HMAC-SHA256 of the whole body.
-func verifyHook(r *http.Request, secret string) error {
+// verifyHook checks the request against the secret — a GitLab token, or an
+// HMAC-SHA256 of the whole body — and returns the body, which an issues
+// sync reads the item from.
+func verifyHook(r *http.Request, secret string) ([]byte, error) {
+	body, err := readHookBody(r.Body)
+	if err != nil {
+		return nil, err
+	}
 	if token := r.Header.Get("X-Gitlab-Token"); token != "" {
 		if subtle.ConstantTimeCompare([]byte(token), []byte(secret)) == 1 {
-			return nil
+			return body, nil
 		}
-		return errHookSignature
+		return nil, errHookSignature
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
-	if err := hashBody(mac, r.Body); err != nil {
-		return err
-	}
+	_, _ = mac.Write(body) // a hash never fails to write
 	sum := mac.Sum(nil)
 	for _, sig := range hookSignatures {
 		got, ok := strings.CutPrefix(r.Header.Get(sig.header), sig.prefix)
 		want, err := hex.DecodeString(got)
 		if ok && got != "" && err == nil && hmac.Equal(want, sum) {
-			return nil
+			return body, nil
 		}
 	}
-	return errHookSignature
+	return nil, errHookSignature
 }
 
-// hashBody streams a body of at most maxHookBodyBytes into h.
-func hashBody(h hash.Hash, body io.Reader) error {
-	n, err := io.Copy(h, io.LimitReader(body, maxHookBodyBytes+1))
+// readHookBody reads a body of at most maxHookBodyBytes.
+func readHookBody(body io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(body, maxHookBodyBytes+1))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if n > maxHookBodyBytes {
-		return &http.MaxBytesError{Limit: maxHookBodyBytes}
+	if len(data) > maxHookBodyBytes {
+		return nil, &http.MaxBytesError{Limit: maxHookBodyBytes}
 	}
-	return nil
+	return data, nil
 }

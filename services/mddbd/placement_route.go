@@ -43,7 +43,7 @@ var globalWriteRoutes = map[string]bool{
 	"/v1/webhooks": true, "/v1/webhooks/delete": true, "/v1/automation": true, "/v1/automation/": true,
 	"/v1/embedding-configs": true, "/v1/embedding-configs/": true, "/v1/embedding-configs/set-default": true,
 	"/v1/chat/skills": true, "/v1/chat/skills/": true, "/v1/chat/mcp-secrets": true, "/v1/chat/mcp-secrets/": true,
-	"/v1/chat/scenarios/": true,
+	"/v1/chat/scenarios/": true, "/v1/forge-tokens": true,
 }
 
 // maxRouteRounds bounds how often one request is routed again because the

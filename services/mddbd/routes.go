@@ -92,6 +92,7 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	if s.AutomationManager != nil {
 		mux.HandleFunc("/v1/automation", s.handleAutomation)
 		mux.HandleFunc("/v1/automation/", s.handleAutomationDetail)
+		mux.HandleFunc(syncRefreshPath, s.guardWrite(s.handleSyncRefresh)) // INT-023
 		if s.AutomationLogStore != nil {
 			mux.HandleFunc("/v1/automation-logs", s.handleAutomationLogs)
 		}
@@ -128,6 +129,7 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/tenants", s.handleTenants)
 	mux.HandleFunc("/v1/tenants/", s.handleTenants)
 	mux.HandleFunc(chatMcpSecretsPath, s.handleChatMcpSecrets) // MCP-005
+	mux.HandleFunc(forgeTokensPath, s.handleForgeTokens)       // INT-023
 	mux.HandleFunc(chatMcpSecretsPath+"/", s.handleChatMcpSecrets)
 	mux.HandleFunc(chatMcpInspectPath, s.handleChatMcpInspect)
 	mux.HandleFunc(chatMcpCallPath, s.handleChatMcpCall)

@@ -30,8 +30,11 @@ type ChatScenarioManager struct {
 	skills map[string]*ChatSkill // #404, chat_skill_manager.go
 	// mcpSecrets are the external MCP servers' credentials (MCP-005, chat_mcp_secret.go).
 	mcpSecrets map[string]*chatMcpSecret
-	version    uint64
-	now        func() time.Time
+	// forgeTokens are the default forge tokens, host → secret (INT-023,
+	// forge_tokens.go), stored with the secrets.
+	forgeTokens map[string]string
+	version     uint64
+	now         func() time.Time
 }
 
 // bucketChatScenarios holds one JSON value per scenario, plus the version
@@ -45,7 +48,7 @@ var (
 // NewChatScenarioManager creates the manager; call LoadAll before use.
 func NewChatScenarioManager(db *bolt.DB) *ChatScenarioManager {
 	return &ChatScenarioManager{db: db, m: map[string]*ChatScenario{}, skills: map[string]*ChatSkill{},
-		mcpSecrets: map[string]*chatMcpSecret{}, now: time.Now}
+		mcpSecrets: map[string]*chatMcpSecret{}, forgeTokens: map[string]string{}, now: time.Now}
 }
 
 // FollowDB makes it use the server's current handle after a restore.
@@ -62,13 +65,14 @@ func (c *ChatScenarioManager) LoadAll() error {
 	m := map[string]*ChatScenario{}
 	var skills map[string]*ChatSkill
 	var secrets map[string]*chatMcpSecret
+	var forgeTokens map[string]string
 	var version uint64
 	err := c.handle().Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(bucketChatScenarios)
 		sb, skillErr := tx.CreateBucketIfNotExists(bucketChatSkills)
 		mb, secretErr := tx.CreateBucketIfNotExists(bucketChatMcpSecrets)
 		if err = errors.Join(err, skillErr, secretErr); err == nil {
-			skills, secrets = loadChatSkills(sb), loadChatMcpSecrets(mb)
+			skills, secrets, forgeTokens = loadChatSkills(sb), loadChatMcpSecrets(mb), loadForgeTokens(mb)
 			if v := b.Get(chatScenarioVersionKey); len(v) == 8 {
 				version = binary.BigEndian.Uint64(v)
 			}
@@ -88,7 +92,7 @@ func (c *ChatScenarioManager) LoadAll() error {
 		return err
 	}
 	c.mu.Lock()
-	c.m, c.skills, c.mcpSecrets, c.version = m, skills, secrets, version
+	c.m, c.skills, c.mcpSecrets, c.forgeTokens, c.version = m, skills, secrets, forgeTokens, version
 	c.mu.Unlock()
 	return nil
 }

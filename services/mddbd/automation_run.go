@@ -170,7 +170,11 @@ func (s *Server) lastRunResult(r *AutomationRule) *AutomationRunResult {
 		res.Added, res.Updated, res.Unchanged, res.Deleted, res.Failed =
 			c.Added, c.Updated, c.Unchanged, c.Deleted, c.Failed
 		res.Ref, res.Commit, res.UpToDate = c.Ref, c.Commit, c.UpToDate
-		res.CommitURL = r.Sync.commitURL(c.Commit)
+		// A rule without a url names the commit on the repository it
+		// resolves to now (INT-023).
+		if a, err := s.resolvedSync(r.Sync); err == nil {
+			res.CommitURL = a.commitURL(c.Commit)
+		}
 	}
 	return res
 }

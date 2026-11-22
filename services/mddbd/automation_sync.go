@@ -19,7 +19,7 @@ import (
 // branch, a tag or its latest release (#421). The same scheduler that fires webhooks
 // and takes backups (OPS-023) runs it; this file holds the action's shape and
 // its validation, sync_run.go the run, sync_http.go, sync_s3.go and
-// sync_git*.go the sources.
+// sync_git*.go and sync_issues*.go the sources.
 
 // Sync sources.
 const (
@@ -27,6 +27,9 @@ const (
 	SyncSourceURLs    = "urls"
 	SyncSourceS3      = "s3"
 	SyncSourceGit     = "git"
+	// SyncSourceIssues mirrors a forge repository's issues and pull
+	// requests (INT-023).
+	SyncSourceIssues = "issues"
 )
 
 // Bounds of a run. A rule may lower them; the caps are what it may raise
@@ -57,13 +60,14 @@ const (
 
 // SyncAction is what a cron rule with a sync does on each run.
 type SyncAction struct {
-	// Source is "sitemap", "urls", "s3" or "git".
+	// Source is "sitemap", "urls", "s3", "git" or "issues".
 	Source string `json:"source"`
 	// Collection and Lang are where the documents go.
 	Collection string `json:"collection"`
 	Lang       string `json:"lang"`
 	// URL is the sitemap (or sitemap index) of a sitemap source, or the https
-	// URL of a git source's repository.
+	// URL of a git or issues source's repository — which those two may leave
+	// to a collection's repository (sync_repository.go).
 	URL string `json:"url,omitempty"`
 	// URLs are the pages of a urls source.
 	URLs []string `json:"urls,omitempty"`
@@ -83,8 +87,11 @@ type SyncAction struct {
 	MaxDocuments int `json:"maxDocuments,omitempty"`
 	// MaxBytes bounds one fetched document (default 10 MiB, at most 100 MiB).
 	MaxBytes int64 `json:"maxBytes,omitempty"`
-	// GitSyncFields are the fields of a git source (#421).
+	// GitSyncFields are the fields of a git source (#421), most of which an
+	// issues source reads too.
 	GitSyncFields
+	// IssuesSyncFields are the fields only an issues source reads (INT-023).
+	IssuesSyncFields
 }
 
 // normalize fills the defaults and rejects what cannot run.
@@ -124,6 +131,8 @@ func (a *SyncAction) checkSource() error {
 		}
 	case SyncSourceGit:
 		return a.checkGit()
+	case SyncSourceIssues:
+		return a.checkIssues()
 	case SyncSourceS3:
 		if a.StorageConfig != nil {
 			a.Bucket = cmp.Or(strings.TrimSpace(a.Bucket), a.StorageConfig.Bucket)
@@ -134,7 +143,7 @@ func (a *SyncAction) checkSource() error {
 			return errors.New("an s3 sync needs storageConfig.endpoint and a bucket")
 		}
 	default:
-		return fmt.Errorf("invalid sync source: %q (valid: sitemap, urls, s3, git)", a.Source)
+		return fmt.Errorf("invalid sync source: %q (valid: sitemap, urls, s3, git, issues)", a.Source)
 	}
 	return nil
 }
@@ -159,7 +168,9 @@ func (a *SyncAction) describe() string {
 	case SyncSourceURLs:
 		return fmt.Sprintf("%d urls", len(a.URLs))
 	case SyncSourceGit:
-		return a.URL + "@" + cmp.Or(a.Ref, "HEAD")
+		return cmp.Or(a.URL, a.repositoryFromName()) + "@" + cmp.Or(a.Ref, "HEAD")
+	case SyncSourceIssues:
+		return cmp.Or(a.URL, a.repositoryFromName()) + " issues"
 	}
 	return "s3://" + a.Bucket + "/" + a.Prefix
 }
@@ -189,6 +200,10 @@ func redactedSync(a *SyncAction) *SyncAction {
 	c := *a
 	c.URLs = slices.Clone(a.URLs)
 	c.Include, c.Exclude = slices.Clone(a.Include), slices.Clone(a.Exclude)
+	if a.Comments != nil {
+		comments := *a.Comments
+		c.Comments = &comments
+	}
 	c.StorageConfig = redactedStorageConfig(a.StorageConfig)
 	return &c
 }

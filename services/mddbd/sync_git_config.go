@@ -42,6 +42,11 @@ type GitSyncFields struct {
 	// wrote — a collection seeded by `mddb-cli autoindex`. Off by default:
 	// a sync never overwrites a document it did not write.
 	Adopt bool `json:"adopt,omitempty"`
+	// RepositoryFrom names the collection whose repository (INT-023) a rule
+	// without a url reads: the code collection holds the link once, the
+	// issues rule writing next to it points at it. Empty: the repository of
+	// the rule's own collection.
+	RepositoryFrom string `json:"repositoryFrom,omitempty"`
 }
 
 // The ref that follows the forge's releases.
@@ -69,14 +74,12 @@ var validForges = map[string]bool{forgeGitHub: true, forgeGitLab: true, forgeGit
 var errGitForgeUnknown = errors.New("a git sync reads from github.com, gitlab.com and codeberg.org, " +
 	"or from a self-hosted GitHub, GitLab, Gitea or Forgejo named in forge (github, gitlab, gitea, forgejo)")
 
-// checkGit validates a git source: an https repository URL a forge serves,
-// a ref, globs that parse and secret names that may name a secret.
+// checkGit validates a git source: the forge fields, a ref and globs that
+// parse.
 func (a *SyncAction) checkGit() error {
 	g := &a.GitSyncFields
 	g.Ref = strings.TrimSpace(g.Ref)
-	g.Forge = strings.ToLower(strings.TrimSpace(g.Forge))
-	a.URL = strings.TrimRight(strings.TrimSpace(a.URL), "/")
-	if _, err := parseGitRepo(a.URL, g.Forge); err != nil {
+	if err := a.checkForge(); err != nil {
 		return err
 	}
 	if err := checkGitRef(g.Ref); err != nil {
@@ -85,6 +88,22 @@ func (a *SyncAction) checkGit() error {
 	for _, glob := range append(append([]string(nil), g.Include...), g.Exclude...) {
 		if _, err := path.Match(glob, ""); err != nil {
 			return fmt.Errorf("sync glob %q: %w", glob, err)
+		}
+	}
+	return nil
+}
+
+// checkForge validates what a git and an issues source share: an https
+// repository URL a forge serves — or none, left to a collection's repository
+// (sync_repository.go) — and secret names that may name a secret.
+func (a *SyncAction) checkForge() error {
+	g := &a.GitSyncFields
+	g.Forge = strings.ToLower(strings.TrimSpace(g.Forge))
+	g.RepositoryFrom = strings.TrimSpace(g.RepositoryFrom)
+	a.URL = strings.TrimRight(strings.TrimSpace(a.URL), "/")
+	if a.URL != "" {
+		if _, err := parseGitRepo(a.URL, g.Forge); err != nil {
+			return err
 		}
 	}
 	for _, ref := range []string{g.TokenSecretRef, g.HookSecretRef} {

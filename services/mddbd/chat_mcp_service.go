@@ -61,14 +61,15 @@ func (s *Server) PutChatMcpSecret(name, header, value string) (bool, error) {
 	return s.ChatScenarios.PutMcpSecret(name, header, []byte(value))
 }
 
-// DeleteChatMcpSecret removes a secret no scenario and no git sync (#421,
-// "automation:<rule>") uses.
+// DeleteChatMcpSecret removes a secret no scenario, no git or issues sync
+// (#421, "automation:<rule>"), no collection's repository and no default
+// forge token (INT-023, "collection:<name>", "default:<host>") uses.
 func (s *Server) DeleteChatMcpSecret(name string) ([]string, error) {
 	if s.ChatScenarios == nil {
 		return nil, errChatScenariosUnavailable
 	}
-	if rules := s.syncRulesUsingSecret(name); len(rules) > 0 {
-		return rules, errChatMcpSecretInUse
+	if users := append(s.syncRulesUsingSecret(name), s.collectionsUsingSecret(name)...); len(users) > 0 {
+		return users, errChatMcpSecretInUse
 	}
 	return s.ChatScenarios.DeleteMcpSecret(name)
 }
