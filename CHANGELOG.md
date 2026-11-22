@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Panel handed out `mcp_` keys the server never checks (#445).** With `MDDB_MCP_API_KEY_ENABLED` off, the scenario's *MCP keys* card and the *API Keys* tab now say so, name the setting and disable *Create*.
 - **mddb-chat searches named no collection (#448).** The hybrid, full-text and vector search requests to mddbd left `collection` empty, so `search_docs` failed against a real mddbd with "missing required fields: collection, query". The test double now checks the field.
 - **Flaky cluster tests on slow runners (#444).** The cluster end-to-end tests wait for a stable leader and term before their setup writes, and follow a leader change during them; failover, partition and quorum assertions are unchanged.
+- **SonarCloud security findings on 2.19.9 (`main`).** The mddb-chat Dockerfiles install their packages with `--no-install-recommends`, and the panel's Open WebUI template matches the script's default MCP address with a pattern instead of an `http://` literal.
 
 ## [2.19.9] - 2026-11-21
 
