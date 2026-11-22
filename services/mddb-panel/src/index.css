@@ -172,15 +172,21 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* One scroll (FE-021). The app shell (App.jsx) is exactly the visible
+   window high (100dvh) and scrolls nothing itself; its sidebar and page
+   panes do. <body> used to be a flex box at least 100vh high: on a phone or
+   tablet 100vh is taller than the visible window, and a flex item's minimum
+   width let #root grow wider than the window, so the document itself
+   scrolled — a second scrollbar beside the page's and a blank band of
+   <html> background below the shell. Now neither grows past the window. */
 body {
   margin: 0;
-  display: flex;
   min-width: 320px;
-  min-height: 100vh;
 }
 
 #root {
   width: 100%;
+  min-width: 0;
 }
 
 * {

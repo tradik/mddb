@@ -207,12 +207,32 @@ describe('App', () => {
     ['memory', 'admin tool page'], ['features', 'features panel'],
   ])('view mode %s shows only %s', async (viewMode, label) => {
     const { container } = await renderWith({ viewMode, currentDocument: { key: 'a' } });
-    expect(container.querySelector('.flex-1.flex.overflow-hidden').textContent).toBe(label);
+    expect(container.querySelector('main').textContent).toBe(label);
   });
 
   test('a page whose module is switched off shows the notice instead (GO-049)', async () => {
     vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features: [{ name: 'geo', enabled: false }], version: 1 });
     const { container } = await renderWith({ viewMode: 'geo' });
-    expect(container.querySelector('.flex-1.flex.overflow-hidden').textContent).toBe('feature geo is off');
+    expect(container.querySelector('main').textContent).toBe('feature geo is off');
+  });
+
+  test('on a phone the sidebar starts folded and folds again after picking a page or a collection', async () => {
+    const matchMedia = vi.fn((query) => ({ matches: query === '(max-width: 767px)' }));
+    vi.stubGlobal('matchMedia', matchMedia);
+    await renderWith({ sidebarCollapsed: false });
+    expect(useStore.getState().sidebarCollapsed).toBe(true);
+    act(() => useStore.setState({ sidebarCollapsed: false }));
+    act(() => useStore.setState({ viewMode: 'config' }));
+    expect(useStore.getState().sidebarCollapsed).toBe(true);
+    act(() => useStore.setState({ sidebarCollapsed: false }));
+    act(() => useStore.setState({ currentCollection: 'docs' }));
+    expect(useStore.getState().sidebarCollapsed).toBe(true);
+  });
+
+  test('on a wider screen the sidebar stays as it was', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    await renderWith({ sidebarCollapsed: false });
+    act(() => useStore.setState({ viewMode: 'config' }));
+    expect(useStore.getState().sidebarCollapsed).toBe(false);
   });
 });
