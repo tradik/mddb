@@ -12,7 +12,7 @@ import (
 // planStore reads and writes a backlog through the server's ordinary
 // document API: search with meta filters, aggregate, and conditional adds.
 // Nothing here lists the whole collection: rows are found by kind and
-// status, and the next row by a facet over the todo rows' order values.
+// status, and the next row by a facet over the order values of the rows still to do.
 type planStore struct {
 	client     *mddb.Client
 	collection string
@@ -101,7 +101,7 @@ func (s planStore) nextOrder(ctx context.Context) (int, error) {
 	return high + 1, nil
 }
 
-// first is the todo row a session would take now, or nil when there is none.
+// first is the row still to do that a session would take now, or nil when there is none.
 // Only the rows at the lowest order are fetched. When those rows were all
 // taken between the facet and the search, it looks again.
 func (s planStore) first(ctx context.Context) (*mddb.Document, error) {
@@ -135,7 +135,7 @@ func lowestOrder(values []string) string {
 	return low
 }
 
-// claim takes the first todo row: it marks it doing with a write that only
+// claim takes the first row still to do: it marks it doing with a write that only
 // succeeds over the revision just read. A session that loses the race
 // looks again and takes the next row instead.
 func (s planStore) claim(ctx context.Context) (*mddb.Document, error) {
