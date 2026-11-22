@@ -28,6 +28,9 @@ type ConfigResponse struct {
 	SearchStatsEnabled    bool            `json:"searchStatsEnabled"`
 	// ESCompat is the Elasticsearch-compatible search subset (MDDB_ES_COMPAT).
 	ESCompat ESCompatStatus `json:"esCompat"`
+	// QdrantCompat is the Qdrant-compatible point query (MDDB_QDRANT_COMPAT,
+	// #447), in the same shape.
+	QdrantCompat ESCompatStatus `json:"qdrantCompat"`
 	// SearchMaxLimit is the most results one search returns
 	// (MDDB_SEARCH_MAX_LIMIT, #368); a collection's maxTopK can only lower it.
 	SearchMaxLimit int `json:"searchMaxLimit"`
@@ -174,6 +177,7 @@ func (s *Server) configResponse(aud configAudience) ConfigResponse {
 		AutomationLogsEnabled: env("MDDB_AUTOMATION_LOGS", "enable") != "disable",
 		SearchStatsEnabled:    searchStatsEnabled(),
 		ESCompat:              ESCompatStatus{Enabled: esCompatEnabled(), Prefix: esPathPrefix},
+		QdrantCompat:          ESCompatStatus{Enabled: qdrantCompatEnabled(), Prefix: qdrantPathPrefix},
 		SearchMaxLimit:        s.searchMaxLimit(),
 		Telemetry:             telemetryStatus(aud),
 		ClientAddressing:      clientAddressingStatus(),

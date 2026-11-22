@@ -845,6 +845,19 @@ jobs:
           MDDB_BIN: ${{ runner.temp }}/mddbd
         run: uv run --no-sync pytest -q
 
+      # #447: qdrant-client, unmodified, making the query_points call Open
+      # WebUI's External Knowledge Source (Qdrant provider) makes. Same job
+      # and same build: five tests, no second runner.
+      - name: Install qdrant-client
+        working-directory: test/qdrant-compat
+        run: uv sync --locked
+
+      - name: Run qdrant-client tests
+        working-directory: test/qdrant-compat
+        env:
+          MDDB_BIN: ${{ runner.temp }}/mddbd
+        run: uv run --no-sync pytest -q
+
   chat:
     name: mddb-chat (Rust)
     runs-on: ubuntu-latest

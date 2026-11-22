@@ -90,6 +90,11 @@ func requestCredentials(r *http.Request) (apiKey, token string) {
 	if apiKey == "" && isESPath(r.URL.Path) {
 		apiKey = esAPIKey(r)
 	}
+	// #447: qdrant-client sends api_key=... as `api-key: <key>`; read only
+	// on /qdrant, for the same reason.
+	if apiKey == "" && isQdrantPath(r.URL.Path) {
+		apiKey = qdrantAPIKey(r)
+	}
 	if apiKey == "" && strings.HasPrefix(token, APIKeyPrefix) {
 		apiKey, token = token, ""
 	}

@@ -1,0 +1,19 @@
+# #447: qdrant-client, unmodified, against MDDB's /qdrant point query — the
+# call Open WebUI's External Knowledge Source (Qdrant provider) makes. Not a
+# package — a locked test environment, so CI runs the client version
+# committed in uv.lock, not whatever resolves that day.
+[project]
+name = "mddb-qdrant-compat-test"
+version = "0.0.0"  # never published; not swept by bump-version.sh
+description = "qdrant-client compatibility test for MDDB's Qdrant-compatible point query (#447)."
+requires-python = ">=3.10"
+dependencies = [
+    "qdrant-client>=1.20.0",
+    "pytest>=9.2.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["."]

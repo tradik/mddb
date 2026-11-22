@@ -167,7 +167,9 @@ curl -H "X-API-Key: mddb_live_..." \
 subset under `/es` (v2.18.10+, `MDDB_ES_COMPAT=true`) the key is also accepted
 as `Authorization: ApiKey mddb_live_...`, the header Elasticsearch clients send
 for `api_key=...`; `/v1` does not read that scheme. See
-[ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md#authentication-and-permissions).
+[ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md#authentication-and-permissions). On the Qdrant-compatible point query under `/qdrant` (v2.19.10+,
+`MDDB_QDRANT_COMPAT=true`) it is also accepted as `api-key: mddb_live_...`, the
+header `qdrant-client` sends; see [QDRANT_COMPAT.md](QDRANT_COMPAT.md#authentication-and-permissions).
 
 **API Key Format:**
 - Prefix: `mddb_live_`
@@ -305,7 +307,7 @@ A rule is one of:
 | authenticated | any valid credential; touches no collection data | `/v1/system/info`, `/v1/fts-languages`, `/v1/geo-encode`, `/v1/auth/me` |
 | admin | a global administrator | backup, restore, audit, encryption, automation, embedding configs, corpus build/install, user management, pprof, `/v1/admin/diagnose` |
 | collection | read, write (or admin) on **every** collection the request names | `/v1/fts`, `/v1/add-batch`, `/v1/ingest`, `/v1/schema/*`, `/v1/geo-*`, `/v1/synonyms` (GET reads, POST/DELETE write) |
-| handler | the entry point checks, because only it knows the collection | a job, alias or curation rule looked up by id, a multipart upload, the `/es` index in the path, the event stream (filtered per event), replication (its own secret, mTLS or an admin) |
+| handler | the entry point checks, because only it knows the collection | a job, alias or curation rule looked up by id, a multipart upload, the `/es` index or `/qdrant` collection in the path, the event stream (filtered per event), replication (its own secret, mTLS or an admin) |
 
 How the collection is found: the query string (`collection`, `collections`)
 and a JSON body (`collection`, `sourceCollection`, `collections`,
