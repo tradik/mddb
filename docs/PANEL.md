@@ -272,7 +272,7 @@ existed but nothing showed them):
 
   ![Code Symbols lookup of an ambiguous name: the list of its eight definitions to pick from, each with its type and file](panel-code-symbol-candidates.png)
 
-- **Indexing status** (System page): queued embedding and metadata work for
+- **Indexing status** (System page; on Collection Maintenance since 2.19.11): queued embedding and metadata work for
   the server or one collection, with a progress bar, image embedding, and the
   collections whose index is still training. It refreshes every 5 s until
   everything is indexed.
@@ -409,10 +409,11 @@ refused request (403) reads *Not permitted* and says which grant it needs.
 - **Document viewer**: *Expiry (TTL)* sets or removes a document's TTL
   (`/v1/set-ttl`); *Classify* ranks labels against the document or other text
   (`/v1/classify`).
-- **System page**: *Collection maintenance* — checksum (`/v1/checksum`, to
+- **Collection maintenance and backups**: checksum (`/v1/checksum`, to
   compare replicas), export as NDJSON or ZIP (`/v1/export`) and *Truncate
-  revisions* (confirmed); *Backup and restore* — *Back up now* (`/v1/backup`)
-  and *Restore* from a backup file (`/v1/restore`, confirmed).
+  revisions* (confirmed); *Back up now* (`/v1/backup`) and *Restore* from a
+  backup file (`/v1/restore`, confirmed). They started on the System page and
+  have their own pages since 2.19.11 (see below).
 - **Code Symbols**: *Code graph* (`/v1/code-graph`) — what depends on a file
   and what it depends on, 1–3 hops, with the justifying symbol and lines.
 - **Geo Search**: tools for area search by bounding box or GeoJSON polygon
@@ -694,13 +695,13 @@ open, so a first visit shows the same pages as before.
 
 | Group | Pages |
 |---|---|
-| Collections | Import, Collection Aliases, Collection Schemas, Embedding Models, Duplicates, Temporal Analytics |
+| Collections | Import, Collection Maintenance, Collection Aliases, Collection Schemas, Embedding Models, Duplicates, Temporal Analytics |
 | Search | Vector Search, Cross Search, Geo Search, Code Symbols |
 | Search Tuning | Search Advisor, Retrieval Evaluation, Synonyms, Stop Words, Curation Rules, Spell Checker, Vector Space |
 | Chat | Chat, Agent Memory, LLM Connections |
 | Integrations | Automation, Webhooks, API Endpoints |
 | Security | Users, Groups, My Account (with authentication), Tenants (2.19.8), Security, Encryption, Audit Log |
-| System | System Info, Cluster (with replication), Configuration, Features, Client Settings |
+| System | System Info, Backup & Restore, Cluster (with replication), Configuration, Features, Client Settings |
 
 A page is listed only when the server has it on. A module switched off on the
 *Features* page hides its pages. Users, Groups and My Account need
@@ -730,6 +731,51 @@ report hides nothing.
   sidebar shows the collection list, then the menu, then the server figures
   (documents, revisions, size, embeddings), so the menu is reached without
   scrolling past the figures.
+
+### Backup & Restore and Collection Maintenance (2.19.11)
+
+Two things people need regularly used to be cards at the bottom of System
+Info. Each now has its own page, next to what it acts on; System Info keeps
+a line linking to both.
+
+**Backup & Restore** (System group: it acts on the whole server):
+
+- *Back up now* writes a copy of the whole database on the server, optionally
+  under a name (`GET /v1/backup?to=`). The server checks the copy before it
+  keeps it.
+- *Restore* brings the database back to a backup file (`POST /v1/restore`)
+  after a confirmation that names the file and says what a restore replaces:
+  every collection, its documents and their history; whatever was written
+  after the backup is lost.
+- *Backups* lists the runs of the scheduled backups (from the automation log,
+  `GET /v1/automation-logs?ruleId=`, 20 per rule) and the backups taken on
+  the page, with the time and the state (stored and checked, failed with the
+  server's error, skipped). *Use for restore* puts a listed file in the
+  restore field; a backup in object storage (`s3://…`) is fetched back by
+  hand first.
+- *Scheduled backups* lists the cron rules with a backup action: when each
+  runs, where its backups go and how many it keeps, each with a button to the
+  Automation page, where rules are made and changed.
+- The server has no call that lists the files of its backup folder, reports
+  their size or serves one for download, so the page shows none of that: a
+  backup taken with the CLI or MCP is not listed, and files are copied off
+  the server from `MDDB_BACKUP_DIR` ([BACKUP.md](BACKUP.md)).
+- Backups need admin on "*". A signed-in account without it reads why, and
+  the buttons are off. The scheduled part is left out where the Automation
+  page is (automation module off, `automationsEnabled: false`), and for an
+  account that may not read automation rules.
+
+**Collection Maintenance** (Collections group, after Import):
+
+- One collection at a time: *Checksum* (a fingerprint to compare between
+  servers), *Export* (the whole collection as NDJSON or a ZIP of Markdown
+  files) and *Truncate revisions* (keep the newest N versions of each
+  document, confirmed). Each has one sentence on what it does and when to use
+  it; the endpoint and the permission it needs sit behind its **?**.
+- *Truncate revisions* is off for a read-only collection, which refuses
+  writes.
+- *Indexing status* (`GET /v1/indexing-status`), whether what was written is
+  searchable yet, moved here from System Info too.
 
 ### One scroll (2.19.11)
 
@@ -1253,6 +1299,11 @@ services/mddb-panel/
 │   │   ├── GlobalShortcuts.jsx  # `/` and `?` anywhere in the panel (2.19.7)
 │   │   ├── ShortcutsDialog.jsx  # The list of shortcuts (2.19.7)
 │   │   ├── EndpointsPanel.jsx   # API endpoints browser
+│   │   ├── BackupsPanel.jsx     # Backup & Restore page (2.19.11)
+│   │   ├── BackupHistory.jsx    # Its list of backups
+│   │   ├── ScheduledBackups.jsx # Its scheduled backups (cron rules)
+│   │   ├── CollectionMaintenancePanel.jsx # Collection Maintenance page (2.19.11)
+│   │   ├── MaintenanceAction.jsx # One action: sentence, help, controls
 │   │   ├── ChatScenariosPanel.jsx      # Chat scenarios: list, save, delete
 │   │   ├── ChatScenarioForm.jsx        # Scenario editor (prompt, collections, skills)
 │   │   ├── ChatScenarioStyleFields.jsx # Off-topic behaviour and style

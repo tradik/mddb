@@ -31,7 +31,7 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - 🔗 **Collection aliases** (2.18.8+) - A page to list, create, move and delete aliases (`/v1/aliases`)
 - 🎯 **Retrieval evaluation** (2.18.8+) - Stored evaluation queries and a run of them under fts, hybrid and vector, with recall@k, nDCG@k, MRR, latency and tokens (`/v1/eval`, `/v1/eval-queries`)
 - 🧩 **Code symbols** (2.18.8+) - Definitions, references, callers, callees, tests and siblings of one symbol (`/v1/symbol`), plus the recognised languages
-- ⏳ **Indexing status & storage** (2.18.2+/2.18.8+) - On the System page: queued embedding work with auto-refresh (`/v1/indexing-status`), and bytes per collection, category and bucket measured on demand (`/v1/storage`)
+- ⏳ **Indexing status & storage** (2.18.2+/2.18.8+) - Queued embedding work with auto-refresh (`/v1/indexing-status`, on the Collection Maintenance page since 2.19.11), and, on the System page, bytes per collection, category and bucket measured on demand (`/v1/storage`)
 - 🔁 **Background vector reindex** (2.18.4+) - Reindex as a job with progress, time left and a recent-jobs table (`/v1/vector-reindex/jobs`)
 - 🖼️ **Image documents** (2.18.9+) - An image document shows its picture (`/v1/image`); upload can *Extract images* from PDFs and Markdown
 - 📥 **Upload** (2.19.0) - Every file goes to `/v1/upload`, so the server reads Markdown frontmatter (lists included); 24 formats accepted
@@ -44,7 +44,7 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - 👤 **My account** (2.19.0) - Signed-in identity in the header (`/v1/auth/me`) and personal API keys: create (secret shown once), list, revoke
 - ☑️ **Batch delete, export & facets** (2.19.0, export 2.19.7) - Multi-select in the document list with *Export ZIP / NDJSON* of the selection (`/v1/export` with `keys`) and *Delete selected* (`/v1/delete-batch`); per-value metadata counts (`/v1/aggregate`)
 - ⏱️ **TTL & classify** (2.19.0) - In the document viewer: set or remove expiry (`/v1/set-ttl`), zero-shot labels (`/v1/classify`)
-- 🧰 **Maintenance** (2.19.0) - On the System page: checksum, export (NDJSON/ZIP), truncate revisions, back up now, restore
+- 🧰 **Maintenance** (2.19.0) - Checksum, export (NDJSON/ZIP) and truncate revisions on the Collection Maintenance page; back up now, the list of backups, restore and the scheduled backups on the Backup & Restore page (both 2.19.11, before on the System page)
 - 🕸️ **Code graph, geo tools, temporal events, spell cleanup** (2.19.0) - `/v1/code-graph`; bounding box, polygon, geohash and geo reindex; one document's events; `/v1/spell-cleanup`
 - ⌨️ **Editor shortcuts** (2.19.7) - `Ctrl/Cmd+B`, `I`, `K`, `S`, `Tab` for list indent, `Esc` leaves fullscreen; `/` focuses the menu search, `?` lists every shortcut
 - 💾 **Drafts** (2.19.7) - Unsaved edits are kept in `localStorage` and offered for restore; saves send `expectedRevision`, so a newer server version is reported (409), not overwritten
