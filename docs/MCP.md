@@ -359,7 +359,7 @@ Key features:
 - **TTL support** — `expiresAt` Unix timestamp (0 = never expires)
 - **Disable without delete** — revoke instantly, keep for audit
 - **Cache** — lookups cached for `MDDB_MCP_API_KEY_CACHE_TTL` (default 60s), auto-invalidated on create/delete/disable
-- **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab); each key is listed as `mcp_… · <fingerprint>` with its scope, and its Disable and Delete buttons name it by that fingerprint. The create form takes an optional scope (collections, read-only, chat scenario); Chat → a scenario lists the keys bound to it, with create and delete. When `/v1/config` reports `protocols.mcp.apiKeyEnabled: false`, both places say the server does not check MCP keys, name `MDDB_MCP_API_KEY_ENABLED=true` and disable *Create*; a `warning` returned with a new key is shown with it (2.19.10, #445)
+- **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab); each key is listed as `mcp_… · <fingerprint>` with its scope, and its Disable and Delete buttons name it by that fingerprint. The create form takes an optional scope (collections, read-only, chat scenario, and from 2.19.11 the read-only collections among the chosen ones and a memory namespace); Chat → a scenario lists the keys bound to it, with create and delete. When `/v1/config` reports `protocols.mcp.apiKeyEnabled: false`, both places say the server does not check MCP keys, name `MDDB_MCP_API_KEY_ENABLED=true` and disable *Create*; a `warning` returned with a new key is shown with it (2.19.10, #445)
 
   ![LLM Connections page, API Keys tab: a new key shown once with a copy button, and the stored key docs-agent](panel-mcp-api-keys.png)
 
@@ -388,16 +388,18 @@ curl -X POST http://localhost:11023/v1/mcp/keys \
 | `collections` | Collections, aliases or `role:` targets (e.g. `role:reference`) the key may reach. Stored as given and resolved on every call, the way RBAC resolves them: an alias reaches its collection now, a `role:` target every collection that holds the role now. Empty = every collection. |
 | `readOnly` | The key may call only the tools read-only mode (`MDDB_MCP_MODE=read`) allows. |
 | `scenario` | Binds the key to a chat scenario (`400` when no scenario has that name). The key's collections are the scenario's `allowedCollections`, read from the stored scenario on every call — editing the scenario changes the key's reach — intersected with `collections` when both are set. A bound key is always read-only. |
+| `readOnlyCollections` | (v2.19.11) Names among `collections` the key may read but not write; it writes only to the others. Each must be in `collections` by name or reach a subset of it after alias and `role:` resolution (`400` otherwise), and is resolved on every call as `collections` is. Naming every one of `collections` stores the key as `readOnly: true`. `readOnly: true` keeps its meaning: nothing is written. |
+| `memoryNamespace` | (v2.19.11) The memory namespace of a key limited to collections or a scenario (`400` on any other key; 1–128 characters, no surrounding spaces). Keys with the same name share their memory sessions; without it the key has a namespace of its own. See [Memory namespaces](#memory-namespaces-v21911). |
 
 What a scoped key may call, by the tool's access class (`mcpToolAccessRules`):
 
 | Class | Verdict for a scoped key |
 |---|---|
-| Collection read or write | For a key limited to collections or a scenario: allowed when every collection the call names, after alias and `role:` resolution, is in the scope; a call that names no collection is refused, unless the tool's default targets are in the scope (`reference_*` with `role:reference` in the scope). A write is refused to a read-only key. |
+| Collection read or write | For a key limited to collections or a scenario: allowed when every collection the call names, after alias and `role:` resolution, is in the scope; a call that names no collection is refused, unless the tool's default targets are in the scope (`reference_*` with `role:reference` in the scope). A write is refused to a read-only key, and (v2.19.11) a write that names any of `readOnlyCollections` — in `collection`, `collections`, `source_collection` or `target_collections`, by name or alias — is refused too; a write counts as any tool read-only mode refuses. The memory collections are never in a scope. |
 | Every collection at once (`get_stats`, `vector_stats`, `list_schemas`, `bulk_ingest_status`, …) | Refused when the key is limited to collections or a scenario; allowed to a key that is only read-only, when the tool reads. |
 | Administration (`create_backup`, `chat_skill_*`, automations, …) | Refused. |
 | Handled inside the tool (`chat_scenario_get`, `chat_conversation_*`) | Refused. |
-| Memory store (`memory_*`) | Refused: it holds every user's sessions, whatever the collections. |
+| Memory store (`memory_*`) | (v2.19.11) For a key limited to collections or a scenario: allowed inside the key's [memory namespace](#memory-namespaces-v21911); to a read-only key only `memory_recall`, `memory_list_sessions` and `memory_session_history`. Refused to a key that is only read-only: it is not limited, so it has no namespace. |
 | No collection data (`fts_languages`, `geo_encode`, `feature_list`, …) | Allowed; to a read-only key only when read-only mode allows the tool. |
 
 The same check covers `resources/read` (`mddb://{collection}/{key}` and
@@ -410,7 +412,38 @@ collection only), `chat_scenario_list` (lists the scenarios whose collections
 are all in the scope) and `/events` (a scoped key must name an in-scope
 `?collection=`). A refused call answers `tool "<name>": forbidden`.
 `tools/list` leaves out the tools a key can never call: writes for a read-only
-key, and the every-collection, administration, handler and memory tools.
+key, the every-collection, administration and handler tools, and the memory
+tools for a key with no namespace (the memory writes too for a read-only
+key). A key with `readOnlyCollections` that may still write to one collection
+sees the write tools.
+
+A test (`TestKeyScopeTablePinned`) pins the verdict of every built-in tool for
+each kind of key, so a tool added later, or an edit that opens one, fails it
+until the table says so.
+
+#### Memory namespaces (v2.19.11)
+
+A key limited to collections or a scenario reads and writes its own part of
+the memory store, so an agent with a project key can hand a session over to
+the next one ([Work tracking](WORK-TRACKING.md#4-hand-a-session-over)).
+
+- The namespace is derived from the key (a hash, not the key), or is the
+  key's `memoryNamespace`; the two forms can never be equal.
+- `memory_start_session`, `memory_add_message` and `memory_summarize` stamp
+  what they store with the namespace (meta field `memoryNamespace`, over any
+  value the caller's `meta` sets).
+- `memory_list_sessions` and `memory_recall` return only the namespace's
+  sessions and messages; `memory_session_history`, `memory_add_message` and
+  `memory_summarize` on a session of another namespace answer `session not
+  found`, as for one that does not exist.
+- Sessions stored before 2.19.11, or by an unscoped key or a main-auth user,
+  carry no namespace: they are the global namespace, which no limited key
+  sees. An unscoped key and a main-auth user see every session, as before.
+- Deleting a key keeps its memory. A new key gets a new namespace, unless it
+  names the same `memoryNamespace`.
+- `memory_recall` finds the messages written with a key of the namespace; a
+  message a main-auth user adds to a namespaced session is in its history but
+  not in the key's recall.
 
 A scenario-bound key follows the scenario: while it is disabled or deleted, or
 the `chat` module is off, every `tools/call` and `resources/read` of the key is
@@ -427,7 +460,9 @@ for the key, which is validated on every request, so disabling or deleting the
 key stops the token too (within `MDDB_MCP_API_KEY_CACHE_TTL` for a token
 presented to another replica; at once on the replica that made the change).
 
-A static key takes the same scope as a fourth field and a trailing `:ro`:
+A static key takes the same scope as a fourth field and a trailing `:ro`; a
+static key limited to collections has a memory namespace derived from it.
+`readOnlyCollections` and `memoryNamespace` are fields of stored keys only:
 
 ```
 MDDB_MCP_API_KEYS=key:name:toolsets:collections:ro

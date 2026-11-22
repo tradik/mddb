@@ -340,8 +340,13 @@ resolves them), `readOnly`, or a chat `scenario` whose `allowedCollections`
 it reaches, read-only — and every `tools/call` and `resources/read` on it is
 checked against that scope, also with main auth off: a collection outside it,
 a call naming no collection, a write on a read-only key, and the
-every-collection, administration, handler and memory tools are refused with
-`tool "…": forbidden`. An OAuth token minted from the key has its scope. See
+every-collection, administration and handler tools are refused with
+`tool "…": forbidden`. Since v2.19.11 a key may also name
+`readOnlyCollections` among its collections, which it reads but cannot write,
+and a key limited to collections or a scenario uses the memory tools inside
+its own memory namespace (other keys' and older sessions answer `session not
+found`); a key that is only read-only is still refused them. An OAuth token
+minted from the key has its scope. See
 [MCP.md — Scoped keys](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199).
 With main auth on and MCP keys off, the MCP listener requires the main
 credentials and every tool call is gated by RBAC.
