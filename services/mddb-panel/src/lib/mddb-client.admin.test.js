@@ -80,6 +80,10 @@ describe('automation', () => {
     ['deleteAutomation', (c) => c.deleteAutomation('r1'), '/v1/automation/r1', DELETE],
     ['testAutomation', (c) => c.testAutomation(odd), `/v1/automation/${oddEnc}/test`, POST],
     ['runAutomation', (c) => c.runAutomation(odd), `/v1/automation/${oddEnc}/run`, POST],
+    ['syncRefresh', (c) => c.syncRefresh('docs'), '/v1/sync/refresh', POST, { collection: 'docs' }],
+    ['syncRefresh one item', (c) => c.syncRefresh('docs', 42), '/v1/sync/refresh', POST, { collection: 'docs', number: 42 }],
+    ['getForgeTokens', (c) => c.getForgeTokens(), '/v1/forge-tokens', GET],
+    ['setForgeTokens', (c) => c.setForgeTokens({ 'github.com': 'gh' }), '/v1/forge-tokens', PUT, { defaults: { 'github.com': 'gh' } }],
     ['listAutomationLogs defaults', (c) => c.listAutomationLogs(), '/v1/automation-logs?limit=50', GET],
     ['listAutomationLogs every filter', (c) => c.listAutomationLogs({ limit: 0, cursor: 'x', ruleId: 'r', status: 'ok' }), '/v1/automation-logs?cursor=x&ruleId=r&status=ok', GET],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));

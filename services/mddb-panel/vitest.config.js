@@ -293,6 +293,14 @@ const coverageFiles = [
   'src/components/CollectionChecklist.jsx',
   'src/components/MCPKeyScopeFields.jsx',
   'src/components/ChatScenarioMcpKeys.jsx',
+  // 2.19.11 (INT-023): issues as a synced source, a collection's repository,
+  // default forge tokens and the pick-or-paste secret control.
+  'src/lib/use-stored-secrets.js',
+  'src/components/SecretPicker.jsx',
+  'src/components/SyncRepositoryFields.jsx',
+  'src/components/IssuesSyncFields.jsx',
+  'src/components/CollectionRepository.jsx',
+  'src/components/ForgeTokensCard.jsx',
 ];
 
 export default mergeConfig(
