@@ -273,7 +273,7 @@ MDDB implements both MCP revisions in full — see [Protocol revisions](MCP-REVI
 | Feature | Description |
 |---------|-------------|
 | **Tool Annotations** | All 114 built-in tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
-| **Structured Output** | `outputSchema` on key tools (stats, search, classification, aggregation) for client-side validation |
+| **Structured Output** | `outputSchema` on key tools (stats, search, classification, aggregation), and `structuredContent` conforming to it on every successful call of those tools (v2.19.12+; before, a client that checks the schema refused their answers, #461) |
 | **5 Built-in Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |
 | **MCP Logging** | `logging/setLevel` with RFC 5424 levels (debug → emergency) |

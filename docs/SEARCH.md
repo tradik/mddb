@@ -669,7 +669,10 @@ When the cap lowered a request's limit, the response says so:
   headers `X-Limit-Capped: true` and `X-Limit: 1000` instead.
 - gRPC responses have `limit_capped` and `limit`.
 - MCP tool results carry both fields in the JSON text and also as
-  `structuredContent: {"limitCapped": true, "limit": 1000}`.
+  `structuredContent: {"limitCapped": true, "limit": 1000}`. A tool with an
+  output schema (`full_text_search`, `search_documents`, `semantic_search`,
+  `hybrid_search`) returns its whole answer as `structuredContent` on every
+  call since 2.19.12, so there the two fields sit in that object.
 - GraphQL `fts`, `vectorSearch`, `search` and `codeSymbol` have `limitCapped`
   and `limit`; both are `null` when nothing was capped.
 
