@@ -2,9 +2,9 @@
  * The Backup & Restore page's lists (2.19.11), built from what the server
  * already reports: the cron rules with a backup action (GET /v1/automation)
  * and the runs of those rules in the automation log (GET /v1/automation-logs,
- * `action: "backup"`, `target` = where the backup went). The server has no
- * call that lists backup files or serves one for download, so the page shows
- * the backups it knows of: the scheduled runs and the ones taken on the page.
+ * `action: "backup"`, `target` = where the backup went), and the backups
+ * taken on the page. From 2.19.11 the server lists its backup files too;
+ * lib/backup-files.js merges these rows with them.
  */
 
 /** The cron rules that take a backup, from GET /v1/automation (a list or `{ rules }`). */

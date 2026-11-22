@@ -50,6 +50,8 @@ describe('schemas, keys, facets, duplicates, batches, maintenance', () => {
     ['deleteBatch sends only key and lang', (c) => c.deleteBatch({ collection: 'c', documents: [{ key: 'k', lang: 'en', meta: {} }] }), '/v1/delete-batch', POST, { collection: 'c', documents: [{ key: 'k', lang: 'en' }] }],
     ['checksum', (c) => c.checksum('my docs'), '/v1/checksum?collection=my+docs', GET],
     ['restore', (c) => c.restore('backup-1.db'), '/v1/restore', POST, { from: 'backup-1.db' }],
+    ['listBackups', (c) => c.listBackups(), '/v1/backups', GET],
+    ['listBackups paged', (c) => c.listBackups({ limit: 50, offset: 100 }), '/v1/backups?limit=50&offset=100', GET],
     ['promoteNode defaults to no force (GO-051)', (c) => c.promoteNode(), '/v1/replication/promote', POST, { force: false }],
     ['promoteNode forced', (c) => c.promoteNode({ force: true }), '/v1/replication/promote', POST, { force: true }],
     ['demoteNode sends no body', (c) => c.demoteNode(), '/v1/replication/demote', POST],
@@ -69,6 +71,17 @@ describe('file-shaped answers', () => {
     expect(req.method).toBe(POST);
     expect(req.body).toEqual({ collection: 'c', filterMeta: {}, format: 'zip' });
     expect(req.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer tok' });
+  });
+
+  test('a backup file downloads with its name, the name encoded in the path', async () => {
+    const fetchMock = stubFetch(new Response('bolt', { headers: { 'Content-Disposition': 'attachment; filename=nightly.db' } }));
+    const { blob, filename } = await client.downloadBackup('night ly.db');
+    expect(await blob.text()).toBe('bolt');
+    expect(filename).toBe('nightly.db');
+    const req = lastRequest(fetchMock);
+    expect(req.url).toBe('/v1/backups/night%20ly.db/download');
+    expect(req.method).toBe(GET);
+    expect(req.headers).toEqual({ Authorization: 'Bearer tok' });
   });
 
   test('export sends keys only when a selection is given (FE-014)', async () => {

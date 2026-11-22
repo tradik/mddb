@@ -9,10 +9,14 @@ import { render, screen, cleanup, fireEvent, act, within } from '@testing-librar
 vi.mock('../lib/mddb-client', () => ({
   default: {
     getMe: vi.fn(), listFeatures: vi.fn(), listAutomation: vi.fn(), listAutomationLogs: vi.fn(), backup: vi.fn(), restore: vi.fn(),
+    listBackups: vi.fn(), downloadBackup: vi.fn(),
   },
 }));
+vi.mock('../lib/download', () => ({ saveBlob: vi.fn() }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
+const { saveBlob } = await import('../lib/download');
+const { BACKUP_FILES_PAGE } = await import('../lib/use-backup-files');
 const { useStore } = await import('../lib/store');
 const { resetFeatures } = await import('../lib/features');
 const { RUNS_PER_RULE } = await import('../lib/use-backup-history');
@@ -45,8 +49,21 @@ beforeEach(() => {
   mddbClient.listFeatures.mockResolvedValue({ features: [{ name: 'automation', enabled: true }] });
   mddbClient.listAutomation.mockResolvedValue({ rules: [nightly, offsite, { id: 'w', type: 'cron', webhookId: 'x' }] });
   mddbClient.listAutomationLogs.mockImplementation(({ ruleId }) => Promise.resolve(logs[ruleId]));
+  // A server before 2.19.11: no file list. The listing tests below answer it.
+  mddbClient.listBackups.mockRejectedValue(httpError(404));
+  saveBlob.mockReset();
 });
 afterEach(cleanup);
+
+/** A client error with the HTTP status, as apiError builds it. */
+function httpError(status, message = `API Error (${status}): x`) {
+  return Object.assign(new Error(message), { status });
+}
+
+const files = [
+  { name: 'mddb-1.db', path: '/data/backups/nightly/mddb-1.db', bytes: 3 * 1024 * 1024, modifiedAt: '1970-01-01T00:01:40Z', state: 'checksummed', collectionFiles: 0 },
+  { name: 'snap.db', path: '/data/backups/snap.db', bytes: 512, modifiedAt: '1970-01-01T00:03:20Z', state: 'unknown', collectionFiles: 4 },
+];
 
 describe('BackupsPanel', () => {
   test('lists the scheduled runs and the backup rules, one log read per rule', async () => {
@@ -122,7 +139,87 @@ describe('BackupsPanel', () => {
     expect(screen.getByRole('note').textContent).toContain('only an administrator of the whole server');
     expect(screen.getByRole('button', { name: 'Back up now' }).disabled).toBe(true);
     expect(mddbClient.listAutomation).not.toHaveBeenCalled();
+    expect(mddbClient.listBackups).not.toHaveBeenCalled();
     expect(screen.queryByRole('region', { name: 'Scheduled backups' })).toBeNull();
+  });
+
+  test('every backup file is listed with its size, a run that wrote one shares its row', async () => {
+    mddbClient.listBackups.mockResolvedValue({ backups: files, total: 2 });
+    await renderPage();
+    expect(mddbClient.listBackups).toHaveBeenCalledWith({ limit: BACKUP_FILES_PAGE });
+    const table = screen.getByRole('table', { name: 'Backups' });
+    const rows = within(table).getAllByRole('row');
+    expect(within(table).getByRole('columnheader', { name: 'Size' })).toBeTruthy();
+    // snap.db is the newest; mddb-1.db is one row with its scheduled run.
+    expect(rows[1].textContent).toContain('snap.db');
+    expect(rows[1].textContent).toContain('512 B');
+    expect(rows[1].textContent).toContain('plus 4 collection files, kept on the server');
+    expect(within(rows[1]).getByText('On the server').className).toContain('bg-surface-subtle');
+    expect(within(table).getAllByText('mddb-1.db')).toHaveLength(1);
+    expect(within(table).getAllByText('3.0 MB').length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('Scheduled: nightly')).toHaveLength(3);
+    expect(within(table).getAllByRole('button', { name: /^Download/ })).toHaveLength(2);
+    expect(within(table).getAllByRole('button', { name: /for restore/ })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Show older backups' })).toBeNull();
+
+    mddbClient.downloadBackup.mockResolvedValueOnce({ blob: 'b', filename: null });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Download snap.db' })));
+    expect(mddbClient.downloadBackup).toHaveBeenCalledWith('snap.db');
+    expect(saveBlob).toHaveBeenCalledWith({ blob: 'b', filename: null }, 'snap.db');
+
+    mddbClient.downloadBackup.mockRejectedValueOnce(httpError(404, 'API Error (404): backup not found'));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Download mddb-1.db' })));
+    expect(screen.getByRole('alert').textContent).toBe('API Error (404): backup not found');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use snap.db for restore' }));
+    expect(screen.getByLabelText('Restore from file').value).toBe('/data/backups/snap.db');
+  });
+
+  test('older backups load page by page; a backup taken now reloads the list', async () => {
+    mddbClient.listBackups.mockResolvedValueOnce({ backups: [files[1]], total: 2 }).mockResolvedValueOnce({ backups: [files[0]], total: 2 });
+    await renderPage();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Show older backups' })));
+    expect(mddbClient.listBackups).toHaveBeenLastCalledWith({ limit: BACKUP_FILES_PAGE, offset: 1 });
+    expect(screen.getAllByRole('button', { name: /^Download/ })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Show older backups' })).toBeNull();
+
+    mddbClient.listBackups.mockRejectedValueOnce(httpError(500, 'API Error (500): disk'));
+    mddbClient.backup.mockResolvedValueOnce({ backup: '/data/backups/now.db' });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Back up now' })));
+    expect(mddbClient.listBackups).toHaveBeenCalledTimes(3);
+    expect(screen.getByRole('alert').textContent).toBe('API Error (500): disk');
+    // The list is gone with the failed read; the page shows what it knows.
+    expect(screen.getByRole('table', { name: 'Backups' }).textContent).toContain('now.db');
+  });
+
+  test('a failed next page is shown and keeps the rows', async () => {
+    mddbClient.listBackups.mockResolvedValueOnce({ backups: [files[1]], total: 2 }).mockRejectedValueOnce(httpError(500, 'API Error (500): gone'));
+    await renderPage();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Show older backups' })));
+    expect(screen.getByRole('alert').textContent).toBe('API Error (500): gone');
+    expect(screen.getByRole('button', { name: 'Download snap.db' })).toBeTruthy();
+  });
+
+  test('a server without the file list leaves the page as before', async () => {
+    await renderPage();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Size' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Download/ })).toBeNull();
+    cleanup();
+    // An answer that is not the API's JSON (a page server's HTML) counts the same.
+    mddbClient.listBackups.mockRejectedValue(new SyntaxError('Unexpected token <'));
+    await renderPage();
+    expect(screen.queryByRole('alert')).toBeNull();
+    cleanup();
+    mddbClient.listBackups.mockRejectedValue(httpError(405));
+    await renderPage();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  test('a refused file list is shown', async () => {
+    mddbClient.listBackups.mockRejectedValue(httpError(403, 'API Error (403): admin access required'));
+    await renderPage();
+    expect(screen.getByRole('alert').textContent).toContain('API Error (403): admin access required');
   });
 
   test('without authentication the page works as for an admin', async () => {
