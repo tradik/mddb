@@ -282,3 +282,27 @@ func TestESSearchNeedsReadPermission(t *testing.T) {
 		t.Fatalf("no claims: %d", rec.Code)
 	}
 }
+
+// A collection whose retrieval profile defaults to passages still answers
+// _search with hits: the ES layer asks for whole results, as /v1 callers who
+// pass format=results do.
+func TestESSearchIgnoresAPassagesProfile(t *testing.T) {
+	s, h := esTestServer(t)
+	esSeed(t, h)
+	if s.CollectionManager == nil {
+		s.CollectionManager = NewCollectionManager(s.DB)
+		if err := s.CollectionManager.EnsureBucket(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.CollectionManager.Set("books", &CollectionConfig{Retrieval: &RetrievalProfileDef{Format: FormatPassages}}); err != nil {
+		t.Fatal(err)
+	}
+	if p := s.RetrievalProfile("books"); p == nil || p.Format != FormatPassages {
+		t.Fatalf("profile: %+v", p)
+	}
+	out := esSearchOK(t, h, "/es/books/_search", `{"query":{"match":{"content":"brown"}}}`)
+	if esSortedHitIDs(out) != "bear,fox" {
+		t.Fatalf("hits under a passages profile: %v", out)
+	}
+}
