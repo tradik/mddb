@@ -20,6 +20,11 @@ func TestMain(m *testing.M) {
 	if p := os.Getenv(verifyChildEnv); p != "" {
 		os.Exit(runVerifyChild(p))
 	}
+	// The model training tests start this binary as their trainer and
+	// evaluate command, which the job's own variable marks.
+	if os.Getenv("MDDB_TRAIN_JOB_ID") != "" {
+		os.Exit(runFakeTrainer(os.Args[1:]))
+	}
 	if os.Getenv("MDDB_OUTBOUND_ALLOW_PRIVATE") == "" {
 		_ = os.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "true")
 	}

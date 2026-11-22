@@ -193,6 +193,11 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/corpus/install":                ruleAdmin,
 	"/v1/corpus/inspect":                ruleAdmin, // FE-022
 	"/v1/corpus/remove":                 ruleAdmin,
+	"/v1/training/profiles":             ruleAdmin, // a run starts a process on the server
+	"/v1/training/datasets":             ruleAdmin,
+	"/v1/training/datasets/":            ruleAdmin,
+	"/v1/training/jobs":                 ruleAdmin,
+	"/v1/training/jobs/":                ruleAdmin,
 	"/v1/mcp/keys":                      ruleAdmin,
 	"/v1/mcp/keys/disable":              ruleAdmin,
 	"/v1/admin/diagnose":                ruleAdmin, // OPS-025
