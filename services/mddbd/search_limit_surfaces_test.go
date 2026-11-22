@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -22,8 +24,10 @@ func wantMCPCapped(t *testing.T, tool string, res map[string]any, want int) {
 	if res["isError"] == true {
 		t.Fatalf("%s: %v", tool, res)
 	}
+	// A tool with an output schema carries its whole answer, numbers as
+	// json.Number (#461); any other tool carries only the two fields (#368).
 	detail, _ := res["structuredContent"].(map[string]any)
-	if detail["limitCapped"] != true || detail["limit"] != want {
+	if detail["limitCapped"] != true || fmt.Sprint(detail["limit"]) != strconv.Itoa(want) {
 		t.Fatalf("%s: structuredContent %v, want capped to %d", tool, detail, want)
 	}
 	text := res["content"].([]map[string]any)[0]["text"].(string)
@@ -71,9 +75,15 @@ func TestSearchLimit_MCPTools(t *testing.T) {
 	} {
 		wantMCPCapped(t, name, mcpCall(s, tc.tool, tc.args), 2)
 	}
-	// Under the cap: no structured content, as before.
-	if res := mcpCall(s, "full_text_search", with(map[string]any{"limit": 2})); res["structuredContent"] != nil {
+	// Under the cap: no structured content on a tool without an output
+	// schema, as before; a tool with one carries its answer and no cap.
+	if res := mcpCall(s, "cross_search", map[string]any{"target_collections": []any{"gold"}, "query": "pump water", "top_k": 2}); res["structuredContent"] != nil {
 		t.Fatalf("under the cap: %v", res)
+	}
+	res := mcpCall(s, "full_text_search", with(map[string]any{"limit": 2}))
+	detail, _ := res["structuredContent"].(map[string]any)
+	if _, hasResults := detail["results"]; !hasResults || detail["limitCapped"] != nil || detail["limit"] != nil {
+		t.Fatalf("schema tool under the cap: %v", res)
 	}
 }
 

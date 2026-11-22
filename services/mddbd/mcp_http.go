@@ -104,14 +104,7 @@ func (m *MCPHTTPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"content": []map[string]interface{}{
-			{
-				"type": "text",
-				"text": result,
-			},
-		},
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(mcpToolResult(req.Name, result)); err != nil {
 		slog.Error("encoding tool call response", "err", err)
 	}
 }
