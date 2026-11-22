@@ -450,6 +450,9 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		Sort:            mcpGetString(args, "sort"),
 		BM25K1:          mcpGetFloatPtr(args, "bm25_k1"),
 		BM25B:           mcpGetFloatPtr(args, "bm25_b"),
+		// In the schema since v2.9.14 and not read until 2.19.12.
+		FacetBy:        mcpGetStringSlice(args, "facet_by"),
+		FacetMaxValues: mcpGetInt(args, "facet_max_values"),
 	}
 	filter, filterErr := mcpGetFilter(args)
 	if filterErr != nil {

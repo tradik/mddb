@@ -491,3 +491,29 @@ func TestMCPStructuredContent(t *testing.T) {
 		t.Fatalf("text changed: %v", res)
 	}
 }
+
+// hybrid_search over MCP reads facet_by and facet_max_values, which its input
+// schema has named since v2.9.14.
+func TestMCPHybridSearch_Facets(t *testing.T) {
+	s, cleanup := structuredGold(t)
+	defer cleanup()
+	res := mcpCall(s, "hybrid_search", map[string]any{"collection": "gold", "query": "pump water",
+		"facet_by": []any{"category"}, "facet_max_values": 1})
+	structured, _ := res["structuredContent"].(map[string]any)
+	facets, _ := structured["facets"].(map[string]any)
+	if buckets, _ := facets["category"].([]any); len(buckets) != 1 {
+		t.Fatalf("facets = %v in %v", structured["facets"], res)
+	}
+	if hybridFacets(nil, []string{"category"}, 0) != nil {
+		t.Fatal("facets without results")
+	}
+}
+
+// A field Go encodes as null when nil validates: matchedTerms of a
+// full-text result and a document's meta.
+func TestMCPOutputSchemas_NullableFields(t *testing.T) {
+	answer := map[string]any{"results": []any{map[string]any{"matchedTerms": nil, "document": map[string]any{"meta": nil}}}}
+	if errs := schemaErrors("", mcpToolOutputSchemas["full_text_search"], answer); len(errs) != 0 {
+		t.Fatalf("null matchedTerms or meta refused: %v", errs)
+	}
+}

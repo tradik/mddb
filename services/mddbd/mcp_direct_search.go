@@ -333,6 +333,7 @@ func (c *DirectClient) hybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		ImageHits:       imageHits,
 		LimitReport:     httpReq.limitReport,
 		RerankResult:    httpReq.rerankRun.Result(),
+		Facets:          hybridFacets(items, req.FacetBy, req.FacetMaxValues),
 	}
 	for _, item := range items {
 		resp.Results = append(resp.Results, MCPHybridSearchResult{
