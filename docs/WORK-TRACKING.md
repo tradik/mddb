@@ -2,13 +2,10 @@
 title: "Work Tracking for Agents (v2.19.11)"
 slug: "docs/work-tracking"
 description: "Mirror a repository's issues and pull requests into a collection, keep the plan, backlog and progress notes next to them, and hand sessions over through the memory tools."
-status: draft
+status: publish
 ---
 
 # Work Tracking for Agents (v2.19.11)
-
-> **Draft.** This page describes 2.19.11 as planned. It is published when
-> the release ships, with every example run against a server.
 
 A coding agent needs three things besides the code: what is asked for
 (issues), what to do next (a plan), and what the last session left behind.

@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Blog:** "MDDB as Your Knowledge Base" — loading folders, sites and repositories, who reads what, and the four ways to connect (MCP, External Knowledge, the web search engine, a scenario as a model), with a measured question: 380 tokens for three passages against about 71,800 for the three documents.
 - **Blog:** "Keep Your Agent's Code Index Live" — `autoindex --watch` and `hook install` on a local checkout, a project skill that makes the agent search first, measured delays (1.5–2.1 s from save to searchable, 0.16–0.22 s per commit) and token estimates per lookup.
 
+- **Model training (TRN-001): module `modelTraining`, off by default, admin only.** MDDB builds a training dataset from one or several collections (JSON Lines: `text`, or `pairs` from a template over content and metadata; filter, split, shuffle with a seed, duplicate removal, a licence summary and an acknowledgement for collections with no licence on record) and starts an external trainer command. Commands come only from the operator's file (`MDDB_TRAINERS_CONFIG`): the API and the panel pick a profile by name and set the parameters it declares, never a command or a path; no shell, a job directory nothing leaves, an environment allowlist, timeouts, cancel, an audit entry per start, cancel and download. A trial run on a small sample, and an evaluation before and after through an operator-configured evaluate command, shown side by side. Routes under `/v1/training/`; the panel's **Model Training** page; docs/MODEL-TRAINING.md and a step-by-step guide with a recipes example. MDDB trains nothing itself and gains no dependency. 27 modules.
+- **Corpus packs of several collections (FE-022).** `POST /v1/corpus/build` takes `collections` and `name`; pack format 2 holds one file per collection, each with its own licence and checksum, and installs each back under its own name, read-only. A pack of one collection still writes format 1, which servers since 2.18.10 read; a server before 2.19.11 refuses a format-2 pack. `POST /v1/corpus/inspect` shows a pack's manifest and name clashes before an install. `mddb-cli corpus build -c a -c b=LICENSE --name NAME`.
+- **Panel: Corpus Packs page** next to the collections: installed packs, upload with a preview before installing, create from one or several collections, download, remove; shortcuts on the collection list.
+- **Panel: Backup & Restore and Collection Maintenance pages (FE-023, FE-024)**, moved out of System Info. `GET /v1/backups` lists the backup files in `MDDB_BACKUP_DIR` (name, size, date, whether a checksum file lies beside it) and `GET /v1/backups/{name}/download` serves one; both admin only, confined to backup files in that directory, every download in the audit log.
+- **Feature modules have a plain `title` and `summary`** (`GET /v1/features`, gRPC `FeatureProto`), beside the technical `description`.
+- **Blog:** "From Collections to a Model File" and "Issues, Plans and Sessions in MDDB", both with figures from a running server.
+- **A filter condition may be a bare value or a list**: `"filter": {"state": "open"}` reads as `{"state": {"in": ["open"]}}`. It used to be refused.
+
 ### Changed
 
 - **Compatibility floor (VERSIONING.md):** MDDB keeps compatibility with every release from 2.19.0 onward. Behaviour kept only for releases before 2.19.0 may change in a minor release, is kept where that is cheap and safe, and each such change is listed here. Databases from older releases still open, and a security fix may change behaviour of any age.
@@ -31,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Panel: one scroll.** The page no longer shows a second scrollbar or a blank band under the content, and no longer scrolls sideways below 731 px; Client Settings can be scrolled.
+- **No issue or ticket numbers in texts a user reads** (feature descriptions, the endpoint catalogue, MCP tool descriptions, panel labels); the technical detail sits behind a help control. Two tests keep them out.
+- **`fields: ["meta.title"]`** on the MCP search tools returned no title; the `meta.` prefix the agent instructions use is now read as the metadata key.
 - **Cluster tests on Windows runners:** the end-to-end cluster tests ran a 20 ms heartbeat and 150 ms election timeout there too and re-elected over a hundred times in five seconds; on Windows they now run five times longer, and `internal/cluster`'s ten times (it was five), with the waits for a leader scaled to match. Test-only.
 - **`mddb-cli autoindex hook run`** wrote the CLI usage text into `.git/mddb-autoindex.log` after an error; the log now holds only the error.
 

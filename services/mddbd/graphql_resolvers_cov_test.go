@@ -424,7 +424,7 @@ func TestCovFVectorReindexReturnsFreshStats(t *testing.T) {
 // by both the listing and the vector search.
 func TestCovFMalformedFilterIsRefused(t *testing.T) {
 	a, _ := covFAdapter(t)
-	bad := map[string]any{"category": 5}
+	bad := map[string]any{"category": []any{map[string]any{"a": 1}}} // a bare 5 is "equals 5" since 2.19.11
 	if conn, err := a.SearchDocuments(context.Background(), gql.SearchInput{Collection: "docs", Filter: bad}); err == nil || conn != nil {
 		t.Errorf("SearchDocuments with a malformed filter = %v, %v; want an error", conn, err)
 	}
