@@ -38,6 +38,8 @@ status: publish
   - [POST /v1/export](#post-v1export)
   - [GET /v1/backup](#get-v1backup)
   - [POST /v1/restore](#post-v1restore)
+  - [GET /v1/backups](#get-v1backups)
+  - [GET /v1/backups/{name}/download](#get-v1backupsnamedownload)
   - [POST /v1/truncate](#post-v1truncate)
   - [GET /v1/indexing-status](#get-v1indexing-status)
   - [GET /v1/stats](#get-v1stats)
@@ -1721,6 +1723,71 @@ with a closed or destroyed database. A failed restore returns `500` with the
 previous data still being served. The gRPC `Restore` RPC follows the same
 contract and, like this endpoint, resets the binlog so replication followers
 re-snapshot.
+
+---
+
+### GET /v1/backups
+
+List the backup files in the server's backup directory (`MDDB_BACKUP_DIR`),
+newest first (v2.19.11). Admin on `*`.
+
+**Query Parameters**:
+- `limit` (optional): rows per page, default 100, at most 1000
+- `offset` (optional): rows to skip, default 0
+
+**Response**:
+```json
+{
+  "backups": [
+    {
+      "name": "mddb-20261122T030000Z.db",
+      "path": "/data/backups/mddb-20261122T030000Z.db",
+      "bytes": 52428800,
+      "modifiedAt": "2026-11-22T03:00:04Z",
+      "state": "checksummed",
+      "collectionFiles": 0
+    }
+  ],
+  "total": 1,
+  "limit": 100,
+  "offset": 0,
+  "note": "Backups in folders inside the backup directory, and backups a scheduled rule stores in object storage, are not listed."
+}
+```
+
+**Notes**:
+- Lists regular `.db` files in the backup directory itself, never a folder
+  inside it, a symlink, a checksum or temporary file, or the live database.
+  Backups a scheduled rule stores in object storage are not listed.
+- `state` is `checksummed` when a `<name>.sha256` file lies beside the backup
+  (written by a scheduled run after the integrity check), else `unknown`. The
+  list never re-checks a file; a restore checks it before installing it.
+- `collectionFiles` counts the files in `<name>.d/` (per-collection layout).
+- See [BACKUP.md](BACKUP.md#listing-and-downloading-backups).
+
+---
+
+### GET /v1/backups/{name}/download
+
+Download one backup file listed by `GET /v1/backups` (v2.19.11). Admin on `*`.
+
+**Response**: the file, `application/octet-stream`, with `Content-Length` and
+`Content-Disposition: attachment; filename=<name>`. Range requests are
+answered with `206`. `HEAD` answers the headers only.
+
+**cURL Example**:
+```bash
+curl -OJ "http://localhost:11023/v1/backups/nightly.db/download"
+```
+
+**Notes**:
+- `{name}` is a single file name: a path separator, `..`, an absolute path or
+  a NUL is refused, and the file is opened through the backup directory, so a
+  symlink cannot lead out of it.
+- Every name that is not a listed backup answers `404 {"error":"backup not found"}`.
+- In the per-collection layout the download is the main file only.
+- Each download, served or refused, is written to the audit log as
+  `backup.download` with the user.
 
 ---
 

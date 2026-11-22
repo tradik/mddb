@@ -31,6 +31,8 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/export", s.handleExport)
 	mux.HandleFunc("/v1/backup", s.handleBackup)
 	mux.HandleFunc("/v1/restore", s.guardWrite(s.handleRestore))
+	mux.HandleFunc("/v1/backups", s.handleBackups)     // FE-024: the backup files
+	mux.HandleFunc("/v1/backups/", s.handleBackupItem) // FE-024: {name}/download
 	mux.HandleFunc("/v1/truncate", s.guardWrite(s.handleTruncate))
 	mux.HandleFunc("/v1/delete", s.guardWrite(s.handleDelete))
 	mux.HandleFunc("/v1/delete-batch", s.guardWrite(s.handleDeleteBatch))
