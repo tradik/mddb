@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Cluster tests on Windows runners:** the end-to-end cluster tests ran a 20 ms heartbeat and 150 ms election timeout there too and re-elected over a hundred times in five seconds; on Windows they now run five times longer, and `internal/cluster`'s ten times (it was five), with the waits for a leader scaled to match. Test-only.
 - **`mddb-cli autoindex hook run`** wrote the CLI usage text into `.git/mddb-autoindex.log` after an error; the log now holds only the error.
 
 ## [2.19.10] - 2026-11-22

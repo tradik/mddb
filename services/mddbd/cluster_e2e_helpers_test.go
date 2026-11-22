@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -25,11 +26,22 @@ import (
 // without closing its log, as kill -9 leaves it) and started again on the
 // same files and port.
 
-// Short timings: the tests run elections in well under a second.
-const (
-	testHeartbeat = 20 * time.Millisecond
-	testElection  = 150 * time.Millisecond
+// Short timings: the tests run elections in well under a second. On Windows
+// a loaded runner missed 20 ms heartbeats often enough to re-elect a hundred
+// times in five seconds (2.19.10), so there every timing and every wait for a
+// leader is five times longer, as in internal/cluster.
+var (
+	testHeartbeat = e2eScaled(20 * time.Millisecond)
+	testElection  = e2eScaled(150 * time.Millisecond)
 )
+
+// e2eScaled is d, five times longer on Windows.
+func e2eScaled(d time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return 5 * d
+	}
+	return d
+}
 
 type clusterOpts struct {
 	nodes int
