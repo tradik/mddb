@@ -435,7 +435,7 @@ same server functions and gated with the same permissions:
 | `ListCorpusPacks` | read, filtered to the caller's tenant | `packs` (`CorpusPackProto`: `collection`, `read_only`, `corpus` as `CorpusInfoProto`) and `total` |
 | `InstallCorpusPack` | admin, writable server | client stream. The first message holds either `url` (an `https://` URL the server downloads through its SSRF guard, no redirect out of TLS) or the first `data` chunk; `sha256`, in the first message, is the pack file's checksum, checked before anything is installed. Capped at `MDDB_CORPUS_MAX_BYTES` |
 | `RemoveCorpusPack` | admin, writable server | `{name}` → `{status, name, deleted}` |
-| `BuildCorpusPack` | admin | `{collection, version, description, license, sources}` → a stream of `CorpusPackChunk` (at most 1 MiB of `data` each); the first also carries `filename` and `doc_count` |
+| `BuildCorpusPack` | admin | `{collection, version, description, license, sources}`, or `name` and `collections` (`CorpusCollectionProto{name, license, sources}`, v2.19.11) instead of `collection` → a stream of `CorpusPackChunk` (at most 1 MiB of `data` each); the first also carries `filename` and `doc_count` |
 
 Errors map as on REST: `INVALID_ARGUMENT` (400), `NOT_FOUND` (404),
 `ALREADY_EXISTS` (409), `PERMISSION_DENIED` (403), `INTERNAL` (500).
