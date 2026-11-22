@@ -10,8 +10,10 @@ export default function Header({ onRefresh }) {
   const isAuthenticated = authManager.isAuthenticated();
 
   return (
-    <header className="bg-surface border-b border-line h-16 flex-shrink-0">
-      <div className="h-full px-6 flex items-center justify-between">
+    <header className="bg-surface border-b border-line flex-shrink-0">
+      {/* At least 64px high; on a narrow screen the controls wrap to a second
+          line instead of pushing the page wider than the window (FE-021). */}
+      <div className="min-h-16 px-4 md:px-6 py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex items-center space-x-3">
           <Database className="w-8 h-8 text-accent" />
           <div>
@@ -20,7 +22,7 @@ export default function Header({ onRefresh }) {
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-2 md:gap-4">
           {/* Search Mode Toggle */}
           <div className="flex items-center bg-surface-subtle rounded-lg p-0.5">
             <button
@@ -92,7 +94,7 @@ export default function Header({ onRefresh }) {
           )}
         </div>
       </div>
-      {/* Fixed-position, so the 64px header height the layout relies on stays. */}
+      {/* Fixed-position, so it never changes the header's height. */}
       <LimitCappedNotice />
     </header>
   );
