@@ -223,3 +223,39 @@ func TestSaveStreamLeavesNothingOnFailure(t *testing.T) {
 		t.Fatalf("left behind: %v", entries)
 	}
 }
+
+// FE-022: several collections in one pack, each named with -c.
+func TestCorpusBuildOfSeveralCollections(t *testing.T) {
+	fs := newFakeServer(t, map[string]interface{}{"/v1/corpus/build": "PACK"})
+	t.Chdir(t.TempDir())
+	if _, err := runCLI(t, fs.URL, "corpus", "build", "--name", "kb", "-c", "docs", "-c", "notes=Apache-2.0", "--license", "MIT", "--version", "2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat("kb-2.mddbpack"); err != nil {
+		t.Fatal("the pack is not named after --name")
+	}
+	body := fs.lastCall(t).Body
+	assertBodyField(t, body, "name", "kb")
+	assertBodyField(t, body, "collections", []map[string]string{{"name": "docs"}, {"name": "notes", "license": "Apache-2.0"}})
+	// Without --name the server decides; the file is named after the first.
+	if _, err := runCLI(t, fs.URL, "corpus", "build", "-c", "docs", "--license", "MIT"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat("docs.mddbpack"); err != nil {
+		t.Fatal("no default file name for one -c collection")
+	}
+	calls := len(fs.calls())
+	for _, args := range [][]string{
+		{"docs", "-c", "notes"},
+		{},
+		{"-c", "=MIT"},
+		{"-c", "notes="},
+	} {
+		if _, err := runCLI(t, fs.URL, append([]string{"corpus", "build", "--license", "MIT"}, args...)...); err == nil {
+			t.Fatalf("%v was sent", args)
+		}
+	}
+	if len(fs.calls()) != calls {
+		t.Fatal("a refused build reached the server")
+	}
+}
