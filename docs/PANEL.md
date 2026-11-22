@@ -585,13 +585,26 @@ collections, then the vector store list or collection names as vector store
 IDs and a test query. The function (`mddb_model.py`) and its Valves follow.
 See [LLM_CONNECTIONS.md](LLM_CONNECTIONS.md#open-webui).
 
+<!-- Open WebUI engines (#449-#451): begin -->
+### LLM Connections: Open WebUI engines (2.19.10)
+
+The *Open WebUI* tab of *Chat → LLM Connections* lists, below the function
+script, the three Open WebUI settings MDDB can answer: Web Search, Reranking
+and Content Extraction, each with its settings path, the URL on the server
+the panel shows (`/v1/web-search`, `/v1/rerank`, `/v1/extract`) and the API
+key to enter, and the Features module (`webSearch`, `rerankApi`,
+`extractApi`) that must be switched on first ([OPENWEBUI.md](OPENWEBUI.md)).
+<!-- Open WebUI engines (#449-#451): end -->
+
 ### Module switches: the Features page (2.19.0)
 
 "Features" in the menu's System group lists the server's optional modules
 (`GET /v1/features`): chat, chat with external MCP servers, geo, temporal,
 spell, curation, automation, memory, code intelligence, evaluation, corpus
 packs, classification, duplicates, images, webhooks, collection schemas,
-collection aliases, cross search, search tuning and full-text tuning.
+collection aliases, cross search, search tuning and full-text tuning, and
+(2.19.10, off by default, under Integrations) the web search, rerank and
+extraction endpoints Open WebUI can call ([OPENWEBUI.md](OPENWEBUI.md)).
 Documents, collections,
 full-text and vector search, auth and backups are always on and not listed.
 

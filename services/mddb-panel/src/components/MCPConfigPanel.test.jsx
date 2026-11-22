@@ -160,6 +160,11 @@ describe('MCPConfigPanel non-Claude examples', () => {
     filename: document.querySelector('.bg-gray-900 .font-mono').textContent,
     content: code(),
     instructions: [...document.querySelectorAll('ol li')].map((li) => li.textContent),
+    // #449-#451: the Open WebUI tab's engine sections; other tabs have none.
+    sections: [...document.querySelectorAll('[data-engine-section]')].map((section) => ({
+      title: section.querySelector('h4').textContent,
+      steps: [...section.querySelectorAll('li')].map((li) => li.textContent),
+    })),
   });
 
   test.each([

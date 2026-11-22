@@ -32,6 +32,10 @@ export const FEATURE_VIEWS = {
   crossSearch: ['crossSearch'],
   searchTuning: ['searchAdvisor', 'vectorSpace'],
   ftsTuning: ['synonyms', 'stopwords'],
+  // #449-#451: endpoints for Open WebUI's admin settings; no panel page.
+  webSearch: [],
+  rerankApi: [],
+  extractApi: [],
 };
 
 /** Human names of the modules, for the notice and the Features page. */
@@ -56,6 +60,9 @@ export const FEATURE_LABELS = {
   crossSearch: 'Cross search',
   searchTuning: 'Search tuning',
   ftsTuning: 'Full-text tuning',
+  webSearch: 'Web search endpoint',
+  rerankApi: 'Rerank endpoint',
+  extractApi: 'Document extraction endpoint',
 };
 
 /** The label of a module; an unknown name is shown as it is. */
