@@ -16,6 +16,7 @@ import {
   Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2,
   MessageSquare, ToggleRight, Brain, Database, MessagesSquare, FileCheck, Import, CopyX, UserRound, Building2, Package,
 } from 'lucide-react';
+import { Archive, Wrench } from 'lucide-react';
 import { isViewEnabled } from './features';
 
 export const NAV_GROUPS = [
@@ -25,6 +26,7 @@ export const NAV_GROUPS = [
       // Corpus packs, then Model training, go first in this group.
       { mode: 'corpus', icon: Package, label: 'Corpus Packs' },
       { mode: 'import', icon: Import, label: 'Import' },
+      { mode: 'maintenance', icon: Wrench, label: 'Collection Maintenance' },
       { mode: 'aliases', icon: Link2, label: 'Collection Aliases' },
       { mode: 'schemas', icon: FileCheck, label: 'Collection Schemas' },
       { mode: 'embeddings', icon: Brain, label: 'Embedding Models' },
@@ -80,6 +82,7 @@ export const NAV_GROUPS = [
   {
     id: 'system', label: 'System', items: [
       { mode: 'system', icon: Server, label: 'System Info' },
+      { mode: 'backups', icon: Archive, label: 'Backup & Restore' },
       { mode: 'cluster', icon: GitBranch, label: 'Cluster', when: 'cluster' },
       { mode: 'config', icon: Settings, label: 'Configuration' },
       { mode: 'features', icon: ToggleRight, label: 'Features' },

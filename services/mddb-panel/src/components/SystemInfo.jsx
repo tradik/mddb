@@ -6,10 +6,7 @@ import GainCard from './GainCard';
 import { openCorpusPage } from '../lib/corpus-intent';
 import DiagnoseCard from './DiagnoseCard';
 import ServerEdgeCard from './ServerEdgeCard';
-import IndexingStatusCard from './IndexingStatusCard';
 import StorageCard from './StorageCard';
-import CollectionMaintenanceCard from './CollectionMaintenanceCard';
-import BackupRestoreCard from './BackupRestoreCard';
 
 export default function SystemInfo() {
   const {
@@ -19,6 +16,7 @@ export default function SystemInfo() {
     setSystemInfo,
     setSystemInfoLoading,
     setSystemInfoError,
+    setViewMode,
   } = useStore();
 
   useEffect(() => {
@@ -244,9 +242,6 @@ export default function SystemInfo() {
 
         <GainCard />
 
-        {/* 2.18.8: is what was just written searchable yet? */}
-        <IndexingStatusCard />
-
         {/* 2.18.2: where the bytes of the database file are */}
         <StorageCard />
 
@@ -257,9 +252,13 @@ export default function SystemInfo() {
 
         <DiagnoseCard />
 
-        <CollectionMaintenanceCard />
-
-        <BackupRestoreCard />
+        {/* 2.19.11: backups and collection upkeep have pages of their own. */}
+        <p className="text-sm text-fg-muted">
+          Backups now live on{' '}
+          <button type="button" onClick={() => setViewMode('backups')} className="text-info-strong underline hover:no-underline">Backup &amp; Restore</button>,
+          and checksum, export, revision clean-up and indexing status on{' '}
+          <button type="button" onClick={() => setViewMode('maintenance')} className="text-info-strong underline hover:no-underline">Collection Maintenance</button>.
+        </p>
 
         {/* Refresh Button */}
         <div className="mt-6 flex justify-end">
