@@ -48,6 +48,9 @@ import { useSSE } from './lib/useSSE';
 // 2.19.0: memory, schemas, duplicates, import and account pages.
 import AdminToolViews from './components/AdminToolViews';
 
+/** Below Tailwind's `md` breakpoint the sidebar overlays the page. */
+const PHONE_QUERY = '(max-width: 767px)';
+
 function App() {
   const {
     stats,
@@ -56,6 +59,7 @@ function App() {
     setStatsLoading,
     setStatsError,
     currentDocument,
+    currentCollection,
     searchMode,
     viewMode: requestedView,
     sidebarWidth,
@@ -119,6 +123,12 @@ function App() {
     }
   };
 
+  // On a phone the open sidebar covers the page (FE-021), so picking a page
+  // or a collection folds it away; a phone also starts with it folded.
+  useEffect(() => {
+    if (window.matchMedia?.(PHONE_QUERY).matches) setSidebarCollapsed(true);
+  }, [requestedView, currentCollection, setSidebarCollapsed]);
+
   const loadStats = async () => {
     setStatsLoading(true);
     setStatsError(null);
@@ -169,18 +179,22 @@ function App() {
   const effectiveWidth = sidebarCollapsed ? 0 : sidebarWidth;
 
   return (
-    // Fixed viewport shell: the banner and header take their natural height and
-    // the row below gets the rest (flex-1 min-h-0), so neither the page nor the
-    // sidebar scrolls because of a hard-coded header height.
+    // Fixed viewport shell (FE-021): exactly the visible window high, never
+    // scrolled itself. The banner and header take their natural height and the
+    // row below gets the rest (flex-1 min-h-0). Inside it the sidebar scrolls
+    // on its own when it is taller than the window, and each page pane of the
+    // <main> area is the one scroll container of its page. index.css keeps
+    // <body> from growing past the shell, which is what showed a second
+    // scrollbar and a blank band under the page.
     <div className="h-dvh flex flex-col overflow-hidden bg-surface-muted">
       <ComplianceBanner />
       <GlobalShortcuts />
       <Header onRefresh={loadStats} />
 
-      <div className="flex flex-1 min-h-0">
-        {/* Sidebar */}
+      <div className="relative flex flex-1 min-h-0">
+        {/* Sidebar: beside the page, or over it on a phone. */}
         <div
-          className="relative flex-shrink-0 transition-[width] duration-150"
+          className="relative flex-shrink-0 transition-[width] duration-150 max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:max-w-[85vw] max-md:shadow-xl"
           style={{ width: effectiveWidth }}
         >
           {!sidebarCollapsed && (
@@ -192,7 +206,7 @@ function App() {
         {!sidebarCollapsed && (
           <div
             onMouseDown={handleMouseDown}
-            className="w-1 flex-shrink-0 cursor-col-resize bg-surface-strong hover:bg-primary-400 active:bg-primary-500 transition-colors"
+            className="w-1 flex-shrink-0 cursor-col-resize bg-surface-strong hover:bg-primary-400 active:bg-primary-500 transition-colors max-md:hidden"
           />
         )}
 
@@ -207,7 +221,9 @@ function App() {
           </button>
         )}
 
-        <div className="flex-1 min-w-0 flex overflow-hidden">
+        {/* Every direct child is a page pane and scrolls its own page; panes
+            beside each other (a list and the document viewer) scroll apart. */}
+        <main className="flex-1 min-w-0 flex overflow-hidden *:min-h-0 *:overflow-y-auto">
           {viewMode === 'cluster' && (
             <div className="flex-1 min-w-0 border-l border-line">
               <ClusterPanel />
@@ -422,7 +438,7 @@ function App() {
             </>
           )}
           <AdminToolViews viewMode={viewMode} currentDocument={currentDocument} />
-        </div>
+        </main>
       </div>
       <SSEToast connected={sseConnected} lastEvent={sseLastEvent} />
     </div>
