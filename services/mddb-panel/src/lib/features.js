@@ -39,6 +39,7 @@ export const FEATURE_VIEWS = {
   vectorStores: [],
   esCompat: [],
   qdrantCompat: [],
+  modelTraining: ['training'],
 };
 
 /**
@@ -73,6 +74,7 @@ export const FEATURE_LABELS = {
   vectorStores: 'Vector store API',
   esCompat: 'Search API under /es',
   qdrantCompat: 'Vector query under /qdrant',
+  modelTraining: 'Model training',
 };
 
 /** The plain name of a module: the server's title, ours, or the name itself. */

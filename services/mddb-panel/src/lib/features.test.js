@@ -24,6 +24,7 @@ describe('the map', () => {
       'memory', 'codeIntel', 'eval', 'corpus', 'classify', 'duplicates', 'images',
       'webhooks', 'schemas', 'aliases', 'crossSearch', 'searchTuning', 'ftsTuning',
       'webSearch', 'rerankApi', 'extractApi', 'vectorStores', 'esCompat', 'qdrantCompat',
+      'modelTraining',
     ]);
     expect(featureForView('vectorSpace')).toBe('searchTuning');
     expect(featureForView('stopwords')).toBe('ftsTuning');
@@ -124,6 +125,12 @@ describe('useFeatures', () => {
     // A third component mounted after the load does not fetch again.
     renderHook(() => useFeatures());
     expect(mddbClient.listFeatures).toHaveBeenCalledTimes(2);
+
+    // One unmounted stops listening; the other still hears a reload.
+    first.unmount();
+    vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features: [chat], version: 3 });
+    await act(() => second.result.current.reload());
+    expect(second.result.current.version).toBe(3);
   });
 
   test('a client without listFeatures counts as a failed load, not a crash', async () => {

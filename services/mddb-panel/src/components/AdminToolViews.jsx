@@ -8,6 +8,7 @@ import TenantsPanel from './TenantsPanel';
 import CorpusPacksPage from './CorpusPacksPage';
 import BackupsPanel from './BackupsPanel';
 import CollectionMaintenancePanel from './CollectionMaintenancePanel';
+import TrainingPanel from './TrainingPanel';
 
 /** The pages added in 2.19.0 and after, by view mode. */
 const PAGES = {
@@ -20,6 +21,7 @@ const PAGES = {
   corpus: CorpusPacksPage, // FE-022
   backups: BackupsPanel, // FE-023
   maintenance: CollectionMaintenancePanel, // FE-023
+  training: TrainingPanel,
 };
 
 /** Pages whose documents open in the viewer beside them. */

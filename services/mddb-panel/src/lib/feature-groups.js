@@ -13,7 +13,7 @@
 
 /** Category id, heading and the modules in it, in display order. */
 export const FEATURE_GROUPS = [
-  { id: 'data', label: 'Collections', features: ['corpus', 'aliases', 'schemas', 'duplicates', 'temporal', 'classify', 'images'] },
+  { id: 'data', label: 'Collections', features: ['corpus', 'modelTraining', 'aliases', 'schemas', 'duplicates', 'temporal', 'classify', 'images'] },
   { id: 'search', label: 'Search', features: ['crossSearch', 'geo', 'codeIntel'] },
   { id: 'tuning', label: 'Search Tuning', features: ['searchTuning', 'eval', 'ftsTuning', 'curation', 'spell'] },
   { id: 'chat', label: 'Chat', features: ['chat', 'chatExternalMcp', 'memory'] },
