@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **mddb-chat: `url` 2.5.9** (RUSTSEC-2026-0592, a stack overflow in `Url::origin()` on nested `blob:` URLs); `form_urlencoded` 1.2.3 with it.
 - **Panel: one scroll.** The page no longer shows a second scrollbar or a blank band under the content, and no longer scrolls sideways below 731 px; Client Settings can be scrolled.
 - **No issue or ticket numbers in texts a user reads** (feature descriptions, the endpoint catalogue, MCP tool descriptions, panel labels); the technical detail sits behind a help control. Two tests keep them out.
 - **`fields: ["meta.title"]`** on the MCP search tools returned no title; the `meta.` prefix the agent instructions use is now read as the metadata key.

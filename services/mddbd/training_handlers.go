@@ -127,7 +127,7 @@ func (s *Server) handleTrainingDatasets(w http.ResponseWriter, r *http.Request, 
 			trainingError(w, err)
 			return
 		}
-		writeJSONStatus(w, http.StatusAccepted, map[string]any{"jobId": j.ID, "job": j})
+		writeJSONStatus(w, http.StatusAccepted, map[string]any{"jobId": j.ID, "job": m.view(j)})
 	default:
 		methodNotAllowed(w)
 	}
@@ -150,7 +150,7 @@ func (s *Server) handleTrainingJobs(w http.ResponseWriter, r *http.Request, m *t
 			trainingError(w, err)
 			return
 		}
-		writeJSONStatus(w, http.StatusAccepted, map[string]any{"jobId": j.ID, "job": j})
+		writeJSONStatus(w, http.StatusAccepted, map[string]any{"jobId": j.ID, "job": m.view(j)})
 	default:
 		methodNotAllowed(w)
 	}
@@ -204,11 +204,11 @@ func (s *Server) handleTrainingJob(w http.ResponseWriter, r *http.Request, m *tr
 	case action == "cancel" && r.Method == http.MethodPost:
 		j, err := m.cancel(id, trainingKindRun)
 		s.auditTraining(r, "cancel", id, err)
-		answerJob(w, j, err)
+		answerJob(w, m, j, err)
 	case action == "evaluate" && r.Method == http.MethodPost:
 		j, err := m.submitEvaluate(id)
 		s.auditTraining(r, "evaluate", id, err)
-		answerJob(w, j, err)
+		answerJob(w, m, j, err)
 	case action == "download" && r.Method == http.MethodGet:
 		s.downloadResult(w, r, m, id)
 	default:
@@ -227,12 +227,12 @@ func showTrainingJob(w http.ResponseWriter, m *trainingManager, id, kind string)
 }
 
 // answerJob answers a job an action was accepted for.
-func answerJob(w http.ResponseWriter, j *trainingJob, err error) {
+func answerJob(w http.ResponseWriter, m *trainingManager, j *trainingJob, err error) {
 	if err != nil {
 		trainingError(w, err)
 		return
 	}
-	writeJSONStatus(w, http.StatusAccepted, map[string]any{"jobId": j.ID, "job": j})
+	writeJSONStatus(w, http.StatusAccepted, map[string]any{"jobId": j.ID, "job": m.view(j)})
 }
 
 // answerDeleted answers a delete.
