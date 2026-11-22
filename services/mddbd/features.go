@@ -44,6 +44,7 @@ const (
 	FeatureVectorStores    = "vectorStores"
 	FeatureESCompat        = "esCompat"
 	FeatureQdrantCompat    = "qdrantCompat"
+	FeatureModelTraining   = "modelTraining"
 )
 
 // featuresForceOffEnv names the operator's override: a comma-separated list

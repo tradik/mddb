@@ -57,6 +57,7 @@ func (s *Server) shutdownSteps() []shutdownStep {
 
 	// 2. Drain the queues, so what was accepted is finished or recorded.
 	add("bulk-ingest", s.BulkIngest != nil, func() { s.BulkIngest.Stop() })
+	add("training", s.Training != nil, func() { s.Training.stop() })
 	add("index-queue", s.IndexQueue != nil, func() { s.IndexQueue.Shutdown() })
 	add("embedding-worker", s.EmbeddingWorker != nil, func() { s.EmbeddingWorker.Stop() })
 	//    The index checkpoints (SRCH-023), once the last embedding is in the

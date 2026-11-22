@@ -41,6 +41,8 @@ var httpFeatureRoutes = map[string]string{
 	"/v1/web-search": FeatureWebSearch, "/v1/rerank": FeatureRerankAPI, "/v1/extract/process": FeatureExtractAPI,
 	"/v1/vector_stores": FeatureVectorStores, "/v1/vector_stores/": FeatureVectorStores,
 	"/es": FeatureESCompat, "/es/": FeatureESCompat, "/qdrant": FeatureQdrantCompat, "/qdrant/": FeatureQdrantCompat,
+	"/v1/training/profiles": FeatureModelTraining, "/v1/training/datasets": FeatureModelTraining, "/v1/training/datasets/": FeatureModelTraining,
+	"/v1/training/jobs": FeatureModelTraining, "/v1/training/jobs/": FeatureModelTraining,
 }
 
 // routeFeature is the module of a route pattern, "" for core.

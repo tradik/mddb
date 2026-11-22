@@ -97,4 +97,9 @@ var featureRegistry = []featureDef{
 	{Name: FeatureQdrantCompat, DefaultEnv: qdrantCompatEnv, Title: "Vector query under /qdrant",
 		Summary:     "Lets existing vector search clients query your collections without code changes.",
 		Description: "Qdrant-compatible point query under /qdrant. MDDB_QDRANT_COMPAT=true turns it on by default."},
+	// Starts the operator's trainer commands: off until an administrator
+	// turns it on.
+	{Name: FeatureModelTraining, Title: "Model training",
+		Summary:     "Turns collections into a training dataset and starts the training tool your server operator set up.",
+		Description: "Routes under /v1/training. Trainer commands come only from the file MDDB_TRAINERS_CONFIG names; without one, datasets can still be built."},
 }
