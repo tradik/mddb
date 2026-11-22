@@ -33,13 +33,15 @@ type trainingManager struct {
 	s        *Server
 	profiles *trainerProfiles
 	root     string
-	ctx      context.Context
-	stopAll  context.CancelCauseFunc
 	wg       sync.WaitGroup
-	// mu guards running and slots, and serialises changes to a live job
-	// with the write of its record.
-	mu       sync.Mutex
+	// mu guards running, slots and stopped, and serialises changes to a live
+	// job with the write of its record.
+	mu sync.Mutex
+	// running holds the cancel of every job in the background; stop calls
+	// each with errServerStopping, and once stopped is set a job launched
+	// later starts cancelled.
 	running  map[string]context.CancelCauseFunc
+	stopped  bool
 	slots    map[string]int
 	lastSave map[string]time.Time
 }
@@ -47,8 +49,7 @@ type trainingManager struct {
 // newTrainingManager reads the profiles and recovers the jobs a previous
 // process left running.
 func newTrainingManager(s *Server) *trainingManager {
-	ctx, stop := context.WithCancelCause(context.Background())
-	m := &trainingManager{s: s, profiles: loadTrainerProfiles(), root: s.trainingDir(), ctx: ctx, stopAll: stop,
+	m := &trainingManager{s: s, profiles: loadTrainerProfiles(), root: s.trainingDir(),
 		running: map[string]context.CancelCauseFunc{}, slots: map[string]int{}, lastSave: map[string]time.Time{}}
 	for _, e := range m.profiles.errors {
 		slog.Warn("trainer profile refused", "err", e)
@@ -62,7 +63,12 @@ func newTrainingManager(s *Server) *trainingManager {
 // stop tells every running job to end and waits for them, within a bound.
 // A job stopped so is marked interrupted.
 func (m *trainingManager) stop() {
-	m.stopAll(errServerStopping)
+	m.mu.Lock()
+	m.stopped = true
+	for _, cancel := range m.running {
+		cancel(errServerStopping)
+	}
+	m.mu.Unlock()
 	done := make(chan struct{})
 	go func() { m.wg.Wait(); close(done) }()
 	select {
@@ -106,10 +112,15 @@ func (m *trainingManager) progress(j *trainingJob, pct float64, msg string) {
 }
 
 // launch runs fn in the background with a context cancel and shutdown end.
+// The job's context is its own: the manager lives as long as the server,
+// and stop reaches every job through its cancel.
 func (m *trainingManager) launch(id string, fn func(ctx context.Context)) {
-	ctx, cancel := context.WithCancelCause(m.ctx)
+	ctx, cancel := context.WithCancelCause(context.Background())
 	m.mu.Lock()
 	m.running[id] = cancel
+	if m.stopped {
+		cancel(errServerStopping)
+	}
 	m.mu.Unlock()
 	m.wg.Add(1)
 	go func() {
