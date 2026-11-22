@@ -316,6 +316,9 @@ const coverageFiles = [
   'src/components/BackupsPanel.jsx',
   'src/components/BackupHistory.jsx',
   'src/components/ScheduledBackups.jsx',
+  // 2.19.11 (FE-024): the backup files, their sizes and downloads.
+  'src/lib/backup-files.js',
+  'src/lib/use-backup-files.js',
   'src/components/CollectionMaintenancePanel.jsx',
   'src/components/MaintenanceAction.jsx',
 ];
