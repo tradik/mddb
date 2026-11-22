@@ -360,8 +360,15 @@ if __name__ == "__main__":
       return {
         filename: 'mddb_model.py',
         content: mddbModelPyRaw.replace('http://mddb:9000', mcpBase),
+        // #446: External Knowledge needs no code: Open WebUI's OpenAI-compatible
+        // provider calls /v1/vector_stores on the HTTP API. The function below
+        // is the other way, kept as it was.
         instructions: [
-          'Go to Open WebUI → Admin → Functions → Add new function',
+          'Knowledge without code: Open WebUI → Admin → Settings → Integrations → External Knowledge Sources → Add',
+          `Provider: OpenAI-compatible. Endpoint: ${httpBase}/v1`,
+          'API key: an MDDB API key (mddb_live_…) of a user with read permission on the collections',
+          'List the vector stores, or enter collection names as vector store IDs, then run a test query',
+          'Or use this function: Go to Open WebUI → Admin → Functions → Add new function',
           'Paste this script and save it',
           'Configure the Valves (settings) to match your LLM provider',
           'For Ollama: set llmApiUrl to your Ollama address',

@@ -190,6 +190,9 @@ tags:
     description: A subset of the Elasticsearch REST API under /es, translated
       onto MDDB's own search and write paths (requires MDDB_ES_COMPAT=true;
       v2.18.10+). See ELASTICSEARCH-COMPAT.md.
+  - name: OpenAI Compatibility
+    description: The two OpenAI Vector Stores routes Open WebUI's OpenAI-compatible
+      External Knowledge Source provider calls, served on MDDB's own search (#446).
 
 paths:
   /health:
@@ -8651,6 +8654,80 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "503": {$ref: "#/components/responses/SearchBusy"}
 
+  /v1/vector_stores:
+    get:
+      tags:
+        - OpenAI Compatibility
+      summary: List vector stores (the collections the caller may read)
+      description: |
+        (#446) The OpenAI Vector Stores list, as Open WebUI's OpenAI-compatible
+        External Knowledge Source provider calls it. One store per collection
+        the caller may read: read permission, the tenant namespace and an MCP
+        API key's scope apply per collection. Sorted by id, paged with
+        `limit` and `after`. Aliases are not listed. `created_at` is 0: MDDB
+        does not record when a collection was created.
+      operationId: listOpenAIVectorStores
+      parameters:
+        - name: limit
+          in: query
+          description: Stores per page, 1-100.
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+        - name: after
+          in: query
+          description: The last id of the previous page (its `last_id`).
+          schema: {type: string}
+      responses:
+        "200":
+          description: A page of stores
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpenAIVectorStoreList"}
+        "400": {$ref: "#/components/responses/OpenAIError"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {$ref: "#/components/responses/OpenAIError"}
+
+  /v1/vector_stores/{vector_store_id}/search:
+    parameters:
+      - name: vector_store_id
+        in: path
+        required: true
+        description: A collection name or alias, URL-escaped (`acme%2Fdocs` for `acme/docs`).
+        schema: {type: string}
+    post:
+      tags:
+        - OpenAI Compatibility
+      summary: Search a vector store (a collection)
+      description: |
+        (#446) The OpenAI vector store search, as Open WebUI's
+        OpenAI-compatible External Knowledge Source provider sends it. A
+        collection with embeddings is searched by hybrid search, any other by
+        full-text search; each result is the passage around the document's
+        best match, with a score in 0-1. Needs read permission on the
+        collection: 403 whether or not it exists, 404 for an unknown
+        collection the caller may read. `filters`, `rewrite_query` and
+        `ranking_options.ranker` are accepted and ignored.
+      operationId: searchOpenAIVectorStore
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/OpenAIVectorStoreSearchRequest"}
+      responses:
+        "200":
+          description: The passages found
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpenAIVectorStoreSearchPage"}
+        "400": {$ref: "#/components/responses/OpenAIError"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/OpenAIError"}
+        "404": {$ref: "#/components/responses/OpenAIError"}
+        "413": {$ref: "#/components/responses/OpenAIError"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "500": {$ref: "#/components/responses/OpenAIError"}
+        "503": {$ref: "#/components/responses/SearchBusy"}
+
   /v1/cross-search:
     post:
       tags:
@@ -10055,6 +10132,94 @@ components:
             reason: {type: string, example: "[fuzzy] query clause is not supported by the MDDB Elasticsearch subset"}
             root_cause: {type: array, items: {type: object}}
         status: {type: integer}
+    OpenAIError:
+      type: object
+      description: (#446) An error in the OpenAI shape; the status code is MDDB's.
+      properties:
+        error:
+          type: object
+          properties:
+            message: {type: string, example: no read permission on this vector store}
+            type: {type: string, enum: [invalid_request_error, authentication_error, permission_error, server_error]}
+            param: {type: string, nullable: true}
+            code: {type: string, example: forbidden}
+    OpenAIVectorStore:
+      type: object
+      properties:
+        id: {type: string, example: acme/docs}
+        object: {type: string, enum: [vector_store]}
+        name: {type: string, example: acme/docs}
+        created_at: {type: integer, description: Always 0, example: 0}
+        status: {type: string, enum: [completed]}
+        file_counts:
+          type: object
+          description: Documents; every stored document is searchable, so all are completed.
+          properties:
+            in_progress: {type: integer}
+            completed: {type: integer}
+            failed: {type: integer}
+            cancelled: {type: integer}
+            total: {type: integer}
+        metadata:
+          type: object
+          properties:
+            description: {type: string, description: "The collection's configured description"}
+    OpenAIVectorStoreList:
+      type: object
+      properties:
+        object: {type: string, enum: [list]}
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/OpenAIVectorStore"}
+        first_id: {type: string, nullable: true}
+        last_id: {type: string, nullable: true}
+        has_more: {type: boolean}
+    OpenAIVectorStoreSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          description: One query, or several searched as one.
+          oneOf:
+            - type: string
+            - type: array
+              items: {type: string}
+        max_num_results: {type: integer, minimum: 1, default: 10, description: Values above 50 are lowered to 50.}
+        filters: {type: object, description: Accepted and ignored.}
+        rewrite_query: {type: boolean, description: Accepted and ignored.}
+        ranking_options:
+          type: object
+          properties:
+            ranker: {type: string, description: Accepted and ignored.}
+            score_threshold: {type: number, description: Drops results scoring below it.}
+    OpenAIVectorStoreSearchPage:
+      type: object
+      properties:
+        object: {type: string, enum: [vector_store.search_results.page]}
+        search_query:
+          type: array
+          items: {type: string}
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              file_id: {type: string, description: The document id}
+              filename: {type: string, description: The document key}
+              score: {type: number, minimum: 0, maximum: 1}
+              attributes:
+                type: object
+                description: The document's metadata (several values joined with ", "), plus collection, lang, and url when the metadata has one.
+                additionalProperties: true
+              content:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type: {type: string, enum: [text]}
+                    text: {type: string}
+        has_more: {type: boolean}
+        next_page: {type: string, nullable: true}
     CollectionQuota:
       type: object
       description: |
@@ -16862,6 +17027,11 @@ components:
               leaderId: {type: string, example: n2}
               term: {type: integer, format: uint64, example: 5}
               group: {type: string, description: "(v2.19.8) With placement redirects: the node group", example: g2}
+    OpenAIError:
+      description: (#446) An error in the OpenAI shape, typed by the status
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/OpenAIError"}
     ESBadRequest:
       description: An unsupported or malformed clause, named in error.reason
       content:

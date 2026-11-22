@@ -22,6 +22,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/replication/status": ruleAuthenticated,
 	"/v1/fts-languages":      ruleAuthenticated,
 	"/v1/chat/scenarios":     ruleAuthenticated, // #403: the list is filtered to what the caller may read
+	"/v1/vector_stores":      ruleAuthenticated, // #446: the list is filtered to what the caller may read
 	"/v1/chat/mcp/call":      ruleAuthenticated, // MCP-005: the scenario's collections, checked when it is read
 	"/v1/code-languages":     ruleAuthenticated,
 	"/v1/features":           ruleAuthenticated, // GO-049: the module switches
@@ -139,6 +140,7 @@ var httpAccessRules = map[string]accessRule{
 	"/graphql":                 ruleHandler, // per field: graphqlAccessRules
 	"/es":                      ruleHandler, // the index in the path (INT-019)
 	"/es/":                     ruleHandler,
+	"/v1/vector_stores/":       ruleHandler, // #446: the collection is the {id} in the path
 	"/tools/call":              ruleHandler, // per tool: mcpToolAccessRules
 	"/resources/read":          ruleHandler, // per resource: mcpResourceRule
 	"/sse":                     ruleHandler, // JSON-RPC, per tool and resource
