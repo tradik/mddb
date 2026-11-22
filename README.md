@@ -389,7 +389,7 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **Custom MCP Tools** - Define YAML-based AI tools for domain-specific workflows
 - ✅ **RAG Pipeline** - Built-in support for retrieval-augmented generation workflows
 - ✅ **Integrations** - Docling, Langflow, OpenSearch, SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension ([guide](docs/INTEGRATIONS.md))
-- ✅ **Elasticsearch-compatible subset** - `MDDB_ES_COMPAT=true` mounts `_search`, `_count`, `_doc`, `_bulk` under `/es`, translated onto MDDB's full-text, vector (`auto`), hybrid (`rrf`) and metadata paths with the same auth, permissions and limits as `/v1`; tested in CI with the unmodified `elasticsearch-py` (v2.18.10+) — **[Details](docs/ELASTICSEARCH-COMPAT.md)**
+- ✅ **Elasticsearch-compatible subset** - the `esCompat` module (System → Features, or `MDDB_ES_COMPAT=true`) mounts `_search`, `_count`, `_doc`, `_bulk` under `/es`, translated onto MDDB's full-text, vector (`auto`), hybrid (`rrf`) and metadata paths with the same auth, permissions and limits as `/v1`; tested in CI with the unmodified `elasticsearch-py` (v2.18.10+) — **[Details](docs/ELASTICSEARCH-COMPAT.md)**
 
 ### Core Functionality
 - ✅ **Document Management** - Full CRUD with metadata and collections
@@ -447,6 +447,9 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **Removing Permissions (2.19.9)** - `DELETE /v1/auth/permissions` and `/v1/auth/group-permissions`, GraphQL `deletePermission` / `deleteGroupPermission`, and a remove button in the panel ([AUTHENTICATION.md](docs/AUTHENTICATION.md))
 - ✅ **Connecting an MCP Client to a Running Server (2.19.9)** - `MDDB_MCP_PUBLIC_URL` and `/v1/config` report how MCP is reached; the panel's Claude tab builds the command, the project file and the connector steps for this server ([LLM_CONNECTIONS.md](docs/LLM_CONNECTIONS.md))
 - ✅ **Who Can Read a Chat Scenario (2.19.10)** - `GET /v1/chat/scenarios/{name}/access` lists every user with the grant that lets them read the scenario's collections; the panel shows it in the scenario's *Access* card, with links to LLM Connections, Users and Groups ([API.md](docs/API.md#chat-scenarios-v1chatscenarios))
+- ✅ **Open WebUI (2.19.10)** - MDDB plugs into Open WebUI as an External Knowledge source (OpenAI-compatible vector stores at `/v1/vector_stores`, or the Qdrant provider at `/qdrant`), as its web search, reranker and document loader (`/v1/web-search`, `/v1/rerank`, `/v1/extract`), and mddb-chat serves each chat scenario as a model (`/v1/models`, `/v1/chat/completions`); every surface is a module, off by default ([OPENWEBUI.md](docs/OPENWEBUI.md), [LLM_CONNECTIONS.md](docs/LLM_CONNECTIONS.md#open-webui))
+- ✅ **Qdrant-compatible point query (2.19.10)** - `qdrant-client`'s `query_points` searches a collection under `/qdrant` ([QDRANT_COMPAT.md](docs/QDRANT_COMPAT.md))
+- ✅ **VS Code (2.19.10)** - the panel writes `.vscode/mcp.json` for the chat built into VS Code, with the key kept in VS Code's secret storage ([LLM_CONNECTIONS.md](docs/LLM_CONNECTIONS.md#vs-code-v21910))
 - ✅ **Automatic Catch-up** - Followers pull missing transactions
 - ✅ **Zero-Downtime Snapshots** - Full sync for new followers
 - ✅ **Cluster Monitoring** - Web panel with health and lag metrics
@@ -687,7 +690,7 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 - **[Reference Coding](docs/REFERENCE-CODING.md)** - Other projects' code as searchable references, with their licences
 - **[Code Intelligence](docs/CODE-INTELLIGENCE.md)** - Definitions, references, callers and implementations: heuristic for 13 programming languages, precise from a language server with `autoindex --semantic`
 - **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch (and when MDDB alone is enough), SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension, LangChain / LangGraph
-- **[Elasticsearch-compatible subset](docs/ELASTICSEARCH-COMPAT.md)** - `MDDB_ES_COMPAT=true`: unmodified Elasticsearch clients index, search (`match`, `bool`, `term`, `range`, `knn`, `highlight`, `terms` aggs) and delete under `/es`; unsupported clauses are a 400 naming them (v2.18.10+)
+- **[Elasticsearch-compatible subset](docs/ELASTICSEARCH-COMPAT.md)** - the `esCompat` module (or `MDDB_ES_COMPAT=true`): unmodified Elasticsearch clients index, search (`match`, `bool`, `term`, `range`, `knn`, `highlight`, `terms` aggs) and delete under `/es`; unsupported clauses are a 400 naming them (v2.18.10+)
 - **[Bulk Import](docs/BULK-IMPORT.md)** - `mddb-cli autoindex` for a directory or repository, and the converters it uses
 - **[Blog](blog/)** - Release announcements and engineering notes
 
