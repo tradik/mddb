@@ -779,19 +779,33 @@ a line linking to both.
   after a confirmation that names the file and says what a restore replaces:
   every collection, its documents and their history; whatever was written
   after the backup is lost.
-- *Backups* lists the runs of the scheduled backups (from the automation log,
+- *Backups* lists every backup file in the server's backup folder
+  (`GET /v1/backups`, 200 at a time, *Show older backups* reads the next
+  ones) with its size, date and state, together with the runs of the
+  scheduled backups (from the automation log,
   `GET /v1/automation-logs?ruleId=`, 20 per rule) and the backups taken on
-  the page, with the time and the state (stored and checked, failed with the
-  server's error, skipped). *Use for restore* puts a listed file in the
-  restore field; a backup in object storage (`s3://…`) is fetched back by
-  hand first.
+  the page. A run or a backup taken here that wrote a listed file is that
+  file's row, matched on its full path, not a second row. States: *Stored and
+  checked* (a scheduled run that stored and checked it, or a checksum file
+  beside it), *On the server* (a file the server keeps no record of checking),
+  *Failed* with the server's error, *Skipped*.
+- *Download* saves a listed file (`GET /v1/backups/{name}/download`). In the
+  per-collection layout the row says how many collection files stay on the
+  server; the download is the main file. The file passes through the
+  browser's memory, so copy a very large backup off the server with
+  `curl -OJ` instead ([BACKUP.md](BACKUP.md#listing-and-downloading-backups)).
+- *Use for restore* puts a backup in the restore field; a backup in object
+  storage (`s3://…`) is fetched back by hand first.
+- Backups in a folder inside the backup folder (a scheduled rule's `path`)
+  and in object storage are not in the file list; their runs still are.
 - *Scheduled backups* lists the cron rules with a backup action: when each
   runs, where its backups go and how many it keeps, each with a button to the
   Automation page, where rules are made and changed.
-- The server has no call that lists the files of its backup folder, reports
-  their size or serves one for download, so the page shows none of that: a
-  backup taken with the CLI or MCP is not listed, and files are copied off
-  the server from `MDDB_BACKUP_DIR` ([BACKUP.md](BACKUP.md)).
+- A server before 2.19.11 cannot list its backup files. The page then shows
+  the scheduled runs and the backups taken on the page, without sizes or
+  downloads, as it did before, and says so behind the list's **?**.
+- The server has no call that deletes a backup file; scheduled backups keep
+  their newest ones through their `keep`.
 - Backups need admin on "*". A signed-in account without it reads why, and
   the buttons are off. The scheduled part is left out where the Automation
   page is (automation module off, `automationsEnabled: false`), and for an
