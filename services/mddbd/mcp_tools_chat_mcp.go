@@ -24,7 +24,7 @@ var chatMcpServerSchema = map[string]interface{}{
 		"resultMaxChars": map[string]interface{}{"type": "integer", "description": "Default 4000"},
 		"forwardIdentity": map[string]interface{}{
 			"type": "object",
-			"description": "Send the signed-in chat user's identity as a short-lived token signed with a separate secret (#414); " +
+			"description": "Send the signed-in chat user's identity as a short-lived token signed with a separate secret; " +
 				"only signed-in sessions are offered the server's tools. Off when left out",
 			"properties": map[string]interface{}{
 				"secretRef":  map[string]interface{}{"type": "string", "description": "The signing key's chat MCP secret, at least 32 bytes, not the server's secretRef"},

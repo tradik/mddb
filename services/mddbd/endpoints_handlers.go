@@ -345,9 +345,9 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 
 		// Cross-collection search
 		{Method: "POST", Path: "/v1/cross-search", Description: "Cross-collection vector search", RequiresAuth: authEnabled},
-		{Method: "POST", Path: "/v1/web-search", Description: "Search readable collections in the Open WebUI external web search shape (module webSearch, #449)", RequiresAuth: authEnabled},
-		{Method: "POST", Path: "/v1/rerank", Description: "Score texts with the reranking model (module rerankApi, #450)", RequiresAuth: authEnabled},
-		{Method: "PUT", Path: "/v1/extract/process", Description: "Convert a file to Markdown without storing it (module extractApi, #451)", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/web-search", Description: "Search readable collections in the Open WebUI external web search shape (module webSearch)", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/rerank", Description: "Score texts with the reranking model (module rerankApi)", RequiresAuth: authEnabled},
+		{Method: "PUT", Path: "/v1/extract/process", Description: "Convert a file to Markdown without storing it (module extractApi)", RequiresAuth: authEnabled},
 
 		// Duplicate detection
 		{Method: "POST", Path: "/v1/find-duplicates", Description: "Find duplicate and similar documents in a collection", RequiresAuth: authEnabled},

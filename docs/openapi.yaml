@@ -10860,9 +10860,22 @@ components:
               crossSearch,
               searchTuning,
               ftsTuning,
+              webSearch,
+              rerankApi,
+              extractApi,
+              vectorStores,
+              esCompat,
+              qdrantCompat,
             ]
+        title:
+          type: string
+          description: (v2.19.11+) Short plain name for people, e.g. "Geo search"
+        summary:
+          type: string
+          description: (v2.19.11+) One plain sentence on what switching the module on gives
         description:
           type: string
+          description: Technical detail — routes, environment variables, what keeps working while the module is off
         enabled:
           type: boolean
           description: Works now — switched on, not forced off, every required module on

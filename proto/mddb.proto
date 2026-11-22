@@ -2790,6 +2790,8 @@ message FeatureProto {
   repeated string blocked_by = 8;                // required modules that are off
   int64 updated_at = 9;                          // Unix seconds; 0 when never switched
   string updated_by = 10;
+  string title = 11;                             // (v2.19.11+) short plain name, e.g. "Geo search"
+  string summary = 12;                           // (v2.19.11+) one plain sentence; description holds the technical detail
 }
 
 message ListFeaturesRequest {}

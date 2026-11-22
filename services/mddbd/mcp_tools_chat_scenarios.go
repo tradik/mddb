@@ -41,7 +41,7 @@ var chatScenarioSchema = map[string]interface{}{
 			"maxTokens":   map[string]interface{}{"type": "integer"},
 			"extraBody":   map[string]interface{}{"type": "object", "description": "Sent to the model API as is, e.g. reasoning_effort"},
 			"loopGuard": map[string]interface{}{"type": "object",
-				"description": "Overrides mddb-chat's repetition-loop guard (#413); 0 or absent keeps its setting",
+				"description": "Overrides mddb-chat's repetition-loop guard; 0 or absent keeps its setting",
 				"properties": map[string]interface{}{
 					"enabled":   map[string]interface{}{"type": "boolean"},
 					"ngram":     map[string]interface{}{"type": "integer", "minimum": 0, "maximum": maxLoopGuardNgram},
@@ -57,7 +57,7 @@ var chatScenarioSchema = map[string]interface{}{
 			"messagesPerMinute": map[string]interface{}{"type": "integer"},
 		}},
 		"mcpServers": map[string]interface{}{"type": "array", "items": chatMcpServerSchema,
-			"description": "External MCP servers whose read-only tools the assistant may call (MCP-005); each allowed tool is checked against the server when saved"},
+			"description": "External MCP servers whose read-only tools the assistant may call; each allowed tool is checked against the server when saved"},
 	},
 }
 
