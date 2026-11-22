@@ -32,7 +32,7 @@ export const FEATURE_VIEWS = {
   crossSearch: ['crossSearch'],
   searchTuning: ['searchAdvisor', 'vectorSpace'],
   ftsTuning: ['synonyms', 'stopwords'],
-  // #449-#451: endpoints for Open WebUI's admin settings; no panel page.
+  // Endpoints for other tools to call; no panel page.
   webSearch: [],
   rerankApi: [],
   extractApi: [],
@@ -41,39 +41,43 @@ export const FEATURE_VIEWS = {
   qdrantCompat: [],
 };
 
-/** Human names of the modules, for the notice and the Features page. */
+/**
+ * Plain names of the modules, the same as the server's `title` (2.19.11).
+ * The server's own title wins once the list has loaded; these cover an older
+ * server that sends none, and the moment before the list arrives.
+ */
 export const FEATURE_LABELS = {
-  chat: 'Chat',
-  chatExternalMcp: 'Chat: external MCP servers',
+  chat: 'Chat assistants',
+  chatExternalMcp: 'Tools from other MCP servers',
   geo: 'Geo search',
-  temporal: 'Temporal analytics',
+  temporal: 'Activity over time',
   spell: 'Spell checker',
-  curation: 'Curation rules',
+  curation: 'Pinned and hidden results',
   automation: 'Automation',
   memory: 'Agent memory',
   codeIntel: 'Code intelligence',
-  eval: 'Retrieval evaluation',
+  eval: 'Search quality checks',
   corpus: 'Corpus packs',
   classify: 'Classification',
-  duplicates: 'Duplicate detection',
+  duplicates: 'Duplicate finder',
   images: 'Image documents',
   webhooks: 'Webhooks',
   schemas: 'Collection schemas',
   aliases: 'Collection aliases',
-  crossSearch: 'Cross search',
-  searchTuning: 'Search tuning',
-  ftsTuning: 'Full-text tuning',
+  crossSearch: 'Search across collections',
+  searchTuning: 'Search tuning tools',
+  ftsTuning: 'Synonyms and stop words',
   webSearch: 'Web search endpoint',
   rerankApi: 'Rerank endpoint',
-  extractApi: 'Document extraction endpoint',
-  vectorStores: 'OpenAI-compatible vector stores',
-  esCompat: 'Elasticsearch-compatible API',
-  qdrantCompat: 'Qdrant-compatible query',
+  extractApi: 'File-to-Markdown endpoint',
+  vectorStores: 'Vector store API',
+  esCompat: 'Search API under /es',
+  qdrantCompat: 'Vector query under /qdrant',
 };
 
-/** The label of a module; an unknown name is shown as it is. */
+/** The plain name of a module: the server's title, ours, or the name itself. */
 export function featureLabel(name) {
-  return FEATURE_LABELS[name] || name;
+  return state.list.find((feature) => feature.name === name)?.title || FEATURE_LABELS[name] || name;
 }
 
 /** The module a viewMode belongs to, or null for a core page. */

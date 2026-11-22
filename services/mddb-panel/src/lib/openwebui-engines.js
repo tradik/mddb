@@ -8,12 +8,14 @@
  * Kept apart from llm-connection-templates.js so the tab's other examples can
  * change without touching these.
  */
+import { featureLabel } from './features';
 
 const KEY = 'API key: an MDDB API key (API Keys tab), sent as Bearer';
 
 /** openWebUIEngineSections lists `{ id, title, steps }`, one per Open WebUI setting. */
 export function openWebUIEngineSections(httpBase) {
-  const module = (name) => `Switch on the "${name}" module under Features first; while it is off the endpoint answers 404`;
+  // The module by its Features page name, so the two never drift apart.
+  const module = (name) => `Switch on "${featureLabel(name)}" under Features first; while it is off the endpoint answers 404`;
   return [
     {
       id: 'webSearch',
@@ -23,7 +25,7 @@ export function openWebUIEngineSections(httpBase) {
         `External Web Search URL: ${httpBase}/v1/web-search (add ?collections=docs,kb to search only those)`,
         `External Web Search ${KEY}`,
         'Bypass Web Loader: on (the snippet is the passage; a link to MDDB needs the key)',
-        module('Web search endpoint'),
+        module('webSearch'),
       ],
     },
     {
@@ -34,7 +36,7 @@ export function openWebUIEngineSections(httpBase) {
         `API Base URL: ${httpBase}/v1/rerank`,
         KEY,
         'Reranking Model: reranker (any name; this server uses its own reranking model)',
-        module('Rerank endpoint'),
+        module('rerankApi'),
       ],
     },
     {
@@ -44,7 +46,7 @@ export function openWebUIEngineSections(httpBase) {
         'Content Extraction Engine: External',
         `Document Loader URL: ${httpBase}/v1/extract (Open WebUI adds /process)`,
         KEY,
-        module('Document extraction endpoint'),
+        module('extractApi'),
       ],
     },
   ];

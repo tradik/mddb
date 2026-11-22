@@ -4,6 +4,7 @@ import mddbClient from '../lib/mddb-client';
 import { useFeatures, featureLabel } from '../lib/features';
 import FeatureRow from './FeatureRow';
 import FeatureBulkBar from './FeatureBulkBar';
+import HelpPopover from './HelpPopover';
 import { groupFeatures } from '../lib/feature-groups';
 
 // GO-049 (2.19.0): the Features page under Administration. One switch per
@@ -71,12 +72,22 @@ export default function FeaturesPanel() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-surface-muted p-6">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="min-h-full bg-surface-muted p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <ToggleRight className="h-6 w-6 text-accent" aria-hidden="true" />
           <h2 className="text-xl font-bold text-fg">Features</h2>
-          <span className="text-xs text-fg-subtle">version {version}</span>
+          <HelpPopover label="Features">
+            <p>
+              A module that is off answers its API routes with 404 &quot;feature disabled&quot; and its pages leave the
+              menu. Switching needs admin on &quot;*&quot;.
+            </p>
+            <p>
+              The operator can lock modules off with MDDB_FEATURES_FORCE_OFF; such a module stays off until the
+              server&apos;s environment changes.
+            </p>
+            <p>Switches saved: version {version}.</p>
+          </HelpPopover>
         </div>
         <div className="flex items-center gap-3">
           <FeatureBulkBar features={list} busy={busy !== null || loading} onApply={applyAll} />
@@ -91,10 +102,8 @@ export default function FeaturesPanel() {
         </div>
       </div>
       <p className="mb-4 max-w-3xl text-sm text-fg-muted">
-        Each optional module of the server can be switched off. A module that is off answers its API routes with
-        404 &quot;feature disabled&quot; and its pages leave this menu. Documents, collections, full-text and vector
-        search, auth and backups are always on. A module forced off with MDDB_FEATURES_FORCE_OFF stays off until the
-        operator changes the environment. Switching needs admin on &quot;*&quot;.
+        Switch optional parts of the server on or off. What a part stored is kept while it is off and is back when
+        you switch it on again. Documents, collections, search, sign-in and backups are always on.
       </p>
 
       {error && <p role="alert" className="mb-3 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
