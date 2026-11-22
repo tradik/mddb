@@ -1186,15 +1186,6 @@ query {
 }
 ```
 
-## Future Enhancements
-
-The following features are planned for future releases:
-
-- Subscriptions for real-time updates
-- Advanced filtering with logical operators
-- Rate limiting per user/IP
-- DataLoader for N+1 query prevention
-
 ## Contributing
 
 GraphQL resolver implementations are in progress. Contributions welcome:
