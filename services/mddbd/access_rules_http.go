@@ -33,6 +33,10 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/auth/api-keys":      ruleAuthenticated,
 	"/v1/auth/api-keys/":     ruleAuthenticated, // the handler refuses another user's key
 	"/playground":            ruleAuthenticated,
+	// #450, #451: the request carries its own texts or file and no
+	// collection is read or written, like /v1/geo-encode.
+	"/v1/rerank":          ruleAuthenticated,
+	"/v1/extract/process": ruleAuthenticated,
 
 	// Documents.
 	"/v1/add":               ruleWrite,
@@ -135,6 +139,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/tenants/":             ruleHandler, // GO-054: a global admin, or for reads the tenant's own admin
 	"/v1/chat/conversations":   ruleHandler, // the chat collection of the caller's tenant (#405)
 	"/v1/chat/conversations/":  ruleHandler,
+	"/v1/web-search":           ruleHandler, // #449: every collection the caller may read, or the URL's, checked one by one
 	"/v1/events":               ruleHandler, // each event is filtered by permission
 	"/events":                  ruleHandler,
 	"/graphql":                 ruleHandler, // per field: graphqlAccessRules

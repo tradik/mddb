@@ -36,6 +36,9 @@ const (
 	FeatureCrossSearch     = "crossSearch"
 	FeatureSearchTuning    = "searchTuning"
 	FeatureFTSTuning       = "ftsTuning"
+	FeatureWebSearch       = "webSearch"
+	FeatureRerankAPI       = "rerankApi"
+	FeatureExtractAPI      = "extractApi"
 )
 
 // featuresForceOffEnv names the operator's override: a comma-separated list
@@ -51,8 +54,9 @@ type featureDef struct {
 }
 
 // featureRegistry lists every switchable module, in the order the panel
-// shows them. Everything but chatExternalMcp is on by default, so a server
-// that never touched a switch behaves as before 2.19.0.
+// shows them. Everything but chatExternalMcp and the three endpoints added in
+// 2.19.10 is on by default, so a server that never touched a switch behaves
+// as before: a module that opens a new way in starts off.
 var featureRegistry = []featureDef{
 	{Name: FeatureChat, Default: true, Description: "Chat assistants: scenarios, conversations and skills, and the mddb-chat service's join"},
 	{Name: FeatureChatExternalMCP, Requires: []string{FeatureChat}, Description: "Lets chat assistants call tools of external MCP servers (MCP-005)"},
@@ -77,6 +81,11 @@ var featureRegistry = []featureDef{
 	{Name: FeatureCrossSearch, Default: true, Description: "Cross search: one query over several collections"},
 	{Name: FeatureSearchTuning, Default: true, Description: "Search tuning: the Search Advisor and the vector space projection"},
 	{Name: FeatureFTSTuning, Default: true, Description: "Full-text tuning: synonym and stop word management; stored ones apply either way"},
+	// Endpoints in the request shapes Open WebUI sends to an external engine
+	// (#449, #450, #451): off until an administrator turns them on.
+	{Name: FeatureWebSearch, Description: "Web search endpoint: POST /v1/web-search searches the collections the caller may read (#449)"},
+	{Name: FeatureRerankAPI, Description: "Rerank endpoint: POST /v1/rerank scores texts with the configured reranking model (#450)"},
+	{Name: FeatureExtractAPI, Description: "Extraction endpoint: PUT /v1/extract/process converts a file to Markdown without storing it (#451)"},
 }
 
 // featureByName finds a module of the registry.

@@ -56,6 +56,7 @@ status: publish
   - [POST /v1/hybrid-search](#post-v1hybrid-search)
   - [OpenAI-compatible vector stores: /v1/vector_stores](#openai-compatible-vector-stores-v1vector_stores)
   - [POST /v1/cross-search](#post-v1cross-search)
+  - [Open WebUI engines: /v1/web-search, /v1/rerank, /v1/extract/process](#open-webui-engines-v1web-search-v1rerank-v1extractprocess)
   - [POST /v1/find-duplicates](#post-v1find-duplicates)
   - [POST /v1/aggregate](#post-v1aggregate)
   - [GET /v1/collection-config](#get-v1collection-config)
@@ -1913,6 +1914,9 @@ backups are core and cannot be switched off.
 | `crossSearch` | on | `/v1/cross-search`, `CrossSearch`, `cross_search` |
 | `searchTuning` | on | `/v1/search-advisor`, `/v1/vector-projection` (the panel's Vector Space), `SearchAdvisor`, `search_advisor` |
 | `ftsTuning` | on | `/v1/synonyms`, `/v1/stopwords`, the synonym and stop word RPCs and tools |
+| `webSearch` | **off** | `/v1/web-search` (v2.19.10, #449) |
+| `rerankApi` | **off** | `/v1/rerank` (v2.19.10, #450) |
+| `extractApi` | **off** | `/v1/extract/process` (v2.19.10, #451) |
 
 A server that never touched a switch behaves as before 2.19.0.
 
@@ -3379,6 +3383,69 @@ Alternative source modes (use one):
   "searchStats": { "durationMs": 8, "collectionsSearched": 2 }
 }
 ```
+
+---
+
+<!-- Open WebUI engines (#449-#451): begin -->
+### Open WebUI engines: /v1/web-search, /v1/rerank, /v1/extract/process
+
+Three endpoints in the request and response shapes Open WebUI sends to an
+external web search engine, reranker and document loader (v2.19.10). Each is
+a feature module that starts **off**; switch it on at `PUT /v1/features/{name}`
+or on the panel's Features page. Switched off, a route answers
+`404 {"error":"feature disabled","feature":"<module>"}`. Any credential the
+API accepts works as `Authorization: Bearer`, an `mddb_live_…` API key
+included. The settings on the Open WebUI side are in
+[OPENWEBUI.md](OPENWEBUI.md).
+
+| Method | Path | Module | Permission | Answers |
+|---|---|---|---|---|
+| POST | `/v1/web-search` | `webSearch` | `read`, checked per collection in the handler | `[{"link","title","snippet"}]` |
+| POST | `/v1/rerank` | `rerankApi` | authenticated (no collection) | `{"model","results":[{"index","relevance_score"}]}` |
+| PUT | `/v1/extract/process` | `extractApi` | authenticated (no collection) | `{"page_content","metadata"}` or a list of them |
+
+**`POST /v1/web-search`** takes `{"query": "…", "count": 3}` and runs the
+cross-collection full-text search (`?searchType=hybrid` for hybrid) over
+every collection the caller may read, a tenant user's own only, without the
+server's memory and chat stores. `?collections=docs,kb` (or repeated) picks
+the collections, each of which must be readable (`403` otherwise);
+`MDDB_WEBSEARCH_COLLECTIONS` narrows the default server-wide. `link` is the
+document's `url`, `source_url` or `link` metadata when it is http(s), else
+`/v1/doc-meta?collection=…&key=…&lang=…` on the address the request reached;
+`title` is `meta.title`, else the key; `snippet` is the passage around the
+query's words (up to 4096 characters).
+
+```bash
+curl -s -X POST 'http://localhost:11023/v1/web-search?collections=docs' \
+  -H 'Authorization: Bearer mddb_live_…' -H 'Content-Type: application/json' \
+  -d '{"query":"pump reset","count":3}'
+```
+
+**`POST /v1/rerank`** takes `{"model", "query", "documents": […], "top_n"}`
+and scores the documents with the server's reranking model (a stored
+configuration of kind `rerank`, else `MDDB_RERANK_*`). `model` is accepted
+and does not choose a model: the server runs one, and the answer names it.
+Every document gets a result, best first; one the model did not score gets a
+score below all the others. Each document is read up to 2048 characters; more
+than 200 documents or 2 MiB of text is `400`. No model configured is `503`; a
+failing model is `502` with `timeout`, `invalidResponse` or `error`.
+
+**`PUT /v1/extract/process`** takes the file's bytes as the body, its type in
+`Content-Type` and its URL-quoted name in `X-Filename`, and converts it with
+the converters of `/v1/upload` without storing anything. The answer's
+`page_content` is the Markdown; `metadata` has `source`, `converter`, `mime`,
+`conversionConfidence` (a number) and `conversionWarnings`, every other value
+a string. A mailbox or an email with attachments answers a list, the file
+first. Limits are the upload's: 10 MB, `?maxSize=` up to 100 MB, under
+`MDDB_MAX_BODY_BYTES`; over is `413`. An unsupported format is `415`, a file
+that fails to convert `422`.
+
+```bash
+curl -s -X PUT http://localhost:11023/v1/extract/process \
+  -H 'Authorization: Bearer mddb_live_…' -H 'Content-Type: application/pdf' \
+  -H 'X-Filename: Report%20Q1.pdf' --data-binary @report.pdf
+```
+<!-- Open WebUI engines (#449-#451): end -->
 
 ---
 

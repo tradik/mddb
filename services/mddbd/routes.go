@@ -165,6 +165,11 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	// #446: the OpenAI vector store subset Open WebUI's external knowledge calls.
 	mux.HandleFunc(openAIVectorStoresPath, s.handleOpenAIVectorStores)
 	mux.HandleFunc(openAIVectorStoresPath+"/", s.withSearchLimit(s.handleOpenAIVectorStoreSubtree))
+	// #449-#451: the external web search, reranker and document loader
+	// contracts of Open WebUI; each a module that starts off.
+	mux.HandleFunc("/v1/web-search", s.withSearchLimit(s.handleWebSearch))
+	mux.HandleFunc("/v1/rerank", s.handleRerankAPI)
+	mux.HandleFunc("/v1/extract/process", s.handleExtract)
 	// Temporal event tracking. Switched off, its routes answer the JSON
 	// "feature disabled" 404 rather than the mux's plain-text one.
 	if s.TemporalManager != nil {
