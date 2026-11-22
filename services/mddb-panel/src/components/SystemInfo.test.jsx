@@ -5,8 +5,8 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', () => ({ default: { getSystemInfo: vi.fn(), getGain: vi.fn() } }));
-// The corpus-pack, diagnose and server-edge cards have their own suites.
-vi.mock('./CorpusPacksCard', () => ({ default: () => <div>corpus packs card</div> }));
+// The diagnose and server-edge cards have their own suites; corpus packs
+// have their own page (FE-022), linked from here.
 vi.mock('./DiagnoseCard', () => ({ default: () => <div>diagnose card</div> }));
 vi.mock('./ServerEdgeCard', () => ({ default: () => <div>server edge card</div> }));
 vi.mock('./IndexingStatusCard', () => ({ default: () => <div>indexing status card</div> }));
@@ -109,7 +109,8 @@ describe('SystemInfo', () => {
     expect(valueOf('Go Version')).toBe('go1.26.0');
     expect(valueOf('MDDB Version')).toBe('2.18.8');
     expect(await screen.findByText('Retrieval gain, last 30 days')).toBeTruthy();
-    expect(screen.getByText('corpus packs card')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Corpus packs' }));
+    expect(useStore.getState().viewMode).toBe('corpus');
     expect(screen.getByText('diagnose card')).toBeTruthy();
     expect(screen.getByText('maintenance card')).toBeTruthy();
     expect(screen.getByText('backup card')).toBeTruthy();

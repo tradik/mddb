@@ -7,6 +7,7 @@ import CreateCollectionModal from './CreateCollectionModal';
 import CollectionConfigModal from './CollectionConfigModal';
 // 2.19.0: the menu, grouped and searchable.
 import NavMenu from './NavMenu';
+import { CorpusPacksButton, CollectionPackButton } from './CollectionPackButtons';
 import { navConditions } from '../lib/nav-groups';
 // The panel's own version, read from package.json at build time, so a release
 // bump (scripts/bump-version.sh) shows up here with no further edit.
@@ -118,6 +119,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
           <h3 className="text-xs font-semibold text-fg-faint uppercase tracking-wider">
             Collections ({collections.length})
           </h3>
+          <CorpusPacksButton />
           {currentCollection ? (
             <button
               onClick={() => setShowUploadModal(true)}
@@ -179,6 +181,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
                   <span className="text-xs text-fg-subtle">
                     {collection.documentCount}
                   </span>
+                  <CollectionPackButton collection={collection.name} />
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

@@ -22,7 +22,7 @@ export const FEATURE_VIEWS = {
   memory: ['memory'],
   codeIntel: ['codeSymbols'],
   eval: ['eval'],
-  corpus: [],
+  corpus: ['corpus'],
   classify: [],
   duplicates: ['duplicates'],
   images: [],

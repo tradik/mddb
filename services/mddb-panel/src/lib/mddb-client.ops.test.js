@@ -8,7 +8,7 @@ import { stubFetch, lastRequest, jsonResponse, textResponse, expectEndpoint } fr
 vi.mock('./auth', () => ({ authManager: { getToken: vi.fn() } }));
 
 const { authManager } = await import('./auth');
-const { default: client, apiError, planningOptions, dispositionFilename, FORBIDDEN_HINT } = await import('./mddb-client');
+const { default: client, apiError, planningOptions, dispositionFilename, FORBIDDEN_HINT, CORPUS_INSPECT_BYTES } = await import('./mddb-client');
 const { getLimitNotice, reportLimit } = await import('./limit-notice');
 
 beforeEach(() => {
@@ -169,6 +169,22 @@ describe('corpus packs and diagnose', () => {
     expect(lastRequest(fetchMock).url).toBe('/v1/chat/log/export?rating=down&format=csv');
     stubFetch(new Response('[]'));
     await client.chatLogExport(undefined, 'json');
+  });
+
+  test('inspectCorpus sends only the start of the file as "pack"', async () => {
+    const fetchMock = stubFetch(jsonResponse({ manifest: { name: 'kb' }, conflicts: [] }));
+    const pack = new File(['x'.repeat(10)], 'kb.mddbpack');
+    await expect(client.inspectCorpus(pack)).resolves.toEqual({ manifest: { name: 'kb' }, conflicts: [] });
+    const req = lastRequest(fetchMock);
+    expect(req.url).toBe('/v1/corpus/inspect');
+    expect(req.body.get('pack').name).toBe('kb.mddbpack');
+    expect(CORPUS_INSPECT_BYTES).toBe(4 * 1024 * 1024);
+  });
+
+  test('buildCorpus sends several collections under the pack name', async () => {
+    const fetchMock = stubFetch(new Response('PACK'));
+    await client.buildCorpus({ name: 'kb', collections: ['a', { name: 'b', license: 'MIT' }], license: 'CC0-1.0', version: undefined });
+    expect(lastRequest(fetchMock).body).toEqual({ name: 'kb', collections: ['a', { name: 'b', license: 'MIT' }], license: 'CC0-1.0' });
   });
 
   test('buildCorpus leaves out an empty version and description', async () => {

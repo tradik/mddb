@@ -1,4 +1,5 @@
 import { Lock } from 'lucide-react';
+import { openCorpusPage } from '../lib/corpus-intent';
 
 /** Where the collection came from, ending the "Read-only" sentence. */
 function packSource(pack) {
@@ -9,7 +10,8 @@ function packSource(pack) {
 
 // AGT-005: a collection installed from a corpus pack is read-only. Every
 // write — add, update, delete, upload, reindex, TTL, sync — is refused with
-// 403 READ_ONLY, so the panel says so before an operator tries.
+// 403 READ_ONLY, so the panel says so before an operator tries. FE-022: the
+// note links to the pack on the Corpus packs page.
 export default function ReadOnlyNotice({ config, compact = false }) {
   if (!config?.readOnly) return null;
   return (
@@ -18,7 +20,10 @@ export default function ReadOnlyNotice({ config, compact = false }) {
       <p className="text-sm text-fg-soft">
         <strong>Read-only</strong>
         {packSource(config.corpus)}
-        Writes to its documents are refused; remove the pack on the System page to write to this name.
+        Writes to its documents are refused; to write to this name, remove the pack on the{' '}
+        <button type="button" onClick={() => openCorpusPage(config.corpus ? { pack: config.corpus.name } : {})} className="underline text-info-strong hover:text-fg">
+          Corpus packs
+        </button>{' '}page.
       </p>
     </div>
   );
