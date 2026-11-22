@@ -162,6 +162,9 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/cross-search", s.withSearchLimit(s.handleCrossSearch))       // GO-053
 	mux.HandleFunc("/v1/find-duplicates", s.withSearchLimit(s.handleFindDuplicates)) // GO-053
 	mux.HandleFunc("/v1/aggregate", s.withSearchLimit(s.handleAggregate))
+	// #446: the OpenAI vector store subset Open WebUI's external knowledge calls.
+	mux.HandleFunc(openAIVectorStoresPath, s.handleOpenAIVectorStores)
+	mux.HandleFunc(openAIVectorStoresPath+"/", s.withSearchLimit(s.handleOpenAIVectorStoreSubtree))
 	// Temporal event tracking. Switched off, its routes answer the JSON
 	// "feature disabled" 404 rather than the mux's plain-text one.
 	if s.TemporalManager != nil {

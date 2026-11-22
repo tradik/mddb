@@ -54,6 +54,7 @@ status: publish
   - [POST /v1/delete-batch](#post-v1delete-batch)
   - [POST /v1/delete-collection](#post-v1delete-collection)
   - [POST /v1/hybrid-search](#post-v1hybrid-search)
+  - [OpenAI-compatible vector stores: /v1/vector_stores](#openai-compatible-vector-stores-v1vector_stores)
   - [POST /v1/cross-search](#post-v1cross-search)
   - [POST /v1/find-duplicates](#post-v1find-duplicates)
   - [POST /v1/aggregate](#post-v1aggregate)
@@ -3202,6 +3203,123 @@ Hybrid search combining full-text (sparse) and vector (dense) results using alph
   "searchStats": { "durationMs": 12 }
 }
 ```
+
+---
+
+### OpenAI-compatible vector stores: /v1/vector_stores
+
+Two read-only routes in the shape of the OpenAI Vector Stores API (#446).
+They are the two calls Open WebUI's **OpenAI-compatible** External Knowledge
+Source provider makes. A vector store is a collection. Creating, changing
+and deleting stores or files through this API is not served: documents are
+written with `/v1/add` and the other MDDB endpoints. Setup steps are in
+[LLM_CONNECTIONS.md](LLM_CONNECTIONS.md#open-webui).
+
+Authentication works as on the rest of `/v1`: `Authorization: Bearer
+mddb_live_…` (or `X-API-Key`) or a JWT. Errors use the OpenAI error object,
+`{"error":{"message","type","param","code"}}`, with MDDB's status codes. The
+401 for a request without credentials comes from the auth middleware, in
+MDDB's own shape.
+
+**`GET /v1/vector_stores?limit=20&after=<id>`** lists the collections the
+caller may read. Read permission, the tenant namespace and an MCP API key's
+scope apply per collection, so a user with read on two collections lists
+those two. Collections that hold documents and collections that only have a
+configuration are both listed, sorted by name. Aliases are not listed, but
+the search accepts them as ids. `limit` is 1–100 (default 20). `has_more`
+and `last_id` page the list, as Open WebUI does.
+
+```bash
+curl -H "Authorization: Bearer $MDDB_API_KEY" "http://localhost:11023/v1/vector_stores?limit=100"
+```
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "acme/docs",
+      "object": "vector_store",
+      "name": "acme/docs",
+      "created_at": 0,
+      "status": "completed",
+      "file_counts": { "in_progress": 0, "completed": 2, "failed": 0, "cancelled": 0, "total": 2 },
+      "metadata": { "description": "Operations handbook" }
+    }
+  ],
+  "first_id": "acme/docs",
+  "last_id": "acme/docs",
+  "has_more": false
+}
+```
+
+`metadata.description` is the collection's configured description.
+`file_counts` counts documents. `created_at` is `0`, because MDDB does not
+record when a collection was created. The answer is `503` (`stats_pending`)
+while the server's first statistics walk is still running.
+
+**`POST /v1/vector_stores/{id}/search`** searches one collection. `{id}` is
+a collection name or an alias. A name containing `/` (a tenant namespace) is
+sent escaped, `acme%2Fdocs`, as Open WebUI sends it. An unescaped `/` works
+too.
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `query` | string or array of strings | Required. Several strings are searched as one query. |
+| `max_num_results` | integer | 1 or more. Default 10; values above 50 are lowered to 50. |
+| `ranking_options.score_threshold` | number | Drops results scoring below it. |
+| `filters`, `rewrite_query`, `ranking_options.ranker` | | Accepted and ignored. Use `/v1/hybrid-search` for metadata filters. |
+
+The search runs MDDB's own engines. A collection with embeddings, on a
+server with an embedding provider, goes through hybrid search
+(`/v1/hybrid-search` with its defaults and the collection's profile). Any
+other collection goes through full-text search (`/v1/fts`). Each result is
+a passage: the lines around the document's best match, cut as the
+`passages` format cuts them. `score` is in 0–1. Hybrid scores are already
+in that range. A full-text score is divided by the top score, so the best
+hit scores 1.
+
+The caller needs read permission on the collection. Without it the answer
+is `403` whether or not the collection exists. An unknown collection the
+caller may read is `404` (`vector_store_not_found`).
+
+```bash
+curl -X POST "http://localhost:11023/v1/vector_stores/acme%2Fdocs/search" \
+  -H "Authorization: Bearer $MDDB_API_KEY" -H "Content-Type: application/json" \
+  -d '{"query":"how does failover work","max_num_results":5}'
+```
+
+```json
+{
+  "object": "vector_store.search_results.page",
+  "search_query": ["how does failover work"],
+  "data": [
+    {
+      "file_id": "acme/docs|replication|en",
+      "filename": "replication",
+      "score": 1,
+      "attributes": {
+        "collection": "acme/docs",
+        "lang": "en",
+        "url": "https://docs.example.org/replication"
+      },
+      "content": [{ "type": "text", "text": "# Replication\n\nA follower replica copies every write…" }]
+    }
+  ],
+  "has_more": false,
+  "next_page": null
+}
+```
+
+`file_id` is the document's id and `filename` its key. `attributes` holds
+the document's metadata (several values of one key are joined with `, `)
+plus `collection` and `lang`. `url` is the metadata's first `url` value, when
+there is one. Open WebUI shows `filename` as the source title and links
+`attributes.url`.
+
+Open WebUI first calls `GET {endpoint}/vector_store/list`, a route of
+another proxy's API. MDDB does not serve it, and Open WebUI falls back to
+`/v1/vector_stores` on the `404`.
 
 ---
 

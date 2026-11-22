@@ -577,6 +577,14 @@ scenario's *MCP keys* card — the server does not check MCP keys, set
 `MDDB_MCP_API_KEY_ENABLED=true` — and *Create Key* is disabled; a `warning`
 returned with a new key is shown with it (2.19.10, #445).
 
+The **Open WebUI** tab starts with the External Knowledge Source steps
+(#446): *Admin → Settings → Integrations → External Knowledge Sources → Add*,
+provider *OpenAI-compatible*, endpoint `http://<domain>:<HTTP port>/v1`, an
+MDDB API key (`mddb_live_…`) of a user with read permission on the
+collections, then the vector store list or collection names as vector store
+IDs and a test query. The function (`mddb_model.py`) and its Valves follow.
+See [LLM_CONNECTIONS.md](LLM_CONNECTIONS.md#open-webui).
+
 ### Module switches: the Features page (2.19.0)
 
 "Features" in the menu's System group lists the server's optional modules

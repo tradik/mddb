@@ -633,6 +633,54 @@ def ask(question, collection="docs"):
 print(ask("Czym jest MDDB?"))
 ```
 
+## Open WebUI
+
+Open WebUI can use MDDB in two ways. The panel's **Open WebUI** tab shows both,
+with this server's addresses filled in.
+
+### External Knowledge Source (no code)
+
+MDDB serves the two OpenAI Vector Stores routes that Open WebUI's
+**OpenAI-compatible** External Knowledge Source provider calls:
+`GET /v1/vector_stores` and `POST /v1/vector_stores/{id}/search` (#446). A
+vector store is an MDDB collection. Requests and responses are described in
+[API.md](API.md#openai-compatible-vector-stores-v1vector_stores).
+
+1. In Open WebUI: **Admin → Settings → Integrations → External Knowledge
+   Sources → Add**.
+2. **Provider:** OpenAI-compatible.
+3. **Endpoint:** the MDDB HTTP API base URL plus `/v1`, for example
+   `http://mddb.example.com:11023/v1`. Open WebUI must be able to reach it.
+4. **API key:** an MDDB API key (`mddb_live_…`, `POST /v1/auth/api-key`) of
+   a user with read permission on the collections to search. With auth off,
+   the key is not checked.
+5. List the vector stores, or enter collection names as vector store IDs.
+   A tenant collection such as `acme/docs` is entered as it is; Open WebUI
+   escapes the `/` and MDDB accepts it.
+6. Run a test query.
+
+What the server does with these calls:
+
+- **The list** holds the collections the key's user may read. Read
+  permission, the tenant namespace and MCP API key scope apply per
+  collection. The description is the collection's configured description.
+- **A search** uses hybrid search when the collection has embeddings and the
+  server has an embedding provider, and full-text search otherwise. Each
+  result is the passage around the document's best match. The source title is
+  the document key and the link is its `url` metadata, when it has one.
+- **Before the list**, Open WebUI calls `GET /v1/vector_store/list`, a route
+  of another proxy's API. MDDB answers 404 and Open WebUI falls back to
+  `/v1/vector_stores`.
+- **Not served:** creating, changing or deleting stores and files through
+  this API. Documents are written with `/v1/add` and the other endpoints.
+  OpenAI `filters` are accepted and ignored.
+
+### Function (pipe)
+
+The tab's `mddb_model.py` is an Open WebUI function: **Admin → Functions →
+Add new function**, paste the script, save it, and set its Valves for your
+LLM provider (`llmProvider`, `llmApiUrl`, `llmApiKey`).
+
 ## Generic REST API Integration
 
 Any LLM agent that supports HTTP tools can connect to MDDB. Key endpoints:
@@ -644,6 +692,7 @@ Any LLM agent that supports HTTP tools can connect to MDDB. Key endpoints:
 | `/v1/fts` | POST | Full-text search (TF-IDF/BM25) |
 | `/v1/get` | POST | Get specific document |
 | `/v1/add` | POST | Add/update document |
+| `/v1/vector_stores`, `/v1/vector_stores/{id}/search` | GET, POST | OpenAI-compatible vector store list and search ([Open WebUI](#open-webui)) |
 
 See the [REST API reference](/docs/api/reference/), generated from the OpenAPI specification, for complete API details.
 
@@ -655,7 +704,7 @@ The MDDB Panel includes an **LLM Connections** page (sidebar → LLM Connections
 - A **Claude** tab with five variants: Claude Code command (default), project `.mcp.json`, custom connector, local stdio (Docker) and local stdio (binary)
 - An **API key** field on the Claude tab when MCP API keys are on: empty, the examples show the placeholder `mcp_…` and a **Create a key** link; a key created in the **API Keys** tab fills it. The key stays in the page only (not stored, not in the URL) and is gone when you leave the page
 - Copy (exactly the shown variant) and Download (only for variants that are files)
-- Setup instructions per agent
+- Setup instructions per agent; the **Open WebUI** tab has the External Knowledge Source steps with this server's `/v1` endpoint, then the function's
 - **API Keys** tab — create, disable and delete MCP API keys; a new key takes an optional scope (collections, read-only, a chat scenario, v2.19.9) and the list shows each key's scope ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199))
 
 **[← Back to README](../README.md)**
