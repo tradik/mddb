@@ -755,6 +755,6 @@ The MDDB Panel includes an **LLM Connections** page (sidebar → LLM Connections
 - An **API key** field on the Claude tab when MCP API keys are on: empty, the examples show the placeholder `mcp_…` and a **Create a key** link; a key created in the **API Keys** tab fills it. The key stays in the page only (not stored, not in the URL) and is gone when you leave the page
 - Copy (exactly the shown variant) and Download (only for variants that are files)
 - Setup instructions per agent; the **Open WebUI** tab has the External Knowledge Source steps with this server's `/v1` endpoint, then the function's
-- **API Keys** tab — create, disable and delete MCP API keys; a new key takes an optional scope (collections, read-only, a chat scenario, v2.19.9) and the list shows each key's scope ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199))
+- **API Keys** tab — create, disable and delete MCP API keys; a new key takes an optional scope (collections, read-only, a chat scenario, v2.19.9; the read-only collections among the chosen ones and a memory namespace, v2.19.11) and the list shows each key's scope ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199))
 
 **[← Back to README](../README.md)**
