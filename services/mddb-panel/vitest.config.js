@@ -295,6 +295,13 @@ const coverageFiles = [
   'src/components/ChatScenarioMcpKeys.jsx',
   // 2.19.11 (FE-021): plain texts with a help control, one page scroll.
   'src/components/HelpPopover.jsx',
+  // 2.19.11 (FE-022): the Corpus packs page beside the collections.
+  'src/lib/corpus-packs.js',
+  'src/lib/corpus-intent.js',
+  'src/components/CorpusPacksPage.jsx',
+  'src/components/CorpusUploadCard.jsx',
+  'src/components/CorpusBuildForm.jsx',
+  'src/components/CollectionPackButtons.jsx',
   // 2.19.11 (INT-023): issues as a synced source, a collection's repository,
   // default forge tokens and the pick-or-paste secret control.
   'src/lib/use-stored-secrets.js',

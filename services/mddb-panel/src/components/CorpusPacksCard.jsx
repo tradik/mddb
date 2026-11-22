@@ -1,217 +1,140 @@
-import { useEffect, useRef, useState } from 'react';
-import { Package, Lock, Upload, Trash2, Download, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { Package, Lock, Trash2, Download, AlertTriangle } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import { useStore } from '../lib/store';
 import { saveBlob } from '../lib/download';
+import { useAction } from '../lib/use-action';
+import { formatBytes, packFileName, rebuildRequest } from '../lib/corpus-packs';
+import ApiErrorNotice from './ApiErrorNotice';
+import ConfirmDialog from './ConfirmDialog';
 
-// AGT-005: a corpus pack is a portable snapshot of a collection — documents,
-// full-text index, vectors, geo points — installed read-only on any server.
-// Listing is open to readers; building, installing and removing need admin on
-// "*". A pack embedded by another model than the server's installs with
-// vectorsDisabled: its hybrid search falls back to full text.
+// AGT-005, FE-022: the packs installed on this server, one row per pack —
+// a pack of several collections lists them all. Downloading builds the pack
+// again from its collections as they were recorded; removing deletes every
+// collection the pack installed. Both need admin on "*", like installing.
 
-const inputClass = 'w-full px-2 py-1.5 border border-line-strong rounded text-sm focus:outline-none focus:ring-2 focus:ring-focus';
-
-function PackRow({ pack, onRemove, removing }) {
-  const info = pack.corpus;
+function PackFacts({ pack }) {
+  const size = formatBytes(pack.bytes);
   return (
-    <li className="py-3 flex items-start justify-between gap-3">
-      <div className="min-w-0">
+    <>
+      <p className="mt-0.5 text-xs text-fg-subtle">
+        {pack.docCount} documents{size && ` · ${size}`} · licence {pack.license}
+      </p>
+      <p className="mt-0.5 text-xs text-fg-subtle">
+        Made with MDDB {pack.mddbVersion}
+        {pack.installedAt && `, installed ${new Date(pack.installedAt).toLocaleString()}`}
+        {pack.sources.length > 0 && ` · from ${pack.sources.map((s) => s.repo + (s.commit ? ' @ ' + s.commit : '')).join(', ')}`}
+      </p>
+    </>
+  );
+}
+
+function PackRow({ pack, canManage, busy, highlighted, onDownload, onRemove, onOpen }) {
+  return (
+    <li id={`pack-${pack.name}`} className={`py-3 flex flex-wrap items-start justify-between gap-3 ${highlighted ? 'bg-info-muted -mx-2 px-2 rounded' : ''}`}>
+      <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-fg">{pack.collection}</span>
-          {info.version && <span className="text-xs text-fg-subtle">v{info.version}</span>}
+          <span className="font-medium text-fg break-all">{pack.name}</span>
+          {pack.version && <span className="text-xs text-fg-subtle">v{pack.version}</span>}
           {pack.readOnly && (
             <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2 py-0.5 text-xs font-medium text-fg-soft">
               <Lock className="h-3 w-3" aria-hidden="true" /> read-only
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-xs text-fg-subtle">
-          {info.docCount} documents · licence {info.license} · built by MDDB {info.mddbVersion}
-          {info.installedAt && ` · installed ${new Date(info.installedAt).toLocaleString()}`}
-        </div>
-        {info.vectorsDisabled && (
-          <div className="mt-1 flex items-center gap-1 text-xs text-warning-strong">
-            <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-            Embedded by another model than this server&apos;s: vector search finds nothing here, hybrid uses full text.
-          </div>
+        {pack.description && <p className="mt-0.5 text-sm text-fg-soft">{pack.description}</p>}
+        <PackFacts pack={pack} />
+        {pack.several && (
+          <p className="mt-1 text-xs text-fg-soft">
+            Collections:{' '}
+            {pack.collections.map((c, i) => (
+              <span key={c.name}>
+                {i > 0 && ', '}
+                <button type="button" onClick={() => onOpen(c.name)} className="underline text-info-strong hover:text-fg">{c.name}</button>
+                {` (${c.docCount}, ${c.license})`}
+              </span>
+            ))}
+          </p>
+        )}
+        {pack.vectorsDisabled && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-warning-strong">
+            <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+            Made with another embedding model than this server uses: meaning-based search finds nothing here, keyword search works.
+          </p>
         )}
       </div>
-      <button
-        type="button"
-        onClick={() => onRemove(pack.collection)}
-        disabled={removing}
-        aria-label={`Remove pack ${pack.collection}`}
-        className="shrink-0 rounded p-1.5 text-danger hover:bg-danger-soft disabled:opacity-50"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {canManage && (
+        <div className="flex shrink-0 gap-1">
+          <button type="button" onClick={() => onDownload(pack)} disabled={busy} aria-label={`Download pack ${pack.name}`}
+            className="rounded p-1.5 text-fg-soft hover:bg-surface-subtle disabled:opacity-50">
+            <Download className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button type="button" onClick={() => onRemove(pack)} disabled={busy} aria-label={`Remove pack ${pack.name}`}
+            className="rounded p-1.5 text-danger hover:bg-danger-soft disabled:opacity-50">
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </li>
   );
 }
 
-export default function CorpusPacksCard() {
-  const { stats, setStats } = useStore();
-  const [packs, setPacks] = useState([]);
-  const [error, setError] = useState(null);
+/**
+ * CorpusPacksCard lists `packs` (groupPacks). `onChanged` runs after a
+ * removal; `highlight` names a pack to mark (opened from its collection).
+ */
+export default function CorpusPacksCard({ packs, loadError, canManage, highlight, onChanged }) {
+  const { setCurrentCollection, setViewMode } = useStore();
+  const { busy, error, run } = useAction();
+  const [removing, setRemoving] = useState(null);
   const [message, setMessage] = useState(null);
-  const [busy, setBusy] = useState(null);
-  const [file, setFile] = useState(null);
-  const [build, setBuild] = useState({ collection: '', license: '', version: '' });
-  const fileInput = useRef(null);
 
-  const load = () => mddbClient
-    .listCorpus()
-    .then((data) => setPacks(data.packs || []))
-    .catch((err) => setError(err.message));
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  const fail = (err) => setError(err.message);
-
-  // Runs one admin action, then reloads the packs and the collection list.
-  // It rejects on failure; every caller ends it with .catch(fail).
-  const run = async (name, action) => {
-    setBusy(name);
-    setError(null);
+  const download = (pack) => run(async () => {
     setMessage(null);
-    try {
-      setMessage(await action());
-      await load();
-      setStats(await mddbClient.getStats());
-    } finally {
-      setBusy(null);
-    }
+    const body = rebuildRequest(pack);
+    saveBlob(await mddbClient.buildCorpus(body), packFileName(body));
+  });
+
+  const remove = () => run(async () => {
+    const res = await mddbClient.removeCorpus(removing.name);
+    setMessage(`Removed ${removing.name}: ${res.deleted} documents deleted.`);
+    setRemoving(null);
+    await onChanged();
+  });
+
+  const openCollection = (name) => {
+    setCurrentCollection(name);
+    setViewMode('documents');
   };
-
-  const install = () => run('install', async () => {
-    const res = await mddbClient.installCorpus(file);
-    setFile(null);
-    fileInput.current.value = '';
-    const warnings = res.warnings?.length ? ` ${res.warnings.join(' ')}` : '';
-    return `Installed ${res.name} (${res.docCount} documents), read-only.${warnings}`;
-  }).catch(fail);
-
-  const remove = (name) => {
-    if (!confirm(`Remove the pack "${name}" and its collection? Its documents are deleted from this server.`)) return;
-    run('remove', async () => {
-      const res = await mddbClient.removeCorpus(name);
-      return `Removed ${name} (${res.deleted} documents deleted).`;
-    }).catch(fail);
-  };
-
-  const buildPack = async (e) => {
-    e.preventDefault();
-    setBusy('build');
-    setError(null);
-    setMessage(null);
-    try {
-      saveBlob(await mddbClient.buildCorpus(build), `${build.collection}.mddbpack`);
-    } catch (err) {
-      fail(err);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const collections = (stats?.collections || []).map((c) => c.name);
 
   return (
-    <div className="bg-surface rounded-lg shadow mb-6 p-6">
-      <div className="flex items-center mb-2">
-        <Package className="w-5 h-5 text-accent mr-2" aria-hidden="true" />
-        <h2 className="text-lg font-semibold text-fg">Corpus packs</h2>
-      </div>
-      <p className="text-sm text-fg-subtle mb-3">
-        Read-only collections installed from a <code>.mddbpack</code> — no re-embedding or reindexing.
-        Every write to them is refused (403 READ_ONLY); remove the pack to use the name again.
-        Installing, removing and building need admin on &quot;*&quot;.
-      </p>
-
-      {error && <p role="alert" className="mb-3 rounded border border-danger-line bg-danger-soft p-2 text-sm text-danger-strong">{error}</p>}
-      {message && <output className="mb-3 block rounded border border-success-line bg-success-soft p-2 text-sm text-success-strong">{message}</output>}
-
+    <section aria-labelledby="corpus-installed" className="bg-surface rounded-lg shadow p-4 sm:p-6">
+      <h3 id="corpus-installed" className="flex items-center gap-2 text-lg font-semibold text-fg mb-2">
+        <Package className="w-5 h-5 text-accent" aria-hidden="true" /> Installed packs
+      </h3>
+      <ApiErrorNotice error={loadError || error} />
+      {message && <output className="mb-2 block rounded border border-success-line bg-success-soft p-2 text-sm text-success-strong">{message}</output>}
       {packs.length === 0 ? (
-        <p className="text-sm text-fg-subtle">No packs installed.</p>
+        <p className="text-sm text-fg-subtle">No packs installed on this server.</p>
       ) : (
         <ul className="divide-y divide-line">
           {packs.map((pack) => (
-            <PackRow key={pack.collection} pack={pack} onRemove={remove} removing={busy === 'remove'} />
+            <PackRow key={pack.name} pack={pack} canManage={canManage} busy={busy} highlighted={pack.name === highlight}
+              onDownload={download} onRemove={setRemoving} onOpen={openCollection} />
           ))}
         </ul>
       )}
-
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div>
-          <h3 className="text-sm font-medium text-fg-soft mb-1">Install a pack</h3>
-          <label htmlFor="corpus-file" className="sr-only">Pack file</label>
-          <input
-            id="corpus-file"
-            ref={fileInput}
-            type="file"
-            accept=".mddbpack"
-            onChange={(e) => setFile(e.target.files[0] || null)}
-            className="block w-full text-sm text-fg-muted"
-          />
-          <button
-            type="button"
-            onClick={install}
-            disabled={!file || busy !== null}
-            className="mt-2 flex items-center px-3 py-1.5 bg-primary-700 text-white text-sm rounded hover:bg-primary-800 disabled:opacity-50"
-          >
-            <Upload className="w-4 h-4 mr-1.5" aria-hidden="true" />
-            {busy === 'install' ? 'Installing…' : 'Install'}
-          </button>
-        </div>
-
-        <form onSubmit={buildPack}>
-          <h3 className="text-sm font-medium text-fg-soft mb-1">Build a pack</h3>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label htmlFor="corpus-collection" className="block text-xs text-fg-subtle">Collection</label>
-              <select
-                id="corpus-collection"
-                value={build.collection}
-                onChange={(e) => setBuild({ ...build, collection: e.target.value })}
-                className={inputClass}
-              >
-                <option value="">Select…</option>
-                {collections.map((name) => <option key={name} value={name}>{name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="corpus-license" className="block text-xs text-fg-subtle">Licence</label>
-              <input
-                id="corpus-license"
-                value={build.license}
-                onChange={(e) => setBuild({ ...build, license: e.target.value })}
-                placeholder="CC-BY-4.0"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="corpus-version" className="block text-xs text-fg-subtle">Version</label>
-              <input
-                id="corpus-version"
-                value={build.version}
-                onChange={(e) => setBuild({ ...build, version: e.target.value })}
-                placeholder="optional"
-                className={inputClass}
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={!build.collection || !build.license.trim() || busy !== null}
-            className="mt-2 flex items-center px-3 py-1.5 bg-surface-subtle text-fg-soft text-sm rounded hover:bg-surface-strong disabled:opacity-50"
-          >
-            <Download className="w-4 h-4 mr-1.5" aria-hidden="true" />
-            {busy === 'build' ? 'Building…' : 'Build and download'}
-          </button>
-        </form>
-      </div>
-    </div>
+      {busy && !removing && <p role="status" className="mt-2 text-sm text-fg-muted">Preparing the download… a large pack takes a while.</p>}
+      {removing && (
+        <ConfirmDialog
+          title="Remove a corpus pack"
+          message={<>Remove the pack <strong>{removing.name}</strong>? Its collections ({removing.collections.map((c) => c.name).join(', ')}) and their {removing.docCount} documents are deleted from this server. The pack file you installed it from is not affected.</>}
+          confirmLabel="Remove"
+          busy={busy}
+          onConfirm={remove}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
+    </section>
   );
 }

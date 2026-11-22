@@ -5,6 +5,7 @@ import DuplicatesPanel from './DuplicatesPanel';
 import AccountPanel from './AccountPanel';
 import DocumentViewer from './DocumentViewer';
 import TenantsPanel from './TenantsPanel';
+import CorpusPacksPage from './CorpusPacksPage';
 
 /** The pages added in 2.19.0 and after, by view mode. */
 const PAGES = {
@@ -14,6 +15,7 @@ const PAGES = {
   duplicates: DuplicatesPanel,
   account: AccountPanel,
   tenants: TenantsPanel, // GO-054
+  corpus: CorpusPacksPage, // FE-022
 };
 
 /** Pages whose documents open in the viewer beside them. */
