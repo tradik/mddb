@@ -126,7 +126,8 @@ func (e *trainingEvaluation) compare() {
 	before := e.Base != nil && e.Base.Report != nil
 	switch {
 	case after && before:
-		d := e.Result.Report.Score - e.Base.Report.Score
+		// Rounded: 0.6 - 0.2 is 0.39999999999999997 in binary floating point.
+		d := math.Round((e.Result.Report.Score-e.Base.Report.Score)*1e6) / 1e6
 		e.Delta = &d
 		if d <= 0 {
 			e.Notes = append(e.Notes, "The tuned model did not score higher than the base model on the validation records.")
