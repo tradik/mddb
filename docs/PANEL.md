@@ -610,9 +610,18 @@ full-text and vector search, auth and backups are always on and not listed.
 
 ![Features page: modules grouped by category, each with its switch, description and default, and Turn on all / Turn off all buttons](panel-features.png)
 
+- **Plain texts (2.19.11)**: each card shows the module's short name and one
+  sentence on what switching it on gives you — the server's `title` and
+  `summary`. The **?** next to the name opens the technical detail: the
+  route or environment variable (`description`), the setting name, whether a
+  new server starts with it on or off, the modules it needs and a link to
+  [FEATURES.md](FEATURES.md#optional-modules). An older server without
+  `title` and `summary` shows its `description` as before. No text on the
+  page names an issue or a ticket.
 - **Categories**: the modules sit under the same headings as their pages in
-  the menu — Search, Data, Chat, Integrations — and a module a
-  newer server reports but the panel does not know yet appears under Other.
+  the menu — Collections, Search, Search Tuning, Chat, Integrations — and a
+  module a newer server reports but the panel does not know yet appears
+  under Other.
 - **Turn on all / Turn off all**: for every module at the top of the page,
   and for one category next to its heading. A confirmation names each module
   that changes and each one skipped because the operator forced it off.
@@ -620,8 +629,8 @@ full-text and vector search, auth and backups are always on and not listed.
   external MCP servers when turning on, the other way round when turning
   off); a module that fails is reported and the rest still run. Stored data
   stays either way.
-- **Switch**: one per module, with its description, its default, the modules
-  it requires and who changed it last and when. Switching calls
+- **Switch**: one per module, with its summary and who changed it last and
+  when; the default and the modules it requires are behind the **?**. Switching calls
   `PUT /v1/features/{name}` and needs admin on `"*"`; the server's 403 is
   shown as it is.
 - **Locked**: a module the operator forced off with
@@ -688,8 +697,9 @@ open, so a first visit shows the same pages as before.
 
 | Group | Pages |
 |---|---|
-| Search | Vector Search, Cross Search, Geo Search, Vector Space, Search Advisor, Retrieval Evaluation, Code Symbols, Synonyms, Stop Words, Curation Rules, Spell Checker |
-| Data | Collection Aliases, Collection Schemas, Embedding Models, Import, Duplicates, Temporal Analytics |
+| Collections | Import, Collection Aliases, Collection Schemas, Embedding Models, Duplicates, Temporal Analytics |
+| Search | Vector Search, Cross Search, Geo Search, Code Symbols |
+| Search Tuning | Search Advisor, Retrieval Evaluation, Synonyms, Stop Words, Curation Rules, Spell Checker, Vector Space |
 | Chat | Chat, Agent Memory, LLM Connections |
 | Integrations | Automation, Webhooks, API Endpoints |
 | Security | Users, Groups, My Account (with authentication), Tenants (2.19.8), Security, Encryption, Audit Log |
@@ -717,6 +727,49 @@ report hides nothing.
   switched off, no authentication or no replication — is not shown.
 - The placement lives in one data file, `src/lib/nav-groups.js`; the sidebar
   renders from it.
+- **A page sits next to what it acts on (2.19.11)**: the Collections group
+  comes first, right under the sidebar's collection list; the search tuning
+  pages have their own group instead of filling the Search group. The
+  sidebar shows the collection list, then the menu, then the server figures
+  (documents, revisions, size, embeddings), so the menu is reached without
+  scrolling past the figures.
+
+### One scroll (2.19.11)
+
+The panel fills exactly the visible window and the document itself never
+scrolls. Inside it:
+
+- each page scrolls in its own pane; a list and the document viewer beside it
+  scroll apart;
+- the sidebar scrolls on its own only when it is taller than the window;
+- wide content (a table, a code block) scrolls sideways inside its own box,
+  never the page.
+
+Before 2.19.11 `<body>` was a flex box at least `100vh` high around a
+`100dvh` shell. Where `100vh` is taller than the visible window (a phone or
+tablet browser with a collapsing address bar), and where the header's
+minimum width pushed the page wider than a narrow window, the document
+scrolled as well: a second scrollbar beside the page's and a band of page
+background below the panel. Pages without a scroller of their own (Client
+Settings) were cut off at the bottom. `src/layout.test.js` keeps the rules;
+the result was measured in headless Chromium at 390, 768 and 1440 pixels
+wide on every page of the menu: the document's scroll height equals the
+window's, and no page scrolls the document sideways.
+
+On a phone (below 768 pixels) the header wraps to a second line, the
+sidebar opens over the page instead of squeezing it, and it folds away when
+a page or a collection is picked.
+
+### Help popovers (2.19.11)
+
+Texts on a page are short and plain; the technical detail behind them sits
+behind a **?** button (`src/components/HelpPopover.jsx`, the panel's one help
+control). It is a disclosure: the button has `aria-expanded` and
+`aria-controls`, Tab reaches the links inside, Escape closes it and returns
+focus to the button, and a click outside or focus leaving it closes it. On a
+phone it opens as a sheet at the bottom of the window. It uses the panel's
+colour tokens (`bg-surface`, `text-fg-muted`, `border-line-strong`), which
+meet WCAG 2.2 AA in both themes.
 
 ### Dark mode (2.19.7)
 
