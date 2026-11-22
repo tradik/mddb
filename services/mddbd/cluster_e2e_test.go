@@ -18,12 +18,7 @@ import (
 
 func TestClusterElectsOneLeaderAndReplicates(t *testing.T) {
 	tc := startTestCluster(t, clusterOpts{nodes: 3, auto: true})
-	l := tc.leader(5 * time.Second)
-	for i := range 20 {
-		if err := l.write("c", i); err != nil {
-			t.Fatal(err)
-		}
-	}
+	l := tc.writeAll(tc.stableLeader(5*time.Second), "c", 0, 20)
 	tc.waitSame(l, "c")
 	for _, n := range tc.nodes {
 		if n == l {
@@ -42,13 +37,9 @@ func TestClusterElectsOneLeaderAndReplicates(t *testing.T) {
 
 func TestClusterFailoverWhenTheLeaderIsKilled(t *testing.T) {
 	tc := startTestCluster(t, clusterOpts{nodes: 3, auto: true})
-	old := tc.leader(5 * time.Second)
-	for i := range 10 {
-		if err := old.write("c", i); err != nil {
-			t.Fatal(err)
-		}
-	}
+	old := tc.writeAll(tc.stableLeader(5*time.Second), "c", 0, 10)
 	tc.waitSame(old, "c")
+	old = tc.stableLeader(5 * time.Second) // the node to kill leads now
 
 	killed := time.Now()
 	tc.halt(old, false)
@@ -57,11 +48,7 @@ func TestClusterFailoverWhenTheLeaderIsKilled(t *testing.T) {
 	if next == old {
 		t.Fatal("the killed node still leads")
 	}
-	for i := 10; i < 20; i++ {
-		if err := next.write("c", i); err != nil {
-			t.Fatal(err)
-		}
-	}
+	next = tc.writeAll(next, "c", 10, 20)
 
 	// The old leader comes back on its files: it follows, and holds what
 	// the new leader holds (its log was not closed, so by a snapshot).
@@ -77,13 +64,9 @@ func TestClusterFailoverWhenTheLeaderIsKilled(t *testing.T) {
 
 func TestClusterPartitionedLeaderStopsAndItsWritesAreSetAside(t *testing.T) {
 	tc := startTestCluster(t, clusterOpts{nodes: 3, auto: true})
-	old := tc.leader(5 * time.Second)
-	for i := range 5 {
-		if err := old.write("c", i); err != nil {
-			t.Fatal(err)
-		}
-	}
+	old := tc.writeAll(tc.stableLeader(5*time.Second), "c", 0, 5)
 	tc.waitSame(old, "c")
+	old = tc.stableLeader(5 * time.Second) // the node to cut off leads now
 
 	// Cut the leader off. Inside its lease it still takes a write — which
 	// no other node receives.
@@ -100,9 +83,7 @@ func TestClusterPartitionedLeaderStopsAndItsWritesAreSetAside(t *testing.T) {
 	if next == old {
 		t.Fatal("the cut-off node leads")
 	}
-	if err := next.write("c", 200); err != nil {
-		t.Fatal(err)
-	}
+	next = tc.writeAll(next, "c", 200, 201)
 
 	// The network heals: the old leader follows, its data becomes the new
 	// leader's, and the write only it took is in the rejected-writes file.
@@ -146,18 +127,12 @@ func rejectedFileHolds(t *testing.T, path, key string) bool {
 
 func TestClusterQuorumKeepsEveryAcknowledgedWrite(t *testing.T) {
 	tc := startTestCluster(t, clusterOpts{nodes: 3, auto: true, ack: ackQuorum})
-	l := tc.leader(5 * time.Second)
-	acked := 0
-	for i := range 30 {
-		if err := l.write("q", i); err != nil {
-			t.Fatal(err)
-		}
-		acked++
-	}
+	const acked = 30
+	l := tc.writeAll(tc.stableLeader(5*time.Second), "q", 0, acked)
 	// Kill the leader at once: every acknowledged write is on a majority,
 	// so the next leader has it.
 	tc.halt(l, false)
-	next := tc.leader(10 * time.Second)
+	next := tc.stableLeader(10 * time.Second) // it must still lead when its followers are cut
 	if _, n := next.checksum("q"); n != acked {
 		t.Fatalf("the new leader holds %d of %d acknowledged writes", n, acked)
 	}
@@ -229,7 +204,7 @@ func postAdmin(h http.HandlerFunc, body string) *httptest.ResponseRecorder {
 
 func TestClusterFollowerAnswersWritesWithTheLeader(t *testing.T) {
 	tc := startTestCluster(t, clusterOpts{nodes: 3, auto: true})
-	l := tc.leader(5 * time.Second)
+	l := tc.stableLeader(5 * time.Second)
 	var f *testNode
 	for _, n := range tc.nodes {
 		if n != l {

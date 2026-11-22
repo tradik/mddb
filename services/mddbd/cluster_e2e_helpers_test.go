@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -214,57 +213,6 @@ func (tc *testCluster) stopAll() {
 	for _, n := range tc.nodes {
 		tc.halt(n, true)
 	}
-}
-
-// leader waits for exactly one node that takes writes, checking on every
-// poll that no two nodes lead in the same term.
-func (tc *testCluster) leader(within time.Duration) *testNode {
-	tc.t.Helper()
-	deadline := time.Now().Add(within)
-	for time.Now().Before(deadline) {
-		tc.checkOneLeaderPerTerm()
-		var writable []*testNode
-		for _, n := range tc.nodes {
-			if n.up && !n.cut.Load() && n.s.cluster.node.CanWrite() == nil {
-				writable = append(writable, n)
-			}
-		}
-		if len(writable) == 1 {
-			return writable[0]
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	tc.t.Fatalf("no single leader within %s: %s", within, tc.describe())
-	return nil
-}
-
-// checkOneLeaderPerTerm fails when two nodes lead the same term.
-func (tc *testCluster) checkOneLeaderPerTerm() {
-	tc.t.Helper()
-	leaders := map[uint64]string{}
-	for _, n := range tc.nodes {
-		if !n.up || n.s.cluster.node.State() != cluster.Leader {
-			continue
-		}
-		term := n.s.cluster.node.Term()
-		if other, dup := leaders[term]; dup {
-			tc.t.Fatalf("%s and %s both lead term %d", other, n.id, term)
-		}
-		leaders[term] = n.id
-	}
-}
-
-func (tc *testCluster) describe() string {
-	var parts []string
-	for _, n := range tc.nodes {
-		if !n.up {
-			parts = append(parts, n.id+": down")
-			continue
-		}
-		st := n.s.cluster.node.Status()
-		parts = append(parts, fmt.Sprintf("%s: %s term %d leader %q writable %v cut %v", n.id, st.State, st.Term, st.LeaderID, st.Writable, n.cut.Load()))
-	}
-	return strings.Join(parts, "; ")
 }
 
 // write adds a document to collection c on node n.
