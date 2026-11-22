@@ -70,7 +70,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.19.9"
+  version: "2.19.10"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb
@@ -6713,6 +6713,76 @@ paths:
                     description: Each external MCP server's state (MCP-005).
                     items:
                       $ref: "#/components/schemas/ChatMcpServerState"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/ChatScenarioNotFound"}
+
+  /v1/chat/scenarios/{name}/access:
+    parameters:
+      - $ref: "#/components/parameters/ChatScenarioName"
+    get:
+      tags:
+        - Chat
+      summary: Who can read a chat scenario
+      description: |
+        Every user, by name, with what they can read of the scenario's
+        allowed collections (aliases resolved) and the rule that grants it
+        (v2.19.10, #441). A scenario is offered only to an account that can
+        read all of them. `via` follows the server's permission order:
+        `admin` (admin on "*"), `user` (own grant on the collection),
+        `user:*` (own grant on "*"), `group:<name>`, `group:<name>:*`; when
+        several groups match, the first by name. A tenant user reads only
+        inside the tenant's namespace. With authentication off, `users` is
+        empty. Requires admin on "*": a caller without it gets `403` whether
+        the scenario exists or not. No password or key hashes are returned.
+      operationId: getChatScenarioAccess
+      responses:
+        "200":
+          description: The users and their access
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [scenario, authEnabled, collections, users]
+                properties:
+                  scenario:
+                    type: string
+                  authEnabled:
+                    type: boolean
+                  collections:
+                    type: array
+                    description: The allowed collections, aliases resolved.
+                    items:
+                      type: string
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      required: [username, admin, full, grants]
+                      properties:
+                        username:
+                          type: string
+                        admin:
+                          type: boolean
+                          description: Admin on "*" (never for a tenant user).
+                        disabled:
+                          type: boolean
+                          description: Present and true for a disabled user.
+                        full:
+                          type: boolean
+                          description: Can read every collection, so the scenario is offered to them.
+                        grants:
+                          type: array
+                          description: One entry per collection the user can read.
+                          items:
+                            type: object
+                            required: [collection, via]
+                            properties:
+                              collection:
+                                type: string
+                              via:
+                                type: string
+                                example: "group:readers"
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/ChatScenarioNotFound"}

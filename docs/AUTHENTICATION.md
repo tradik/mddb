@@ -271,7 +271,13 @@ on any single collection set that flag too (SEC-020).
 1. Check if user is a global admin (admin on `"*"`; bypasses all checks)
 2. Check collection-specific permission
 3. Check wildcard (`"*"`) permission
-4. Deny by default
+4. Check the user's groups, by name: the group's grant on the collection, then its grant on `"*"`
+5. Deny by default
+
+A tenant user is first limited to the tenant's namespace. To see which rule
+lets each user read a chat scenario's collections, an admin on `"*"` calls
+`GET /v1/chat/scenarios/{name}/access` (2.19.10); the panel shows it in the
+scenario's *Access* card. See [API.md](API.md#chat-scenarios-v1chatscenarios).
 
 ### Where permissions are enforced (2.18.10+, SEC-019)
 

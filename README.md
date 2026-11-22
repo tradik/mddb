@@ -446,6 +446,7 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **Scoped MCP API Keys (2.19.9)** - An MCP API key can be limited to chosen collections, to reads, or to one chat scenario (its collections, read-only, with the scenario's prompt as the MCP `instructions`); OAuth tokens carry the scope of their key ([MCP.md](docs/MCP.md))
 - ✅ **Removing Permissions (2.19.9)** - `DELETE /v1/auth/permissions` and `/v1/auth/group-permissions`, GraphQL `deletePermission` / `deleteGroupPermission`, and a remove button in the panel ([AUTHENTICATION.md](docs/AUTHENTICATION.md))
 - ✅ **Connecting an MCP Client to a Running Server (2.19.9)** - `MDDB_MCP_PUBLIC_URL` and `/v1/config` report how MCP is reached; the panel's Claude tab builds the command, the project file and the connector steps for this server ([LLM_CONNECTIONS.md](docs/LLM_CONNECTIONS.md))
+- ✅ **Who Can Read a Chat Scenario (2.19.10)** - `GET /v1/chat/scenarios/{name}/access` lists every user with the grant that lets them read the scenario's collections; the panel shows it in the scenario's *Access* card, with links to LLM Connections, Users and Groups ([API.md](docs/API.md#chat-scenarios-v1chatscenarios))
 - ✅ **Automatic Catch-up** - Followers pull missing transactions
 - ✅ **Zero-Downtime Snapshots** - Full sync for new followers
 - ✅ **Cluster Monitoring** - Web panel with health and lag metrics
