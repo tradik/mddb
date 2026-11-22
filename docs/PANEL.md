@@ -154,13 +154,10 @@ existed but nothing showed them):
 
 ### Server features of 2.18.9 and 2.18.10
 
-- **Corpus packs** (System page): installed packs with version, licence,
-  document count and a read-only badge, a warning when a pack's vectors are
-  disabled (another embedding model), install from a `.mddbpack` file,
-  remove after a confirm, and build-and-download of a collection's pack.
-  A read-only collection shows a notice in its document list and settings,
-  and its Upload and delete controls are off (its documents can still be
-  selected and exported). Needs admin on `"*"`.
+- **Corpus packs**: since 2.19.11 on their own page beside the collections
+  ([Corpus packs](#corpus-packs)). A read-only collection shows a notice in
+  its document list and settings, and its Upload and delete controls are off
+  (its documents can still be selected and exported).
 - **Diagnose bundle** (System page): downloads `GET /v1/admin/diagnose` with
   the opt-in profiles, integrity check and real collection names.
 - **Automations**: a cron rule's action is a webhook, a scheduled backup
@@ -643,8 +640,8 @@ full-text and vector search, auth and backups are always on and not listed.
   (Chat, Geo Search, Temporal Analytics, Spell Checker, Curation Rules,
   Automation, Code Symbols with its code graph, Retrieval Evaluation, Agent
   Memory, Duplicates, Webhooks, Collection Schemas, Collection Aliases,
-  Cross Search, Search Advisor and Vector Space, Synonyms and Stop Words); the viewer's *Classify* box and the *Corpus packs*
-  card on the System page go with `classify` and `corpus`. A direct visit to such a
+  Cross Search, Search Advisor and Vector Space, Synonyms and Stop Words); the viewer's *Classify* box goes with `classify`, and the
+  *Corpus Packs* page with `corpus`. A direct visit to such a
   page shows "… is switched off" with a link to this page instead of a page
   full of 404 errors.
 - **Older servers**: while the list loads, and when it cannot be loaded
@@ -996,6 +993,45 @@ Both development and production servers proxy `/v1/*` requests to mddbd:
 2. **Select Collection**: Click on any collection in the sidebar to view its documents.
 
 3. **View Document Count**: Each collection shows the number of documents it contains.
+
+### Corpus packs
+
+A corpus pack is a copy of one or more collections in a single file, ready to
+install on another server, where they are read-only
+([CORPUS-PACKS.md](CORPUS-PACKS.md)). The **Corpus Packs** page sits in the
+menu's Data group, beside the collections (2.19.11). Ways in:
+
+- the package button beside the *Collections* title in the sidebar;
+- a collection's row: *Create pack from this collection* (shown on hover or
+  focus), or, for a collection installed from a pack, a lock labelled
+  *From pack NAME vVERSION, read-only* that opens that pack;
+- the read-only notice of such a collection, and a link on System info.
+
+The page has three parts:
+
+- **Installed packs**: one row per pack — name, version, licence,
+  description, documents, size, read-only state, the MDDB release that made
+  it, when it was installed and where its documents came from. A pack of
+  several collections lists them, each linking to its documents. *Download*
+  makes the pack again from its collections as they were recorded; *Remove*
+  asks first, then deletes every collection the pack installed.
+- **Upload a pack**: choosing a `.mddbpack` file sends only its first
+  megabytes to `POST /v1/corpus/inspect`, and the page shows the pack's name,
+  version, licence, documents and the collections it installs as before the
+  whole file is uploaded. A file that is not a pack, a pack without a
+  licence, and a name already used on the server are each explained in plain
+  words, with the server's own words below; *Install* stays off until the
+  pack can be installed.
+- **Create a pack**: tick one collection or several, give the licence
+  (required: a pack is meant to be shared, and servers refuse one without a
+  licence), optionally a version, a description and the sources of the
+  documents; several collections need a pack name, and each may carry its own
+  licence. *Create and download* saves the file.
+
+Long operations show a busy line until the server answers; the server does
+not report progress for packs. Listing is open to readers; uploading,
+creating, downloading and removing need admin on `"*"`, and with sign-in on,
+those parts are hidden from anyone else.
 
 ### Viewing Documents
 
