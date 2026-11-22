@@ -2,14 +2,13 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
+	"strings"
 	"time"
 
 	"mddb/internal/boltx"
@@ -27,6 +26,9 @@ import (
 // keys are copied into the shared file, as -merge-collections copies a
 // collection file back. Either way the collection's config is written first,
 // read-only, so no write reaches the collection while it is being filled.
+// A pack of several collections (FE-022) installs each the same way, after
+// every one of them has been checked and found free; a failure part-way
+// removes the ones already installed.
 
 // errCorpusConflict is an install refused because the name is taken: 409.
 var errCorpusConflict = errors.New("collection already exists")
@@ -39,6 +41,8 @@ type corpusInstallResult struct {
 	DocCount        int      `json:"docCount"`
 	VectorsDisabled bool     `json:"vectorsDisabled"`
 	Warnings        []string `json:"warnings"`
+	// Collections are the collections the pack installed (FE-022).
+	Collections []string `json:"collections"`
 }
 
 // corpusMaxBytes is MDDB_CORPUS_MAX_BYTES: the largest collection.db an
@@ -47,7 +51,7 @@ func corpusMaxBytes() int64 {
 	return envconf.Int64("MDDB_CORPUS_MAX_BYTES", corpusMaxBytesDefault)
 }
 
-// installCorpus reads a pack from r and installs it as a read-only collection.
+// installCorpus reads a pack from r and installs its collections read-only.
 func (s *Server) installCorpus(r io.Reader) (*corpusInstallResult, error) {
 	work, root, err := s.newCorpusWork()
 	if err != nil {
@@ -59,26 +63,75 @@ func (s *Server) installCorpus(r io.Reader) (*corpusInstallResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := filepath.Join(work, corpusDataName)
-	if err := verifyDatabase(path); err != nil {
-		return nil, fmt.Errorf("%w: collection.db is not a usable database: %w", errCorpusInvalid, err)
+	parts := m.parts()
+	paths := make([]string, len(parts))
+	for i, p := range parts {
+		paths[i] = filepath.Join(work, corpusMemberName(m.Format, i))
+		if err := verifyDatabase(paths[i]); err != nil {
+			return nil, fmt.Errorf("%w: %s is not a usable database: %w", errCorpusInvalid, corpusMemberName(m.Format, i), err)
+		}
+		if err := checkPackFile(paths[i], p, s.BucketNames.Docs); err != nil {
+			return nil, err
+		}
 	}
-	if err := checkPackFile(path, m, s.BucketNames.Docs); err != nil {
-		return nil, err
+	if conflicts := s.corpusConflicts(m); len(conflicts) > 0 {
+		return nil, fmt.Errorf("%w: %s", errCorpusConflict, strings.Join(conflicts, "; "))
 	}
 
-	res := &corpusInstallResult{Name: m.Name, Version: m.Version, License: m.License, DocCount: m.DocCount, Warnings: []string{}}
-	if why := m.embeddingMismatch(s.embeddingIdentity()); why != "" {
-		res.VectorsDisabled = true
-		res.Warnings = append(res.Warnings, why+": its vectors are not loaded, and hybrid search on it uses full text only")
-		slog.Warn("corpus pack installed with its vectors disabled", "pack", m.Name, "why", why)
+	res := &corpusInstallResult{Name: m.Name, Version: m.Version, License: m.License, DocCount: m.DocCount, Warnings: []string{}, Collections: []string{}}
+	disabled := make([]bool, len(parts))
+	for i, p := range parts {
+		if why := p.Embedding.mismatch(s.embeddingIdentity()); why != "" {
+			disabled[i], res.VectorsDisabled = true, true
+			res.Warnings = append(res.Warnings, corpusWarning(m, p, why))
+			slog.Warn("corpus pack installed with its vectors disabled", "pack", m.Name, "collection", p.Name, "why", why)
+		}
+		if err := s.attachCorpus(m, p, paths[i], disabled[i]); err != nil {
+			s.undoCorpusInstall(res.Collections)
+			return nil, err
+		}
+		res.Collections = append(res.Collections, p.Name)
 	}
-	if err := s.attachCorpus(m, path, res.VectorsDisabled); err != nil {
-		return nil, err
+	for i, p := range parts {
+		s.loadInstalledCorpus(p.Name, disabled[i])
 	}
-	s.loadInstalledCorpus(m.Name, res.VectorsDisabled)
-	slog.Info("corpus pack installed", "pack", m.Name, "version", m.Version, "documents", m.DocCount, "license", m.License)
+	slog.Info("corpus pack installed", "pack", m.Name, "version", m.Version, "collections", len(parts), "documents", m.DocCount, "license", m.License)
 	return res, nil
+}
+
+// corpusWarning words why a collection's vectors are not loaded; in a pack
+// of several collections it names the collection.
+func corpusWarning(m *corpusManifest, p corpusPart, why string) string {
+	if m.Format == corpusFormatMulti {
+		why = "collection " + p.Name + ": " + why
+	}
+	return why + ": its vectors are not loaded, and hybrid search on it uses full text only"
+}
+
+// corpusConflicts is why the pack cannot be installed beside what the
+// server holds: a pack of that name already installed, or a collection of
+// the pack that already holds data. Empty when it can.
+func (s *Server) corpusConflicts(m *corpusManifest) []string {
+	if len(s.packCollections(m.Name)) > 0 {
+		return []string{fmt.Sprintf("a pack named %q is already installed: remove it first (mddb-cli corpus remove)", m.Name)}
+	}
+	out := []string{}
+	for _, p := range m.parts() {
+		if s.collectionHasData(p.Name) {
+			out = append(out, fmt.Sprintf("collection %q already holds data: remove the pack installed under that name (mddb-cli corpus remove) or delete the collection first", p.Name))
+		}
+	}
+	return out
+}
+
+// undoCorpusInstall removes the collections of a pack installed before a
+// later one failed.
+func (s *Server) undoCorpusInstall(collections []string) {
+	for _, name := range collections {
+		if _, err := s.removeCorpusCollection(name); err != nil {
+			slog.Error("removing a partly installed corpus pack failed", "collection", name, "err", err)
+		}
+	}
 }
 
 // embeddingIdentity is the model and dimensions of the server's embedding
@@ -90,28 +143,28 @@ func (s *Server) embeddingIdentity() (string, int) {
 	return s.Embedding.Model(), s.Embedding.Dimensions()
 }
 
-// checkPackFile opens the unpacked collection.db and refuses it unless every
-// bucket is a collection bucket holding only the pack's own collection's
-// keys, and it holds the documents the manifest says. A pack that carried
+// checkPackFile opens an unpacked collection file and refuses it unless
+// every bucket is a collection bucket holding only the keys of p's
+// collection, and it holds the documents the manifest says. A pack that carried
 // keys of another collection would write into that collection on install.
 // The file is then brought to this build's format (DOC-017) and given every
 // collection bucket.
-func checkPackFile(path string, m *corpusManifest, docsBucket []byte) error {
+func checkPackFile(path string, p corpusPart, docsBucket []byte) error {
 	db, err := openBolt(path, &bolt.Options{Timeout: time.Second})
 	if err != nil {
-		return fmt.Errorf("%w: collection.db: %w", errCorpusInvalid, err)
+		return fmt.Errorf("%w: the file of %q: %w", errCorpusInvalid, p.Name, err)
 	}
 	defer func() { _ = db.Close() }()
 	if v, verr := migrate.Version(db); verr != nil || v > migrate.Latest() {
-		return fmt.Errorf("%w: collection.db has storage format %d; this server knows %d", errCorpusInvalid, v, migrate.Latest())
+		return fmt.Errorf("%w: the file of %q has storage format %d; this server knows %d", errCorpusInvalid, p.Name, v, migrate.Latest())
 	}
 	if err := db.View(func(tx *bolt.Tx) error {
-		return tx.ForEach(func(name []byte, b *bolt.Bucket) error { return checkPackBucket(name, b, m.Name) })
+		return tx.ForEach(func(name []byte, b *bolt.Bucket) error { return checkPackBucket(name, b, p.Name) })
 	}); err != nil {
 		return fmt.Errorf("%w: %w", errCorpusInvalid, err)
 	}
-	if n := countPrefix(db, docsBucket, []byte("doc|"+m.Name+"|")); n != m.DocCount || n == 0 {
-		return fmt.Errorf("%w: collection.db holds %d documents of %q, the manifest says %d", errCorpusInvalid, n, m.Name, m.DocCount)
+	if n := countPrefix(db, docsBucket, []byte("doc|"+p.Name+"|")); n != p.DocCount || n == 0 {
+		return fmt.Errorf("%w: the file of %q holds %d documents of it, the manifest says %d", errCorpusInvalid, p.Name, n, p.DocCount)
 	}
 	return errors.Join(migrate.Run(db), boltx.EnsureBuckets(db, collectionBuckets...))
 }
@@ -123,34 +176,34 @@ func checkPackBucket(name []byte, b *bolt.Bucket, collection string) error {
 		return nil
 	}
 	if !isCollectionBucket(name) {
-		return fmt.Errorf("collection.db holds bucket %q, which is not collection data", name)
+		return fmt.Errorf("the file of %q holds bucket %q, which is not collection data", collection, name)
 	}
 	return b.ForEach(func(k, v []byte) error {
 		if c, ok := keyCollection(string(name), k); v == nil || !ok || c != collection {
-			return fmt.Errorf("collection.db holds key %q of bucket %s, which is not collection %q's", k, name, collection)
+			return fmt.Errorf("the file of %q holds key %q of bucket %s, which is not that collection's", collection, k, name)
 		}
 		return nil
 	})
 }
 
-// attachCorpus records the pack in the collection's config, read-only, then
-// puts its data in place; a failure takes the config back.
-func (s *Server) attachCorpus(m *corpusManifest, path string, vectorsDisabled bool) error {
+// attachCorpus records the pack in the config of p's collection, read-only,
+// then puts its file at path in place; a failure takes the config back.
+func (s *Server) attachCorpus(m *corpusManifest, p corpusPart, path string, vectorsDisabled bool) error {
 	if s.CollectionManager == nil {
 		return errors.New("collection configs are not available on this server")
 	}
-	prev, hadPrev := s.CollectionManager.Get(m.Name)
-	cfg := &CollectionConfig{Type: "default", Description: m.Description, ReadOnly: true, Corpus: m.info(vectorsDisabled, time.Now())}
-	if err := s.CollectionManager.put(m.Name, cfg); err != nil {
+	prev, hadPrev := s.CollectionManager.Get(p.Name)
+	cfg := &CollectionConfig{Type: "default", Description: m.Description, ReadOnly: true, Corpus: m.info(p, vectorsDisabled, time.Now())}
+	if err := s.CollectionManager.put(p.Name, cfg); err != nil {
 		return err
 	}
 	// Checked with writes already refused, so none can land in between.
-	err := s.fillCorpusCollection(m.Name, path)
+	err := s.fillCorpusCollection(p.Name, path)
 	if err != nil {
 		if hadPrev {
-			_ = s.CollectionManager.put(m.Name, prev)
+			_ = s.CollectionManager.put(p.Name, prev)
 		} else {
-			_ = s.CollectionManager.Delete(m.Name)
+			_ = s.CollectionManager.Delete(p.Name)
 		}
 	}
 	return err
@@ -219,56 +272,4 @@ func (s *Server) collectionVectorsDisabled(collection string) bool {
 	}
 	cfg, found := s.CollectionManager.Get(collection)
 	return found && cfg.Corpus != nil && cfg.Corpus.VectorsDisabled
-}
-
-// removeCorpus deletes an installed pack: its data, its file and its config.
-// It returns the number of documents removed. Only a pack is removed here; a
-// collection written by hand is deleted with /v1/delete-collection.
-func (s *Server) removeCorpus(name string) (int, error) {
-	cfg, found := (*CollectionConfig)(nil), false
-	if s.CollectionManager != nil {
-		cfg, found = s.CollectionManager.Get(name)
-	}
-	if !found || cfg.Corpus == nil {
-		return 0, fmt.Errorf("no corpus pack named %q is installed: %w", name, errNotFound)
-	}
-	// The delete writes to the collection, so it is made writable first,
-	// and read-only again if the delete fails.
-	writable := *cfg
-	writable.ReadOnly = false
-	if err := s.CollectionManager.put(name, &writable); err != nil {
-		return 0, err
-	}
-	n, err := s.deleteCollection(name)
-	if err != nil {
-		_ = s.CollectionManager.put(name, cfg)
-		return 0, err
-	}
-	s.clearReadCaches()
-	slog.Info("corpus pack removed", "pack", name, "documents", n)
-	return n, nil
-}
-
-// corpusPacks is every installed pack in the caller's tenant, by collection:
-// GET /v1/corpus, the corpus_list MCP tool and the ListCorpusPacks RPC.
-func (s *Server) corpusPacks(ctx context.Context) []corpusListEntry {
-	out := []corpusListEntry{}
-	if s.CollectionManager == nil {
-		return out
-	}
-	tenant := TenantFromContext(ctx)
-	for name, cfg := range s.CollectionManager.ListAll() {
-		if cfg.Corpus != nil && CollectionInTenant(tenant, name) {
-			out = append(out, corpusListEntry{Collection: name, ReadOnly: cfg.ReadOnly, Corpus: cfg.Corpus})
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Collection < out[j].Collection })
-	return out
-}
-
-// corpusListEntry is one installed pack.
-type corpusListEntry struct {
-	Collection string      `json:"collection"`
-	ReadOnly   bool        `json:"readOnly"`
-	Corpus     *CorpusInfo `json:"corpus"`
 }

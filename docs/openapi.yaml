@@ -8492,11 +8492,16 @@ paths:
     post:
       tags:
         - Collection Config
-      summary: Build a corpus pack of a collection
+      summary: Build a corpus pack of one or several collections
       description: >
         Takes a consistent snapshot of the collection — documents, full-text
         index, vectors, geo points — and streams it as a tar.zst pack with
         manifest.json and collection.db (AGT-005, docs/CORPUS-PACKS.md).
+        With `collections` (FE-022) the pack holds several collections, one
+        file each (format 2: collection-1.db … collection-N.db), and installs
+        them as the collections they were built from; naming both `collection`
+        and `collections` is refused. One collection without a licence or
+        sources of its own still makes a format-1 pack.
         Refused without a licence, for an encrypted collection and for one whose
         documents live in S3 or memory. Requires the admin permission.
       operationId: buildCorpusPack
@@ -8523,7 +8528,9 @@ paths:
                 type: string
                 format: binary
         "400":
-          description: No licence, an invalid name, or a collection that cannot be packed
+          description: >
+            No licence, an invalid name, both collection and collections, several
+            collections without a pack name, or a collection that cannot be packed
           content:
             application/json:
               schema:
@@ -8531,7 +8538,7 @@ paths:
         "403":
           description: Admin access required
         "404":
-          description: The collection has no documents
+          description: A collection of the pack has no documents
           content:
             application/json:
               schema:
@@ -8543,8 +8550,10 @@ paths:
         - Collection Config
       summary: Install a corpus pack
       description: >
-        Installs an uploaded pack as a read-only collection, without a restart,
-        re-embedding or reindexing. The pack is an upload, never a path or a URL
+        Installs an uploaded pack as a read-only collection — a pack of several
+        collections (format 2) as each of them — without a restart,
+        re-embedding or reindexing. Either every collection of the pack is
+        installed or none. The pack is an upload, never a path or a URL
         for the server to fetch. A pack whose vectors were made by another model
         than the server's is installed with vectorsDisabled and a warning: hybrid
         search on it answers from full text. Requires the admin permission;
@@ -8580,18 +8589,68 @@ paths:
         "403":
           description: Admin access required, or read-only mode
         "409":
-          description: A collection of that name already holds data
+          description: A pack of that name is already installed, or a collection of the pack already holds data
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/corpus/inspect:
+    post:
+      tags:
+        - Collection Config
+      summary: Read a corpus pack's manifest without installing it
+      description: >
+        (FE-022) Reads only manifest.json, the first member of the uploaded pack,
+        checks it as an install would, and answers what the pack holds and why an
+        install here would answer 409. Nothing is written. The upload may be the
+        pack's first megabytes only; at most 16 MiB of it is read. Requires the
+        admin permission.
+      operationId: inspectCorpusPack
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [pack]
+              properties:
+                pack:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: The manifest, and any conflicts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  manifest:
+                    $ref: "#/components/schemas/CorpusManifest"
+                  conflicts:
+                    type: array
+                    description: Why an install would answer 409; empty when it would not.
+                    items:
+                      type: string
+        "400":
+          description: Not a pack, an unsupported format, a manifest without a licence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Admin access required
 
   /v1/corpus/remove:
     post:
       tags:
         - Collection Config
       summary: Remove an installed corpus pack
-      description: Deletes the pack's collection — data, file and config. Requires the admin permission.
+      description: >
+        Deletes every collection the pack installed — data, file and config.
+        `name` is the pack's name: for a pack of one collection, the
+        collection's. Requires the admin permission.
       operationId: removeCorpusPack
       requestBody:
         required: true
@@ -18108,6 +18167,24 @@ components:
             answers from full text only.
         embedding:
           $ref: "#/components/schemas/CorpusEmbedding"
+        description:
+          type: string
+        sources:
+          type: array
+          description: (FE-022) This collection's sources, as the manifest names them.
+          items:
+            $ref: "#/components/schemas/CorpusSource"
+        bytes:
+          type: integer
+          description: (FE-022) Size of this collection's file in the pack.
+        packLicense:
+          type: string
+          description: (FE-022) A pack of several collections only — the licence of the pack as a whole; `license` is this collection's.
+        collections:
+          type: array
+          description: (FE-022) A pack of several collections only — every collection it installed.
+          items:
+            type: string
 
     CorpusEmbedding:
       type: object
@@ -18140,11 +18217,25 @@ components:
 
     CorpusBuildRequest:
       type: object
-      required: [collection, license]
+      required: [license]
+      description: Names the pack's collections in `collection` or in `collections`, not both.
       properties:
         collection:
           type: string
           description: The collection to pack; the pack installs under this name.
+        collections:
+          type: array
+          description: >
+            (FE-022) The collections to pack, each a name or an object with its
+            own licence and sources. Each installs as the collection it was
+            built from.
+          items:
+            oneOf:
+              - type: string
+              - $ref: "#/components/schemas/CorpusBuildCollection"
+        name:
+          type: string
+          description: (FE-022) The pack's name; required for several collections.
         version:
           type: string
           example: "1.31"
@@ -18159,6 +18250,79 @@ components:
           description: Where the documents came from; each source needs a licence.
           items:
             $ref: "#/components/schemas/CorpusSource"
+
+    CorpusBuildCollection:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        license:
+          type: string
+          description: This collection's licence; without one, the pack's.
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/CorpusSource"
+
+    CorpusManifest:
+      type: object
+      description: manifest.json of a pack (docs/CORPUS-PACKS.md).
+      properties:
+        format:
+          type: integer
+          description: 1 for one collection, 2 for several.
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        mddbVersion:
+          type: string
+        schemaVersion:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        license:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/CorpusSource"
+        embedding:
+          $ref: "#/components/schemas/CorpusEmbedding"
+        docCount:
+          type: integer
+        sha256:
+          type: string
+        bytes:
+          type: integer
+        collections:
+          type: array
+          description: Format 2 only — the pack's collections, in archive order.
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              license:
+                type: string
+              sources:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CorpusSource"
+              schemaVersion:
+                type: integer
+              embedding:
+                $ref: "#/components/schemas/CorpusEmbedding"
+              docCount:
+                type: integer
+              sha256:
+                type: string
+              bytes:
+                type: integer
 
     CorpusInstallResult:
       type: object
@@ -18175,6 +18339,11 @@ components:
           type: boolean
         warnings:
           type: array
+          items:
+            type: string
+        collections:
+          type: array
+          description: (FE-022) The collections the pack installed.
           items:
             type: string
 

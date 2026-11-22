@@ -16,17 +16,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// Building a corpus pack (AGT-005): a consistent snapshot of one collection,
-// described by a manifest and streamed as tar.zst.
-
-// corpusBuildRequest is the body of POST /v1/corpus/build.
-type corpusBuildRequest struct {
-	Collection  string         `json:"collection"`
-	Version     string         `json:"version,omitempty"`
-	Description string         `json:"description,omitempty"`
-	License     string         `json:"license"`
-	Sources     []corpusSource `json:"sources,omitempty"`
-}
+// Building a corpus pack (AGT-005): a consistent snapshot of one collection
+// or several (FE-022), described by a manifest and streamed as tar.zst.
 
 // errCorpusInvalid marks a request or a pack the server refuses as it is:
 // HTTP 400, never a server fault.
@@ -71,42 +62,53 @@ func (s *Server) newCorpusWork() (string, *os.Root, error) {
 	return work, root, nil
 }
 
-// prepareCorpus snapshots the collection and writes its manifest. Nothing
-// is streamed yet, so every refusal can still be an HTTP status.
+// prepareCorpus snapshots the pack's collections and writes its manifest.
+// Nothing is streamed yet, so every refusal can still be an HTTP status.
 func (s *Server) prepareCorpus(req corpusBuildRequest) (*corpusBuild, error) {
-	m := &corpusManifest{Format: corpusFormat, Name: req.Collection, Version: req.Version,
-		Description: req.Description, MddbVersion: VERSION, CreatedAt: time.Now().UTC(),
-		License: req.License, Sources: req.Sources}
-	if err := errors.Join(validPackName(m.Name), m.validateLicenses(), s.packableCollection(m.Name)); err != nil {
-		return nil, fmt.Errorf("%w: %w", errCorpusInvalid, err)
+	m, parts, err := req.plan()
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range parts {
+		if err := s.packableCollection(p.Name); err != nil {
+			return nil, fmt.Errorf("%w: %w", errCorpusInvalid, err)
+		}
 	}
 	work, root, err := s.newCorpusWork()
 	if err != nil {
 		return nil, err
 	}
 	b := &corpusBuild{manifest: m, work: work, root: root}
-	if err := s.fillCorpus(b); err != nil {
+	if err := s.fillCorpus(b, parts); err != nil {
 		b.close()
 		return nil, err
 	}
 	return b, nil
 }
 
-// fillCorpus writes the snapshot into the build and describes it.
-func (s *Server) fillCorpus(b *corpusBuild) error {
+// fillCorpus writes the snapshot of each collection into the build and
+// describes it.
+func (s *Server) fillCorpus(b *corpusBuild, parts []corpusPart) error {
 	m := b.manifest
-	if err := s.snapshotCollection(m.Name, b.root, corpusDataName); err != nil {
-		return err
+	for i := range parts {
+		p, member := &parts[i], corpusMemberName(m.Format, i)
+		if err := s.snapshotCollection(p.Name, b.root, member); err != nil {
+			return err
+		}
+		if err := s.describeSnapshot(filepath.Join(b.work, member), p); err != nil {
+			return err
+		}
+		if p.DocCount == 0 {
+			return fmt.Errorf("collection %q: %w: it has no documents", p.Name, errNotFound)
+		}
+		file, err := hashFile(b.root, member)
+		if err != nil {
+			return err
+		}
+		p.SHA256, p.Bytes = file.sum, file.size
 	}
-	if err := s.describeSnapshot(filepath.Join(b.work, corpusDataName), m); err != nil {
-		return err
-	}
-	if m.DocCount == 0 {
-		return fmt.Errorf("collection %q: %w: it has no documents", m.Name, errNotFound)
-	}
-	file, err := hashFile(b.root, corpusDataName)
-	m.SHA256, m.Bytes = file.sum, file.size
-	return err
+	m.setParts(parts)
+	return nil
 }
 
 // packableCollection refuses a collection whose data is not all in bbolt or
@@ -213,19 +215,19 @@ func (kb *keyBatch) flush() error {
 	})
 }
 
-// describeSnapshot fills in what the manifest says about the snapshot at
-// path: its documents, its storage format and how its vectors were made.
-func (s *Server) describeSnapshot(path string, m *corpusManifest) error {
+// describeSnapshot fills in what the manifest says about the snapshot of p
+// at path: its documents, its storage format and how its vectors were made.
+func (s *Server) describeSnapshot(path string, p *corpusPart) error {
 	snap, err := openBolt(path, &bolt.Options{Timeout: time.Second, ReadOnly: true})
 	if err != nil {
 		return err
 	}
 	defer func() { _ = snap.Close() }()
-	if m.SchemaVersion, err = migrate.Version(snap); err != nil {
+	if p.SchemaVersion, err = migrate.Version(snap); err != nil {
 		return err
 	}
-	m.DocCount = countPrefix(snap, s.BucketNames.Docs, []byte("doc|"+m.Name+"|"))
-	m.Embedding = s.snapshotEmbedding(snap, m.Name)
+	p.DocCount = countPrefix(snap, s.BucketNames.Docs, []byte("doc|"+p.Name+"|"))
+	p.Embedding = s.snapshotEmbedding(snap, p.Name)
 	return nil
 }
 

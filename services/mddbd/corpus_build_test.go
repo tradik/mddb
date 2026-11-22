@@ -76,7 +76,7 @@ func TestSnapshotFailures(t *testing.T) {
 	if err := s.snapshotCollection("docs", root, "taken"); err == nil {
 		t.Fatal("a snapshot was written over a directory")
 	}
-	if err := s.describeSnapshot(filepath.Join(root.Name(), "taken"), validManifest()); err == nil {
+	if err := s.describeSnapshot(filepath.Join(root.Name(), "taken"), &corpusPart{Name: "docs"}); err == nil {
 		t.Fatal("a directory was described as a snapshot")
 	}
 
