@@ -284,7 +284,7 @@ The module switches (`/v1/features`, GO-049) over gRPC.
 
 | RPC | Permission | |
 |---|---|---|
-| `ListFeatures` | authenticated | `features` (`FeatureProto`: `name`, `description`, `enabled`, `configured`, `default_enabled`, `requires`, `locked_by`, `blocked_by`, `updated_at` in Unix seconds, `updated_by`) and `version` |
+| `ListFeatures` | authenticated | `features` (`FeatureProto`: `name`, `title` and `summary` (v2.19.11+, plain texts for people), `description` (technical detail), `enabled`, `configured`, `default_enabled`, `requires`, `locked_by`, `blocked_by`, `updated_at` in Unix seconds, `updated_by`) and `version` |
 | `SetFeature` | admin, writable server | `{name, enabled}` → `{feature, version}`; `NOT_FOUND` for an unknown module, `FAILED_PRECONDITION` when `MDDB_FEATURES_FORCE_OFF` locks it |
 
 Every RPC of a disabled module answers `FAILED_PRECONDITION`

@@ -4,7 +4,7 @@ package main
 // (issue #102), reused across search_documents / semantic_search /
 // full_text_search so the wording stays in one place.
 const (
-	mcpIncludeContentDesc = "(v2.10.2+) Include the document body (content_md) in each hit. Default: true, or false when fields is set (v2.11.0+, GO-019). Pass explicitly to override either default."
+	mcpIncludeContentDesc = "(v2.10.2+) Include the document body (content_md) in each hit. Default: true, or false when fields is set (v2.11.0+). Pass explicitly to override either default."
 	mcpFieldsDesc         = "(v2.10.2+) Restrict returned meta to these keys (e.g. [\"name\",\"currentVersion\"]); each hit is reduced to id, key and the listed meta. Since v2.11.0 setting fields also drops the body unless include_content=true is passed explicitly. Empty = all meta."
 )
 
