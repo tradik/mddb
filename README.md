@@ -738,13 +738,6 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 
 **[Detailed architecture](docs/ARCHITECTURE.md)**
 
-## 🗺️ What's next
-
-Shipped work is in **[CHANGELOG.md](CHANGELOG.md)**. What people are asking for
-is in **[Issues](https://github.com/tradik/mddb/issues)** and
-**[Discussions](https://github.com/tradik/mddb/discussions/categories/ideas)**.
-Both are current by construction, which a hand-written roadmap was not.
-
 ## 🏁 Used by
 
 - **[daemonports.org](https://daemonports.org/)** — about 120,000 pages from the
