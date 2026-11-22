@@ -33,11 +33,12 @@ func featureManager(t *testing.T, forceOff string) (*FeatureManager, *bolt.DB) {
 func TestFeatureRegistryDefaults(t *testing.T) {
 	f, _ := featureManager(t, "")
 	list := f.List()
-	if len(list) != len(featureRegistry) || len(list) != 23 {
+	if len(list) != len(featureRegistry) || len(list) != 26 {
 		t.Fatalf("registry: %d modules", len(list))
 	}
 	// The modules that open a new way in start off (#449-#451).
-	off := map[string]bool{FeatureChatExternalMCP: true, FeatureWebSearch: true, FeatureRerankAPI: true, FeatureExtractAPI: true}
+	off := map[string]bool{FeatureChatExternalMCP: true, FeatureWebSearch: true, FeatureRerankAPI: true, FeatureExtractAPI: true,
+		FeatureVectorStores: true, FeatureESCompat: true, FeatureQdrantCompat: true}
 	for _, st := range list {
 		want := !off[st.Name]
 		if st.Enabled != want || st.Configured != want || st.Default != want || st.LockedBy != "" || st.UpdatedAt != nil {
@@ -153,5 +154,30 @@ func TestFeatureStoreFailuresAndBinlog(t *testing.T) {
 	}
 	if err := f.Set(FeatureEval, true, ""); err == nil {
 		t.Error("set on a closed database")
+	}
+}
+
+// MDDB_ES_COMPAT=true and MDDB_QDRANT_COMPAT=true, the switches before
+// 2.19.10, turn their module on by default; a switch set on the Features page
+// wins over them, either way.
+func TestFeatureDefaultEnv(t *testing.T) {
+	t.Setenv(esCompatEnv, "true")
+	t.Setenv(qdrantCompatEnv, "")
+	f, _ := featureManager(t, "")
+	if !f.Enabled(FeatureESCompat) || f.Enabled(FeatureQdrantCompat) {
+		t.Fatal("MDDB_ES_COMPAT=true turns esCompat on, and only it")
+	}
+	if st, _ := f.State(FeatureESCompat); !st.Default {
+		t.Errorf("the reported default follows the variable: %+v", st)
+	}
+	if err := f.Set(FeatureESCompat, false, "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if f.Enabled(FeatureESCompat) {
+		t.Error("a stored switch wins over the variable")
+	}
+	var nilMgr *FeatureManager
+	if !nilMgr.Enabled(FeatureESCompat) {
+		t.Error("a nil manager follows the variable too")
 	}
 }

@@ -24,6 +24,7 @@ func openAIFTSServer(t *testing.T) *Server {
 		"# Replication\n\nA follower replica copies every write from the leader.\n\nFailover promotes a follower.",
 		map[string][]string{"url": {"https://docs.example.org/replication"}, "tag": {"ops", "ha"}})
 	addTestDoc(t, s, "acme/docs", "backup", "en", "# Backup\n\nBackups are tarballs, restored with one command.", nil)
+	switchModules(t, s, FeatureVectorStores)
 	return s
 }
 
@@ -188,6 +189,7 @@ func TestOpenAIVectorStoreSearchHybrid(t *testing.T) {
 		t.Run(layout, func(t *testing.T) {
 			t.Setenv("MDDB_STORAGE_LAYOUT", layout)
 			s := covGVectorServer(t)
+			switchModules(t, s, FeatureVectorStores)
 			covGEmbedded(t, s, "kb", "go", "golang meetup in berlin", map[string][]string{"url": {"https://example.org/go"}})
 			covGEmbedded(t, s, "kb", "rust", "rust conference in warsaw", nil)
 			h := esHandler(t, s, false)

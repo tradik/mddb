@@ -65,6 +65,7 @@ func openAIListServer(t *testing.T) *Server {
 	if err := s.CollectionManager.Set("gamma", &CollectionConfig{Type: "default"}); err != nil {
 		t.Fatal(err)
 	}
+	switchModules(t, s, FeatureVectorStores)
 	return s
 }
 

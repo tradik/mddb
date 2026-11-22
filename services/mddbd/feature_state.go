@@ -87,7 +87,7 @@ func (f *FeatureManager) List() []FeatureState {
 func (f *FeatureManager) state(d featureDef) FeatureState {
 	s := f.setting(d)
 	st := FeatureState{Name: d.Name, Description: d.Description, Enabled: f.enabled(d), Configured: s.Enabled,
-		Default: d.Default, Requires: append([]string{}, d.Requires...), UpdatedBy: s.UpdatedBy}
+		Default: d.defaultOn(), Requires: append([]string{}, d.Requires...), UpdatedBy: s.UpdatedBy}
 	if f.forced(d.Name) {
 		st.LockedBy = featuresForceOffEnv
 	}

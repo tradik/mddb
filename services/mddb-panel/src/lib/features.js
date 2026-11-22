@@ -36,6 +36,9 @@ export const FEATURE_VIEWS = {
   webSearch: [],
   rerankApi: [],
   extractApi: [],
+  vectorStores: [],
+  esCompat: [],
+  qdrantCompat: [],
 };
 
 /** Human names of the modules, for the notice and the Features page. */
@@ -63,6 +66,9 @@ export const FEATURE_LABELS = {
   webSearch: 'Web search endpoint',
   rerankApi: 'Rerank endpoint',
   extractApi: 'Document extraction endpoint',
+  vectorStores: 'OpenAI-compatible vector stores',
+  esCompat: 'Elasticsearch-compatible API',
+  qdrantCompat: 'Qdrant-compatible query',
 };
 
 /** The label of a module; an unknown name is shown as it is. */

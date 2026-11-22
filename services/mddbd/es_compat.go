@@ -3,8 +3,6 @@ package main
 import (
 	"net/http"
 	"strings"
-
-	"mddb/internal/envconf"
 )
 
 // Elasticsearch-compatible subset (INT-019).
@@ -42,11 +40,6 @@ const (
 	esLangField    = "lang"
 )
 
-// esCompatEnabled reports whether MDDB_ES_COMPAT turns the surface on.
-func esCompatEnabled() bool {
-	return envconf.String(esCompatEnv, "false") == "true"
-}
-
 // isESPath reports whether path belongs to the surface.
 func isESPath(path string) bool {
 	return path == esPathPrefix || strings.HasPrefix(path, esPathPrefix+"/")
@@ -62,11 +55,9 @@ func esAPIKey(r *http.Request) string {
 	return strings.TrimSpace(key)
 }
 
-// registerESRoutes mounts the surface when it is enabled.
+// registerESRoutes mounts the surface; the esCompat module gates it
+// (feature_gates.go), so it answers 404 until it is switched on.
 func (s *Server) registerESRoutes(mux routeMux) {
-	if !esCompatEnabled() {
-		return
-	}
 	mux.HandleFunc(esPathPrefix, s.handleES)
 	mux.HandleFunc(esPathPrefix+"/", s.handleES)
 }

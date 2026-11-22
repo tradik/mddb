@@ -116,7 +116,7 @@ func (f *FeatureManager) setting(d featureDef) featureSetting {
 			return s
 		}
 	}
-	return featureSetting{Name: d.Name, Enabled: d.Default}
+	return featureSetting{Name: d.Name, Enabled: d.defaultOn()}
 }
 
 // forced reports whether the operator forced a module off.

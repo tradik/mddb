@@ -60,7 +60,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
 | `MDDB_METRICS_PUBLIC` | `"false"` | bool | With `MDDB_AUTH_ENABLED=true`, serve `/metrics` without credentials (SEC-009). No effect when auth is off ([TELEMETRY.md](TELEMETRY.md)) |
 | `MDDB_SEARCH_STATS` | `"true"` | bool | Include `searchStats` in search responses |
-| `MDDB_FEATURES_FORCE_OFF` | `""` | list | Optional modules kept off whatever the panel says (v2.19.0, GO-049), comma-separated, e.g. `geo,chat`: `chat`, `chatExternalMcp`, `geo`, `temporal`, `spell`, `curation`, `automation`, `memory`, `codeIntel`, `eval`, `corpus`, `classify`, `duplicates`, `images`, `webhooks`, `schemas`, `aliases`, `crossSearch`, `searchTuning`, `ftsTuning`, `webSearch`, `rerankApi`, `extractApi`. Such a module is shown as locked and `PUT /v1/features/{name}` answers `409`. Unknown names are ignored. See [API.md](API.md#features-v1features) |
+| `MDDB_FEATURES_FORCE_OFF` | `""` | list | Optional modules kept off whatever the panel says (v2.19.0, GO-049), comma-separated, e.g. `geo,chat`: `chat`, `chatExternalMcp`, `geo`, `temporal`, `spell`, `curation`, `automation`, `memory`, `codeIntel`, `eval`, `corpus`, `classify`, `duplicates`, `images`, `webhooks`, `schemas`, `aliases`, `crossSearch`, `searchTuning`, `ftsTuning`, `webSearch`, `rerankApi`, `extractApi`, `vectorStores`, `esCompat`, `qdrantCompat`. Such a module is shown as locked and `PUT /v1/features/{name}` answers `409`. Unknown names are ignored. See [API.md](API.md#features-v1features) |
 
 ---
 
@@ -805,7 +805,7 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
-| `MDDB_ES_COMPAT` | `false` | bool | `true` mounts a subset of the Elasticsearch REST API under `/es` on the HTTP listener: `_search`, `_count`, `_doc`, `_create`, `_bulk`, `_refresh`, `GET /es`. Requests are translated onto `/v1` search and write paths, behind the same auth, permissions, rate limiter and body cap; `/v1` is unchanged. Unsupported clauses are a `400` naming them. See [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md) |
+| `MDDB_ES_COMPAT` | `false` | bool | `true` turns the `esCompat` module on by default (from v2.19.10 a switch on the Features page wins), which mounts a subset of the Elasticsearch REST API under `/es` on the HTTP listener: `_search`, `_count`, `_doc`, `_create`, `_bulk`, `_refresh`, `GET /es`. Requests are translated onto `/v1` search and write paths, behind the same auth, permissions, rate limiter and body cap; `/v1` is unchanged. Unsupported clauses are a `400` naming them. See [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md) |
 
 ---
 
@@ -813,7 +813,7 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
-| `MDDB_QDRANT_COMPAT` | `false` | bool | `true` mounts the Qdrant REST requests `qdrant-client`'s `query_points` makes under `/qdrant` on the HTTP listener (`GET /qdrant`, `POST /qdrant/collections/{name}/points/query`), so Open WebUI's External Knowledge Source with the Qdrant provider can search a collection. The vector goes to `/v1/vector-search` (chunk mode) behind the same auth, permissions, rate limiter and body cap; the `api-key` header is accepted as an MDDB API key. See [QDRANT_COMPAT.md](QDRANT_COMPAT.md) |
+| `MDDB_QDRANT_COMPAT` | `false` | bool | `true` turns the `qdrantCompat` module on by default (a switch on the Features page wins), which mounts the Qdrant REST requests `qdrant-client`'s `query_points` makes under `/qdrant` on the HTTP listener (`GET /qdrant`, `POST /qdrant/collections/{name}/points/query`), so Open WebUI's External Knowledge Source with the Qdrant provider can search a collection. The vector goes to `/v1/vector-search` (chunk mode) behind the same auth, permissions, rate limiter and body cap; the `api-key` header is accepted as an MDDB API key. See [QDRANT_COMPAT.md](QDRANT_COMPAT.md) |
 
 ## Open WebUI Engines (v2.19.10+)
 

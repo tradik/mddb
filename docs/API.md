@@ -1917,6 +1917,9 @@ backups are core and cannot be switched off.
 | `webSearch` | **off** | `/v1/web-search` (v2.19.10, #449) |
 | `rerankApi` | **off** | `/v1/rerank` (v2.19.10, #450) |
 | `extractApi` | **off** | `/v1/extract/process` (v2.19.10, #451) |
+| `vectorStores` | **off** | `/v1/vector_stores`, `/v1/vector_stores/{id}/search` (v2.19.10, #446) |
+| `esCompat` | **off**, on with `MDDB_ES_COMPAT=true` | `/es`, `/es/…` (the Elasticsearch-compatible subset; module since v2.19.10) |
+| `qdrantCompat` | **off**, on with `MDDB_QDRANT_COMPAT=true` | `/qdrant`, `/qdrant/…` (v2.19.10, #447) |
 
 A server that never touched a switch behaves as before 2.19.0.
 
@@ -3218,6 +3221,9 @@ Source provider makes. A vector store is a collection. Creating, changing
 and deleting stores or files through this API is not served: documents are
 written with `/v1/add` and the other MDDB endpoints. Setup steps are in
 [LLM_CONNECTIONS.md](LLM_CONNECTIONS.md#open-webui).
+Both belong to the `vectorStores` module, off by default: until it is
+switched on (*System → Features*, `PUT /v1/features/vectorStores`) they answer
+`404 {"error":"feature disabled","feature":"vectorStores"}`.
 
 Authentication works as on the rest of `/v1`: `Authorization: Bearer
 mddb_live_…` (or `X-API-Key`) or a JWT. Errors use the OpenAI error object,
