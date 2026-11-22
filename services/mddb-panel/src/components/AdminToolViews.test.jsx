@@ -11,6 +11,8 @@ vi.mock('./DuplicatesPanel', () => ({ default: () => 'duplicates page' }));
 vi.mock('./AccountPanel', () => ({ default: () => 'account page' }));
 vi.mock('./DocumentViewer', () => ({ default: () => ' + viewer' }));
 vi.mock('./TenantsPanel', () => ({ default: () => 'tenants page' }));
+vi.mock('./BackupsPanel', () => ({ default: () => 'backups page' }));
+vi.mock('./CollectionMaintenancePanel', () => ({ default: () => 'maintenance page' }));
 
 const { default: AdminToolViews } = await import('./AdminToolViews');
 
@@ -24,6 +26,8 @@ describe('AdminToolViews', () => {
     ['duplicates', 'duplicates page'],
     ['account', 'account page'],
     ['tenants', 'tenants page'],
+    ['backups', 'backups page'],
+    ['maintenance', 'maintenance page'],
   ])('%s shows %s', (viewMode, label) => {
     const { container } = render(<AdminToolViews viewMode={viewMode} />);
     expect(container.textContent).toBe(label);

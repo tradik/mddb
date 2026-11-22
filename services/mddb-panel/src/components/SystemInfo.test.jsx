@@ -9,10 +9,7 @@ vi.mock('../lib/mddb-client', () => ({ default: { getSystemInfo: vi.fn(), getGai
 // have their own page (FE-022), linked from here.
 vi.mock('./DiagnoseCard', () => ({ default: () => <div>diagnose card</div> }));
 vi.mock('./ServerEdgeCard', () => ({ default: () => <div>server edge card</div> }));
-vi.mock('./IndexingStatusCard', () => ({ default: () => <div>indexing status card</div> }));
 vi.mock('./StorageCard', () => ({ default: () => <div>storage card</div> }));
-vi.mock('./CollectionMaintenanceCard', () => ({ default: () => <div>maintenance card</div> }));
-vi.mock('./BackupRestoreCard', () => ({ default: () => <div>backup card</div> }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
@@ -112,8 +109,6 @@ describe('SystemInfo', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Corpus packs' }));
     expect(useStore.getState().viewMode).toBe('corpus');
     expect(screen.getByText('diagnose card')).toBeTruthy();
-    expect(screen.getByText('maintenance card')).toBeTruthy();
-    expect(screen.getByText('backup card')).toBeTruthy();
     expect(screen.getByText('server edge card')).toBeTruthy();
   });
 
@@ -148,5 +143,16 @@ describe('SystemInfo', () => {
     fireEvent.click(screen.getByRole('button', { name: /Refresh/ }));
     expect(await screen.findByText('db-2')).toBeTruthy();
     expect(mddbClient.getSystemInfo).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('pages that moved out', () => {
+  test('System Info links to Backup & Restore and Collection Maintenance', async () => {
+    vi.mocked(mddbClient.getSystemInfo).mockResolvedValue(info);
+    render(<SystemInfo />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Backup & Restore' }));
+    expect(useStore.getState().viewMode).toBe('backups');
+    fireEvent.click(screen.getByRole('button', { name: 'Collection Maintenance' }));
+    expect(useStore.getState().viewMode).toBe('maintenance');
   });
 });
