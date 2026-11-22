@@ -507,6 +507,10 @@ type MCPHybridSearchRequest struct {
 	// the default.
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+	// FacetBy and FacetMaxValues ask for facets over the results, as on
+	// POST /v1/hybrid-search.
+	FacetBy        []string `json:"facetBy,omitempty"`
+	FacetMaxValues int      `json:"facetMaxValues,omitempty"`
 
 	IndexWait            // readLevel, waitForIndex, waitForKeys (GO-042)
 	PassageOptions       // format, passageLines (AGT-002)
@@ -562,6 +566,8 @@ type MCPHybridSearchResponse struct {
 	// ImageHits are the images the query matched by their picture, with
 	// includeImages and a provider that embeds images (RAG-010).
 	ImageHits []ImageRef `json:"imageHits,omitempty"`
+	// Facets count the results per value of each facetBy key.
+	Facets FacetResult `json:"facets,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
 	Passages     *PassagesResponse `json:"-"`

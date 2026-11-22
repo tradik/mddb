@@ -30,6 +30,12 @@ func outArray(items map[string]interface{}) map[string]interface{} {
 	return map[string]interface{}{"type": "array", "items": items}
 }
 
+// outNullable is schema, or null: for a field Go encodes as null when its
+// slice or map is nil.
+func outNullable(schema map[string]interface{}) map[string]interface{} {
+	return outWith(schema, map[string]interface{}{"type": []string{schema["type"].(string), "null"}})
+}
+
 // outMap is an object whose every value follows values (a map keyed by name).
 func outMap(values map[string]interface{}) map[string]interface{} {
 	return map[string]interface{}{"type": "object", "additionalProperties": values}
@@ -54,7 +60,7 @@ func outDocumentProps() map[string]interface{} {
 		"id":         outType("string"),
 		"key":        outType("string"),
 		"lang":       outType("string"),
-		"meta":       outType("object"),
+		"meta":       outType("object", "null"),
 		"content_md": outType("string"),
 		"added_at":   outType("string"),
 		"updated_at": outType("string"),
@@ -166,7 +172,7 @@ var mcpToolOutputSchemas = map[string]map[string]interface{}{
 		"passages":  outPassages(true),
 		"results": outArray(outObject(outWith(outGroupProps(), map[string]interface{}{
 			"score":        outType("number"),
-			"matchedTerms": outArray(outType("string")),
+			"matchedTerms": outNullable(outArray(outType("string"))),
 			"document":     outObject(outDocumentProps()),
 			"highlights": outArray(outObject(map[string]interface{}{
 				"fragment":     outType("string"),
@@ -185,6 +191,7 @@ var mcpToolOutputSchemas = map[string]map[string]interface{}{
 		"vectorAlgorithm": outType("string"),
 		"distanceMetric":  outType("string"),
 		"plan":            outSearchPlan(),
+		"facets":          outFacets(),
 		"passages":        outPassages(true),
 		"results": outArray(outObject(outWith(outGroupProps(), map[string]interface{}{
 			"combinedScore": outType("number"),

@@ -371,16 +371,23 @@ func hybridResponse(req *HybridSearchRequest, items []HybridSearchResultItem, pl
 	return resp
 }
 
+// hybridFacets counts the results per value of each facetBy key; nil without
+// keys or without results. Shared by REST and the MCP tool.
+func hybridFacets(items []HybridSearchResultItem, facetBy []string, maxPerKey int) FacetResult {
+	if len(facetBy) == 0 || len(items) == 0 {
+		return nil
+	}
+	docs := make([]storage.Doc, len(items))
+	for i, it := range items {
+		docs[i] = it.Document
+	}
+	return computeFacets(docs, facetBy, maxPerKey)
+}
+
 // decorateHybridResponse adds facets and search statistics, and counts the
 // operation.
 func (s *Server) decorateHybridResponse(resp *HybridSearchResponse, req *HybridSearchRequest, start time.Time) {
-	if len(req.FacetBy) > 0 && len(resp.Results) > 0 {
-		docs := make([]storage.Doc, len(resp.Results))
-		for i, it := range resp.Results {
-			docs[i] = it.Document
-		}
-		resp.Facets = computeFacets(docs, req.FacetBy, req.FacetMaxValues)
-	}
+	resp.Facets = hybridFacets(resp.Results, req.FacetBy, req.FacetMaxValues)
 	if s.Metrics != nil {
 		s.Metrics.IncOp("hybrid_search", req.Strategy)
 	}
