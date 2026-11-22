@@ -135,7 +135,15 @@ func passageAtHit(collection string, doc *storage.Doc, terms []string, highlight
 	for _, h := range highlights {
 		terms = append(terms, h.MatchedTerms...)
 	}
-	return passageAround(collection, doc, hitLine(doc.ContentMD, terms), opts.radius(), opts.PassageTokens, score, source)
+	p := passageAround(collection, doc, hitLine(doc.ContentMD, terms), opts.radius(), opts.PassageTokens, score, source)
+	// One line over the bound was cut from its start; a paragraph is one
+	// line, and what matched may be past the cut. Cut around the match.
+	if p.Truncated && p.Lines.Start == p.Lines.End {
+		line := newSourceText(doc).text(p.Lines.Start, p.Lines.End)
+		p.Content = cutAround(line, terms, opts.PassageTokens*4)
+		p.Tokens = approxTokens(p.Content)
+	}
+	return p
 }
 
 // hitLine picks the line where the most distinct terms meet, counting each
@@ -145,15 +153,7 @@ func passageAtHit(collection string, doc *storage.Doc, terms []string, highlight
 // words (a stem matches "classes" by "class"); a fuzzy match "query~indexed"
 // is looked up by its indexed form. Ties go to the earlier line.
 func hitLine(content string, terms []string) int {
-	var clean []string
-	for _, t := range terms {
-		if i := strings.LastIndexByte(t, '~'); i >= 0 {
-			t = t[i+1:]
-		}
-		if t = strings.ToLower(t); t != "" && !containsString(clean, t) {
-			clean = append(clean, t)
-		}
-	}
+	clean := cleanTerms(terms)
 	lines := strings.Split(strings.ToLower(content), "\n")
 	for _, wholeWord := range []bool{true, false} {
 		hits := make([][]bool, len(lines)) // hits[line][term]
@@ -251,6 +251,61 @@ func capPassage(p *Passage, tokenCap int) {
 	}
 	p.Content = p.Content[:cut] + cutMark
 	p.Tokens, p.Truncated = approxTokens(p.Content), true
+}
+
+// cleanTerms lowers matched terms and drops duplicates; a fuzzy match
+// "query~indexed" is kept by its indexed form.
+func cleanTerms(terms []string) []string {
+	var clean []string
+	for _, t := range terms {
+		if i := strings.LastIndexByte(t, '~'); i >= 0 {
+			t = t[i+1:]
+		}
+		if t = strings.ToLower(t); t != "" && !containsString(clean, t) {
+			clean = append(clean, t)
+		}
+	}
+	return clean
+}
+
+// cutLead starts a text cut at its beginning.
+const cutLead = "[…] "
+
+// cutAround cuts s to maxBytes on rune boundaries, keeping the first place a
+// term matches in view: from the start when the match is in the first half
+// of the cut, else from a quarter of the cut before it. Each cut end is
+// marked. Terms are matched as hitLine matches them, without case.
+func cutAround(s string, terms []string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+	start := 0
+	if lower := strings.ToLower(s); len(lower) == len(s) {
+		first := -1
+		for _, t := range cleanTerms(terms) {
+			if at := strings.Index(lower, t); at >= 0 && (first < 0 || at < first) {
+				first = at
+			}
+		}
+		if first > maxBytes/2 {
+			start = first - maxBytes/4
+		}
+	}
+	for start > 0 && start < len(s) && !utf8.RuneStart(s[start]) {
+		start++
+	}
+	end := min(start+maxBytes, len(s))
+	for end > start && end < len(s) && !utf8.RuneStart(s[end]) {
+		end--
+	}
+	out := s[start:end]
+	if start > 0 {
+		out = cutLead + out
+	}
+	if end < len(s) {
+		out += cutMark
+	}
+	return out
 }
 
 // passageOfChunk wraps a chunk or window a search already cut.

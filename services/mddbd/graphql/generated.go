@@ -101,6 +101,7 @@ type ComplexityRoot struct {
 		Siblings        func(childComplexity int) int
 		Symbol          func(childComplexity int) int
 		Tests           func(childComplexity int) int
+		Totals          func(childComplexity int) int
 		Truncated       func(childComplexity int) int
 	}
 
@@ -274,6 +275,7 @@ type ComplexityRoot struct {
 		Symbol     func(childComplexity int) int
 		Target     func(childComplexity int) int
 		Tokens     func(childComplexity int) int
+		Truncated  func(childComplexity int) int
 	}
 
 	PassageLines struct {
@@ -304,6 +306,11 @@ type ComplexityRoot struct {
 	QueryDecomposition struct {
 		Parts func(childComplexity int) int
 		Texts func(childComplexity int) int
+	}
+
+	RelationTotal struct {
+		Relation func(childComplexity int) int
+		Total    func(childComplexity int) int
 	}
 
 	RerankMove struct {
@@ -760,6 +767,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CodeSymbol.Tests(childComplexity), true
+	case "CodeSymbol.totals":
+		if e.ComplexityRoot.CodeSymbol.Totals == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Totals(childComplexity), true
 	case "CodeSymbol.truncated":
 		if e.ComplexityRoot.CodeSymbol.Truncated == nil {
 			break
@@ -1646,6 +1659,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Passage.Tokens(childComplexity), true
+	case "Passage.truncated":
+		if e.ComplexityRoot.Passage.Truncated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Truncated(childComplexity), true
 
 	case "PassageLines.end":
 		if e.ComplexityRoot.PassageLines.End == nil {
@@ -1831,6 +1850,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.QueryDecomposition.Texts(childComplexity), true
+
+	case "RelationTotal.relation":
+		if e.ComplexityRoot.RelationTotal.Relation == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RelationTotal.Relation(childComplexity), true
+	case "RelationTotal.total":
+		if e.ComplexityRoot.RelationTotal.Total == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RelationTotal.Total(childComplexity), true
 
 	case "RerankMove.after":
 		if e.ComplexityRoot.RerankMove.After == nil {
@@ -2537,6 +2569,8 @@ func (ec *executionContext) childFields_CodeSymbol(ctx context.Context, field gr
 		return ec.fieldContext_CodeSymbol_ambiguous(ctx, field)
 	case "candidates":
 		return ec.fieldContext_CodeSymbol_candidates(ctx, field)
+	case "totals":
+		return ec.fieldContext_CodeSymbol_totals(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type CodeSymbol", field.Name)
 }
@@ -2827,6 +2861,8 @@ func (ec *executionContext) childFields_Passage(ctx context.Context, field graph
 		return ec.fieldContext_Passage_container(ctx, field)
 	case "target":
 		return ec.fieldContext_Passage_target(ctx, field)
+	case "truncated":
+		return ec.fieldContext_Passage_truncated(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Passage", field.Name)
 }
@@ -2849,6 +2885,16 @@ func (ec *executionContext) childFields_QueryDecomposition(ctx context.Context, 
 		return ec.fieldContext_QueryDecomposition_texts(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type QueryDecomposition", field.Name)
+}
+
+func (ec *executionContext) childFields_RelationTotal(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "relation":
+		return ec.fieldContext_RelationTotal_relation(ctx, field)
+	case "total":
+		return ec.fieldContext_RelationTotal_total(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type RelationTotal", field.Name)
 }
 
 func (ec *executionContext) childFields_RerankMove(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -5109,6 +5155,38 @@ func (ec *executionContext) fieldContext_CodeSymbol_candidates(_ context.Context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_SymbolCandidate(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSymbol_totals(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_totals(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Totals, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*RelationTotal) graphql.Marshaler {
+			return ec.marshalNRelationTotal2ᚕᚖmddbᚋgraphqlᚐRelationTotalᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_totals(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_RelationTotal(ctx, field)
 		},
 	}
 	return fc, nil
@@ -9012,6 +9090,29 @@ func (ec *executionContext) fieldContext_Passage_target(_ context.Context, field
 	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
 }
 
+func (ec *executionContext) _Passage_truncated(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_truncated(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Truncated, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *bool) graphql.Marshaler {
+			return ec.marshalOBoolean2ᚖbool(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_truncated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "Boolean")
+}
+
 func (ec *executionContext) _PassageLines_start(ctx context.Context, field graphql.CollectedField, obj *PassageLines) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10135,6 +10236,52 @@ func (ec *executionContext) _QueryDecomposition_texts(ctx context.Context, field
 }
 func (ec *executionContext) fieldContext_QueryDecomposition_texts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("QueryDecomposition", field, false, false, "String")
+}
+
+func (ec *executionContext) _RelationTotal_relation(ctx context.Context, field graphql.CollectedField, obj *RelationTotal) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RelationTotal_relation(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Relation, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RelationTotal_relation(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RelationTotal", field, false, false, "String")
+}
+
+func (ec *executionContext) _RelationTotal_total(ctx context.Context, field graphql.CollectedField, obj *RelationTotal) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RelationTotal_total(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Total, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RelationTotal_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RelationTotal", field, false, false, "Int")
 }
 
 func (ec *executionContext) _RerankMove_id(ctx context.Context, field graphql.CollectedField, obj *RerankMove) (ret graphql.Marshaler) {
@@ -13239,7 +13386,7 @@ func (ec *executionContext) unmarshalInputCodeSymbolInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "name", "path", "include", "limit", "includeContent"}
+	fieldsInOrder := [...]string{"collection", "name", "path", "excludeTests", "include", "limit", "includeContent"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13267,6 +13414,13 @@ func (ec *executionContext) unmarshalInputCodeSymbolInput(ctx context.Context, o
 				return it, err
 			}
 			it.Path = data
+		case "excludeTests":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("excludeTests"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExcludeTests = data
 		case "include":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("include"))
 			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
@@ -13421,7 +13575,7 @@ func (ec *executionContext) unmarshalInputFTSInput(ctx context.Context, obj any)
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "limit", "format", "passageLines", "includeImages", "rerank"}
+	fieldsInOrder := [...]string{"collection", "query", "limit", "format", "passageLines", "passageTokens", "includeImages", "rerank"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13463,6 +13617,13 @@ func (ec *executionContext) unmarshalInputFTSInput(ctx context.Context, obj any)
 				return it, err
 			}
 			it.PassageLines = data
+		case "passageTokens":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("passageTokens"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PassageTokens = data
 		case "includeImages":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeImages"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
@@ -14366,7 +14527,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio", "includeImages", "queryImage", "queryDecomposition", "rerank"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "passageTokens", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio", "includeImages", "queryImage", "queryDecomposition", "rerank"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -14457,6 +14618,13 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.PassageLines = data
+		case "passageTokens":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("passageTokens"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PassageTokens = data
 		case "algorithm":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("algorithm"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -14967,6 +15135,11 @@ func (ec *executionContext) _CodeSymbol(ctx context.Context, sel ast.SelectionSe
 			}
 		case "candidates":
 			out.Values[i] = ec._CodeSymbol_candidates(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totals":
+			out.Values[i] = ec._CodeSymbol_totals(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -16094,6 +16267,11 @@ func (ec *executionContext) _Passage(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "truncated":
+			out.Values[i] = ec._Passage_truncated(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -16319,6 +16497,44 @@ func (ec *executionContext) _QueryDecomposition(ctx context.Context, sel ast.Sel
 			}
 		case "texts":
 			out.Values[i] = ec._QueryDecomposition_texts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var relationTotalImplementors = []string{"RelationTotal"}
+
+func (ec *executionContext) _RelationTotal(ctx context.Context, sel ast.SelectionSet, obj *RelationTotal) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, relationTotalImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RelationTotal")
+		case "relation":
+			out.Values[i] = ec._RelationTotal_relation(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "total":
+			out.Values[i] = ec._RelationTotal_total(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -17883,6 +18099,30 @@ func (ec *executionContext) marshalNPassageLines2ᚖmddbᚋgraphqlᚐPassageLine
 func (ec *executionContext) unmarshalNRegisterWebhookInput2mddbᚋgraphqlᚐRegisterWebhookInput(ctx context.Context, v any) (RegisterWebhookInput, error) {
 	res, err := ec.unmarshalInputRegisterWebhookInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNRelationTotal2ᚕᚖmddbᚋgraphqlᚐRelationTotalᚄ(ctx context.Context, sel ast.SelectionSet, v []*RelationTotal) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNRelationTotal2ᚖmddbᚋgraphqlᚐRelationTotal(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNRelationTotal2ᚖmddbᚋgraphqlᚐRelationTotal(ctx context.Context, sel ast.SelectionSet, v *RelationTotal) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "RelationTotal!")
+		return graphql.Null
+	}
+	return ec._RelationTotal(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNRerankMove2ᚖmddbᚋgraphqlᚐRerankMove(ctx context.Context, sel ast.SelectionSet, v *RerankMove) graphql.Marshaler {

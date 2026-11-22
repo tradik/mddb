@@ -235,7 +235,12 @@ query {
 
 `fts` and `vectorSearch` take `format: "passages"` and `passageLines`
 (v2.18.8); the response then fills `passages` (path, `lines`, `symbol`,
-`content`) and leaves `results` empty.
+`content`) and leaves `results` empty. `passageTokens` (v2.19.13) is the most
+tokens one passage may hold (default 500, max 8000); a passage cut to it
+carries `truncated: true`.
+
+`codeSymbol` takes `excludeTests` and a directory as `path` (v2.19.13), and
+returns `totals { relation total }` for each relation the limit cut.
 
 ### Search Documents
 

@@ -118,14 +118,18 @@ type CodeSymbol struct {
 	// Several definitions and no path chose one: see candidates.
 	Ambiguous  bool               `json:"ambiguous"`
 	Candidates []*SymbolCandidate `json:"candidates"`
+	// Passages each cut relation held before limit (v2.19.13); empty when none was cut.
+	Totals []*RelationTotal `json:"totals"`
 }
 
 type CodeSymbolInput struct {
 	Collection string `json:"collection"`
 	// Bare (Close) or, with semantic facts, qualified (Server.Close).
 	Name string `json:"name"`
-	// The file (meta.path) of the one definition wanted (CODE-012).
+	// The file (meta.path) of the one definition wanted (CODE-012), or a directory holding it (v2.19.13).
 	Path *string `json:"path,omitempty"`
+	// Leave out every passage in a test file, before limit (v2.19.13).
+	ExcludeTests *bool `json:"excludeTests,omitempty"`
 	// definitions, references, callers, callees, tests, siblings, implementations; default all
 	Include        []string `json:"include,omitempty"`
 	Limit          *int     `json:"limit,omitempty"`
@@ -185,6 +189,8 @@ type FTSInput struct {
 	// results (default) or passages: path, lines, symbol and text per hit (AGT-002).
 	Format       *string `json:"format,omitempty"`
 	PassageLines *int    `json:"passageLines,omitempty"`
+	// Most tokens per passage (default 500, max 8000); a cut passage says truncated (v2.19.13).
+	PassageTokens *int `json:"passageTokens,omitempty"`
 	// Attach each hit's images (RAG-010).
 	IncludeImages *bool `json:"includeImages,omitempty"`
 	// Order the best candidates with the reranking model (RAG-011).
@@ -373,6 +379,8 @@ type Passage struct {
 	Container *string `json:"container,omitempty"`
 	// <path>#<qualified name> of the looked-up definition this passage is about, from semantic facts (CODE-012).
 	Target *string `json:"target,omitempty"`
+	// Content was cut to the passage token bound; lines are what is left (v2.19.13).
+	Truncated *bool `json:"truncated,omitempty"`
 }
 
 // A 1-based, inclusive line range.
@@ -396,6 +404,12 @@ type RegisterWebhookInput struct {
 	URL        string   `json:"url"`
 	Events     []string `json:"events"`
 	Collection string   `json:"collection"`
+}
+
+// How many passages a relation of a symbol lookup held before limit cut it.
+type RelationTotal struct {
+	Relation string `json:"relation"`
+	Total    int    `json:"total"`
 }
 
 // Model reranking of a search's best candidates (RAG-011). Off unless enabled
@@ -574,6 +588,8 @@ type VectorSearchInput struct {
 	// results (default) or passages: path, lines, symbol and text per hit (AGT-002).
 	Format       *string `json:"format,omitempty"`
 	PassageLines *int    `json:"passageLines,omitempty"`
+	// Most tokens per passage (default 500, max 8000); a cut passage says truncated (v2.19.13).
+	PassageTokens *int `json:"passageTokens,omitempty"`
 	// flat (default, or the collection profile's), auto (SRCH-013: the planner
 	// picks), hnsw, ivf, pq, opq, sq, sq4 or bq.
 	Algorithm *string `json:"algorithm,omitempty"`

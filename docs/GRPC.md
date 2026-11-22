@@ -231,6 +231,9 @@ additive with new numbers:
 | `CodeSymbolResponse` | `semantic_source` | 14 | Language servers behind the facts, e.g. `gopls/0.24.0` |
 | `CodeSymbolResponse` | `ambiguous` | 15 | Several definitions and no `path` chose one |
 | `CodeSymbolResponse` | `candidates` | 16 | `SymbolCandidate { path = 1, name = 2, kind = 3 }`, the definitions an ambiguous name may mean |
+| `CodeSymbolRequest` | `exclude_tests` | 7 | (v2.19.13) Leave out every passage in a test file, before `limit`. `path` may also name a directory |
+| `CodeSymbolResponse` | `totals` | 17 | (v2.19.13) `map<string, int32>`: passages each cut relation held before `limit` |
+| `Passage` | `truncated` | 16 | (v2.19.13) `content` was cut to the passage token bound; `start_line` and `end_line` are what is left |
 | `Passage` | `container` | 14 | Type or class holding the definition |
 | `Passage` | `target` | 15 | `<path>#<qualified name>` of the looked-up definition this passage is about |
 
@@ -626,6 +629,7 @@ the code that REST and MCP use. They take the same options:
 | `filter` (`map<string, MetaCondition>`) | `Search`, `FTS`, `VectorSearch`, `HybridSearch`, `CrossSearch` | Operators `any_of` (REST `in`), `prefix`, `contains`, `gt`/`gte`/`lt`/`lte`, `none_of` (REST `not`), `exists`; ANDed with `filter_meta` (SRCH-017) |
 | `group_by` (`GroupBy`) | `FTS`, `VectorSearch`, `HybridSearch`, `CrossSearch` | At most `per_group` results per metadata value, document or collection; results carry `group` and `group_rank` (SRCH-016) |
 | `format`, `passage_lines` | the same four | `"passages"` returns `repeated Passage passages`: a path, lines, the enclosing symbol and the text (AGT-002) |
+| `passage_tokens` | the same four | (v2.19.13) Most tokens per passage (default 500, max 8000); a cut passage has `truncated` set |
 | `wait_for_index_ms`, `wait_for_keys`, `read_level` | `VectorSearch`, `HybridSearch`, `CrossSearch` | Wait for queued embeddings; the response carries `indexing` (GO-042) |
 | `retrieval_mode`, `window_size` | `VectorSearch` | `chunk` and `window` modes; results carry `chunk_text`, `start_line`, `end_line` |
 | `bm25_k1`, `bm25_b` | `FTS`, `HybridSearch`, `EvalConfigProto`, `RetrievalProfileProto` | BM25 parameters (SRCH-018); unset = the collection profile, then 1.2 / 0.75 |

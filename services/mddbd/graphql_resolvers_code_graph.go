@@ -95,6 +95,7 @@ func (a *GraphQLAdapter) CodeSymbol(ctx context.Context, input gql.CodeSymbolInp
 	res, err := a.mcp.CodeSymbol(ctx, &SymbolRequest{
 		Collection: input.Collection, Name: input.Name, Path: derefString(input.Path), Include: input.Include,
 		Limit: derefInt(input.Limit, 0), IncludeContent: derefBool(input.IncludeContent, false),
+		ExcludeTests: derefBool(input.ExcludeTests, false),
 	})
 	if err != nil {
 		return nil, err
@@ -107,6 +108,13 @@ func (a *GraphQLAdapter) CodeSymbol(ctx context.Context, input gql.CodeSymbolInp
 		Implementations: passagesToGQL(res.Implementations), Precision: optString(res.Precision),
 		SemanticSource: optString(res.SemanticSource), Ambiguous: res.Ambiguous,
 		Candidates: make([]*gql.SymbolCandidate, 0, len(res.Candidates)),
+		Totals:     make([]*gql.RelationTotal, 0, len(res.Totals)),
+	}
+	// In the order the relations are documented, so the list is stable.
+	for _, rel := range res.relations() {
+		if n, cut := res.Totals[rel.name]; cut {
+			out.Totals = append(out.Totals, &gql.RelationTotal{Relation: rel.name, Total: n})
+		}
 	}
 	for _, c := range res.Candidates {
 		out.Candidates = append(out.Candidates, &gql.SymbolCandidate{Path: c.Path, Name: c.Name, Kind: c.Kind})
@@ -127,6 +135,9 @@ func passagesToGQL(in []Passage) []*gql.Passage {
 			Lang:  optString(p.Lang), Symbol: optString(p.Symbol), Kind: optString(p.Kind),
 			Content: optString(p.Content), Source: optString(p.Source),
 			Container: optString(p.Container), Target: optString(p.Target),
+		}
+		if p.Truncated {
+			g.Truncated = &p.Truncated
 		}
 		if p.Score != 0 {
 			score := p.Score

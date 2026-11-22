@@ -31,7 +31,7 @@ func (g *GRPCServer) CodeSymbol(ctx context.Context, req *proto.CodeSymbolReques
 	}
 	// The lookup MCP and GraphQL run, under the same search slot (GO-053).
 	res, err := NewDirectClient(g.server).CodeSymbol(ctx, &SymbolRequest{Collection: req.Collection, Name: req.Name, Path: req.Path,
-		Include: req.Include, Limit: int(req.Limit), IncludeContent: req.IncludeContent})
+		Include: req.Include, Limit: int(req.Limit), IncludeContent: req.IncludeContent, ExcludeTests: req.ExcludeTests})
 	if err != nil {
 		return nil, grpcError(codes.InvalidArgument, err)
 	}
@@ -44,6 +44,12 @@ func (g *GRPCServer) CodeSymbol(ctx context.Context, req *proto.CodeSymbolReques
 		SemanticSource: res.SemanticSource, Ambiguous: res.Ambiguous}
 	for _, c := range res.Candidates {
 		out.Candidates = append(out.Candidates, &proto.SymbolCandidate{Path: c.Path, Name: c.Name, Kind: c.Kind})
+	}
+	for rel, n := range res.Totals {
+		if out.Totals == nil {
+			out.Totals = map[string]int32{}
+		}
+		out.Totals[rel] = safeInt32(n)
 	}
 	return out, nil
 }

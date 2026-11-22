@@ -594,7 +594,7 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 		DistanceMetric: req.DistanceMetric, FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
 		IncludeContent: req.IncludeContent, GroupBy: groupByOf(req.GroupBy), SearchType: req.SearchType,
 		IndexWait:       indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
-		PassageOptions:  passageOptions(req.Format, req.PassageLines),
+		PassageOptions:  passageOptions(req.Format, req.PassageLines, req.PassageTokens),
 		PlanOptions:     planOptions(req.Explain, req.LatencyTargetMs),
 		FeedbackOptions: feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
 		ImageOptions:    ImageOptions{IncludeImages: req.IncludeImages},            // RAG-010

@@ -121,14 +121,18 @@ type Passage {
   container: String
   "<path>#<qualified name> of the looked-up definition this passage is about, from semantic facts (CODE-012)."
   target: String
+  "Content was cut to the passage token bound; lines are what is left (v2.19.13)."
+  truncated: Boolean
 }
 
 input CodeSymbolInput {
   collection: String!
   "Bare (Close) or, with semantic facts, qualified (Server.Close)."
   name: String!
-  "The file (meta.path) of the one definition wanted (CODE-012)."
+  "The file (meta.path) of the one definition wanted (CODE-012), or a directory holding it (v2.19.13)."
   path: String
+  "Leave out every passage in a test file, before limit (v2.19.13)."
+  excludeTests: Boolean
   "definitions, references, callers, callees, tests, siblings, implementations; default all"
   include: [String!]
   limit: Int
@@ -159,6 +163,14 @@ type CodeSymbol {
   "Several definitions and no path chose one: see candidates."
   ambiguous: Boolean!
   candidates: [SymbolCandidate!]!
+  "Passages each cut relation held before limit (v2.19.13); empty when none was cut."
+  totals: [RelationTotal!]!
+}
+
+"How many passages a relation of a symbol lookup held before limit cut it."
+type RelationTotal {
+  relation: String!
+  total: Int!
 }
 
 "A definition an ambiguous name may mean; ask again with name and path (CODE-012)."
@@ -464,6 +476,8 @@ input VectorSearchInput {
   "results (default) or passages: path, lines, symbol and text per hit (AGT-002)."
   format: String
   passageLines: Int
+  "Most tokens per passage (default 500, max 8000); a cut passage says truncated (v2.19.13)."
+  passageTokens: Int
   """
   flat (default, or the collection profile's), auto (SRCH-013: the planner
   picks), hnsw, ivf, pq, opq, sq, sq4 or bq.
@@ -544,6 +558,8 @@ input FTSInput {
   "results (default) or passages: path, lines, symbol and text per hit (AGT-002)."
   format: String
   passageLines: Int
+  "Most tokens per passage (default 500, max 8000); a cut passage says truncated (v2.19.13)."
+  passageTokens: Int
   "Attach each hit's images (RAG-010)."
   includeImages: Boolean
   "Order the best candidates with the reranking model (RAG-011)."

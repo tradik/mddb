@@ -38,7 +38,7 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		IncludeContent: req.IncludeContent, Algorithm: req.Algorithm, RetrievalMode: req.RetrievalMode,
 		WindowSize: int(req.WindowSize), Oversample: req.Oversample, GroupBy: groupByOf(req.GroupBy),
 		IndexWait:            indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
-		PassageOptions:       passageOptions(req.Format, req.PassageLines),
+		PassageOptions:       passageOptions(req.Format, req.PassageLines, req.PassageTokens),
 		PlanOptions:          planOptions(req.Explain, req.LatencyTargetMs),
 		FeedbackOptions:      feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
 		DecompositionOptions: DecompositionOptions{QueryDecomposition: req.QueryDecomposition}, // SRCH-020
@@ -319,7 +319,7 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 	fr := FTSSearchRequest{Collection: req.Collection, Query: req.Query, Limit: int(req.Limit), Algorithm: req.Algorithm,
 		Fuzzy: int(req.Fuzzy), FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
 		Lang: req.Lang, Boost: req.Boost, FacetBy: req.FacetBy, FacetMaxValues: int(req.FacetMaxValues),
-		GroupBy: groupByOf(req.GroupBy), PassageOptions: passageOptions(req.Format, req.PassageLines),
+		GroupBy: groupByOf(req.GroupBy), PassageOptions: passageOptions(req.Format, req.PassageLines, req.PassageTokens),
 		BM25K1: req.Bm25K1, BM25B: req.Bm25B, ImageOptions: ImageOptions{IncludeImages: req.IncludeImages},
 		RerankRequest: RerankRequest{Rerank: rerankOptionsFromProto(req.Rerank)}} // RAG-011
 	if err := g.server.normalizeFTSRequest(&fr); err != nil {
@@ -434,7 +434,7 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		BM25K1: req.Bm25K1, BM25B: req.Bm25B,
 		GroupBy:              groupByOf(req.GroupBy),
 		IndexWait:            indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
-		PassageOptions:       passageOptions(req.Format, req.PassageLines),
+		PassageOptions:       passageOptions(req.Format, req.PassageLines, req.PassageTokens),
 		PlanOptions:          planOptions(req.Explain, req.LatencyTargetMs),
 		FeedbackOptions:      feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
 		DecompositionOptions: DecompositionOptions{QueryDecomposition: req.QueryDecomposition}, // SRCH-020

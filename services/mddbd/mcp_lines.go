@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"unicode/utf8"
 )
 
 // Line answers for agents.
@@ -23,17 +22,10 @@ const FormatLines = "lines"
 const lineTextMax = 160
 
 // lineText is one source line as shown in a line answer: without its
-// indentation, cut to lineTextMax bytes on a rune boundary.
-func lineText(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) <= lineTextMax {
-		return s
-	}
-	cut := lineTextMax
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + cutMark
+// indentation, cut to lineTextMax bytes around the first of terms it holds
+// (see cutAround), or from its start without any.
+func lineText(s string, terms ...string) string {
+	return cutAround(strings.TrimSpace(s), terms, lineTextMax)
 }
 
 // lineWriter writes hits, naming a path once for consecutive hits in it.
@@ -144,8 +136,9 @@ func writeSymbolPassage(w *lineWriter, p *Passage, withTarget bool) {
 
 // passageLines renders ranked passages as lines: a header "path:start-end
 // Symbol" per hit and its non-empty lines numbered under it. more says the
-// search held further hits past the ones shown.
-func passageLines(passages []Passage, more bool) string {
+// search held further hits past the ones shown; a line too long to show whole
+// is cut around the first of terms it holds.
+func passageLines(passages []Passage, more bool, terms []string) string {
 	w := &lineWriter{}
 	for i := range passages {
 		p := &passages[i]
@@ -156,7 +149,7 @@ func passageLines(passages []Passage, more bool) string {
 		w.line("%s", head)
 		for n, l := range strings.Split(p.Content, "\n") {
 			if strings.TrimSpace(l) != "" {
-				w.line("  %d: %s", p.Lines.Start+n, lineText(l))
+				w.line("  %d: %s", p.Lines.Start+n, lineText(l, terms...))
 			}
 		}
 	}
