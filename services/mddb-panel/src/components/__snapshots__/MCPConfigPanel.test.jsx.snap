@@ -71,6 +71,7 @@ if __name__ == "__main__":
       "Set your BIELIK_API_KEY in the script",
       "Run: python bielik_mddb_config.py "Twoje pytanie tutaj"",
     ],
+    "sections": [],
   },
   "ChatGPT": {
     "content": "{
@@ -159,6 +160,7 @@ if __name__ == "__main__":
       "Make sure your MDDB server at http://db.example.com:11023 is publicly accessible",
       "Save and test the GPT with prompts like "Search my docs for..."",
     ],
+    "sections": [],
   },
   "DeepSeek": {
     "content": "{
@@ -188,6 +190,7 @@ if __name__ == "__main__":
       "Use DeepSeek as the LLM provider in your MCP client",
       "The MDDB tools will be available for document search and retrieval",
     ],
+    "sections": [],
   },
   "MCP Config": {
     "content": "mddb:
@@ -203,6 +206,7 @@ if __name__ == "__main__":
       "Streamable HTTP (2025-11-25): POST/GET /mcp — new standard transport",
       "Legacy SSE (2024-11-05): GET /sse + POST /message — still supported",
     ],
+    "sections": [],
   },
   "Manus": {
     "content": "# Manus Agent - MDDB Tool Configuration
@@ -255,6 +259,7 @@ body:
       "The agent can use semantic search, full-text search, and document retrieval",
       "Adjust collection names and parameters to match your data",
     ],
+    "sections": [],
   },
   "Ollama (Python)": {
     "content": "#!/usr/bin/env python3
@@ -329,6 +334,7 @@ if __name__ == "__main__":
       "Ensure MDDB is running at http://db.example.com:11023",
       "Run: python mddb_ollama_agent.py "your question here"",
     ],
+    "sections": [],
   },
   "Open WebUI": {
     "content": "MDDB_URL = "http://db.example.com:9000"",
@@ -344,6 +350,37 @@ if __name__ == "__main__":
       "For Ollama: set llmApiUrl to your Ollama address",
       "For OpenAI: set llmProvider=openai, llmApiUrl=https://api.openai.com, llmApiKey=<your API key>",
       "For DeepSeek: set llmProvider=deepseek, llmApiUrl=https://api.deepseek.com, llmApiKey=...",
+    ],
+    "sections": [
+      {
+        "steps": [
+          "Web Search Engine: external",
+          "External Web Search URL: http://db.example.com:11023/v1/web-search (add ?collections=docs,kb to search only those)",
+          "External Web Search API key: an MDDB API key (API Keys tab), sent as Bearer",
+          "Bypass Web Loader: on (the snippet is the passage; a link to MDDB needs the key)",
+          "Switch on the "Web search endpoint" module under Features first; while it is off the endpoint answers 404",
+        ],
+        "title": "Web search: Admin Panel → Settings → Web Search",
+      },
+      {
+        "steps": [
+          "Reranking Engine: External",
+          "API Base URL: http://db.example.com:11023/v1/rerank",
+          "API key: an MDDB API key (API Keys tab), sent as Bearer",
+          "Reranking Model: reranker (any name; this server uses its own reranking model)",
+          "Switch on the "Rerank endpoint" module under Features first; while it is off the endpoint answers 404",
+        ],
+        "title": "Reranking: Admin Panel → Settings → Documents (Hybrid Search on)",
+      },
+      {
+        "steps": [
+          "Content Extraction Engine: External",
+          "Document Loader URL: http://db.example.com:11023/v1/extract (Open WebUI adds /process)",
+          "API key: an MDDB API key (API Keys tab), sent as Bearer",
+          "Switch on the "Document extraction endpoint" module under Features first; while it is off the endpoint answers 404",
+        ],
+        "title": "Content extraction: Admin Panel → Settings → Documents",
+      },
     ],
   },
 }
@@ -420,6 +457,7 @@ if __name__ == "__main__":
       "Set your BIELIK_API_KEY in the script",
       "Run: python bielik_mddb_config.py "Twoje pytanie tutaj"",
     ],
+    "sections": [],
   },
   "ChatGPT": {
     "content": "{
@@ -508,6 +546,7 @@ if __name__ == "__main__":
       "Make sure your MDDB server at http://db.example.com:11023 is publicly accessible",
       "Save and test the GPT with prompts like "Search my docs for..."",
     ],
+    "sections": [],
   },
   "DeepSeek": {
     "content": "{
@@ -537,6 +576,7 @@ if __name__ == "__main__":
       "Use DeepSeek as the LLM provider in your MCP client",
       "The MDDB tools will be available for document search and retrieval",
     ],
+    "sections": [],
   },
   "MCP Config": {
     "content": "# MDDB MCP Custom Tools Configuration
@@ -585,6 +625,7 @@ custom_tools:
       "Streamable HTTP (2025-11-25): POST/GET /mcp — new standard transport",
       "Legacy SSE (2024-11-05): GET /sse + POST /message — still supported",
     ],
+    "sections": [],
   },
   "Manus": {
     "content": "# Manus Agent - MDDB Tool Configuration
@@ -637,6 +678,7 @@ body:
       "The agent can use semantic search, full-text search, and document retrieval",
       "Adjust collection names and parameters to match your data",
     ],
+    "sections": [],
   },
   "Ollama (Python)": {
     "content": "#!/usr/bin/env python3
@@ -711,6 +753,7 @@ if __name__ == "__main__":
       "Ensure MDDB is running at http://db.example.com:11023",
       "Run: python mddb_ollama_agent.py "your question here"",
     ],
+    "sections": [],
   },
   "Open WebUI": {
     "content": "MDDB_URL = "http://db.example.com:9000"",
@@ -726,6 +769,37 @@ if __name__ == "__main__":
       "For Ollama: set llmApiUrl to your Ollama address",
       "For OpenAI: set llmProvider=openai, llmApiUrl=https://api.openai.com, llmApiKey=<your API key>",
       "For DeepSeek: set llmProvider=deepseek, llmApiUrl=https://api.deepseek.com, llmApiKey=...",
+    ],
+    "sections": [
+      {
+        "steps": [
+          "Web Search Engine: external",
+          "External Web Search URL: http://db.example.com:11023/v1/web-search (add ?collections=docs,kb to search only those)",
+          "External Web Search API key: an MDDB API key (API Keys tab), sent as Bearer",
+          "Bypass Web Loader: on (the snippet is the passage; a link to MDDB needs the key)",
+          "Switch on the "Web search endpoint" module under Features first; while it is off the endpoint answers 404",
+        ],
+        "title": "Web search: Admin Panel → Settings → Web Search",
+      },
+      {
+        "steps": [
+          "Reranking Engine: External",
+          "API Base URL: http://db.example.com:11023/v1/rerank",
+          "API key: an MDDB API key (API Keys tab), sent as Bearer",
+          "Reranking Model: reranker (any name; this server uses its own reranking model)",
+          "Switch on the "Rerank endpoint" module under Features first; while it is off the endpoint answers 404",
+        ],
+        "title": "Reranking: Admin Panel → Settings → Documents (Hybrid Search on)",
+      },
+      {
+        "steps": [
+          "Content Extraction Engine: External",
+          "Document Loader URL: http://db.example.com:11023/v1/extract (Open WebUI adds /process)",
+          "API key: an MDDB API key (API Keys tab), sent as Bearer",
+          "Switch on the "Document extraction endpoint" module under Features first; while it is off the endpoint answers 404",
+        ],
+        "title": "Content extraction: Admin Panel → Settings → Documents",
+      },
     ],
   },
 }

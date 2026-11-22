@@ -23,6 +23,7 @@ describe('the map', () => {
       'chat', 'chatExternalMcp', 'geo', 'temporal', 'spell', 'curation', 'automation',
       'memory', 'codeIntel', 'eval', 'corpus', 'classify', 'duplicates', 'images',
       'webhooks', 'schemas', 'aliases', 'crossSearch', 'searchTuning', 'ftsTuning',
+      'webSearch', 'rerankApi', 'extractApi',
     ]);
     expect(featureForView('vectorSpace')).toBe('searchTuning');
     expect(featureForView('stopwords')).toBe('ftsTuning');

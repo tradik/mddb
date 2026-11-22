@@ -635,8 +635,10 @@ print(ask("Czym jest MDDB?"))
 
 ## Open WebUI
 
-Open WebUI can use MDDB in four ways. The panel's **Open WebUI** tab shows both,
-with this server's addresses filled in.
+Open WebUI can use MDDB in several ways: as an external knowledge source
+(two providers), as a function, as a model provider (a chat scenario), and as
+its web search, reranker and document loader. The panel's **Open WebUI** tab
+shows them with this server's addresses filled in.
 
 ### External Knowledge Source (no code)
 
@@ -713,6 +715,18 @@ Each answer runs the scenario exactly as the widget does: its composed prompt
 and guardrails, its collections and tools, its LLM settings. Open WebUI's own
 system prompt, tools and images are not passed on (images are refused with
 400). Details and limits: [mddb-chat README](../services/mddb-chat/README.md#openai-compatible-api).
+
+<!-- Open WebUI engines (#449-#451): begin -->
+### Web search, reranker and document loader (#449–#451)
+
+Open WebUI's admin settings can send web search, reranking and content
+extraction to an external service. MDDB answers all three in Open WebUI's
+shapes, each behind a Features module that starts off: `POST /v1/web-search`
+(`webSearch`), `POST /v1/rerank` (`rerankApi`) and
+`PUT /v1/extract/process` (`extractApi`, URL entered as `…/v1/extract`). The
+settings, values and limits are in [OPENWEBUI.md](OPENWEBUI.md); the panel's
+Open WebUI tab prints the URLs for the server it shows.
+<!-- Open WebUI engines (#449-#451): end -->
 
 ## Generic REST API Integration
 

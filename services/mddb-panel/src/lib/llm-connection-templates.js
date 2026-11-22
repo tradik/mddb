@@ -5,6 +5,7 @@
  * MCPConfigPanel in 2.19.9 (#440) with their output unchanged.
  */
 import mddbModelPyRaw from '@scripts/mddb_model.py?raw';
+import { openWebUIEngineSections } from './openwebui-engines';
 
 /** STDIO_NOTE is shown with every example that starts its own mddbd over stdio. */
 export const STDIO_NOTE = 'This starts a separate local database on your computer; it does not connect to this server.';
@@ -375,6 +376,8 @@ if __name__ == "__main__":
           'For OpenAI: set llmProvider=openai, llmApiUrl=https://api.openai.com, llmApiKey=<your API key>',
           'For DeepSeek: set llmProvider=deepseek, llmApiUrl=https://api.deepseek.com, llmApiKey=...',
         ],
+        // #449-#451: Open WebUI's external engine settings, answered by this server.
+        sections: openWebUIEngineSections(httpBase),
       };
 
     default:

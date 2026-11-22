@@ -91,6 +91,16 @@ function SetupSteps({ variant }) {
         ))}
       </ol>
       {variant.note && <p className="text-sm text-info-strong font-semibold mt-2">{variant.note}</p>}
+      {variant.sections?.map((section) => (
+        <section key={section.id} data-engine-section={section.id} className="mt-4">
+          <h4 className="text-sm font-semibold text-info-strong mb-1">{section.title}</h4>
+          <ul className="text-sm text-info-strong space-y-1 list-disc list-inside">
+            {section.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

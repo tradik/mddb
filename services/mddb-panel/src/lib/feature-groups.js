@@ -16,7 +16,7 @@ export const FEATURE_GROUPS = [
   { id: 'search', label: 'Search', features: ['crossSearch', 'geo', 'searchTuning', 'eval', 'codeIntel', 'ftsTuning', 'curation', 'spell'] },
   { id: 'data', label: 'Data', features: ['aliases', 'schemas', 'duplicates', 'temporal', 'classify', 'images', 'corpus'] },
   { id: 'chat', label: 'Chat', features: ['chat', 'chatExternalMcp', 'memory'] },
-  { id: 'integrations', label: 'Integrations', features: ['automation', 'webhooks'] },
+  { id: 'integrations', label: 'Integrations', features: ['automation', 'webhooks', 'webSearch', 'rerankApi', 'extractApi'] },
 ];
 
 const OTHER = { id: 'other', label: 'Other' };
