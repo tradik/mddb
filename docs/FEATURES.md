@@ -136,6 +136,50 @@ Complete list of MDDB features organized by category.
 - **Configurable** — `topK`, `multi` (return all above threshold), `threshold`
 - **API Endpoint** — `POST /v1/classify` with gRPC `Classify` RPC and `classify_document` MCP tool
 
+## Optional modules
+
+Parts of the server an administrator switches on and off on the panel's
+*Features* page, with `PUT /v1/features/{name}`, gRPC `SetFeature` or the MCP
+tool `feature_set`. A module that is off answers its API routes with 404
+`{"error":"feature disabled"}`, its MCP tools leave `tools/list`, and its panel
+pages leave the menu; what it stored stays and is back when it is switched on
+again. Documents, collections, full-text and vector search, sign-in and
+backups are always on. The operator can lock modules off with
+`MDDB_FEATURES_FORCE_OFF` (a comma-separated list of setting names).
+
+`GET /v1/features` returns, per module, the short `title` and one-sentence
+`summary` shown on the Features page (2.19.11) and the technical
+`description` shown behind its help control.
+
+| Module | Setting name | What switching it on gives you | Technical detail | New server |
+|---|---|---|---|---|
+| Chat assistants | `chat` | Chat assistants that answer questions from your collections. | Chat scenarios, conversations and skills, and the join of the mddb-chat service. | on |
+| Tools from other MCP servers | `chatExternalMcp` | Lets chat assistants use read-only tools of other MCP servers you add. | A scenario lists the external MCP servers and tools it may call; each tool is checked against its server when the scenario is saved. Needs chat. | off |
+| Geo search | `geo` | Find documents near a place, inside a box or inside a drawn area. | Radius, bounding box and polygon queries over location metadata, geohash helpers and the geo index. | on |
+| Activity over time | `temporal` | Shows which documents are created, changed or read most, and when. | Document events, hot documents and histograms under /v1/temporal/. | on |
+| Spell checker | `spell` | Suggests corrections for misspelled search words. | Suggestions, cleanup and a dictionary per collection. | on |
+| Pinned and hidden results | `curation` | Pin chosen documents to the top of a query's results, or hide them. | Curation rules per collection and query. | on |
+| Automation | `automation` | Runs triggers, scheduled jobs and webhooks on the server for you. | Triggers, crons and webhook actions run by the server, and their run logs. | on |
+| Agent memory | `memory` | Lets AI agents keep conversations and recall them later. | Sessions, messages, recall and summaries. | on |
+| Code intelligence | `codeIntel` | Find functions and classes in source code, and what uses them. | Symbols, the code graph and the reference tools over code collections. | on |
+| Search quality checks | `eval` | Measures how well search finds the right documents for your test questions. | A collection's evaluation queries with their expected documents, and their scores. | on |
+| Corpus packs | `corpus` | Package a collection once as a read-only pack and install it on any server. | Build, list and install corpus packs; an installed pack is a read-only collection. | on |
+| Classification | `classify` | Ranks your labels against a document or a piece of text. | Labels are scored by similarity to the document or text. | on |
+| Duplicate finder | `duplicates` | Finds documents that are identical or nearly the same. | Identical, similar and MinHash groups per collection. | on |
+| Image documents | `images` | Serves the original picture of an image document. | The bytes of an image document over /v1/image. | on |
+| Webhooks | `webhooks` | Add, list and remove webhooks. | Webhook management; webhooks already registered are delivered whether this is on or off. | on |
+| Collection schemas | `schemas` | Define which metadata fields a collection's documents must have. | Schema management and /v1/validate; stored schemas are checked on every write whether this is on or off. | on |
+| Collection aliases | `aliases` | Give a collection a second name, for example to switch versions without changing clients. | Create, list and delete aliases; existing aliases resolve whether this is on or off. | on |
+| Search across collections | `crossSearch` | Run one query over several collections at once. | Cross search over the collections the caller may read. | on |
+| Search tuning tools | `searchTuning` | Advice on search settings, and a map of how your documents relate. | The Search Advisor and the vector space projection. | on |
+| Synonyms and stop words | `ftsTuning` | Edit synonyms and the words full-text search ignores. | Synonym and stop word management; stored ones apply whether this is on or off. | on |
+| Web search endpoint | `webSearch` | Lets a chat front end use your collections as its web search source. | POST /v1/web-search searches the collections the caller may read, in the Open WebUI external web search shape. | off |
+| Rerank endpoint | `rerankApi` | Lets other tools reorder their search results with this server's reranking model. | POST /v1/rerank scores texts with the configured reranking model. | off |
+| File-to-Markdown endpoint | `extractApi` | Lets other tools convert a file to Markdown here without storing it. | PUT /v1/extract/process converts an uploaded file and returns the Markdown. | off |
+| Vector store API | `vectorStores` | Lets apps built for a vector store API search your collections. | OpenAI-compatible GET /v1/vector_stores and POST /v1/vector_stores/{id}/search. | off |
+| Search API under /es | `esCompat` | Lets existing search clients query your collections without code changes. | Elasticsearch-compatible subset under /es. MDDB_ES_COMPAT=true turns it on by default. | off (see detail) |
+| Vector query under /qdrant | `qdrantCompat` | Lets existing vector search clients query your collections without code changes. | Qdrant-compatible point query under /qdrant. MDDB_QDRANT_COMPAT=true turns it on by default. | off (see detail) |
+
 ## APIs & Protocols
 
 ### HTTP/JSON REST API
