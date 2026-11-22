@@ -108,23 +108,49 @@ look like this" with the code and the discussion in one response.
 
 | `kind` | Key | Content | Metadata |
 |---|---|---|---|
-| `backlog` | `backlog/<slug>` | one session's worth of work, as a ready prompt | `size`, `order`, `status` (`todo`, `doing`, `done`), `issues`, `release` |
+| `backlog` | `backlog/<slug>` | one session's worth of work, as a ready prompt | `size`, `order`, `status` (`todo`, `doing`, `done`), `issues`, `release`, `model` |
 | `plan` | `plan/<release>` | a release plan: waves, dependencies, decisions | `release`, `status` |
 | `progress` | `progress/<date>-<slug>` | what was done, what is left, what not to do | `issues`, `commit`, `release` |
 | `decision` | `decision/<slug>` | a decision and its reason | `issues` |
 
+`mddb-cli plan` keeps the backlog rows; the other kinds are ordinary
+documents, written with `add_document` or `mddb-cli add`. Without `-c` the
+collection is the one `autoindex` picks for the working directory, with
+`-work` added.
+
 ```bash
 mddb-cli plan import BACKLOG.md -c shop-api-work   # a Markdown table in
-mddb-cli plan add "#31: webhook with HMAC and a replay window" --size M --issue 31
+mddb-cli plan add "#31: webhook with HMAC and a replay window" --size M --slug webhook-hmac
 mddb-cli plan next          # the first todo row; marks it doing
-mddb-cli plan done webhook-hmac --commit 3f2a9c1
-mddb-cli plan list
-mddb-cli plan export > BACKLOG.md                  # and out again
+mddb-cli plan done webhook-hmac --commit 3f2a9c1 --note "HMAC done; the replay window is left"
+mddb-cli plan list --status todo
+mddb-cli plan export > backlog-table.md            # and out again
 ```
 
-`plan next` takes a row with a conditional write: two agents that ask at the
-same moment get different rows. This is a notebook for agents, not a
-tracker: there are no boards, assignments or notifications.
+- **Slugs.** Without `--slug` a row's slug is its prompt's first six words
+  (`31-webhook-with-hmac-and-a` above); a derived slug that is taken gets
+  `-2`, `-3`. The same prompt added twice is one row, so importing a file
+  again adds only its new rows. `#N` in a prompt is added to `issues`, as
+  `--issue N` is.
+- **Order.** A new row goes after the last one; `--order` places it.
+  `plan next` asks a facet for the lowest `order` among the `todo` rows and
+  reads only the rows at that order.
+- **The table.** `plan import` reads the first Markdown table in the file.
+  Prompt, Size and Model become the row's prompt, `size` and `model`; any
+  other column is kept as meta under its name in camelCase, and the column
+  names in `columns`. `plan export` prints the `todo` and `doing` rows as
+  that table (`--status` chooses), and only the table: the text around it is
+  not stored. A table in the shape export writes (`| a | b |` lines and a
+  `|---|---|` separator) comes back byte for byte.
+
+`plan next` takes a row with a conditional write: it marks the row `doing`
+only over the revision it read, and a session that loses takes the next row,
+so two agents that ask at the same moment get different rows. `--peek` shows
+the row without taking it. Over MCP alone the same takes two calls:
+`search_documents` with `filter: {"kind": "backlog", "status": "todo"}`, then
+`update_document` with the row's meta and its revision as `expected_revision`.
+This is a notebook for agents, not a tracker: there are no boards,
+assignments or notifications.
 
 ## 4. Hand a session over
 
@@ -158,10 +184,12 @@ The agent can search the code and the issues and write only its plan.
 Agents](AGENTS.md#2-give-the-agent-its-instructions)). In short:
 
 1. Start: `plan next`, then `memory_recall` for that task.
-2. Issues: search `<repo>-issues`; fetch one with `get_document` and
-   `issue-<number>`. Call `sync_refresh` when the forge was just changed.
+2. Issues: search `<repo>-issues`; fetch one with `search_documents` and
+   `filter: {"number": "<number>"}`. Call `sync_refresh` when the forge was
+   just changed.
 3. Writes to the forge go through the forge.
-4. End: a `progress` document, the row `done`, a hand-over message.
+4. End: `plan done <slug> --commit <sha> --note "..."` (the row `done` and
+   a `progress` document), then a hand-over message.
 
 ## Limits
 

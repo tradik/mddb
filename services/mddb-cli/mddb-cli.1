@@ -238,6 +238,47 @@ leaves C and C++ files to the heuristics and a list naming c or cpp fails.
 A run where clangd still compiles an indexed file with guessed flags (it logs
 "Failed to find compilation database" or "clangd fallback") sends no C or C++
 facts. C and C++ indexed together share one clangd, reported as c+cpp.
+.SS plan
+Keep a project's backlog as documents in a collection (v2.19.11).
+.PP
+.B mddb-cli plan
+[\fB\-c\fR \fICOLLECTION\fR] [\fB\-\-lang\fR \fICODE\fR] \fISUBCOMMAND\fR
+.PP
+One document per row: key backlog/\fIslug\fR, the prompt as content, and meta
+kind (backlog), status (todo, doing, done), size, order, issues, release and
+model. The collection defaults to the one autoindex picks for the working
+directory with \-work added. Rows are found with meta filters and the next row
+with a facet over order; no subcommand reads the whole collection.
+.TP
+.BR add " \fIPROMPT\fR [\fB\-\-size\fR S|M|L] [\fB\-\-issue\fR \fIN\fR]... [\fB\-\-release\fR \fIX\fR] [\fB\-\-model\fR \fIM\fR] [\fB\-\-order\fR \fIN\fR] [\fB\-\-slug\fR \fIS\fR]"
+Add a row, by default after the last one. The slug is the prompt's first six
+words unless \fB\-\-slug\fR names one; a derived slug that is taken gets \-2,
+\-3. The same prompt added twice is one row. Issue numbers written as #N in
+the prompt are added to \fB\-\-issue\fR.
+.TP
+.BR next " [\fB\-\-peek\fR]"
+Take the first todo row by order, mark it doing and print its slug and
+prompt. The row is taken with a conditional write (expectedRevision); a
+session that loses the race takes the next row, so two sessions asking at the
+same moment get different rows. \fB\-\-peek\fR prints the row without taking it.
+.TP
+.BR done " \fISLUG\fR [\fB\-\-commit\fR \fISHA\fR] [\fB\-\-note\fR \fITEXT\fR]"
+Mark a row done and record the commit. \fB\-\-note\fR also writes
+progress/\fIdate\fR\-\fIslug\fR with the row's issues and release.
+.TP
+.BR list " [\fB\-\-status\fR \fILIST\fR]"
+Print the rows in order, as a table; \fB\-\-json\fR prints the documents.
+.TP
+.BR import " \fIFILE\fR"
+Add the rows of the file's first Markdown table (header, |\-\-\-| separator,
+one line per row) after the existing ones. Prompt, Size and Model columns map
+onto the row; other columns are kept as meta, so export writes the same table.
+A prompt already in the backlog is not added twice.
+.TP
+.BR export " [\fB\-\-status\fR \fILIST\fR]"
+Print the todo and doing rows as a Markdown table. A table in the shape export
+writes ("| a | b |" lines, "|\-\-\-|\-\-\-|" separator) survives import and
+export byte for byte; the text around it is not stored.
 .SS add
 Add or update a markdown document in the database.
 .PP

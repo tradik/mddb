@@ -88,8 +88,10 @@ curl -fsSL -o .claude/skills/mddb/SKILL.md \
 
 They cover choosing between `full_text_search`, `semantic_search` and
 `hybrid_search`, asking for projections and passages instead of documents,
-waiting for an embedding after a write, conditional writes, and the memory
-tools. Measured on this engine, the same `full_text_search` over five 12 KB
+waiting for an embedding after a write, conditional writes, the memory
+tools, and work tracking: the next backlog row, issues from a mirror and a
+hand-over note, from the project's `-work` and `-issues` collections
+(Work Tracking for Agents, v2.19.11). Measured on this engine, the same `full_text_search` over five 12 KB
 documents returns about 19 700 tokens with its defaults and about 327 with
 `fields: ["key"]`. In this repository, edit `AGENTS.md` and run
 `make agent-instructions`; CI fails if a variant was edited by hand or names a
