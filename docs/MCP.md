@@ -34,7 +34,7 @@ transports:
 | Endpoint | What it does |
 |---|---|
 | `GET /tools` | The tool catalog, built-in and custom tools, as `{"tools": [...]}` |
-| `POST /tools/call` | Run one tool: `{"name": "...", "arguments": {...}}`. Answers 403 when the HTTP mode is `read`, and 503 while writes wait for the freelist after a crash, whatever the tool |
+| `POST /tools/call` | Run one tool: `{"name": "...", "arguments": {...}}`. Answers with the same result a JSON-RPC `tools/call` gets: `content`, and `structuredContent` where the tool has it (see [Structured Output](#structured-output-v21912)). Answers 403 when the HTTP mode is `read`, and 503 while writes wait for the freelist after a crash, whatever the tool |
 | `GET /resources` | The resource catalog and resource templates |
 | `POST /resources/read` | Read one resource: `{"uri": "mddb://..."}` |
 | `GET /events` | The server-sent document change events, as `GET /v1/events` on the HTTP port |
@@ -754,8 +754,38 @@ result also carries them as data:
  "structuredContent": {"limitCapped": true, "limit": 1000}}
 ```
 
-A call under the cap has no `structuredContent` and its text is unchanged.
+That is the shape for a tool without an output schema, such as `code_symbol`;
+under the cap it has no `structuredContent` and its text is unchanged. A tool
+that declares an output schema (`full_text_search`, `search_documents`,
+`semantic_search`, `hybrid_search`) returns its whole JSON answer as
+`structuredContent` on every call, so `limit` and `limitCapped` are fields of
+that object (see [Structured Output](#structured-output-v21912)).
 See [Result Limits](SEARCH.md#result-limits-v21810).
+
+## Structured Output (v2.19.12+)
+
+Nine tools declare an `outputSchema` in `tools/list`: `search_documents`,
+`get_stats`, `aggregate`, `semantic_search`, `vector_stats`,
+`full_text_search`, `classify_document`, `hybrid_search` and `get_checksum`.
+Every successful call of one of them returns the answer twice: as text in
+`content`, as before, and as the same JSON object in `structuredContent`,
+which conforms to the declared schema. This holds on both protocol revisions
+and on plain `POST /tools/call`. A `get_checksum` call, for example:
+
+```json
+{"content": [{"type": "text", "text": "{\"collection\": \"docs\", \"checksum\": \"...\", \"documentCount\": 42}"}],
+ "structuredContent": {"collection": "docs", "checksum": "...", "documentCount": 42}}
+```
+
+The other tools declare no schema and return `structuredContent` only for a
+[capped limit](#result-limits-v21810) or a refused call (a quota or rate limit,
+a read-only collection).
+
+Before 2.19.12 the nine tools answered with `content` only. The MCP
+specification requires `structuredContent` from a tool with an output schema,
+and a client that checks refused every such answer with "Tool X has an output
+schema but did not return structured content" (#461). Clients that read the
+text are unaffected by the change: a field is added and nothing is removed.
 
 ## Passages for Code (v2.18.8+)
 
@@ -1135,7 +1165,7 @@ no change; `elicit` is the intended future default.
 |---------|-------------|
 | **Tool Annotations** | `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` on all tools |
 | **Elicitation** (v2.18.9+) | Destructive tools ask the user to confirm when `MDDB_MCP_CONFIRM_DESTRUCTIVE` is set — `InputRequiredResult` for 2026-07-28, `elicitation/create` for 2025-11-25. See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
-| **Structured Output** | `outputSchema` on 9 key tools for client-side validation |
+| **Structured Output** | `outputSchema` on 9 key tools, and `structuredContent` conforming to it on every successful call of those tools (v2.19.12+). See [Structured Output](#structured-output-v21912) |
 | **5 Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |
 | **Logging** | RFC 5424 levels (debug → emergency): `logging/setLevel` for handshake clients, `io.modelcontextprotocol/logLevel` per request for stateless ones |
