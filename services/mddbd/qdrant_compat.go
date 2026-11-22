@@ -6,8 +6,6 @@ import (
 	"time"
 
 	json "mddb/internal/jsonx"
-
-	"mddb/internal/envconf"
 )
 
 // Qdrant-compatible point query (#447).
@@ -42,11 +40,6 @@ const (
 	qdrantDocsHint = "; see docs/QDRANT_COMPAT.md"
 )
 
-// qdrantCompatEnabled reports whether MDDB_QDRANT_COMPAT turns the surface on.
-func qdrantCompatEnabled() bool {
-	return envconf.String(qdrantCompatEnv, "false") == "true"
-}
-
 // isQdrantPath reports whether path belongs to the surface.
 func isQdrantPath(path string) bool {
 	return path == qdrantPathPrefix || strings.HasPrefix(path, qdrantPathPrefix+"/")
@@ -57,11 +50,9 @@ func qdrantAPIKey(r *http.Request) string {
 	return strings.TrimSpace(r.Header.Get("api-key"))
 }
 
-// registerQdrantRoutes mounts the surface when it is enabled.
+// registerQdrantRoutes mounts the surface; the qdrantCompat module gates it
+// (feature_gates.go), so it answers 404 until it is switched on.
 func (s *Server) registerQdrantRoutes(mux routeMux) {
-	if !qdrantCompatEnabled() {
-		return
-	}
 	mux.HandleFunc(qdrantPathPrefix, s.handleQdrant)
 	mux.HandleFunc(qdrantPathPrefix+"/", s.handleQdrant)
 }

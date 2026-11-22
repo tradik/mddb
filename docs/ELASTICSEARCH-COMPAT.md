@@ -7,7 +7,11 @@ status: publish
 
 # Elasticsearch-Compatible Subset
 
-> v2.18.10+ (INT-019). Off by default: `MDDB_ES_COMPAT=true` turns it on.
+> v2.18.10+ (INT-019). Off by default. From v2.19.10 it is the `esCompat`
+> module: switch it on under *System → Features* in the panel or with
+> `PUT /v1/features/esCompat`, no restart. `MDDB_ES_COMPAT=true` still turns it
+> on by default, so a server that used it keeps `/es` after the upgrade; a
+> switch set on the Features page wins. Switched off, `/es` answers `404`.
 
 Code written for Elasticsearch — the official SDKs, LangChain's
 `ElasticsearchStore`, scripts — can index, search and delete MDDB documents

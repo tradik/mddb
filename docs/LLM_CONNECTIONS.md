@@ -648,8 +648,10 @@ MDDB serves the two OpenAI Vector Stores routes that Open WebUI's
 vector store is an MDDB collection. Requests and responses are described in
 [API.md](API.md#openai-compatible-vector-stores-v1vector_stores).
 
-1. In Open WebUI: **Admin → Settings → Integrations → External Knowledge
-   Sources → Add**.
+1. In the MDDB panel, switch on **OpenAI-compatible vector stores** under
+   *System → Features* (module `vectorStores`, off by default; until then the
+   routes answer `404`). Then in Open WebUI: **Admin → Settings → Integrations →
+   External Knowledge Sources → Add**.
 2. **Provider:** OpenAI-compatible.
 3. **Endpoint:** the MDDB HTTP API base URL plus `/v1`, for example
    `http://mddb.example.com:11023/v1`. Open WebUI must be able to reach it.
@@ -679,7 +681,8 @@ What the server does with these calls:
 
 ### External Knowledge Source, Qdrant provider (#447)
 
-Start mddbd with `MDDB_QDRANT_COMPAT=true`, then add an External Knowledge
+Switch on **Qdrant-compatible query** under *System → Features* (module
+`qdrantCompat`, or start mddbd with `MDDB_QDRANT_COMPAT=true`), then add an External Knowledge
 Source with provider **Qdrant**: Endpoint `http://<mddb-host>:11023/qdrant`
 (always include the port: the Qdrant client adds 6333 to a URL without one,
 so behind TLS write `https://host:443/qdrant`), API Key an MDDB API key with

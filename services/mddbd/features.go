@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"strings"
+
+	"mddb/internal/envconf"
 )
 
 // Features (GO-049): optional modules an administrator switches on and off.
@@ -39,6 +41,9 @@ const (
 	FeatureWebSearch       = "webSearch"
 	FeatureRerankAPI       = "rerankApi"
 	FeatureExtractAPI      = "extractApi"
+	FeatureVectorStores    = "vectorStores"
+	FeatureESCompat        = "esCompat"
+	FeatureQdrantCompat    = "qdrantCompat"
 )
 
 // featuresForceOffEnv names the operator's override: a comma-separated list
@@ -51,6 +56,16 @@ type featureDef struct {
 	Description string
 	Requires    []string
 	Default     bool
+	// DefaultEnv names an older switch that, set to "true", turns the module
+	// on by default (MDDB_ES_COMPAT, MDDB_QDRANT_COMPAT): a server that used
+	// it keeps the surface after the upgrade. A switch set on the Features
+	// page wins over it.
+	DefaultEnv string
+}
+
+// defaultOn is the module's state while no switch is stored.
+func (d featureDef) defaultOn() bool {
+	return d.Default || (d.DefaultEnv != "" && envconf.String(d.DefaultEnv, "false") == "true")
 }
 
 // featureRegistry lists every switchable module, in the order the panel
@@ -86,6 +101,11 @@ var featureRegistry = []featureDef{
 	{Name: FeatureWebSearch, Description: "Web search endpoint: POST /v1/web-search searches the collections the caller may read (#449)"},
 	{Name: FeatureRerankAPI, Description: "Rerank endpoint: POST /v1/rerank scores texts with the configured reranking model (#450)"},
 	{Name: FeatureExtractAPI, Description: "Extraction endpoint: PUT /v1/extract/process converts a file to Markdown without storing it (#451)"},
+	// Other products' API shapes over MDDB's own search (2.19.10): off until
+	// an administrator turns them on, so an upgrade opens no new way in.
+	{Name: FeatureVectorStores, Description: "OpenAI-compatible vector stores: GET /v1/vector_stores and POST /v1/vector_stores/{id}/search (#446)"},
+	{Name: FeatureESCompat, DefaultEnv: esCompatEnv, Description: "Elasticsearch-compatible subset under /es (INT-019); MDDB_ES_COMPAT=true turns it on by default"},
+	{Name: FeatureQdrantCompat, DefaultEnv: qdrantCompatEnv, Description: "Qdrant-compatible point query under /qdrant (#447); MDDB_QDRANT_COMPAT=true turns it on by default"},
 }
 
 // featureByName finds a module of the registry.

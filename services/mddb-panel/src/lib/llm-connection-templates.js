@@ -365,10 +365,12 @@ if __name__ == "__main__":
         // provider calls /v1/vector_stores on the HTTP API. The function below
         // is the other way, kept as it was.
         instructions: [
-          'Knowledge without code: Open WebUI → Admin → Settings → Integrations → External Knowledge Sources → Add',
+          'Knowledge without code: switch on "OpenAI-compatible vector stores" under System → Features',
+          'Then Open WebUI → Admin → Settings → Integrations → External Knowledge Sources → Add',
           `Provider: OpenAI-compatible. Endpoint: ${httpBase}/v1`,
           'API key: an MDDB API key (mddb_live_…) of a user with read permission on the collections',
           'List the vector stores, or enter collection names as vector store IDs, then run a test query',
+          `Or provider Qdrant: switch on "Qdrant-compatible query", Endpoint ${httpBase}/qdrant (keep the port), Collection = the collection name, the other fields as they are; Open WebUI must embed with the same model as MDDB`,
           'Or use this function: Go to Open WebUI → Admin → Functions → Add new function',
           'Paste this script and save it',
           'Configure the Valves (settings) to match your LLM provider',

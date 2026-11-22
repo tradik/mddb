@@ -188,15 +188,16 @@ tags:
       per-collection custom dictionaries (requires MDDB_SPELL=true)
   - name: Elasticsearch Compatibility
     description: A subset of the Elasticsearch REST API under /es, translated
-      onto MDDB's own search and write paths (requires MDDB_ES_COMPAT=true;
+      onto MDDB's own search and write paths (the esCompat module, or MDDB_ES_COMPAT=true;
       v2.18.10+). See ELASTICSEARCH-COMPAT.md.
   - name: OpenAI Compatibility
     description: The two OpenAI Vector Stores routes Open WebUI's OpenAI-compatible
-      External Knowledge Source provider calls, served on MDDB's own search (#446).
+      External Knowledge Source provider calls, served on MDDB's own search (#446);
+      the vectorStores module, off by default.
   - name: Qdrant Compatibility
     description: The Qdrant REST requests qdrant-client's query_points makes,
       under /qdrant, run through MDDB's vector search (requires
-      MDDB_QDRANT_COMPAT=true; v2.19.10+). See QDRANT_COMPAT.md.
+      the qdrantCompat module, or MDDB_QDRANT_COMPAT=true; v2.19.10+). See QDRANT_COMPAT.md.
   - name: Open WebUI Engines
     description: The request shapes Open WebUI sends to an external web search
       engine, reranker and document loader (v2.19.10, issues 449-451). Each is a
@@ -9524,8 +9525,8 @@ paths:
                   removed:
                     type: integer
 
-  # INT-019: the Elasticsearch-compatible subset. Mounted only with
-  # MDDB_ES_COMPAT=true; every answer carries X-Elastic-Product. The bodies
+  # INT-019: the Elasticsearch-compatible subset. The esCompat module (off by
+  # default; MDDB_ES_COMPAT=true turns it on); every answer carries X-Elastic-Product. The bodies
   # follow the Elasticsearch REST API; see docs/ELASTICSEARCH-COMPAT.md for
   # what is translated and what is refused (400, naming the clause).
         "400": {$ref: "#/components/responses/BadRequest"}
@@ -9541,7 +9542,7 @@ paths:
       description: |
         What `Elasticsearch.info()` reads. `version.number` is the API level the
         subset follows (8.19.0); `tagline` says it is MDDB. v2.18.10+, needs
-        `MDDB_ES_COMPAT=true`.
+        the `esCompat` module (or `MDDB_ES_COMPAT=true`).
       operationId: esInfo
       responses:
         "200":
@@ -9851,7 +9852,7 @@ paths:
       description: |
         What qdrant-client reads at start-up. `version` is the Qdrant API level
         the subset follows (1.20.0); `title` says it is MDDB. The client only
-        warns on a mismatch. v2.19.10+, needs `MDDB_QDRANT_COMPAT=true`.
+        warns on a mismatch. v2.19.10+, needs the `qdrantCompat` module (or `MDDB_QDRANT_COMPAT=true`).
       operationId: qdrantInfo
       responses:
         "200":

@@ -7,8 +7,11 @@ status: publish
 
 # Qdrant-Compatible Point Query
 
-> v2.19.10+ ([#447](https://github.com/tradik/mddb/issues/447)). Off by default:
-> `MDDB_QDRANT_COMPAT=true` turns it on.
+> v2.19.10+ ([#447](https://github.com/tradik/mddb/issues/447)). Off by default.
+> It is the `qdrantCompat` module: switch it on under *System → Features* in
+> the panel or with `PUT /v1/features/qdrantCompat`, no restart.
+> `MDDB_QDRANT_COMPAT=true` turns it on by default; a switch set on the
+> Features page wins. Switched off, `/qdrant` answers `404`.
 
 Open WebUI's **External Knowledge Source** form has a **Qdrant** provider. It
 embeds the user's question with Open WebUI's own embedding model and calls
