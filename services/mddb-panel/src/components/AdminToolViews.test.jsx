@@ -13,6 +13,7 @@ vi.mock('./DocumentViewer', () => ({ default: () => ' + viewer' }));
 vi.mock('./TenantsPanel', () => ({ default: () => 'tenants page' }));
 vi.mock('./BackupsPanel', () => ({ default: () => 'backups page' }));
 vi.mock('./CollectionMaintenancePanel', () => ({ default: () => 'maintenance page' }));
+vi.mock('./TrainingPanel', () => ({ default: () => 'training page' }));
 
 const { default: AdminToolViews } = await import('./AdminToolViews');
 
@@ -28,6 +29,7 @@ describe('AdminToolViews', () => {
     ['tenants', 'tenants page'],
     ['backups', 'backups page'],
     ['maintenance', 'maintenance page'],
+    ['training', 'training page'],
   ])('%s shows %s', (viewMode, label) => {
     const { container } = render(<AdminToolViews viewMode={viewMode} />);
     expect(container.textContent).toBe(label);
