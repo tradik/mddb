@@ -107,6 +107,7 @@ pub fn test_state_with_link(
         sanitizer: Sanitizer::new(config.security.clone()),
         trusted_proxies: TrustedProxies::parse(&config.security.trusted_proxies),
         metrics: Metrics::default(),
+        key_paces: Default::default(),
         config,
     })
 }

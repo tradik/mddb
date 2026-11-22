@@ -8,7 +8,7 @@ use crate::chat::answer::{self, Reply};
 use crate::chat::conversation;
 use crate::chat::loop_guard::report::StopSite;
 use crate::chat::mcp::McpToolset;
-use crate::chat::outbound::{Sender, send_json};
+use crate::chat::outbound::Outlet;
 use crate::chat::scenario::{self, ActiveScenario, Resolved};
 use crate::chat::trace::TurnTrace;
 use crate::chat::turnlog::{self, LogPolicy};
@@ -19,7 +19,7 @@ use crate::grpc::client::MddbClient;
 use crate::grpc::client::proto::ChatMcpServerStateProto;
 use crate::llm::provider::{ApiMsg, ChatResponse, TokenUsage};
 use crate::session::conversation::ConversationRef;
-use crate::session::types::{MessageRole, WsOutgoing};
+use crate::session::types::{ChatMessage, MessageRole};
 use crate::state::AppState;
 use crate::webhook::types::WebhookPayload;
 
@@ -28,7 +28,7 @@ const MAX_TOOL_ROUNDS: usize = 5;
 /// Answers `content` within `session_id`'s conversation.
 pub async fn handle_message(
     state: &AppState,
-    out: &mut Sender,
+    out: &mut dyn Outlet,
     session_id: &str,
     content: &str,
 ) -> Result<(), AppError> {
@@ -103,29 +103,82 @@ pub async fn handle_message(
         conversation::record(&mut mddb_client, to, question, redact).await;
     }
 
+    let turn = Turn {
+        session_id,
+        scenario_name: &scenario_name,
+        scenario,
+        history,
+        stored: stored.as_ref(),
+        question: &content,
+    };
+    let outcome = run(state, out, &mut mddb_client, turn).await?;
+
+    // The session may be gone by now — the TTL sweep or an `end` from another
+    // path — in which case there is nothing left to record into.
+    if let Some(mut session) = state.session_manager.get_session_mut(session_id) {
+        session.add_message(MessageRole::Assistant, outcome.answer);
+        session.add_tokens(outcome.spent);
+    }
+    Ok(())
+}
+
+/// One accepted question and everything its answer is made from. A
+/// WebSocket session builds it from its own state; the OpenAI-compatible
+/// API (#448) from the request, with no session behind it.
+pub struct Turn<'a> {
+    /// The session the turn is reported under (webhooks, turn log).
+    pub session_id: &'a str,
+    pub scenario_name: &'a str,
+    pub scenario: ActiveScenario,
+    /// The conversation so far, ending in the question.
+    pub history: Vec<ChatMessage>,
+    /// Where a signed session's answer is stored (#405).
+    pub stored: Option<&'a ConversationRef>,
+    /// The question, as accepted.
+    pub question: &'a str,
+}
+
+/// What a finished turn answered, and what it cost (RAG-005).
+#[derive(Debug)]
+pub struct Outcome {
+    pub answer: String,
+    pub spent: TokenUsage,
+}
+
+/// Runs one accepted turn: the scenario's prompt, its tools, the loop guard,
+/// the webhooks and the turn log — and the answer to `out`.
+pub async fn run(
+    state: &AppState,
+    out: &mut dyn Outlet,
+    mddb_client: &mut MddbClient,
+    turn: Turn<'_>,
+) -> Result<Outcome, AppError> {
+    let Turn {
+        session_id,
+        scenario_name,
+        scenario,
+        history,
+        stored,
+        question: content,
+    } = turn;
+
     // #399: the question is accepted, so it gets an id and is reported. The
     // trace follows the turn and becomes the `answer` event at the end.
     let mut trace = TurnTrace::start();
     state.webhook_dispatcher.dispatch(WebhookPayload::message(
         session_id,
-        &scenario_name,
+        scenario_name,
         &trace.message_id,
-        &content,
+        content,
     ));
 
-    let (system_prompt, mcp_states) =
-        system_prompt(&mut mddb_client, &scenario_name, &scenario).await;
+    let (system_prompt, mcp_states) = system_prompt(mddb_client, scenario_name, &scenario).await;
     let mut api_messages = prompt::build_api_messages(&system_prompt, &history);
     // #396: the tools see only what this scenario allows, and the schema says
     // so, so a well-behaved model never asks for anything else.
     let tool_policy =
         tools::ToolPolicy::for_scenario(&scenario, state.config.mddb.result_max_chars).with_mcp(
-            external_tools(
-                state,
-                (&scenario_name, &scenario),
-                &mcp_states,
-                stored.as_ref(),
-            ),
+            external_tools(state, (scenario_name, &scenario), &mcp_states, stored),
         );
     let tool_defs = tools::tool_definitions(&tool_policy);
     trace.offer_mcp(&tool_policy.mcp);
@@ -138,10 +191,10 @@ pub async fn handle_message(
     };
     let closing = Closing {
         session_id,
-        scenario: &scenario_name,
+        scenario: scenario_name,
         llm: &llm,
-        stored: stored.as_ref(),
-        question: &content,
+        stored,
+        question: content,
         logging: &scenario.logging,
     };
 
@@ -150,7 +203,7 @@ pub async fn handle_message(
     let answer_id = trace.answer_id.clone();
     let site = StopSite {
         session_id,
-        scenario: &scenario_name,
+        scenario: scenario_name,
         message_id: &answer_id,
         round: MAX_TOOL_ROUNDS,
     };
@@ -169,7 +222,7 @@ pub async fn handle_message(
             .await;
         let turn = match asked {
             Ok(turn) => turn,
-            Err(e) => return Err(failed(state, &mut mddb_client, &trace, &closing, e).await),
+            Err(e) => return Err(failed(state, mddb_client, &trace, &closing, e).await),
         };
 
         // RAG-005: charged per round, not per turn. A budget that counted only
@@ -204,7 +257,7 @@ pub async fn handle_message(
                     trace.record_tool(tc, &scenario.default_collection);
                     // #406: what the call looked for and found goes to the log.
                     let started = Instant::now();
-                    let run = tools::run_tool(&mut mddb_client, tc, &tool_policy)
+                    let run = tools::run_tool(mddb_client, tc, &tool_policy)
                         .await
                         .unwrap_or_else(|e| tools::ToolRun {
                             output: format!("Tool error: {e}"),
@@ -230,19 +283,11 @@ pub async fn handle_message(
                 // cannot feed the next one either.
                 let reply = answer::guard_content(state, &site.at_round(round), guard, text);
                 for chunk in reply.text.chars().collect::<Vec<_>>().chunks(50) {
-                    let piece: String = chunk.iter().collect();
-                    send_json(out, &WsOutgoing::Chunk { content: piece }).await;
+                    out.chunk(chunk.iter().collect()).await;
                 }
-                finish(
-                    state,
-                    out,
-                    &mut mddb_client,
-                    &trace,
-                    &closing,
-                    (reply, spent),
-                )
-                .await;
-                return Ok(());
+                let outcome =
+                    finish(state, out, mddb_client, &trace, &closing, (reply, spent)).await;
+                return Ok(outcome);
             }
         }
     }
@@ -251,7 +296,7 @@ pub async fn handle_message(
     let streamed = answer::stream(state, out, (&api_messages, &scenario.llm), guard, &site).await;
     let reply = match streamed {
         Ok(reply) => reply,
-        Err(e) => return Err(failed(state, &mut mddb_client, &trace, &closing, e).await),
+        Err(e) => return Err(failed(state, mddb_client, &trace, &closing, e).await),
     };
     // RAG-005: the tool-calling rounds are charged here too, so a turn that
     // exhausted MAX_TOOL_ROUNDS costs what it cost. The streaming call itself
@@ -260,16 +305,7 @@ pub async fn handle_message(
     // this path undercounts by its final response. Stated rather than hidden.
     // A stream the loop guard stops (#413) is cancelled, so it costs no more
     // than what was generated before the stop.
-    finish(
-        state,
-        out,
-        &mut mddb_client,
-        &trace,
-        &closing,
-        (reply, spent),
-    )
-    .await;
-    Ok(())
+    Ok(finish(state, out, mddb_client, &trace, &closing, (reply, spent)).await)
 }
 
 /// The external MCP tools of one turn (MCP-005): the ones mddbd reports
@@ -362,22 +398,19 @@ async fn failed(
 }
 
 /// Closes a turn: `done` to the visitor with the answer's id (#399), the
-/// `answer` webhook, and the answer and its cost recorded in the session —
-/// and, for a signed user, in mddbd with its tools, model and tokens (#405).
-///
-/// The session may be gone by now — the TTL sweep or an `end` from another
-/// path — in which case there is nothing left to record into.
+/// `answer` webhook, and — for a signed user — the answer in mddbd with its
+/// tools, model and tokens (#405). Hands the answer and its cost back to the
+/// caller, which records them in its session if it has one.
 async fn finish(
     state: &AppState,
-    out: &mut Sender,
+    out: &mut dyn Outlet,
     client: &mut MddbClient,
     trace: &TurnTrace,
     closing: &Closing<'_>,
     (reply, spent): (Reply, TokenUsage),
-) {
+) -> Outcome {
     let answer = reply.text;
-    let message_id = trace.answer_id.clone();
-    send_json(out, &WsOutgoing::Done { message_id }).await;
+    out.done(trace.answer_id.clone()).await;
     state.webhook_dispatcher.dispatch(trace.answer(
         closing.session_id,
         closing.scenario,
@@ -395,9 +428,5 @@ async fn finish(
     stored.loop_stopped = reply.loop_stopped;
     let to = closing.destination();
     turnlog::record(state, client, &to, closing.question, stored).await;
-
-    if let Some(mut session) = state.session_manager.get_session_mut(closing.session_id) {
-        session.add_message(MessageRole::Assistant, answer);
-        session.add_tokens(spent);
-    }
+    Outcome { answer, spent }
 }

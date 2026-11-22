@@ -33,3 +33,31 @@ pub async fn send_error(out: &mut Sender, message: &str) {
     )
     .await;
 }
+
+/// Where a turn's answer goes: the visitor's WebSocket, or an HTTP response
+/// of the OpenAI-compatible API (#448). The turn itself (`turn.rs`,
+/// `answer.rs`) knows only this trait, so both front doors run one pipeline.
+#[async_trait::async_trait]
+pub trait Outlet: Send {
+    /// A piece of the answer, in order.
+    async fn chunk(&mut self, content: String);
+    /// Something went wrong after the answer started; what was sent stays.
+    async fn error(&mut self, message: &str);
+    /// The answer is complete; `message_id` names it for a later rating.
+    async fn done(&mut self, message_id: String);
+}
+
+#[async_trait::async_trait]
+impl Outlet for Sender {
+    async fn chunk(&mut self, content: String) {
+        send_json(self, &WsOutgoing::Chunk { content }).await;
+    }
+
+    async fn error(&mut self, message: &str) {
+        send_error(self, message).await;
+    }
+
+    async fn done(&mut self, message_id: String) {
+        send_json(self, &WsOutgoing::Done { message_id }).await;
+    }
+}

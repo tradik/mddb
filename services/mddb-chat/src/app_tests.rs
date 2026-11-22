@@ -240,6 +240,31 @@ async fn the_server_answers_200_on_health_once_connected_and_stops_when_told() {
         .expect("serve ended in an error");
 }
 
+// #448: off, the OpenAI-compatible routes do not exist; on, they ask for a key.
+#[tokio::test]
+async fn the_openai_api_routes_exist_only_when_switched_on() {
+    for (enabled, want) in [(false, 404), (true, 401)] {
+        let mut config = test_config(&dead_addr());
+        config.openai_api.enabled = enabled;
+        let (base, stop, handle) = serving(config).await;
+
+        let models = reqwest::get(format!("{base}/v1/models"))
+            .await
+            .expect("get");
+        let completions = reqwest::Client::new()
+            .post(format!("{base}/v1/chat/completions"))
+            .body("{}")
+            .send()
+            .await
+            .expect("post");
+
+        assert_eq!(models.status(), want, "enabled = {enabled}");
+        assert_eq!(completions.status(), want, "enabled = {enabled}");
+        stop.send(()).expect("the server is gone");
+        handle.await.expect("join").expect("serve");
+    }
+}
+
 #[tokio::test]
 async fn cors_follows_the_configured_origins() {
     let mut config = test_config(&dead_addr());

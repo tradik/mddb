@@ -6,6 +6,7 @@ use crate::config::Config;
 use crate::grpc::link::MddbLink;
 use crate::llm::provider::LlmProvider;
 use crate::metrics::Metrics;
+use crate::openai_api::KeyPaces;
 use crate::security::client_ip::TrustedProxies;
 use crate::security::rate_limiter::RateLimiter;
 use crate::security::sanitizer::Sanitizer;
@@ -31,4 +32,6 @@ pub struct AppState {
     pub trusted_proxies: TrustedProxies,
     /// The counters `/metrics` serves (#413).
     pub metrics: Metrics,
+    /// Each key's pace in each scenario on the OpenAI-compatible API (#448).
+    pub key_paces: KeyPaces,
 }

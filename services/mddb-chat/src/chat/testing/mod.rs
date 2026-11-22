@@ -45,6 +45,8 @@ pub struct ConfigToml {
     pub webhooks: String,
     /// The `[identity]` section (#405), empty for an anonymous-only server.
     pub identity: String,
+    /// Lines under `[mddb]`, such as an `http_url` (#448).
+    pub mddb: String,
 }
 
 impl Default for ConfigToml {
@@ -62,6 +64,7 @@ allowed_collections = ["docs", "guides"]
             .to_string(),
             webhooks: String::new(),
             identity: String::new(),
+            mddb: String::new(),
         }
     }
 }
@@ -75,6 +78,11 @@ impl ConfigToml {
             .collect::<Vec<_>>()
             .join(", ");
         self.webhooks = format!("[[webhooks]]\nurl = \"{url}\"\nevents = [{list}]\n");
+        self
+    }
+
+    pub fn mddb(mut self, toml: &str) -> Self {
+        self.mddb = toml.to_string();
         self
     }
 
@@ -106,9 +114,15 @@ impl ConfigToml {
 
     fn render(&self) -> String {
         format!(
-            "[server]\n[mddb]\n[llm]\nprovider = \"scripted\"\napi_url = \"http://llm.test\"\n\
+            "[server]\n[mddb]\n{}\n[llm]\nprovider = \"scripted\"\napi_url = \"http://llm.test\"\n\
              model = \"test-model\"\n{}\n[session]\n{}\n[security]\nwebhook_secret = \"hook-secret\"\n{}\n{}\n{}\n{}",
-            self.llm, self.session, self.security, self.scenarios, self.webhooks, self.identity
+            self.mddb,
+            self.llm,
+            self.session,
+            self.security,
+            self.scenarios,
+            self.webhooks,
+            self.identity
         )
     }
 }
@@ -172,6 +186,7 @@ impl Harness {
             sanitizer: Sanitizer::new(config.security.clone()),
             trusted_proxies: TrustedProxies::parse(&[]),
             metrics: Metrics::default(),
+            key_paces: Default::default(),
             config,
         });
 

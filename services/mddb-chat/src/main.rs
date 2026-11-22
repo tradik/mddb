@@ -12,6 +12,7 @@ mod grpc;
 mod identity;
 mod llm;
 mod metrics;
+mod openai_api;
 mod routes;
 mod security;
 mod session;

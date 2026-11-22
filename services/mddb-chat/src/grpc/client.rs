@@ -97,10 +97,11 @@ impl MddbClient {
     pub async fn hybrid_search(
         &mut self,
         query: &str,
-        _collection: &str,
+        collection: &str,
         top_k: u32,
     ) -> Result<Vec<SearchResult>, AppError> {
         let request = proto::HybridSearchRequest {
+            collection: collection.to_string(),
             query: query.to_string(),
             top_k: top_k as i32,
             include_content: true,
@@ -134,10 +135,11 @@ impl MddbClient {
     pub async fn fts_search(
         &mut self,
         query: &str,
-        _collection: &str,
+        collection: &str,
         top_k: u32,
     ) -> Result<Vec<SearchResult>, AppError> {
         let request = proto::FtsRequest {
+            collection: collection.to_string(),
             query: query.to_string(),
             limit: top_k as i32,
             ..Default::default()
@@ -170,11 +172,12 @@ impl MddbClient {
     pub async fn vector_search(
         &mut self,
         query: &str,
-        _collection: &str,
+        collection: &str,
         top_k: u32,
     ) -> Result<Vec<SearchResult>, AppError> {
         let request = proto::VectorSearchRequest {
             query: query.to_string(),
+            collection: collection.to_string(),
             top_k: top_k as i32,
             include_content: true,
             ..Default::default()

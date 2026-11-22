@@ -24,6 +24,7 @@ use crate::llm::anthropic::AnthropicProvider;
 use crate::llm::openai::OpenAiProvider;
 use crate::llm::provider::LlmProvider;
 use crate::metrics::Metrics;
+use crate::openai_api;
 use crate::routes;
 use crate::security::client_ip::TrustedProxies;
 use crate::security::rate_limiter::RateLimiter;
@@ -95,6 +96,7 @@ pub async fn build_state(config: Config) -> Result<Arc<AppState>, AppError> {
         sanitizer: Sanitizer::new(config.security.clone()),
         trusted_proxies,
         metrics: Metrics::default(),
+        key_paces: Default::default(),
         config,
     }))
 }
@@ -176,12 +178,17 @@ pub fn cors_layer(server: &ServerConfig) -> CorsLayer {
 
 pub fn router(state: Arc<AppState>) -> Router {
     let cors = cors_layer(&state.config.server);
-    Router::new()
+    let mut app = Router::new()
         .route("/health", get(routes::health::health))
         .route("/config", get(routes::health::config_info))
         .route("/metrics", get(routes::metrics::metrics))
-        .route("/ws", get(routes::ws::ws_handler))
-        .layer(cors)
+        .route("/ws", get(routes::ws::ws_handler));
+    // #448: off by default, and then the routes do not exist at all.
+    if state.config.openai_api.enabled {
+        tracing::info!("OpenAI-compatible API on: GET /v1/models, POST /v1/chat/completions");
+        app = app.merge(openai_api::routes());
+    }
+    app.layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

@@ -185,4 +185,28 @@ fn the_example_config_loads_with_identity_off() {
         cfg.get_scenario("support").unwrap().retention_days,
         Some(30)
     );
+    assert!(!cfg.openai_api.enabled, "documented as off");
+}
+
+// #448: the OpenAI-compatible API is off unless the TOML or the environment
+// turns it on, and the environment wins in both directions.
+#[test]
+fn the_openai_api_is_off_by_default_and_switched_by_the_environment() {
+    let cfg: Config = toml::from_str(MINIMAL).expect("parse");
+    assert!(!cfg.openai_api.enabled);
+    let on: Config = toml::from_str(&with("[openai_api]\nenabled = true")).expect("parse");
+    assert!(on.openai_api.enabled);
+
+    let mut api = OpenAiApiConfig::default();
+    for (value, want) in [
+        (Some("true"), true),
+        (Some("garbage"), true),
+        (None, true),
+        (Some(" 0 "), false),
+        (Some("1"), true),
+        (Some("false"), false),
+    ] {
+        api.apply_env(value);
+        assert_eq!(api.enabled, want, "{value:?}");
+    }
 }

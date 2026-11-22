@@ -71,6 +71,12 @@ A secret under 32 bytes, or `required = true` without one, stops startup.
 See [Scenarios from mddbd](#scenarios-from-mddbd). A `config.toml` without
 this table behaves as before for as long as mddbd stores no scenarios.
 
+### `[openai_api]` — scenarios as models (#448)
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `enabled` | `false` | Serve the [OpenAI-compatible API](#openai-compatible-api). `MDDB_CHAT_OPENAI_API_ENABLED=true` or `1` turns it on, `false` or `0` off, over the file. Off: the two routes do not exist (404). |
+
 The `[server]`, `[llm]`, `[session]`, `[security]` and `[[webhooks]]` tables
 are documented inline in `config.example.toml`.
 
@@ -82,6 +88,8 @@ are documented inline in `config.example.toml`.
 | `GET /health` | Readiness and session counts: `200` once mddbd is reached, `503` before. Also `scenarios_source` (`"mddbd"` or `"toml"`), `scenarios_version`, `chat_enabled` and `chat_external_mcp_enabled` |
 | `GET /config` | The scenarios a visitor can join right now (TOML and mddbd), their labels, and the limits a client needs before joining |
 | `GET /metrics` | Counters in the Prometheus text format (2.19.2): `mddb_chat_loop_guard_triggered_total{scenario}`, the answers the loop guard stopped |
+| `GET /v1/models` | With `[openai_api] enabled`: the scenarios the key may use, one model each ([below](#openai-compatible-api)) |
+| `POST /v1/chat/completions` | With `[openai_api] enabled`: one turn of a scenario, whole or streamed |
 
 ## Starting before mddbd
 
@@ -100,6 +108,66 @@ Set `connect_retry_max_seconds = 0` for the behaviour before 2.19.0: one attempt
 the port opens, and exit with `failed to connect to mddbd` if it fails.
 
 The process exits cleanly on `SIGTERM` and Ctrl-C.
+
+## OpenAI-compatible API
+
+With `[openai_api] enabled = true` (#448) a client that speaks OpenAI's chat
+completions — Open WebUI's *Connections → OpenAI API*, an SDK, `curl` — uses
+the scenarios as models. Base URL `http://<mddb-chat>:11030/v1`, key an mddb
+credential.
+
+**Key.** `Authorization: Bearer <key>`, where the key is an mddbd API key
+(`mddb_live_…`, `POST /v1/auth/api-key`) or a JWT. mddb-chat asks mddbd on
+every request: `GET /v1/auth/me` with the key proves it (401 when mddbd
+refuses it), then `GET /v1/chat/scenarios` with the key lists what that user
+may read — a scenario every collection of which the user can read. A revoked
+key or a removed permission applies at the next request. With mddbd's
+authentication off (`/v1/auth/me` absent) every call is refused with 503:
+there is no key to check. MCP API keys (`mcp_…`) are not accepted: mddbd checks
+them on its MCP listener only. The scenario's own tools still run as
+mddb-chat's service account, bounded by `allowedCollections`, as in the widget.
+
+**Models.** `GET /v1/models` answers
+`{"object":"list","data":[{"id","object":"model","created","owned_by":"mddb","name"}]}`:
+one entry per scenario stored in mddbd that the key may read and mddb-chat has
+loaded enabled. `name` is the scenario's description (its name without one).
+A `[scenarios.*]` table of the TOML is never a model: mddbd holds no access
+rule for it.
+
+**Completions.** `POST /v1/chat/completions` with `model` (the scenario name),
+`messages` and `stream`. The turn is the widget's (`chat::turn::run`): the
+scenario's composed prompt and guardrails, its tools over its collections,
+its `llm` overrides and loop guard, the `message` and `answer` webhooks and the
+turn log, which name the completion id (`chatcmpl-…`) as the session.
+
+| Request field | What happens |
+|---------------|--------------|
+| `messages` | `user` and `assistant` text kept in order; `system`, `developer` and `tool` messages, and assistant messages without text, are dropped. The last kept message must be from the user (400 otherwise). Earlier messages reach the model marked as restored context. |
+| content parts | `{"type":"text"}` parts are joined with a newline; any other part (`image_url`, audio, file) is 400. |
+| `stream` | `false`: one `chat.completion` with `usage`. `true`: `text/event-stream` of `chat.completion.chunk` frames — the first with `role`, then content, then `finish_reason: "stop"` — and `data: [DONE]`. |
+| `stream_options.include_usage` | Adds a frame with `choices: []` and `usage` before `[DONE]`. |
+| `max_tokens`, `max_completion_tokens` | Lower the answer length; the scenario's (or `[llm] max_tokens`) stays the ceiling. `max_completion_tokens` wins when both are sent. |
+| `temperature`, `top_p`, `tools`, `tool_choice`, `user`, others | Ignored: the scenario decides; the model calls only the scenario's tools. |
+
+| Limit | How it applies without a session |
+|-------|----------------------------------|
+| `maxTurns` | The user messages sent, the question included; more is 403. |
+| `tokenBudgetPerSession` | The request's text, bytes / 4 (the estimate of the prompt preview), before the model is asked; over it is 403. What the model reports is in `usage` and is not added up across requests. |
+| `rateLimit.messagesPerMinute` | Per key and scenario; 429. |
+| `[security] rate_limit_per_minute` | Per key instead of per address, since the users of one client share its address; 429. |
+| `[session] max_history_length` | The newest messages kept. |
+| `[session] max_concurrent`, queue | Not applied: there is no seat to take. |
+
+Errors are `{"error":{"message","type","code"}}`: 400 `invalid_request_error`,
+401 `authentication_error`, 403 `permission_error`, 404 `invalid_request_error`
+with `code: "model_not_found"` (for a model that does not exist and for one
+the key may not use alike), 429 `rate_limit_error`, 502/503 `api_error`
+(mddbd, the model, the `chat` module off). A streamed answer that fails after
+it started ends with an `{"error":…}` frame and `[DONE]`.
+
+**Sources.** The pipeline has no structured citations: sources appear in the
+answer text as the scenario's `style.citationTemplate` tells the model to
+write them, the same as in the widget.
 
 ## Scenarios from mddbd
 
@@ -591,7 +659,9 @@ src/
   chat/loop_guard/   the repetition-loop guard (#413): settings, detector, Markdown exemptions, reporting
   metrics.rs         the counters served at /metrics
   chat/prompt.rs     the system prompt and history as the model sees them
-  chat/outbound.rs   frames to the visitor
+  chat/outbound.rs   frames to the visitor; the Outlet a turn's answer goes to
+  openai_api/        the OpenAI-compatible API (#448): routes, the key and its models,
+                     the request as a turn, the answer whole or as SSE frames
   chat/tools.rs      search_docs / get_document and the per-scenario policy
   chat/mcp.rs        a scenario's external MCP tools: which ones a turn offers, their names
   chat/mcp/call.rs   an external tool called through mddbd, its result framed as data

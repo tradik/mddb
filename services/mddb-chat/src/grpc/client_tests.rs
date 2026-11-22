@@ -145,6 +145,9 @@ async fn a_search_is_hybrid_with_five_results_unless_told_otherwise() {
     assert_eq!(call.method, "HybridSearch");
     assert!(call.request.contains("query: \"export\""), "{call:?}");
     assert!(call.request.contains("top_k: 5"), "{call:?}");
+    // #448: the collection was left out, and a real mddbd refuses a search
+    // without one ("missing required fields: collection, query").
+    assert!(call.request.contains("collection: \"docs\""), "{call:?}");
 }
 
 #[tokio::test]
@@ -169,6 +172,7 @@ async fn the_toml_picks_the_search_type_and_size() {
         let call = fake.calls().pop().expect("a call");
         assert_eq!(call.method, method);
         assert!(call.request.contains(size), "{call:?}");
+        assert!(call.request.contains("collection: \"docs\""), "{call:?}");
     }
     assert_eq!(
         fake.count("GetCollectionConfig"),
