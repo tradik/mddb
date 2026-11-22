@@ -82,6 +82,7 @@ func (b *ingestBatch) flush(ctx context.Context) {
 		Options: mddb.IngestOptions{SkipDuplicates: true, Profile: b.o.profile, ExtractImages: b.o.images}})
 	if err != nil {
 		rep.Failed += len(b.docs)
+		rep.sendFailed = true
 		rep.Errors = append(rep.Errors, err.Error())
 	} else {
 		rep.Added, rep.Updated, rep.Unchanged = rep.Added+resp.Added, rep.Updated+resp.Updated, rep.Unchanged+resp.Skipped

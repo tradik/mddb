@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -41,6 +43,16 @@ type autoindexOptions struct {
 	extraMeta map[string][]string
 	// semantic runs language servers and sends their facts (CODE-011).
 	semantic semanticOptions
+	// changedSince narrows a run to the files git reports changed since
+	// this commit, plus untracked ones (AGT-006).
+	changedSince string
+	// only, when not nil, narrows a run to these paths: the ones --watch
+	// saw change, or the ones --changed-since listed.
+	only map[string]bool
+	// watch keeps the command running and indexes what changes, checking
+	// every interval (AGT-006).
+	watch    bool
+	interval time.Duration
 }
 
 func newAutoindexCmd() *cobra.Command {
@@ -71,71 +83,94 @@ failing server is then an error and nothing is sent. Write the list with '=': a
 separate word is the path. clangd needs the build's compile_commands.json:
 --compile-commands names it (or its directory); by default the root and
 <root>/build are searched. rust-analyzer needs the workspace's Cargo.toml at the
-root or one directory below it.`,
+root or one directory below it.
+
+--changed-since REF sends only the files git reports changed between REF and
+the working tree, and the untracked ones; with --prune it deletes the documents
+of the files deleted or renamed away. --watch indexes, then keeps running: every
+--interval (2s) it looks at the files' size and modification time and sends
+the ones that changed, deleting the gone ones with --prune; Ctrl-C stops it.
+Both leave the documents a full --prune run would. --semantic needs the whole
+tree, so it keeps a --changed-since run whole and runs only on --watch's first
+pass. "autoindex hook install" re-indexes after each commit instead.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.root = "."
-			if len(args) == 1 {
-				o.root = args[0]
+			o.root = rootArg(args)
+			if o.watch {
+				ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+				defer stop()
+				return runAutoindexWatch(ctx, newClient(), o)
 			}
 			return runAutoindex(context.Background(), newClient(), o)
 		},
 	}
-	f := cmd.Flags()
-	f.StringVarP(&o.collection, "collection", "c", "", "Collection name (default: the repository or directory name)")
-	f.StringVar(&o.lang, "lang", "en", "Language code stored on every document")
-	f.StringArrayVar(&o.include, "include", nil, "Only index paths matching this glob (repeatable)")
-	f.StringArrayVar(&o.exclude, "exclude", nil, "Skip paths matching this glob (repeatable)")
-	f.Int64Var(&o.maxSize, "max-file-size", defaultMaxFileSize, "Skip files larger than this many bytes")
-	f.StringVar(&o.profile, "profile", "", `Ingest profile: "" (default) or "fast"`)
-	f.BoolVar(&o.prune, "prune", false, "Delete documents whose file no longer exists")
-	f.BoolVar(&o.dryRun, "dry-run", false, "Show what would be indexed, skipped and pruned; write nothing")
-	f.BoolVar(&o.noFrontmatter, "no-frontmatter", false, "Store Markdown files as they are; do not read frontmatter as meta")
-	f.BoolVar(&o.images, "images", false, "Store the images of Markdown files (their linked JPEG, PNG, GIF and WebP files) and PDFs as image documents")
-	f.StringVar(&o.semantic.langs, "semantic", "", "Send language-server facts: auto, or a list ("+semanticLanguagesUsage()+"); off by default")
-	f.Lookup("semantic").NoOptDefVal = semanticAuto
-	f.DurationVar(&o.semantic.timeout, "semantic-timeout", defaultSemanticTimeout, "Stop a language's server after this long")
-	f.IntVar(&o.semantic.concurrency, "semantic-concurrency", defaultSemanticConcurrency, "Requests in flight to a language server")
-	f.IntVar(&o.semantic.memoryMb, "semantic-memory-mb", 0, "Memory limit passed to servers that take one (gopls), in MiB; 0 = none")
-	f.StringVar(&o.semantic.compileCommands, "compile-commands", "", "compile_commands.json or its directory, for C and C++ (default: the root, then <root>/build)")
+	addAutoindexFlags(cmd.Flags(), &o)
+	cmd.AddCommand(newAutoindexHookCmd())
 	return cmd
 }
 
-// runAutoindex plans the run, then carries it out unless it is a dry run.
+// rootArg is the directory a command was given, "." when none.
+func rootArg(args []string) string {
+	if len(args) == 1 {
+		return args[0]
+	}
+	return "."
+}
+
+// runAutoindex runs one pass and prints its report.
 func runAutoindex(ctx context.Context, client *mddb.Client, o autoindexOptions) error {
 	start := time.Now()
-	root, err := filepath.Abs(o.root)
+	rep, err := autoindexPass(ctx, client, o)
 	if err != nil {
 		return err
 	}
+	return printAutoindex(rep, start)
+}
+
+// autoindexPass plans the run, then carries it out unless it is a dry run.
+func autoindexPass(ctx context.Context, client *mddb.Client, o autoindexOptions) (*autoindexReport, error) {
+	root, err := filepath.Abs(o.root)
+	if err != nil {
+		return nil, err
+	}
 	if st, err := os.Stat(root); err != nil || !st.IsDir() {
-		return fmt.Errorf("%s is not a directory", o.root)
+		return nil, fmt.Errorf("%s is not a directory", o.root)
 	}
 	rep := &autoindexReport{Root: root, Git: detectGit(root), DryRun: o.dryRun}
 	rep.Collection = autoindexCollection(o.collection, root, rep.Git)
+	if o.only, err = changedScope(root, rep, o); err != nil {
+		return nil, err
+	}
 
 	files, err := planFiles(ctx, client, root, rep, o)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	rep.IncludeDirs = includeDirs(files)
-	if o.prune {
+	if o.only != nil {
+		files = narrowTo(rep, files, o)
+	} else if o.prune {
 		if rep.ToPrune, rep.pruneCounts, err = prunable(ctx, client, rep.Collection, files); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	// Facts come before the first write: a named language that fails stops
 	// the run with nothing sent.
 	facts, err := semanticFacts(ctx, root, files, rep, o.semantic)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if o.dryRun {
 		rep.Plan = files
-		return printAutoindex(rep, start)
+		return rep, nil
 	}
-	if err := setIncludePaths(ctx, client, rep.Collection, rep.IncludeDirs); err != nil {
-		rep.Errors = append(rep.Errors, "code.includePaths: "+err.Error())
+	// A narrowed run changes a few files: the include roots and the
+	// retrieval profile are the full run's to set.
+	whole := o.only == nil
+	if whole {
+		if err := setIncludePaths(ctx, client, rep.Collection, rep.IncludeDirs); err != nil {
+			rep.Errors = append(rep.Errors, "code.includePaths: "+err.Error())
+		}
 	}
 	semSync := newSemanticSync(ctx, client, rep, facts)
 	ingestFiles(ctx, client, rep, files, o, semSync)
@@ -146,10 +181,12 @@ func runAutoindex(ctx context.Context, client *mddb.Client, o autoindexOptions) 
 	if len(rep.ToPrune) > 0 {
 		pruneDocs(ctx, client, rep, o.lang)
 	}
-	if _, err := client.SearchAdvisor(ctx, rep.Collection, true); err != nil {
-		rep.Errors = append(rep.Errors, "search advisor: "+err.Error())
+	if whole {
+		if _, err := client.SearchAdvisor(ctx, rep.Collection, true); err != nil {
+			rep.Errors = append(rep.Errors, "search advisor: "+err.Error())
+		}
 	}
-	return printAutoindex(rep, start)
+	return rep, nil
 }
 
 // autoindexCollection is the collection a run writes to: the one asked for,
