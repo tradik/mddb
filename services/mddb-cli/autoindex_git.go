@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os/exec"
 	"path"
 	"sort"
@@ -89,4 +90,14 @@ func gitFiles(dir string) ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+// gitError is what git said on standard error when it failed, or the error
+// itself when it did not get that far.
+func gitError(err error) string {
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && len(bytes.TrimSpace(exit.Stderr)) > 0 {
+		return strings.TrimSpace(string(exit.Stderr))
+	}
+	return err.Error()
 }

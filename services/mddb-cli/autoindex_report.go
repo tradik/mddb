@@ -40,6 +40,9 @@ type autoindexReport struct {
 	// announced is the server's `semantic` map from /v1/code-languages:
 	// the languages it keeps facts for; nil from a server before 2.19.3.
 	announced map[string]bool
+	// sendFailed is set when a call to write or delete did not reach the
+	// server: --watch and the hooks try those files again (AGT-006).
+	sendFailed bool
 }
 
 // autoConverted is a document the server converted from a file: its key

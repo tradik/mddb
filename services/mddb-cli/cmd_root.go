@@ -24,6 +24,10 @@ const defaultServerURL = "http://localhost:11023"
 // documented it for years before the CLI read it (fixed in 2.18.9).
 const serverEnv = "MDDB_SERVER"
 
+// apiKeyEnv is the default for --api-key: a git hook (AGT-006) reads the key
+// from the environment instead of holding it in a file.
+const apiKeyEnv = "MDDB_API_KEY"
+
 // defaultServer is MDDB_SERVER when set, defaultServerURL otherwise.
 func defaultServer() string {
 	if u := os.Getenv(serverEnv); u != "" {
@@ -34,7 +38,7 @@ func defaultServer() string {
 
 // newRootCmd builds the whole command tree.
 func newRootCmd() *cobra.Command {
-	serverURL, outputJSON, verbose, apiKey, token = defaultServer(), false, false, "", ""
+	serverURL, outputJSON, verbose, apiKey, token = defaultServer(), false, false, os.Getenv(apiKeyEnv), ""
 
 	rootCmd := &cobra.Command{
 		Use:   "mddb-cli",
@@ -49,7 +53,7 @@ It provides an interface similar to mysql-client for managing markdown documents
 	rootCmd.PersistentFlags().StringVarP(&serverURL, "server", "s", defaultServer(), "MDDB server URL (env "+serverEnv+")")
 	rootCmd.PersistentFlags().BoolVarP(&outputJSON, "json", "j", false, "Output raw JSON")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
-	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "API key for authentication")
+	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", os.Getenv(apiKeyEnv), "API key for authentication (env "+apiKeyEnv+")")
 	rootCmd.PersistentFlags().StringVar(&token, "token", "", "JWT token for authentication")
 
 	rootCmd.AddCommand(

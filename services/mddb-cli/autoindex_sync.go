@@ -70,6 +70,7 @@ func pruneDocs(ctx context.Context, client *mddb.Client, rep *autoindexReport, l
 	resp, err := client.DeleteBatch(ctx, mddb.DeleteBatchRequest{Collection: rep.Collection, Documents: refs})
 	if err != nil {
 		rep.Errors = append(rep.Errors, "prune: "+err.Error())
+		rep.sendFailed = true
 		return
 	}
 	rep.Pruned = resp.Deleted
