@@ -692,7 +692,8 @@ class MDDBClient {
 
   /**
    * Creates an MCP API key. `scope` (#439) may hold `collections`, `readOnly`
-   * and `scenario`; build it with scopeBody (lib/mcp-key-scope.js), which
+   * and `scenario`, and since 2.19.11 `readOnlyCollections` and
+   * `memoryNamespace`; build it with scopeBody (lib/mcp-key-scope.js), which
    * leaves the empty ones out.
    */
   async createMCPAPIKey(name, expiresAt = 0, scope = {}) {
