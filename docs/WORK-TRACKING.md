@@ -154,9 +154,12 @@ assignments or notifications.
 
 ## 4. Hand a session over
 
-The memory tools ([MCP](MCP.md)) work with a key limited to a project from
-2.19.11: such a key reads and writes only its own memory namespace, and a
-read-only key only recalls.
+The memory tools ([MCP](MCP.md#memory-namespaces-v21911)) work with a key
+limited to a project from 2.19.11: such a key reads and writes only its own
+memory namespace, and a read-only key only recalls, lists sessions and reads
+their history. Sessions from before 2.19.11 are not in any key's namespace.
+Two keys of one project share their sessions when both carry the same
+`memoryNamespace`.
 
 - **At the end of a session:** `memory_summarize`, then one message that
   says what was done, what is left, what not to do, and the commit.
@@ -172,11 +175,15 @@ include secrets, and costs more to write than it saves to read.
 curl -X POST http://localhost:11023/v1/mcp/keys -d '{
   "name": "shop-api",
   "collections": ["shop-api", "shop-api-issues", "shop-api-work"],
-  "readOnlyCollections": ["shop-api", "shop-api-issues"]
+  "readOnlyCollections": ["shop-api", "shop-api-issues"],
+  "memoryNamespace": "shop-api"
 }'
 ```
 
-The agent can search the code and the issues and write only its plan.
+The agent can search the code and the issues and write only its plan: every
+write tool naming `shop-api` or `shop-api-issues`, or an alias of either, is
+refused. `readOnlyCollections` must be among `collections`; `memoryNamespace`
+is optional, and without it the key's memory is its own.
 
 ## 6. Tell the agent
 

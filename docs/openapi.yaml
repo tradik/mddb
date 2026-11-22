@@ -1379,6 +1379,30 @@ paths:
                     the scenario's composed prompt as instructions. A name no
                     scenario has is a 400.
                   example: support
+                readOnlyCollections:
+                  type: array
+                  items:
+                    type: string
+                  description: |
+                    Names among `collections` the key may read but not write
+                    (v2.19.11, AGT-007): a write tool naming one of them, by
+                    name or alias, answers `tool "…": forbidden`. Each must be
+                    in `collections` by name or reach a subset of it after
+                    alias and `role:` resolution, else a 400; without
+                    `collections` it is a 400. Naming every one of
+                    `collections` stores the key as `readOnly: true`.
+                  example: [ shop-api, shop-api-issues ]
+                memoryNamespace:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  description: |
+                    The memory namespace of a key limited to collections or a
+                    scenario (v2.19.11, AGT-008): keys with the same name share
+                    their memory_* sessions. Omit for a namespace of the key's
+                    own. On a key without `collections` or `scenario`, or with
+                    surrounding spaces, it is a 400.
+                  example: shop-api
       responses:
         "200":
           description: Key created (plaintext returned once)
@@ -1410,6 +1434,13 @@ paths:
                     type: boolean
                   scenario:
                     type: string
+                  readOnlyCollections:
+                    type: array
+                    items: { type: string }
+                    description: (v2.19.11) null when the key has none, as when readOnly covers them.
+                  memoryNamespace:
+                    type: string
+                    description: (v2.19.11) Empty when the key has a namespace of its own.
                   warning:
                     type: string
                     description: |
@@ -11102,6 +11133,13 @@ components:
         scenario:
           type: string
           description: The chat scenario the key is bound to (v2.19.9).
+        readOnlyCollections:
+          type: array
+          items: { type: string }
+          description: Collections of the scope the key may only read (v2.19.11), as stored.
+        memoryNamespace:
+          type: string
+          description: The memory namespace the key shares with other keys (v2.19.11); absent when it has its own.
 
     MCPAPIKeyRef:
       type: object
