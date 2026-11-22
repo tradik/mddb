@@ -40,6 +40,11 @@ func scoped(k mcpKeyScope) context.Context { return withKeyScope(context.Backgro
 // whose rule is rule, on a call naming "a": written out per class rather
 // than derived from keyScopeMayCall.
 func expectScoped(tool string, rule accessRule) bool {
+	if tool == "sync_refresh" {
+		// The one write rule a read-only key passes: it refreshes a sync
+		// rule's mirror and writes nothing of the caller's (INT-023).
+		return true
+	}
 	switch {
 	case rule.class == accessAuthenticated, rule.class == accessPublic:
 		return toolIsReadOnly(tool)

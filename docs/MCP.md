@@ -277,7 +277,7 @@ and shows its API key field as optional.
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 114 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 115 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 | `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs (v2.18.9). See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
 
@@ -398,7 +398,7 @@ What a scoped key may call, by the tool's access class (`mcpToolAccessRules`):
 | Collection read or write | For a key limited to collections or a scenario: allowed when every collection the call names, after alias and `role:` resolution, is in the scope; a call that names no collection is refused, unless the tool's default targets are in the scope (`reference_*` with `role:reference` in the scope). A write is refused to a read-only key, and (v2.19.11) a write that names any of `readOnlyCollections` — in `collection`, `collections`, `source_collection` or `target_collections`, by name or alias — is refused too; a write counts as any tool read-only mode refuses. The memory collections are never in a scope. |
 | Every collection at once (`get_stats`, `vector_stats`, `list_schemas`, `bulk_ingest_status`, …) | Refused when the key is limited to collections or a scenario; allowed to a key that is only read-only, when the tool reads. |
 | Administration (`create_backup`, `chat_skill_*`, automations, …) | Refused. |
-| `sync_refresh` (2.19.11) | A collection write: allowed to a key limited to collections when the collection it names is in the scope; refused to a read-only key. It runs only the sync rules writing to that collection; `run_automation` stays administration. |
+| `sync_refresh` (2.19.11) | Allowed to a key when the collection it names is in the scope, a read-only key and a collection in `readOnlyCollections` included: it brings a sync rule's mirror up to date and writes nothing of the caller's. With the main authentication it needs write permission on the collection. It runs only the sync rules writing to that collection; `run_automation` stays administration. |
 | Handled inside the tool (`chat_scenario_get`, `chat_conversation_*`) | Refused. |
 | Memory store (`memory_*`) | (v2.19.11) For a key limited to collections or a scenario: allowed inside the key's [memory namespace](#memory-namespaces-v21911); to a read-only key only `memory_recall`, `memory_list_sessions` and `memory_session_history`. Refused to a key that is only read-only: it is not limited, so it has no namespace. |
 | No collection data (`fts_languages`, `geo_encode`, `feature_list`, …) | Allowed; to a read-only key only when read-only mode allows the tool. |
@@ -805,7 +805,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
   a key limited to collections or a scenario — and a custom tool by the action
   it wraps. Calling one anyway is answered `tool "<name>": forbidden`.
 
-Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (114 since 2.19.0) take about
+Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (115 since 2.19.0) take about
 94 KB (≈23 600 tokens) per turn. The 22 tools of `search,code` take about 43 KB
 (≈10 800 tokens), less than half.
 
@@ -849,7 +849,7 @@ stored when a write asks for them: `extract_images` on `upload_file` and
 
 ## Built-in Tool Catalog
 
-All 114 built-in tools, grouped by area. Tool inputs are self-describing via
+All 115 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).

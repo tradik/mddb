@@ -7,10 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.11] - 2026-11-22
+
 ### Added
 
+- **Issues and pull requests as a synced source (INT-023).** A cron rule with `sync.source: "issues"` mirrors a repository's issues and pull requests into a collection, read-only: one document per item (`issue-<n>`, `pull-<n>`), comments as sections, and `state`, `labels`, `assignees`, `milestone`, dates, linked items and the file `paths` the text mentions as metadata. Runs are incremental (a cursor and conditional requests), a rate limit ends the run with the reset time and prunes nothing, and the forge's webhook on `/v1/automation/{id}/hook` refreshes one document per event. GitHub (and Enterprise Server), GitLab, Gitea and Forgejo. MDDB never writes to the forge.
+- **`sync_refresh`** (MCP tool, `POST /v1/sync/refresh`, `{collection, number?}`): bring a synced collection up to date now: one item, or an incremental run of the rules writing to it. At most once every 30 s per rule. A key whose scope holds the collection may call it, a read-only key included; `run_automation` stays administration. 115 MCP tools.
+- **The repository of a collection.** Collection config takes `repository: {url, forge, tokenSecretRef}`. A `git` or `issues` rule may leave out `url` and `tokenSecretRef` and take them from its own collection or from the one named in `repositoryFrom`, so the code collection holds the link once.
+- **Default forge tokens** (`GET`/`PUT /v1/forge-tokens`, admin): a stored secret per host, used when neither the rule nor the collection names one. A token goes only to the host it is registered for and is dropped on a redirect to another host; a secret a collection or a default refers to cannot be deleted (`409`, `usedBy`).
+- **Panel:** an *Issues* source in the sync form, a *Repository* section in collection settings with a button that creates the issues sync, a *Forge tokens* tab, and a control that picks a stored secret or stores a pasted token as one.
+- **MCP keys: `readOnlyCollections` (AGT-007).** A key limited to collections can hold some of them read-only: writes go only to the others. `readOnly: true` keeps its meaning.
+- **MCP keys: memory namespaces (AGT-008).** A key limited to collections or a scenario can use the `memory_*` tools inside its own namespace (derived from the key, or the `memoryNamespace` it names, which two keys can share); a read-only key recalls, lists and reads history. Keys without a limit and the main authentication are unchanged. Sessions from before 2.19.11 are in no key's namespace.
+- **`mddb-cli plan` (AGT-007):** backlog rows as documents in a `<repo>-work` collection: `plan add`, `next` (takes the first open row with a conditional write, so two callers get different rows), `done`, `list`, `import` and `export` (a Markdown table). No new server surface.
+- **Agent instructions:** a *Work tracking* section (next row, recall, issues through the mirror, hand-over) in `AGENTS.md` and the generated skill and rules.
 - **Blog:** "MDDB as Your Knowledge Base" — loading folders, sites and repositories, who reads what, and the four ways to connect (MCP, External Knowledge, the web search engine, a scenario as a model), with a measured question: 380 tokens for three passages against about 71,800 for the three documents.
 - **Blog:** "Keep Your Agent's Code Index Live" — `autoindex --watch` and `hook install` on a local checkout, a project skill that makes the agent search first, measured delays (1.5–2.1 s from save to searchable, 0.16–0.22 s per commit) and token estimates per lookup.
+
+### Changed
+
+- **A key limited to collections no longer reaches the memory collections with the document tools**, even when they were listed in its `collections`: its memory is its namespace.
+- **Scenario-bound keys** now list and may call `memory_recall`, `memory_list_sessions` and `memory_session_history`, inside their own namespace.
 
 ### Fixed
 
