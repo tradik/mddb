@@ -79,9 +79,17 @@ func TestTrainingStoreAndRecovery(t *testing.T) {
 
 func TestTrainingDir(t *testing.T) {
 	t.Setenv(trainingDirEnv, "")
-	if got := (&Server{Path: filepath.Join("data", "mddb.db")}).trainingDir(); got != filepath.Join("data", "training") {
+	// A relative database path still gives an absolute root: the command
+	// runs in its job directory and must get paths that work from there.
+	wd, _ := os.Getwd()
+	if got := (&Server{Path: filepath.Join("data", "mddb.db")}).trainingDir(); got != filepath.Join(wd, "data", "training") {
 		t.Errorf("beside the database: %s", got)
 	}
+	t.Setenv(trainingDirEnv, "jobs")
+	if got := (&Server{}).trainingDir(); got != filepath.Join(wd, "jobs") {
+		t.Errorf("relative MDDB_TRAINING_DIR: %s", got)
+	}
+	t.Setenv(trainingDirEnv, "")
 	if got := (&Server{}).trainingDir(); got != filepath.Join(os.TempDir(), "mddb-training") {
 		t.Errorf("no database path: %s", got)
 	}

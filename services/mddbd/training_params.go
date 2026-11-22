@@ -83,7 +83,7 @@ func (p *trainerParam) validate() error {
 	if p.MaxLength < 0 || p.MaxLength > maxParamMaxLength {
 		return fmt.Errorf("maxLength: 0 to %d", maxParamMaxLength)
 	}
-	if p.MaxLength == 0 {
+	if p.MaxLength == 0 && p.Type == paramString {
 		p.MaxLength = defaultParamMaxLength
 	}
 	p.pattern = safeValuePattern
