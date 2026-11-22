@@ -185,6 +185,8 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/metrics", s.Metrics.HandleMetrics)
 	// INT-019: the Elasticsearch-compatible subset under /es, off by default.
 	s.registerESRoutes(mux)
+	// #447: the Qdrant-compatible point query under /qdrant, off by default.
+	s.registerQdrantRoutes(mux)
 
 	// pprof profiling endpoints (disabled by default, set MDDB_PPROF_ENABLED=true)
 	if env("MDDB_PPROF_ENABLED", "false") == "true" {

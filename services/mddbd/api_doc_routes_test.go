@@ -24,6 +24,7 @@ func everyRESTRoute(t *testing.T) []string {
 	t.Helper()
 	t.Setenv("MDDB_PPROF_ENABLED", "true")
 	t.Setenv(esCompatEnv, "true")
+	t.Setenv(qdrantCompatEnv, "true")
 	srv, cleanup := routeServer(t)
 	t.Cleanup(cleanup)
 	srv.AutomationManager = NewAutomationManager(srv.DB)

@@ -55,6 +55,8 @@ tools/bench/mddb-bench
 tools/bench/maxsim/maxsim
 test/es-compat/.mddbd
 test/es-compat/.venv/
+test/qdrant-compat/.mddbd
+test/qdrant-compat/.venv/
 
 # Rust / cargo build output (can be gigabytes) — any depth
 **/target/

@@ -39,6 +39,7 @@ func allRoutes(t *testing.T) map[string]http.Handler {
 	t.Helper()
 	t.Setenv("MDDB_PPROF_ENABLED", "true")
 	t.Setenv(esCompatEnv, "true")
+	t.Setenv(qdrantCompatEnv, "true")
 	t.Setenv("MDDB_GRAPHQL_ENABLED", "true")
 	t.Setenv("MDDB_GRAPHQL_PLAYGROUND", "true")
 	s := accessServer(t)

@@ -52,7 +52,7 @@ var licenseManifestRes = map[string]*regexp.Regexp{
 
 // licenseManifestOptional are manifests without a licence field by design:
 // test tooling that is never published.
-var licenseManifestOptional = map[string]bool{"test/es-compat/pyproject.toml": true}
+var licenseManifestOptional = map[string]bool{"test/es-compat/pyproject.toml": true, "test/qdrant-compat/pyproject.toml": true}
 
 // licenseWalkSkip are directories the manifest walk does not enter.
 var licenseWalkSkip = map[string]bool{".git": true, ".claude": true, "node_modules": true, "dist": true,

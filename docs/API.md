@@ -5188,6 +5188,7 @@ curl http://localhost:11023/v1/config
 | Field | Source | Meaning |
 |-------|--------|---------|
 | `esCompat.enabled`, `esCompat.prefix` | `MDDB_ES_COMPAT` | Whether the [Elasticsearch-compatible subset](ELASTICSEARCH-COMPAT.md) is served, and under which path (always `/es`) |
+| `qdrantCompat.enabled`, `qdrantCompat.prefix` | `MDDB_QDRANT_COMPAT` | (2.19.10) Whether the [Qdrant-compatible point query](QDRANT_COMPAT.md) is served, and under which path (always `/qdrant`) |
 | `searchMaxLimit` | `MDDB_SEARCH_MAX_LIMIT` | The most results one search returns (default 1000); a collection's `retrieval.maxTopK` can only lower it |
 | `telemetry.enabled`, `telemetry.endpoint` | `MDDB_OTEL_ENDPOINT` | Whether traces are exported, and the collector's **scheme and host only** — never a path, query or credentials. Omitted when tracing is off |
 | `clientAddressing.trustedProxies` | `MDDB_TRUSTED_PROXIES` | **How many** proxy entries are trusted, never which: the addresses describe the operator's network |
@@ -5314,6 +5315,7 @@ Two more groups are off by default and registered only when switched on:
 | Method | Path | Permission | Reference |
 |---|---|---|---|
 | GET, POST, PUT, DELETE | `/es`, `/es/` (the Elasticsearch-compatible subset) | per index in the path, as the matching `/v1` call | [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md#endpoints) (needs `MDDB_ES_COMPAT=true`) |
+| GET, POST | `/qdrant`, `/qdrant/` (the Qdrant-compatible point query, 2.19.10+) | read on the collection in the path | [QDRANT_COMPAT.md](QDRANT_COMPAT.md#endpoints) (needs `MDDB_QDRANT_COMPAT=true`) |
 | GET | `/debug/pprof/`, `/debug/pprof/cmdline`, `/debug/pprof/profile`, `/debug/pprof/symbol`, `/debug/pprof/trace` | global admin | Go's `net/http/pprof`; [config.md](config.md#profiling) (needs `MDDB_PPROF_ENABLED=true`) |
 
 ---

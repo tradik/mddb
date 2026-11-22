@@ -193,6 +193,10 @@ tags:
   - name: OpenAI Compatibility
     description: The two OpenAI Vector Stores routes Open WebUI's OpenAI-compatible
       External Knowledge Source provider calls, served on MDDB's own search (#446).
+  - name: Qdrant Compatibility
+    description: The Qdrant REST requests qdrant-client's query_points makes,
+      under /qdrant, run through MDDB's vector search (requires
+      MDDB_QDRANT_COMPAT=true; v2.19.10+). See QDRANT_COMPAT.md.
 
 paths:
   /health:
@@ -9835,6 +9839,111 @@ paths:
               schema: {$ref: "#/components/schemas/ESWriteResult"}
         "409": {description: The document exists}
 
+  # #447: the Qdrant-compatible point query (Open WebUI External Knowledge, Qdrant provider).
+  /qdrant:
+    get:
+      tags: [Qdrant Compatibility]
+      summary: Version probe
+      description: |
+        What qdrant-client reads at start-up. `version` is the Qdrant API level
+        the subset follows (1.20.0); `title` says it is MDDB. The client only
+        warns on a mismatch. v2.19.10+, needs `MDDB_QDRANT_COMPAT=true`.
+      operationId: qdrantInfo
+      responses:
+        "200":
+          description: Version info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  title: {type: string, example: mddb - qdrant-compatible subset}
+                  version: {type: string, example: 1.20.0}
+                  commit: {type: string, example: mddb-2.19.10}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    head:
+      tags: [Qdrant Compatibility]
+      summary: Version probe (HEAD)
+      operationId: qdrantPing
+      responses:
+        "200": {description: The surface is served}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /qdrant/collections/{collection}/points/query:
+    post:
+      tags: [Qdrant Compatibility]
+      summary: Nearest-neighbour query by a supplied vector (query_points)
+      description: |
+        The request qdrant-client's `query_points` sends over REST, run through
+        `/v1/vector-search` (algorithm auto, chunk retrieval): one point per
+        matching passage. The vector must have the dimension of MDDB's
+        embedding model (a 400 names both). Fields other than those below are
+        a 400 naming them. Needs read on the collection; a caller without it
+        gets 403 whether or not the collection exists. The `api-key` header is
+        accepted as an MDDB API key. See QDRANT_COMPAT.md.
+      operationId: qdrantQueryPoints
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          description: The collection (an alias resolves to its collection).
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  description: A dense vector, or an object whose nearest is one
+                  oneOf:
+                    - {type: array, items: {type: number}}
+                    - {type: object, properties: {nearest: {type: array, items: {type: number}}}}
+                using: {type: string, nullable: true, description: Only null or empty; an MDDB collection has one unnamed vector}
+                limit: {type: integer, minimum: 1, default: 10}
+                offset: {type: integer, minimum: 0, default: 0}
+                score_threshold: {type: number}
+                with_payload: {type: boolean, default: true}
+                with_vector: {type: boolean, enum: [false]}
+                params: {type: object, description: Accepted and ignored}
+      responses:
+        "200":
+          description: Scored points, best first
+          headers:
+            X-Limit-Capped: {schema: {type: string}, description: "Present when the server cap lowered limit+offset"}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, example: ok}
+                  time: {type: number}
+                  result:
+                    type: object
+                    properties:
+                      points:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: {type: string, format: uuid, description: "Stable per collection, document and chunk"}
+                            version: {type: integer, example: 0}
+                            score: {type: number, description: Similarity; higher is closer}
+                            payload:
+                              type: object
+                              properties:
+                                text: {type: string, description: The matching passage}
+                                metadata: {type: object, description: "Document metadata plus collection, key, lang, chunk, source, name"}
+        "400": {$ref: "#/components/responses/QdrantError"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/QdrantError"}
+        "404": {$ref: "#/components/responses/QdrantError"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {$ref: "#/components/responses/SearchBusy"}
+
 components:
   schemas:
     Feature:
@@ -15193,6 +15302,12 @@ components:
           properties:
             enabled: { type: boolean, example: false }
             prefix: { type: string, example: /es, description: Path the subset is served under }
+        qdrantCompat:
+          type: object
+          description: (v2.19.10) The Qdrant-compatible point query (MDDB_QDRANT_COMPAT)
+          properties:
+            enabled: { type: boolean, example: false }
+            prefix: { type: string, example: /qdrant, description: Path the surface is served under }
         searchMaxLimit:
           type: integer
           description: (v2.18.10) Most results one search returns (MDDB_SEARCH_MAX_LIMIT); a collection's maxTopK can only lower it
@@ -17037,6 +17152,18 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/ESError"}
+    QdrantError:
+      description: (v2.19.10, #447) Qdrant's error envelope; the field or problem is named in status.error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: object
+                properties:
+                  error: {type: string}
+              time: {type: number}
     ChatScenarioNotFound:
       description: No chat scenario of that name
       content:

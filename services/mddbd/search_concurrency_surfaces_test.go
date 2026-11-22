@@ -26,7 +26,8 @@ import (
 // timeout of waitMs.
 func limitedGold(t *testing.T, capacity int, waitMs string) (*Server, func()) {
 	t.Helper()
-	t.Setenv(esCompatEnv, "true") // the Elasticsearch-compatible routes are queries too
+	t.Setenv(esCompatEnv, "true")     // the Elasticsearch-compatible routes are queries too
+	t.Setenv(qdrantCompatEnv, "true") // and so is the Qdrant point query (#447)
 	s, cleanup := goldenServer(t)
 	s.SearchLimiter = limiterWith(t, capacity, waitMs)
 	// A stored evaluation set, so the surfaces that take no queries run one.
@@ -142,6 +143,7 @@ func searchSurfaceCalls() []searchSurfaceCall {
 		{"ES _search listing", restBusy("/es/gold/_search", `{"query":{"match_all":{}}}`)},
 		{"ES _search text", restBusy("/es/gold/_search", `{"query":{"match":{"content":"pump water"}}}`)},
 		{"ES _count", restBusy("/es/gold/_count", `{"query":{"match_all":{}}}`)},
+		{"Qdrant points/query", restBusy("/qdrant/collections/gold/points/query", `{"query":[1]}`)},
 
 		{"gRPC Search", grpcBusy(func(g *GRPCServer) error {
 			_, err := g.Search(ctx, &proto.SearchRequest{Collection: "gold"})

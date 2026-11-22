@@ -33,6 +33,11 @@ CI build + vet (GO-011). Build/run any of them with `go run ./<dir>`:
   against a freshly built `mddbd` with `MDDB_ES_COMPAT=true` (INT-019). `make
   test-es-compat` runs it; CI runs it as the `es-compat` job. See
   [ELASTICSEARCH-COMPAT.md](../docs/ELASTICSEARCH-COMPAT.md).
+- `qdrant-compat/` - the unmodified `qdrant-client` (locked in `uv.lock`)
+  making the `query_points` call Open WebUI's External Knowledge Source
+  (Qdrant provider) makes, against a freshly built `mddbd` with auth on and
+  `MDDB_QDRANT_COMPAT=true` (#447). `make test-qdrant-compat` runs it; CI runs
+  it in the `es-compat` job. See [QDRANT_COMPAT.md](../docs/QDRANT_COMPAT.md).
 
 ### Docker
 - `docker-compose.benchmark.yml` - MySQL 9.1 and PostgreSQL 17 containers

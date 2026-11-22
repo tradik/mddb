@@ -141,6 +141,8 @@ var httpAccessRules = map[string]accessRule{
 	"/es":                      ruleHandler, // the index in the path (INT-019)
 	"/es/":                     ruleHandler,
 	"/v1/vector_stores/":       ruleHandler, // #446: the collection is the {id} in the path
+	"/qdrant":                  ruleHandler, // the collection in the path (#447)
+	"/qdrant/":                 ruleHandler,
 	"/tools/call":              ruleHandler, // per tool: mcpToolAccessRules
 	"/resources/read":          ruleHandler, // per resource: mcpResourceRule
 	"/sse":                     ruleHandler, // JSON-RPC, per tool and resource

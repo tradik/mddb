@@ -16,6 +16,7 @@ import (
 func TestHandleConfig_ReportsSearchTelemetryAndProxies(t *testing.T) {
 	withClientAddressing(t)
 	t.Setenv("MDDB_ES_COMPAT", "true")
+	t.Setenv("MDDB_QDRANT_COMPAT", "true")
 	t.Setenv("MDDB_OTEL_ENDPOINT", "https://user:token@collector.internal:4318/v1/traces?k=1")
 	settings := map[string]string{trustedProxiesEnv: "10.0.0.0/8, 192.0.2.7", clientIPHeaderEnv: "CF-Connecting-IP",
 		proxyProtocolEnv: "on"}
@@ -31,6 +32,9 @@ func TestHandleConfig_ReportsSearchTelemetryAndProxies(t *testing.T) {
 	var resp ConfigResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
+	}
+	if !resp.QdrantCompat.Enabled || resp.QdrantCompat.Prefix != "/qdrant" {
+		t.Errorf("qdrant: %+v", resp.QdrantCompat)
 	}
 	if !resp.ESCompat.Enabled || resp.ESCompat.Prefix != "/es" || resp.SearchMaxLimit != 250 {
 		t.Errorf("search: %+v limit %d", resp.ESCompat, resp.SearchMaxLimit)

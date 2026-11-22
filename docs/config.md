@@ -809,6 +809,14 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 ---
 
+## Qdrant-Compatible Point Query (v2.19.10+)
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_QDRANT_COMPAT` | `false` | bool | `true` mounts the Qdrant REST requests `qdrant-client`'s `query_points` makes under `/qdrant` on the HTTP listener (`GET /qdrant`, `POST /qdrant/collections/{name}/points/query`), so Open WebUI's External Knowledge Source with the Qdrant provider can search a collection. The vector goes to `/v1/vector-search` (chunk mode) behind the same auth, permissions, rate limiter and body cap; the `api-key` header is accepted as an MDDB API key. See [QDRANT_COMPAT.md](QDRANT_COMPAT.md) |
+
+---
+
 ## Chat Conversations (v2.19.0+)
 
 | Env Var | Default | Type | Description |
