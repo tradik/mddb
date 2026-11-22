@@ -120,7 +120,9 @@ Every text file under the directory goes into one collection (named after the
 repository), with `path`, `kind`, `language`, `size`, `modified` and the git
 commit in its metadata; the server extracts symbols, and the search advisor
 stores a retrieval profile. Running it again only rewrites what changed;
-`--prune` removes what was deleted, `--dry-run` shows the plan first. See
+`--prune` removes what was deleted, `--dry-run` shows the plan first. While you
+work, `mddb-cli autoindex . --watch` follows every save, and `mddb-cli autoindex
+hook install` re-indexes after each commit in the background. See
 [Bulk Import](docs/BULK-IMPORT.md#autoindex-one-command-v2188).
 
 Add `--semantic` to take definitions, references and implementations from a

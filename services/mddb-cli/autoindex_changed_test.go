@@ -57,7 +57,7 @@ func (s *storeServer) serve(w http.ResponseWriter, r *http.Request) {
 			s.docs[asString(doc["key"])] = asString(doc["contentMd"])
 			added++
 		}
-		fmt.Fprintf(w, `{"added":%d}`, added)
+		_, _ = fmt.Fprintf(w, `{"added":%d}`, added)
 	case "/v1/aggregate":
 		var buckets []map[string]interface{}
 		for k := range s.docs {
@@ -72,7 +72,7 @@ func (s *storeServer) serve(w http.ResponseWriter, r *http.Request) {
 				n++
 			}
 		}
-		fmt.Fprintf(w, `{"deleted":%d}`, n)
+		_, _ = fmt.Fprintf(w, `{"deleted":%d}`, n)
 	case "/v1/search":
 		_, _ = w.Write([]byte(`[]`))
 	case "/v1/collection-config":
@@ -133,7 +133,10 @@ func TestChangedSince_SameAsAFullRun(t *testing.T) {
 	for round := 0; round < 8; round++ {
 		files := map[string][]byte{}
 		for i := 0; i < 6; i++ {
-			files[fmt.Sprintf("d%d/f%d.go", i%2, i)] = []byte(fmt.Sprintf("package d\n// %d\n", i))
+			// Distinct sizes: git sees a change by size, mtime and (not on
+			// Windows) inode, so a rename over a file of the same size and
+			// mtime would pass as unchanged there.
+			files[fmt.Sprintf("d%d/f%d.go", i%2, i)] = []byte(fmt.Sprintf("package d\n// %d %s\n", i, strings.Repeat("x", i)))
 		}
 		dir, git := gitRepo(t, files)
 		base := git("rev-parse", "HEAD")

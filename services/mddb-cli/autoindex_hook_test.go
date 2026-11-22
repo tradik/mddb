@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -54,7 +55,7 @@ func TestHook_InstallStatusUninstall(t *testing.T) {
 	if !strings.HasPrefix(string(data), "#!/bin/sh\necho mine\n") || !strings.Contains(string(data), "'--server' '"+fs.URL+"' '--prune' '-c' 'proj'") {
 		t.Fatalf("post-commit:\n%s", data)
 	}
-	if st, _ := os.Stat(filepath.Join(hooks, "post-merge")); st.Mode()&0o100 == 0 {
+	if st, _ := os.Stat(filepath.Join(hooks, "post-merge")); runtime.GOOS != "windows" && st.Mode()&0o100 == 0 {
 		t.Fatal("hook not executable")
 	}
 

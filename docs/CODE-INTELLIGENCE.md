@@ -251,6 +251,12 @@ changes through any API: the answer falls back to `heuristic` (or `mixed`)
 until the next `autoindex --semantic`. Facts are never shown in search results;
 reading a single document returns them.
 
+`autoindex --watch` and the hooks of `autoindex hook install` (2.19.10) keep
+the text, chunks and heuristic symbols current as you save or commit; they
+compute facts on `--watch`'s first pass, and in a hook whose flags include
+`--semantic`, where the run stays whole. See
+[BULK-IMPORT.md](BULK-IMPORT.md#keeping-a-collection-current---changed-since---watch-hook-v21910).
+
 ## Troubleshooting
 
 | Message or symptom | Cause | Fix |

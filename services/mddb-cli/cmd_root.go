@@ -26,7 +26,7 @@ const serverEnv = "MDDB_SERVER"
 
 // apiKeyEnv is the default for --api-key: a git hook (AGT-006) reads the key
 // from the environment instead of holding it in a file.
-const apiKeyEnv = "MDDB_API_KEY"
+const apiKeyEnv = "MDDB_API_KEY" // #nosec G101 -- the name of a variable, not a key
 
 // defaultServer is MDDB_SERVER when set, defaultServerURL otherwise.
 func defaultServer() string {

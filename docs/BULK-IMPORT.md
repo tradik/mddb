@@ -41,6 +41,32 @@ there is no endpoint that could be pointed at the server's own disk. For
 the same reason there is no MCP tool for it: an agent runs `mddb-cli
 autoindex` like any other command.
 
+### Keeping a collection current: `--changed-since`, `--watch`, `hook` (v2.19.10+)
+
+While you work on a checkout, three ways send only what changed:
+
+```bash
+mddb-cli autoindex . --changed-since origin/main --prune   # what differs from a commit, plus untracked files
+mddb-cli autoindex . --watch --prune                       # index, then follow every save until Ctrl-C
+mddb-cli autoindex hook install -- --prune -c myrepo       # re-index after each commit, merge, checkout, rewrite
+mddb-cli autoindex hook status                             # which hooks hold it, the commit last indexed
+mddb-cli autoindex hook uninstall
+```
+
+| | What it does |
+|---|---|
+| `--changed-since REF` | Sends the files `git diff REF` lists against the working tree (both sides of a rename) and the untracked ones; with `--prune` it deletes the documents of the deleted and renamed-away files, and of files that became ignored, excluded or too large. It skips the include-path and search-advisor steps. Git decides what changed from each file's size, modification time and, on Linux and macOS, inode. Needs a git repository. |
+| `--watch` | A full run, then every `--interval` (default 2 s) a look at each file's size and modification time; the files that changed are sent and, with `--prune`, the gone ones deleted. One line per pass (`12:04:31 3 changed — 1 added, 2 updated, 0 pruned, 0 failed in 84ms`; `--json`: one JSON object per line). It polls rather than taking file events, so there is no dependency and no watch limit to run out of, and it works where events do not arrive (a WSL2 checkout under `/mnt/c`, NFS, a bind mount). A pass that cannot reach the server keeps its files for the next one; a repeated error is printed once. Ctrl-C or SIGTERM stops it between passes, never halfway through a batch. |
+| `hook install [path] [-- flags]` | Adds a block between `# >>> mddb autoindex >>>` and `# <<< mddb autoindex <<<` to `post-commit`, `post-merge`, `post-checkout` and `post-rewrite` (`--events` picks others), in the directory `git rev-parse --git-path hooks` names, so `core.hooksPath` and worktrees work. A hook you already have is kept; `uninstall` takes out only the block, byte for byte, and removes a hook that held nothing else. The flags after `--` are checked and written into the hook; `--watch`, `--dry-run` and `--changed-since` are refused. `--server` is written when you gave it; an API key never is: set `MDDB_API_KEY` in the environment git runs in. |
+| What the hook runs | `autoindex hook run` in the background, output appended to `mddb-autoindex.log` in the git directory, so the commit does not wait and never fails because of it. The run sends what changed since the commit it last indexed (`mddb-autoindex.state`); with no state, or a state commit that is gone after a rebase, it sends every file. The state moves only when every call reached the server. A lock (`mddb-autoindex.lock`, taken over after an hour) means a hook that fires during a run only marks the tree dirty, and the run goes once more: a rebase of fifty commits costs two runs. |
+
+The documents all three leave are the ones a full `autoindex --prune` run
+would leave. `--semantic` needs the whole tree, since an edit in one file moves
+references in others, so with `--changed-since` (and in a hook) the run stays
+whole, and `--watch` computes facts on its first pass only; until the next
+`--semantic` run, the changed files' facts fall back to the heuristic ones
+([CODE-INTELLIGENCE.md](CODE-INTELLIGENCE.md#when-facts-go-stale)).
+
 ### Semantic facts from a language server: `--semantic` (v2.19.3+)
 
 The server's own symbol extraction is heuristic: it reads each file alone, so

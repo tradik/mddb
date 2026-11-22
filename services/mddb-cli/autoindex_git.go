@@ -27,8 +27,9 @@ type gitInfo struct {
 	Name string `json:"name,omitempty"`
 }
 
-// runGit runs git in dir and returns its standard output.
-func runGit(dir string, args ...string) ([]byte, error) {
+// runGit runs git in dir and returns its standard output. It is a variable
+// so tests can make one git call fail.
+var runGit = func(dir string, args ...string) ([]byte, error) {
 	// git is resolved to an absolute path first: LookPath refuses one found
 	// through a relative PATH entry, so a git planted in the working
 	// directory is never run (Sonar go:S4036).

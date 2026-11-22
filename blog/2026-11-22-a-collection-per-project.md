@@ -121,15 +121,18 @@ the agent a guess: *"Search this project's code in the MDDB collection
 An index is only useful while it matches the code. Two cases:
 
 - **The repository you are editing.** Index the local checkout, not the
-  remote: your uncommitted work exists only there. A git hook keeps it
-  current without thinking about it:
+  remote: your uncommitted work exists only there. Either follow every save
+  while you work, or let git hooks re-index after each commit, merge and
+  checkout:
 
   ```bash
-  # .git/hooks/post-commit
-  mddb-cli autoindex . >/dev/null 2>&1 &
+  mddb-cli autoindex . --watch --prune          # until Ctrl-C
+  mddb-cli autoindex hook install -- --prune    # once per repository
   ```
 
-  Without `--semantic` this is quick, because unchanged files are skipped. Run
+  Both send only the files that changed. The hook runs in the background, so
+  a commit never waits for it, and it picks up from the last commit it
+  indexed. Run
   `--semantic` when the structure changed, or once a day. Facts computed from
   an older version of a file are dropped the moment its content changes, and
   the answer falls back to the text-based symbols until the next run, so a
