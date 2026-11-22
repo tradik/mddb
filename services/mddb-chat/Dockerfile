@@ -1,7 +1,7 @@
 # Build stage
 FROM rust:1.99-slim-bookworm AS builder
 
-RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler libprotobuf-dev && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN cargo build --release --locked
 # Runtime stage
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y ca-certificates wget && rm -rf /var/lib/apt/lists/* && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && rm -rf /var/lib/apt/lists/* && \
     groupadd -r mddb && useradd -r -g mddb mddb
 
 COPY --from=builder /app/target/release/mddb-chat /usr/local/bin/mddb-chat

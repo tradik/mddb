@@ -5,6 +5,9 @@
  * MCPConfigPanel in 2.19.9 (#440) with their output unchanged.
  */
 import mddbModelPyRaw from '@scripts/mddb_model.py?raw';
+
+/** The default MCP address written in mddb_model.py, matched to be replaced. */
+const SCRIPT_DEFAULT_MCP = /https?:\/\/mddb:9000/;
 import { openWebUIEngineSections } from './openwebui-engines';
 
 /** STDIO_NOTE is shown with every example that starts its own mddbd over stdio. */
@@ -360,7 +363,9 @@ if __name__ == "__main__":
     case 'openwebui':
       return {
         filename: 'mddb_model.py',
-        content: mddbModelPyRaw.replace('http://mddb:9000', mcpBase),
+        // The script's own default MCP address (a local compose hostname) is
+        // replaced by this server's.
+        content: mddbModelPyRaw.replace(SCRIPT_DEFAULT_MCP, mcpBase),
         // #446: External Knowledge needs no code: Open WebUI's OpenAI-compatible
         // provider calls /v1/vector_stores on the HTTP API. The function below
         // is the other way, kept as it was.
