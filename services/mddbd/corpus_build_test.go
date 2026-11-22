@@ -23,7 +23,7 @@ func TestPrepareCorpusRefusals(t *testing.T) {
 			_ = s.CollectionManager.Set("s3coll", &CollectionConfig{StorageBackend: "s3"})
 			_ = s.CollectionManager.Set("secret", &CollectionConfig{Encrypted: true})
 			_ = s.CollectionManager.Set("docs", &CollectionConfig{Description: "packable"})
-			if err := (&Server{}).packableCollection("docs"); err != nil {
+			if err := errors.Join((&Server{}).packableCollection("docs"), s.packableCollection("docs")); err != nil {
 				t.Fatal(err)
 			}
 			for _, tc := range []struct {

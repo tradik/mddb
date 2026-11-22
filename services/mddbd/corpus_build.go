@@ -95,20 +95,26 @@ func (s *Server) fillCorpus(b *corpusBuild, parts []corpusPart) error {
 		if err := s.snapshotCollection(p.Name, b.root, member); err != nil {
 			return err
 		}
-		if err := s.describeSnapshot(filepath.Join(b.work, member), p); err != nil {
+		if err := s.describePart(b, p, member); err != nil {
 			return err
 		}
-		if p.DocCount == 0 {
-			return fmt.Errorf("collection %q: %w: it has no documents", p.Name, errNotFound)
-		}
-		file, err := hashFile(b.root, member)
-		if err != nil {
-			return err
-		}
-		p.SHA256, p.Bytes = file.sum, file.size
 	}
 	m.setParts(parts)
 	return nil
+}
+
+// describePart describes the snapshot of p written to member: its
+// documents, format and vectors, and the file's checksum and size.
+func (s *Server) describePart(b *corpusBuild, p *corpusPart, member string) error {
+	if err := s.describeSnapshot(filepath.Join(b.work, member), p); err != nil {
+		return err
+	}
+	if p.DocCount == 0 {
+		return fmt.Errorf("collection %q: %w: it has no documents", p.Name, errNotFound)
+	}
+	file, err := hashFile(b.root, member)
+	p.SHA256, p.Bytes = file.sum, file.size
+	return err
 }
 
 // packableCollection refuses a collection whose data is not all in bbolt or
