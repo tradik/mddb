@@ -106,15 +106,21 @@ func newTrainingID(kind string) string {
 	return prefix + hex.EncodeToString(b)
 }
 
-// trainingDir is MDDB_TRAINING_DIR, or "training" beside the database.
+// trainingDir is MDDB_TRAINING_DIR, or "training" beside the database, as
+// an absolute path: a command runs in its job directory, so a relative path
+// handed to it would point somewhere else. (Abs fails only without a working
+// directory; the empty root then fails every job with a clear error.)
 func (s *Server) trainingDir() string {
-	if d := os.Getenv(trainingDirEnv); d != "" {
-		return filepath.Clean(d)
+	dir := os.Getenv(trainingDirEnv)
+	switch {
+	case dir != "":
+	case s.Path == "":
+		dir = filepath.Join(os.TempDir(), "mddb-training")
+	default:
+		dir = filepath.Join(filepath.Dir(s.Path), "training")
 	}
-	if s.Path == "" {
-		return filepath.Join(os.TempDir(), "mddb-training")
-	}
-	return filepath.Join(filepath.Dir(s.Path), "training")
+	abs, _ := filepath.Abs(dir)
+	return abs
 }
 
 // writeBucket runs fn on the job bucket in a write transaction, creating

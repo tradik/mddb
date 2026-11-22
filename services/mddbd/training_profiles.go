@@ -190,6 +190,7 @@ func (t *trainerProfile) validate() error {
 		}
 		t.trialTimeout = d
 	}
+	t.TrialTimeout = t.trialTimeout.String()
 	for name, v := range t.TrialParameters {
 		p := findParam(t.Parameters, name)
 		if p == nil {
@@ -255,6 +256,7 @@ func (c *commandSpec) validate(defaultTimeout time.Duration) error {
 		}
 		c.timeout = d
 	}
+	c.Timeout = c.timeout.String() // the profile list shows what applies
 	return nil
 }
 

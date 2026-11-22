@@ -92,7 +92,12 @@ var configKeys = map[string]configClass{
 	"MDDB_INTERNAL_VERIFY_DB": cfgHidden, "MDDB_REPLICATION_LEADER_ADDR": cfgHidden,
 	"MDDB_REPLICATION_TLS_CA": cfgHidden, "MDDB_REPLICATION_TLS_CERT": cfgHidden, "MDDB_REPLICATION_TLS_KEY": cfgHidden,
 	"MDDB_REPLICATION_TLS_SERVER_NAME": cfgHidden,
-	"MDDB_AUDIT_EXPORT_SYSLOG_ADDR":    cfgHidden, "MDDB_MCP_DOMAIN": cfgHidden, "MDDB_MCP_INSTRUCTIONS": cfgHidden,
+	// Model training: the profile file and job root, and the variables set for
+	// a trainer or evaluate command (paths and a job id, never read back).
+	"MDDB_TRAINERS_CONFIG": cfgHidden, "MDDB_TRAINING_DIR": cfgHidden, "MDDB_TRAIN_DATASET": cfgHidden,
+	"MDDB_TRAIN_VALIDATION": cfgHidden, "MDDB_TRAIN_OUTPUT_DIR": cfgHidden, "MDDB_TRAIN_JOB_ID": cfgHidden,
+	"MDDB_TRAIN_TRIAL": cfgHidden, "MDDB_EVAL_DATASET": cfgHidden, "MDDB_EVAL_MODEL": cfgHidden, "MDDB_EVAL_OUTPUT": cfgHidden,
+	"MDDB_AUDIT_EXPORT_SYSLOG_ADDR": cfgHidden, "MDDB_MCP_DOMAIN": cfgHidden, "MDDB_MCP_INSTRUCTIONS": cfgHidden,
 	"MDDB_MCP_SERVER_DESCRIPTION": cfgHidden, "MDDB_MCP_SERVER_NAME": cfgHidden, "MDDB_MCP_SERVER_VENDOR": cfgHidden,
 	"MDDB_NODE_ID": cfgHidden, "MDDB_OTEL_SERVICE_NAME": cfgHidden, "MDDB_FTS_SYNONYMS": cfgHidden,
 
