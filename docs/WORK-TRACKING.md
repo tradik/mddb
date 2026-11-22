@@ -100,10 +100,10 @@ one no longer listed.
   one document;
 - on demand: `sync_refresh` over MCP (`POST /v1/sync/refresh`) with the
   collection and, optionally, a number: with a number it re-reads that item
-  at once, without it starts an incremental run. A key limited to the
-  collection may call it (it is a write of the collection, so not a
-  read-only key), at most once every 30 s per rule, and the answer says when
-  each rule last ran. `run_automation` remains an administration tool.
+  at once, without it starts an incremental run. A key whose scope holds
+  the collection may call it, a read-only key included: it brings the mirror
+  up to date and writes nothing of the caller's. At most once every 30 s per
+  rule, and the answer says when each rule last ran. `run_automation` remains an administration tool.
 
 ## 2. Ask the mirror instead of the forge
 

@@ -108,9 +108,21 @@ func keyScopeMayCall(k mcpKeyScope, tool string, rule accessRule) bool {
 	return true
 }
 
+// keyScopeRefreshes are the tools that write only a mirror of an outside
+// source, through a sync rule an administrator made (INT-023). A read-only
+// key keeps a collection's documents safe from the agent; asking for the
+// mirror to be brought up to date is not a write of the agent's, and the
+// recommended project key holds its issues collection read-only. The
+// collection must still be in the key's scope, and the tool limits itself to
+// one run per rule every 30 s.
+var keyScopeRefreshes = map[string]bool{"sync_refresh": true}
+
 // keyScopeWrites reports whether a call of tool under rule counts as a write
 // for a key's scope: a write rule, or a tool read-only mode would refuse.
 func keyScopeWrites(tool string, rule accessRule) bool {
+	if keyScopeRefreshes[tool] {
+		return false
+	}
 	return rule.op != PermRead || (tool != "" && !toolIsReadOnly(tool))
 }
 
