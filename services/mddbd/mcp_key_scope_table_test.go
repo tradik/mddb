@@ -31,13 +31,15 @@ var pinnedKeyScopeTable = map[string][]string{
 	// No collection named, a write: a post on the WordPress site, and the
 	// memory store's writes inside the key's namespace (AGT-008).
 	"0110001111": {"wordpress_set_status", "memory_add_message", "memory_start_session", "memory_summarize"},
-	// Reads of the collections named.
+	// Reads of the collections named — and sync_refresh (INT-023), which
+	// brings a sync rule's mirror up to date for whoever may read it,
+	// read-only keys included.
 	"1101111111": {"aggregate", "autocomplete", "bulk_ingest_list", "classify_document", "code_graph", "code_symbol",
 		"cross_search", "export_documents", "find_duplicates", "full_text_search", "geo_polygon", "geo_search",
 		"geo_within", "get_checksum", "get_collection_config", "get_document_meta", "get_indexing_status",
 		"get_meta_keys", "get_schema", "hybrid_search", "list_curation_rules", "list_revisions", "list_stopwords",
 		"list_synonyms", "reference_dependencies", "reference_examples", "reference_search", "reference_symbol",
-		"run_eval", "search_advisor", "search_documents", "semantic_search", "validate_document"},
+		"run_eval", "search_advisor", "search_documents", "semantic_search", "sync_refresh", "validate_document"},
 	// Writes of the collections named.
 	"0100001011": {"add_document", "add_documents_batch", "add_eval_query", "add_stopwords", "add_synonym",
 		"bulk_ingest_submit", "create_curation_rule", "delete_collection", "delete_document", "delete_documents_batch",

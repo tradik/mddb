@@ -2,17 +2,17 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.tradik/mddb",
   "title": "MDDB",
-  "description": "Embedded knowledge base with 114 MCP tools, hybrid BM25+vector search and RAG. One Go binary.",
+  "description": "Embedded knowledge base with 115 MCP tools, hybrid BM25+vector search and RAG. One Go binary.",
   "repository": {
     "url": "https://github.com/tradik/mddb",
     "source": "github"
   },
   "websiteUrl": "https://mddb.tradik.com",
-  "version": "2.19.10",
+  "version": "2.19.11",
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "docker.io/tradik/mddb:2.19.10",
+      "identifier": "docker.io/tradik/mddb:2.19.11",
       "runtimeHint": "docker",
       "transport": {
         "type": "stdio"

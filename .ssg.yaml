@@ -49,14 +49,14 @@ fingerprint: true
 # version strings baked into the HTML at build time (no client-side JS).
 # Updated by the release version sweep alongside Makefile/main.go.
 variables:
-  mddbVersion: "2.19.10"
+  mddbVersion: "2.19.11"
   # The tag date of the version above, not of the one before it: the download
   # section prints it verbatim. It has now been wrong twice in a row (2.11.4's
   # date shown for 2.12.0, then for 2.13.0) — `git log -1 --format=%ad v<tag>`
   # settles it, and the release version sweep has to touch this line too.
   mddbReleaseDate: "22 November 2026"
   # Counted from tools/list against a running server, not from memory.
-  mcpTools: "114"
+  mcpTools: "115"
   # The release binary, measured the way release.yml builds it:
   #   cd services/mddbd && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
   #     go build -ldflags="-s -w" -o /tmp/mddbd . && ls -l /tmp/mddbd
@@ -74,7 +74,6 @@ variables:
   # amd64: 46.7 MB, arm64: 43.0 MB): `curl -s https://hub.docker.com/v2/repositories/tradik/mddb/tags/<tag>`.
   mddbDockerSize: "~47MB"
 
-
 # Native mermaid rendering: ```mermaid fences become <pre class="mermaid">
 # and the runtime is injected only on pages/posts that contain a diagram.
 # (Replaces the theme's former page.html-only bootstrap script, which never
@@ -91,7 +90,6 @@ listen:
   enabled: true
   label: "Listen"
   sections: [posts]
-
 
 # Every post names one of three categories in its frontmatter (Releases,
 # Engineering, Guides); the content_sources default "Blog" only catches a post
@@ -188,7 +186,6 @@ feeds:
   - path: /rss.xml
     format: rss
     title: MDDB blog
-
 
 # /index/ was published for months before the duplicate was removed; send it to
 # the page it duplicated rather than letting it 404.

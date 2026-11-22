@@ -152,10 +152,22 @@ func TestSyncRefreshScopedKey(t *testing.T) {
 		!strings.Contains(err.Error(), "try again in") {
 		t.Errorf("throttled over MCP: %v", err)
 	}
-	for name, ctx := range map[string]context.Context{"out of scope": out, "read-only": readOnly} {
+	if _, err := ts.mcpCallTool(out, "sync_refresh", map[string]any{"collection": "repo-issues"}); err == nil ||
+		!strings.Contains(err.Error(), "forbidden") {
+		t.Errorf("out of scope: %v", err)
+	}
+	// A read-only key, and one holding the collection read-only, may refresh
+	// a mirror in their scope: they pass the scope check and meet the same
+	// 30 s limit as any caller.
+	partly := withKeyScope(context.Background(), mcpKeyScope{collections: []string{"repo-issues", "work"}, readOnlyCollections: []string{"repo-issues"}})
+	for name, ctx := range map[string]context.Context{"read-only": readOnly, "read-only collection": partly} {
 		if _, err := ts.mcpCallTool(ctx, "sync_refresh", map[string]any{"collection": "repo-issues"}); err == nil ||
-			!strings.Contains(err.Error(), "forbidden") {
+			!strings.Contains(err.Error(), "try again in") {
 			t.Errorf("%s: %v", name, err)
+		}
+		if _, err := ts.mcpCallTool(ctx, "add_document", map[string]any{"collection": "repo-issues", "key": "x", "lang": "en", "content": "x"}); err == nil ||
+			!strings.Contains(err.Error(), "forbidden") {
+			t.Errorf("%s may write a document: %v", name, err)
 		}
 	}
 	if _, err := ts.mcpCallTool(in, "run_automation", map[string]any{"id": rule.ID}); err == nil || !strings.Contains(err.Error(), "forbidden") {
