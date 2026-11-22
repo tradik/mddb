@@ -56,7 +56,7 @@ jobs:
         run: make openapi-lint
 
       - name: Generate site with SSG
-        uses: spagu/ssg@6aa91c9289873156df5bff0f21c18ee2ac70793d # v1.9.11
+        uses: spagu/ssg@0ca1576d48c3aebe93f054c659baf2f8402fc4bf # v1.9.12
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19,
@@ -86,7 +86,7 @@ jobs:
           # not landed fails this job with a 404 on ssg-linux-amd64.tar.gz. The
           # check is one command:
           #   gh release view v1.8.58 --repo spagu/ssg --json assets
-          version: 'v1.9.11'
+          version: 'v1.9.12'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'
