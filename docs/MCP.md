@@ -297,7 +297,7 @@ and shows its API key field as optional.
 
 | `MDDB_AUTH_ENABLED` | `MDDB_MCP_API_KEY_ENABLED` | MCP listener behaviour |
 |---|---|---|
-| `true`  | `false` | **Gated by the main AuthManager** — MCP requires the same `Authorization: Bearer` / `X-API-Key` credentials as the HTTP API. Anonymous `tools/call` → `401`. |
+| `true`  | `false` | **Gated by the main AuthManager** — MCP requires the same `Authorization: Bearer` / `X-API-Key` credentials as the HTTP API. Anonymous `tools/call` → `401`. MCP API keys (`mcp_…`) are not checked: one sent in either header gets `401` with `{"error":"MCP API key auth is not enabled on this server: set MDDB_MCP_API_KEY_ENABLED=true to use mcp_ keys"}` (2.19.10, #445; before, `invalid token` / `invalid api key`). |
 | `true`  | `true`  | Gated by MCP API keys (as configured below). |
 | `false` | `true`  | Gated by MCP API keys. |
 | `false` | `false` | **No authentication.** If MCP is bound beyond loopback (e.g. the default `:9000`), the server logs a prominent startup warning. Use only on a trusted/loopback bind, or set one of the flags above. |
@@ -330,6 +330,8 @@ curl -X POST http://localhost:11023/v1/mcp/keys \
   -H "Authorization: Bearer <admin-token>" \
   -d '{"name": "claude-prod", "expiresAt": 0}'
 # Response: {"key":"mcp_a1b2c3d4e5f6...","name":"claude-prod","createdAt":1711...}
+# Without MDDB_MCP_API_KEY_ENABLED=true the key is still created, and the
+# response adds "warning": the MCP listener does not check it (2.19.10, #445).
 
 # List keys (no key material: the "mcp_" scheme marker and a fingerprint,
 # four bytes of SHA-256 of the key that the server log shows too)
@@ -357,7 +359,7 @@ Key features:
 - **TTL support** — `expiresAt` Unix timestamp (0 = never expires)
 - **Disable without delete** — revoke instantly, keep for audit
 - **Cache** — lookups cached for `MDDB_MCP_API_KEY_CACHE_TTL` (default 60s), auto-invalidated on create/delete/disable
-- **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab); each key is listed as `mcp_… · <fingerprint>` with its scope, and its Disable and Delete buttons name it by that fingerprint. The create form takes an optional scope (collections, read-only, chat scenario); Chat → a scenario lists the keys bound to it, with create and delete
+- **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab); each key is listed as `mcp_… · <fingerprint>` with its scope, and its Disable and Delete buttons name it by that fingerprint. The create form takes an optional scope (collections, read-only, chat scenario); Chat → a scenario lists the keys bound to it, with create and delete. When `/v1/config` reports `protocols.mcp.apiKeyEnabled: false`, both places say the server does not check MCP keys, name `MDDB_MCP_API_KEY_ENABLED=true` and disable *Create*; a `warning` returned with a new key is shown with it (2.19.10, #445)
 
   ![LLM Connections page, API Keys tab: a new key shown once with a copy button, and the stored key docs-agent](panel-mcp-api-keys.png)
 

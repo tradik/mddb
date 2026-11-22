@@ -1308,6 +1308,10 @@ paths:
         **once, in this response only** — the listing exposes a fingerprint
         rather than key material, so it cannot be recovered afterwards.
 
+        A key is created even when this server does not check MCP API keys
+        (`MDDB_MCP_API_KEY_ENABLED` is not `true`); the response then carries
+        a `warning` saying so (2.19.10, #445).
+
         Requires admin authentication.
       operationId: createMCPKey
       security:
@@ -1394,6 +1398,14 @@ paths:
                     type: boolean
                   scenario:
                     type: string
+                  warning:
+                    type: string
+                    description: |
+                      Present only when this server does not check MCP API
+                      keys (`MDDB_MCP_API_KEY_ENABLED` is not `true`): the key
+                      is stored, but the MCP listener refuses it until the
+                      setting is on (2.19.10, #445).
+                    example: "MCP API key auth is not enabled on this server: set MDDB_MCP_API_KEY_ENABLED=true to use mcp_ keys"
         "400":
           description: Invalid request body, key name, toolset, collection name or scenario
         "403":

@@ -11,9 +11,11 @@
 package main
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // mcpAuthDecision captures how the MCP listener should be protected relative to
@@ -59,8 +61,7 @@ func decideMCPAuth(authEnabled, mcpKeyEnabled, loopbackBind bool) mcpAuthDecisio
 // reconciles MCP exposure with the main auth configuration.
 func (s *Server) applyMCPAuth(next http.Handler, addr string) http.Handler {
 	authEnabled := env("MDDB_AUTH_ENABLED", "false") == "true"
-	mcpKeyEnabled := os.Getenv("MDDB_MCP_API_KEY_ENABLED") == "true"
-	d := decideMCPAuth(authEnabled, mcpKeyEnabled, isLoopbackListenAddr(addr))
+	d := decideMCPAuth(authEnabled, mcpKeyAuthEnabled(), isLoopbackListenAddr(addr))
 
 	if d.warnInsecure {
 		slog.Warn("MCP listener is unauthenticated — anyone who can reach it has full read/write access to the database. "+
@@ -75,7 +76,43 @@ func (s *Server) applyMCPAuth(next http.Handler, addr string) http.Handler {
 			return next
 		}
 		slog.Info("MCP (listener)", "reason", d.reason, "addr", addr)
-		return s.AuthManager.HTTPMiddleware(next)
+		return refuseMCPKeyWithoutKeyAuth(s.AuthManager, s.AuthManager.HTTPMiddleware(next))
 	}
 	return next
+}
+
+// mcpKeyAuthEnabled reports whether this server checks MCP API keys
+// (MDDB_MCP_API_KEY_ENABLED=true). Off, the store still holds keys and the
+// panel can still create them, but no listener ever consults it (#445).
+func mcpKeyAuthEnabled() bool {
+	return os.Getenv("MDDB_MCP_API_KEY_ENABLED") == "true"
+}
+
+// mcpKeyAuthOffMessage names the setting that makes an MCP API key usable.
+// It says only what /v1/config already tells an admin: whether this server
+// checks MCP keys.
+const mcpKeyAuthOffMessage = "MCP API key auth is not enabled on this server: set MDDB_MCP_API_KEY_ENABLED=true to use mcp_ keys"
+
+// refuseMCPKeyWithoutKeyAuth answers an MCP key with a 401 that names the
+// setting, on a listener the main AuthManager guards because MCP key auth is
+// off (#445). The AuthManager would refuse the key anyway, as "invalid
+// token" or "invalid api key" — true, but it points the operator at the key
+// when the problem is the server. Only the mcp_ prefix is looked at, so
+// every other credential reaches the AuthManager exactly as before, and the
+// refusal is audited like any failed login.
+func refuseMCPKeyWithoutKeyAuth(am *AuthManager, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiKey, token := requestCredentials(r)
+		// A disabled manager guards nothing and a public path needs no
+		// credential: both pass through, as HTTPMiddleware lets them.
+		if !am.enabled || am.isPublicEndpoint(r.URL.Path) ||
+			(!strings.HasPrefix(apiKey, mcpKeySchemePrefix) && !strings.HasPrefix(token, mcpKeySchemePrefix)) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		am.auditAuth(r, "", "auth.mcpkey", "fail", "MCP API key auth is off")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": mcpKeyAuthOffMessage})
+	})
 }

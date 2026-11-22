@@ -3,7 +3,9 @@ import { Key, Plus, Trash2, Ban, AlertCircle } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import { useStore } from '../lib/store';
 import { emptyScope, scopeBody, scopeLabel } from '../lib/mcp-key-scope';
+import { mcpKeyAuthOff } from '../lib/mcp-key-auth';
 import OneTimeSecret from './OneTimeSecret';
+import MCPKeyAuthNotice from './MCPKeyAuthNotice';
 import MCPKeyScopeFields from './MCPKeyScopeFields';
 
 /**
@@ -79,10 +81,13 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
   const [error, setError] = useState(null);
   const [newKeyName, setNewKeyName] = useState('');
   const [createdKey, setCreatedKey] = useState(null);
+  const [createdWarning, setCreatedWarning] = useState(null); // #445
   const [creating, setCreating] = useState(false);
   const [scope, setScope] = useState(emptyScope); // #439
   const [scenarios, setScenarios] = useState([]);
-  const { stats } = useStore();
+  const { stats, config } = useStore();
+  // #445: a server that does not check MCP keys would refuse every key made here.
+  const keyAuthOff = mcpKeyAuthOff(config);
   const collections = (stats?.collections || []).map((c) => c.name);
 
   // Scenarios to bind a key to; none offered when the list is refused.
@@ -108,11 +113,12 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
   useEffect(() => { loadKeys(); }, [loadKeys]);
 
   const handleCreate = async () => {
-    if (!newKeyName.trim()) return;
+    if (!newKeyName.trim() || keyAuthOff) return;
     setCreating(true);
     try {
       const data = await mddbClient.createMCPAPIKey(newKeyName.trim(), 0, scopeBody(scope));
       setCreatedKey(data.key);
+      setCreatedWarning(data.warning || null);
       onKeyCreated?.(data.key);
       setNewKeyName('');
       setScope(emptyScope);
@@ -162,6 +168,8 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
         </div>
       )}
 
+      {keyAuthOff && <MCPKeyAuthNotice />}
+
       {/* Create new key */}
       <div className="flex items-center space-x-2">
         <input
@@ -174,7 +182,7 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
         />
         <button
           onClick={handleCreate}
-          disabled={creating || !newKeyName.trim()}
+          disabled={creating || keyAuthOff || !newKeyName.trim()}
           className="flex items-center space-x-1 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
         >
           <Plus className="w-4 h-4" />
@@ -186,6 +194,7 @@ export default function MCPAPIKeysPanel({ onKeyCreated }) {
 
       {/* Show newly created key (one-time) */}
       {createdKey && <OneTimeSecret secret={createdKey} onDismiss={() => setCreatedKey(null)} />}
+      {createdKey && createdWarning && <MCPKeyAuthNotice warning={createdWarning} />}
 
       {/* Key list */}
       {loading && <p className="text-sm text-fg-subtle">Loading keys...</p>}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Code, Copy, Download, Check, Brain } from 'lucide-react';
 import { useStore } from '../lib/store';
+import { mcpKeyAuthEnabled } from '../lib/mcp-key-auth';
 import mddbClient from '../lib/mddb-client';
 import MCPAPIKeysPanel from './MCPAPIKeysPanel';
 import { withServerDomain, urlOnHost, mcpBaseUrl, mcpEndpoint } from '../lib/server-address';
@@ -122,11 +123,11 @@ export default function MCPConfigPanel() {
   const address = { publicUrl: mcp.publicUrl || '', domain: host, mcpAddr: mcp.addr || ':9000' };
   const mcpUrl = mcpEndpoint(address);
   // A server before 2.19.9 does not say whether keys are on: the key is optional.
-  const keysKnown = typeof mcp.apiKeyEnabled === 'boolean';
-  const keyField = activeTab === 'claude' && (mcp.apiKeyEnabled === true || !keysKnown);
+  const apiKeyEnabled = mcpKeyAuthEnabled(config);
+  const keyField = activeTab === 'claude' && apiKeyEnabled !== false;
 
   const variants = activeTab === 'claude'
-    ? claudeVariants({ mcpUrl, apiKey: keyField ? apiKey : '', apiKeyEnabled: mcp.apiKeyEnabled === true, oauthEnabled: mcp.oauthEnabled === true })
+    ? claudeVariants({ mcpUrl, apiKey: keyField ? apiKey : '', apiKeyEnabled: apiKeyEnabled === true, oauthEnabled: mcp.oauthEnabled === true })
     : [connectionTemplate(activeTab, urlOnHost(host, httpAddr), mcpBaseUrl(address))];
   const variant = variants.find((v) => v.id === variantId) ?? variants[0];
 
@@ -263,7 +264,7 @@ export default function MCPConfigPanel() {
               )}
 
               {keyField && (
-                <ClaudeKeyField value={apiKey} onChange={setApiKey} optional={!keysKnown} onCreate={() => selectTab('api-keys')} />
+                <ClaudeKeyField value={apiKey} onChange={setApiKey} optional={apiKeyEnabled === undefined} onCreate={() => selectTab('api-keys')} />
               )}
 
               {/* Code Block */}
