@@ -234,6 +234,7 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 		{Name: "find_duplicates", Description: "Find duplicate and similar documents"},
 		{Name: "aggregate", Description: "Aggregate metadata facets and date histograms for a collection"},
 		{Name: "ingest_documents", Description: "Bulk ingest with URL key derivation, dedup, and auto-metadata"},
+		{Name: "sync_refresh", Description: syncRefreshDescription},
 		{Name: "upload_file", Description: "Upload file (PDF, DOCX, HTML, TXT, MD, ODT, RTF, YAML, TEX, LOG) with auto-conversion"},
 	}
 
@@ -384,6 +385,7 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 			HTTPEndpoint{Method: "GET/PUT/DELETE", Path: "/v1/automation/{id}", Description: "Get/update/delete automation rule", RequiresAuth: authEnabled},
 			HTTPEndpoint{Method: "POST", Path: "/v1/automation/{id}/test", Description: "Test trigger (dry run)", RequiresAuth: authEnabled},
 			HTTPEndpoint{Method: "POST", Path: "/v1/automation/{id}/run", Description: runAutomationDescription, RequiresAuth: authEnabled},
+			HTTPEndpoint{Method: "POST", Path: syncRefreshPath, Description: syncRefreshDescription, RequiresAuth: authEnabled},
 		)
 		if s.AutomationLogStore != nil {
 			endpoints = append(endpoints,

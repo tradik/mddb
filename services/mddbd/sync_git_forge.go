@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"mddb/internal/httpclient"
@@ -96,14 +98,15 @@ func (r gitRepo) commitURL(commit string) string {
 // of git's smart HTTP; Gitea and Forgejo read the token whatever the name.
 var gitBasicUser = map[string]string{forgeGitHub: "x-access-token", forgeGitLab: "oauth2", forgeGitea: "oauth2"}
 
-// header is a request's header: the sync's User-Agent and, with a token,
-// the forge's credentials — basic auth for git's smart HTTP, the API's
-// Authorization scheme (Gitea's is "token") for the rest.
-func (r gitRepo) header(token string, smartHTTP bool) http.Header {
+// header is the header of a request to rawURL: the sync's User-Agent and,
+// with a token, the forge's credentials — basic auth for git's smart HTTP,
+// the API's Authorization scheme (Gitea's is "token") for the rest. A URL
+// on a host that is not the forge's gets no credentials (INT-023).
+func (r gitRepo) header(rawURL, token string, smartHTTP bool) http.Header {
 	h := syncHeader()
 	var auth string
 	switch {
-	case token == "":
+	case token == "" || !r.tokenHost(rawURL):
 		return h
 	case smartHTTP:
 		auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(gitBasicUser[r.forge]+":"+token))
@@ -114,4 +117,58 @@ func (r gitRepo) header(token string, smartHTTP bool) http.Header {
 	}
 	h.Set("Authorization", auth)
 	return h
+}
+
+// tokenHost reports whether a request to rawURL may carry the repository's
+// token: it goes to the repository's own host, exactly, or — for
+// github.com, whose API and archives have hosts of their own — to those.
+func (r gitRepo) tokenHost(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Host)
+	if host == r.host {
+		return true
+	}
+	if !r.isGitHubCom() {
+		return false
+	}
+	for _, own := range []string{gitHubAPI, gitHubCodeload} {
+		if o, err := url.Parse(own); err == nil && strings.EqualFold(o.Host, host) {
+			return true
+		}
+	}
+	return false
+}
+
+// forgeClient is the client every request of a git or issues source is sent
+// with: gitSyncClient, whose redirects drop the Authorization header when
+// they leave the host the request was sent to (INT-023). Go's client keeps
+// it on a redirect to a subdomain; a token is never meant for one.
+func forgeClient() *http.Client {
+	c := *gitSyncClient()
+	next := c.CheckRedirect
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if !strings.EqualFold(req.URL.Host, via[0].URL.Host) {
+			req.Header.Del("Authorization")
+		}
+		if next == nil {
+			return defaultRedirectPolicy(via)
+		}
+		return next(req, via)
+	}
+	return &c
+}
+
+// maxForgeRedirects is the redirects a forge request follows, as Go's own
+// client does.
+const maxForgeRedirects = 10
+
+// defaultRedirectPolicy is Go's: at most maxForgeRedirects.
+func defaultRedirectPolicy(via []*http.Request) error {
+	if len(via) >= maxForgeRedirects {
+		return errors.New("stopped after 10 redirects")
+	}
+	return nil
 }

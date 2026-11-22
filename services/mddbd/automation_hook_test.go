@@ -111,7 +111,7 @@ func TestAutomationHookRefusals(t *testing.T) {
 	if w.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("a body over the cap: %d", w.Code)
 	}
-	if err := hashBody(sha256.New(), strings.NewReader(strings.Repeat("x", maxHookBodyBytes+1))); err == nil {
+	if _, err := readHookBody(strings.NewReader(strings.Repeat("x", maxHookBodyBytes+1))); err == nil {
 		t.Error("a body over maxHookBodyBytes")
 	}
 

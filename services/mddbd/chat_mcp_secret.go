@@ -85,7 +85,8 @@ func loadChatMcpSecrets(b *bolt.Bucket) map[string]*chatMcpSecret {
 	m := map[string]*chatMcpSecret{}
 	_ = b.ForEach(func(k, v []byte) error { // the callback never fails
 		var sec chatMcpSecret
-		if json.Unmarshal(v, &sec) == nil {
+		// The default forge tokens (forge_tokens.go) share the bucket.
+		if string(k) != string(forgeTokensKey) && json.Unmarshal(v, &sec) == nil {
 			m[string(k)] = &sec
 		}
 		return nil
@@ -145,7 +146,8 @@ func (c *ChatScenarioManager) ListMcpSecrets() []*chatMcpSecretView {
 }
 
 // mcpSecretUsedBy names the scenarios whose servers use a secret, as their
-// credential or as their identity key (#414). Under the lock.
+// credential or as their identity key (#414), and the hosts whose default
+// forge token it is (INT-023). Under the lock.
 func (c *ChatScenarioManager) mcpSecretUsedBy(name string) []string {
 	out := []string{}
 	for _, sc := range c.m {
@@ -157,7 +159,7 @@ func (c *ChatScenarioManager) mcpSecretUsedBy(name string) []string {
 		}
 	}
 	sort.Strings(out)
-	return out
+	return append(out, c.forgeTokensUsing(name)...)
 }
 
 // PutMcpSecret seals and stores a secret, validated by the caller; true when

@@ -110,6 +110,7 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	// --- Write, non-idempotent ---
 	"add_documents_batch":  writeNonIdempotent(),
 	"ingest_documents":     writeNonIdempotent(),
+	"sync_refresh":         writeIdempotent(),
 	"create_automation":    writeNonIdempotent(),
 	"run_automation":       writeNonIdempotent(),
 	"register_webhook":     writeNonIdempotent(),

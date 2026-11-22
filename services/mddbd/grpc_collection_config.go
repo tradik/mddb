@@ -127,7 +127,34 @@ func collectionConfigToProto(cfg *CollectionConfig) *proto.CollectionConfigProto
 		Quota:           quotaToProto(cfg.Quota),
 		ReadOnly:        cfg.ReadOnly,
 		Corpus:          corpusInfoToProto(cfg.Corpus),
+		Repository:      repositoryToProto(cfg.Repository),
 	}
+}
+
+// repositoryToProto carries CollectionRepository (INT-023); nil stays nil.
+func repositoryToProto(r *CollectionRepository) *proto.CollectionRepositoryProto {
+	if r == nil {
+		return nil
+	}
+	return &proto.CollectionRepositoryProto{Url: r.URL, Forge: r.Forge, TokenSecretRef: r.TokenSecretRef}
+}
+
+// applyRepositoryProto sets a repository sent over gRPC on cfg, validated as
+// over REST: nil leaves the stored one alone, an empty url removes it (Set
+// drops it).
+func (s *Server) applyRepositoryProto(cfg *CollectionConfig, in *proto.CollectionRepositoryProto) error {
+	if in == nil {
+		return nil
+	}
+	r := &CollectionRepository{URL: in.GetUrl(), Forge: in.GetForge(), TokenSecretRef: in.GetTokenSecretRef()}
+	if err := r.normalize(); err != nil {
+		return err
+	}
+	if err := s.checkRepositorySecret(r); err != nil {
+		return err
+	}
+	cfg.Repository = r
+	return nil
 }
 
 // corpusInfoToProto carries CorpusInfo (AGT-005). There is no FromProto:
