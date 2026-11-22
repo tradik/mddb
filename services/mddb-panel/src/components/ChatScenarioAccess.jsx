@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import { useStore } from '../lib/store';
 import { useFeatures } from '../lib/features';
+import { navConditions } from '../lib/nav-groups';
 import { accessLinks, accessLabel, throughLabel, sortReaders } from '../lib/chat-scenario-access';
 
 // #441: who can use a stored scenario. Links to the screens that decide it
@@ -56,12 +57,7 @@ export default function ChatScenarioAccess({ name, version, stale = false }) {
   const { features } = useFeatures();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const links = accessLinks({
-    features,
-    authEnabled: config?.authEnabled ?? false,
-    clusterEnabled: !!config?.replicationRole,
-    automationsEnabled: config?.automationsEnabled !== false,
-  });
+  const links = accessLinks({ features, ...navConditions(config) });
 
   useEffect(() => {
     let current = true;

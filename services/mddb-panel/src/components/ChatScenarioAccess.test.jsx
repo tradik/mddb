@@ -67,6 +67,13 @@ describe('ChatScenarioAccess', () => {
     expect(screen.queryByRole('table')).toBeNull();
   });
 
+  test('MCP off: no LLM Connections links, as in the sidebar', async () => {
+    useStore.setState({ config: { authEnabled: true, protocols: { mcp: { enabled: false } } } });
+    await show();
+    expect(screen.queryByRole('button', { name: 'MCP API keys' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Groups' })).toBeTruthy();
+  });
+
   test('a 403 keeps the links and says the list needs admin; another error is shown', async () => {
     vi.mocked(mddbClient.getChatScenarioAccess).mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403 }));
     await show();
