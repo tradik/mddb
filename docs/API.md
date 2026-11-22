@@ -6231,15 +6231,27 @@ curl -s "$MDDB/v1/symbol?collection=repo&name=SearchHybrid&include=definitions,c
 and `includeContent=true` adds the text of definitions, callers and callees —
 references always carry their line.
 
+(v2.19.13) `excludeTests: true` (`excludeTests=true` on `GET`) leaves out every
+passage in a test file before `limit` is applied. `path`
+may name a directory (`internal/session`): the answer then keeps the
+definitions under it. A file path picks a definition in that file, as before.
+
+```bash
+curl -s -X POST "$MDDB/v1/symbol" -d '{"collection": "repo", "name": "Close",
+  "path": "internal/net", "include": ["references"], "excludeTests": true, "limit": 5}'
+```
+
 `limit` applies to each relation separately, not to the response: `limit=20`
 with all seven relations returns up to 140 passages. `candidates` is cut to
-`limit` too. The response has no `total` and no per-relation counts.
-`truncated` is one flag for the whole response: `true` when at least one
-relation (or `candidates`) held more than `limit`, or when a lookup stopped at
-its scan bound of 500 documents or facts. It does not say which relation was
-cut or how many entries were dropped; a list exactly `limit` long may or may
-not be the cut one. It is left out when nothing was cut. To see more of one
-relation, ask for it alone (`include=references`) with a higher `limit`. When
+`limit` too. The response has no `total`. `truncated` is one flag for the
+whole response: `true` when at least one relation (or `candidates`) held more
+than `limit`, or when a lookup stopped at its scan bound of 500 documents or
+facts. It is left out when nothing was cut. (v2.19.13) `totals` says which
+relations the limit cut and how many passages each had before it, for example
+`"totals": {"references": 32}`; a relation missing from it is complete, unless
+the scan bound was reached. Before 2.19.13 a list exactly `limit` long could
+be the cut one or not. To see more of one relation, ask for it alone
+(`include=references`) with a higher `limit`. When
 the server's cap (`MDDB_SEARCH_MAX_LIMIT`, the collection's `maxTopK`) lowered
 the requested `limit`, the response also carries `limit` (the per-relation
 limit used) and `limitCapped: true`; `truncated` is then judged against that
@@ -6326,6 +6338,12 @@ The extension → language table the server classifies source by:
 take `"format": "passages"` and `"passageLines"`. The response is then
 `{"passages": [Passage], "total", "contextTruncated"}` — each passage a path,
 a line range, the definition holding it and its text — instead of documents.
+(v2.19.13) `"passageTokens"` (1 to 8000) bounds one passage; a passage cut
+around a hit holds at most 500 tokens by default. A passage over the bound
+loses context lines first, then the end of its hit line (marked ` […]`), and
+carries `"truncated": true`; its `lines` are the lines returned. Chunks and
+vector hits are cut only when `passageTokens` is set. A hit on a Markdown
+heading returns the heading and the text under it.
 See [SEARCH.md — Passages](SEARCH.md#passages--what-an-agent-gets-v2188).
 
 ### Why the tokeniser differs

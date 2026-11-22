@@ -150,7 +150,7 @@ func TestSummary_MCPAndGRPC(t *testing.T) {
 			t.Fatalf("grpc passages %s: %v %d", mode, err, len(pr.Passages))
 		}
 		out, err = tools.mcpCallTool(ctx, "semantic_search", map[string]any{"collection": "sum", "query": generalQuery, "threshold": 0.3, "format": "passages"})
-		if err != nil || strings.Count(out, `"key": "plant"`) != wantPassages {
+		if err != nil || strings.Count(out, `"key":"plant"`) != wantPassages {
 			t.Fatalf("mcp passages %s: %v %s", mode, err, out)
 		}
 		hp, err := g.HybridSearch(ctx, &proto.HybridSearchRequest{Collection: "sum", Query: generalQuery, TopK: 1, Format: "passages"})

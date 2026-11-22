@@ -129,7 +129,7 @@ func TestFeaturesMCP(t *testing.T) {
 	s := featureServer(t)
 	ts := &MCPToolServer{client: NewDirectClient(s), globalMode: ModeRW}
 	out, err := ts.mcpCallTool(asClaims(alice), "feature_list", nil)
-	if err != nil || !strings.Contains(out, `"name": "images"`) {
+	if err != nil || !strings.Contains(out, `"name":"images"`) {
 		t.Fatalf("list: %s, %v", out, err)
 	}
 	if _, err := ts.mcpCallTool(asClaims(alice), "feature_set", map[string]interface{}{"name": "geo", "enabled": false}); err == nil {
@@ -144,7 +144,7 @@ func TestFeaturesMCP(t *testing.T) {
 		t.Errorf("unknown: %v", err)
 	}
 	out, err = ts.mcpCallTool(asClaims(root), "feature_set", map[string]interface{}{"name": "eval", "enabled": false})
-	if err != nil || !strings.Contains(out, `"version": 1`) {
+	if err != nil || !strings.Contains(out, `"version":1`) {
 		t.Fatalf("set: %s, %v", out, err)
 	}
 	remote := &MCPToolServer{client: covBNewAllErr(), globalMode: ModeRW}

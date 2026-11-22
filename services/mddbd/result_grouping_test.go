@@ -240,7 +240,7 @@ func TestGroupBy_HybridAndCross(t *testing.T) {
 			"target_collections": []interface{}{"repo", "notes"},
 			"group_by":           map[string]interface{}{"key": "author", "perGroup": 1},
 		})
-		if err != nil || !strings.Contains(out, `"groupRank": 1`) {
+		if err != nil || !strings.Contains(out, `"groupRank":1`) {
 			t.Errorf("%s: %v %s", name, err, out)
 		}
 		if _, err := fn(ctx, map[string]interface{}{

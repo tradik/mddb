@@ -202,11 +202,77 @@ mddb-cli autoindex . --semantic=c,cpp --compile-commands build/   # C and C++
 - **References through interfaces** count: gopls reports a call through
   `io.Closer` as a reference to every `Close` that satisfies it, and so does
   the answer.
+- **`totals`** (2.19.13) appears when `limit` cut a relation: per relation,
+  how many passages it had, so a caller knows what a second call with a higher
+  limit would bring. `truncated: true` is set as before.
 
 Full field list: [API](API.md#precise-answers-from-semantic-facts-v2193),
 [MCP](MCP.md), [GraphQL](GRAPHQL.md), [gRPC](GRPC.md). In
 `retrievalMode: graph`, `graphKinds` accepts `implementations`
 ([Search](SEARCH.md)).
+
+## Narrowing a lookup (2.19.13)
+
+- **`excludeTests: true`** (`exclude_tests` on MCP) leaves out every passage
+  in a test file before `limit` is applied, so "implementations outside
+  tests" is one call.
+- **`path` may name a directory.** `path: "internal/session"` keeps the
+  definitions under it; before 2.19.13 a directory returned nothing. A file
+  path picks a definition as before.
+
+```bash
+curl -s -X POST "$MDDB/v1/symbol" -d '{"collection": "myrepo", "name": "Store",
+  "path": "internal/session", "include": ["implementations"], "excludeTests": true}'
+```
+
+`excludeTests` is read from the POST body; the GET query does not take it.
+
+## Answers in lines (2.19.13)
+
+On MCP, `code_symbol` takes `format: "lines"` and answers like grep: one line
+per definition or use and a count per relation. JSON stays the default.
+
+```json
+{"name": "code_symbol", "arguments": {"collection": "myrepo", "name": "Conn.Close",
+  "format": "lines", "include": ["definitions", "references", "tests"], "exclude_tests": true}}
+```
+
+```text
+Conn.Close: semantic (gopls/0.24.0)
+definitions: 1 of 1
+net/conn.go:5-7  method  Conn.Close
+references: 2 of 2
+app/main.go:4  in run: c.Close()
+  :6  in run: c.Close()
+tests: 0 of 0
+```
+
+Definitions, callers, callees, implementations and siblings are
+`path:start-end  kind  Name`; references and tests are
+`path:line  in Enclosing.Func: text`. `20 of 32, more with limit` says the
+limit cut the list; `2 of 2` says it is complete. When a name has several
+definitions, each use ends with `-> path#Name`, the definition it refers to.
+
+For everything that is not a known symbol, the MCP tool `code_search` answers
+in the same shape:
+
+| `mode` | What it does | Default `limit` |
+|---|---|---|
+| `exact` | Every line holding the query as written, ignoring case, with the definition it sits in. Reads the documents under `path` (up to 5 000), so it lists what `grep -i` lists | 50 lines |
+| `words` (default) | Full-text search, ranked; each hit is its line with two lines of context | 5 hits |
+| `meaning` | Hybrid search, same answer shape; on a server without embeddings it answers by words and says so | 5 hits |
+
+```json
+{"name": "code_search", "arguments": {"collection": "myrepo", "query": "ShmBytes", "mode": "exact", "path": "internal/"}}
+```
+
+```text
+internal/config/provider.go:39: [Docker] ShmBytes uint64
+1 of 1 lines in 1 files
+```
+
+`code_search` has no REST endpoint and no output schema. Formats and more
+examples: [MCP](MCP.md#line-answers-for-agents-v21913).
 
 ## How much better
 

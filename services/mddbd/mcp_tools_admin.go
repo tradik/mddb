@@ -49,7 +49,7 @@ func (s *MCPToolServer) toolListRevisions(ctx context.Context, args map[string]i
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -65,7 +65,7 @@ func (s *MCPToolServer) toolRestoreRevision(ctx context.Context, args map[string
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(doc, "", "  ")
+	data, _ := json.Marshal(doc)
 	return fmt.Sprintf("Revision restored successfully:\n%s", string(data)), nil
 }
 
@@ -80,7 +80,7 @@ func (s *MCPToolServer) toolListSynonyms(ctx context.Context, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -130,7 +130,7 @@ func (s *MCPToolServer) toolListStopWords(ctx context.Context, args map[string]i
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -189,7 +189,7 @@ func (s *MCPToolServer) toolGetMetaKeys(ctx context.Context, args map[string]int
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -202,7 +202,7 @@ func (s *MCPToolServer) toolGetChecksum(ctx context.Context, args map[string]int
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -213,7 +213,7 @@ func (s *MCPToolServer) toolListAutomation(ctx context.Context, args map[string]
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -226,7 +226,7 @@ func (s *MCPToolServer) toolCreateAutomation(ctx context.Context, args map[strin
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(created, "", "  ")
+	data, _ := json.Marshal(created)
 	return fmt.Sprintf("Automation rule created:\n%s", string(data)), nil
 }
 
@@ -239,7 +239,7 @@ func (s *MCPToolServer) toolGetAutomation(ctx context.Context, args map[string]i
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(rule, "", "  ")
+	data, _ := json.Marshal(rule)
 	return string(data), nil
 }
 
@@ -256,7 +256,7 @@ func (s *MCPToolServer) toolUpdateAutomation(ctx context.Context, args map[strin
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(updated, "", "  ")
+	data, _ := json.Marshal(updated)
 	return fmt.Sprintf("Automation rule updated:\n%s", string(data)), nil
 }
 
@@ -293,7 +293,7 @@ func (s *MCPToolServer) toolRunAutomation(ctx context.Context, args map[string]i
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(run, "", "  ")
+	data, _ := json.Marshal(run)
 	return string(data), nil
 }
 
@@ -306,7 +306,7 @@ func (s *MCPToolServer) toolGetAutomationLogs(ctx context.Context, args map[stri
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 

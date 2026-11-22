@@ -19,7 +19,7 @@ import (
 func TestChatMcpSecretMCPWithoutKey(t *testing.T) {
 	s := chatServer(t)
 	ts, admin := chatMCP(s), asClaims(root)
-	if out, err := ts.mcpCallTool(admin, "chat_mcp_secret_list", nil); err != nil || !strings.Contains(out, `"encryptionReady": false`) {
+	if out, err := ts.mcpCallTool(admin, "chat_mcp_secret_list", nil); err != nil || !strings.Contains(out, `"encryptionReady":false`) {
 		t.Errorf("list: %s %v", out, err)
 	}
 	_, err := ts.mcpCallTool(admin, "chat_mcp_secret_put", map[string]interface{}{"name": "wiki", "value": "tok-plain"})
@@ -37,7 +37,7 @@ func TestChatMcpSecretMCPLifecycle(t *testing.T) {
 		t.Fatalf("put: %s %v", out, err)
 	}
 	out, err = ts.mcpCallTool(admin, "chat_mcp_secret_list", nil)
-	if err != nil || !strings.Contains(out, `"name": "wiki"`) || !strings.Contains(out, `"set": true`) || strings.Contains(out, "tok-mcp") {
+	if err != nil || !strings.Contains(out, `"name":"wiki"`) || !strings.Contains(out, `"set":true`) || strings.Contains(out, "tok-mcp") {
 		t.Fatalf("list: %s %v", out, err)
 	}
 	for _, tool := range []string{"chat_mcp_secret_put", "chat_mcp_secret_delete"} {
@@ -57,7 +57,7 @@ func TestChatMcpSecretMCPLifecycle(t *testing.T) {
 		t.Errorf("delete in use: %v", err)
 	}
 	out, err = ts.mcpCallTool(admin, "chat_scenario_get", map[string]interface{}{"name": "support"})
-	if err != nil || !strings.Contains(out, `"reason": "feature chatExternalMcp is off"`) {
+	if err != nil || !strings.Contains(out, `"reason":"feature chatExternalMcp is off"`) {
 		t.Errorf("scenario get: %s %v", out, err)
 	}
 	_ = s.DeleteChatScenario("support")

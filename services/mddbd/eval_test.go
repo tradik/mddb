@@ -222,7 +222,7 @@ func TestEval_HTTPAndMCP(t *testing.T) {
 	ctx := context.Background()
 	out, err := tools.mcpCallTool(ctx, "add_eval_query", map[string]interface{}{"collection": "kb", "query": "jwt tokens",
 		"expected_keys": []interface{}{"auth.md"}, "grades": map[string]interface{}{"auth.md": float64(3)}})
-	if err != nil || !strings.Contains(out, `"auth.md": 3`) {
+	if err != nil || !strings.Contains(out, `"auth.md":3`) {
 		t.Fatalf("mcp add: %v %s", err, out)
 	}
 	if _, err = tools.mcpCallTool(ctx, "add_eval_query", map[string]interface{}{"collection": "kb"}); err == nil {
@@ -230,7 +230,7 @@ func TestEval_HTTPAndMCP(t *testing.T) {
 	}
 	out, err = tools.mcpCallTool(ctx, "run_eval", map[string]interface{}{"collection": "kb",
 		"configs": []interface{}{map[string]interface{}{"searchType": "fts", "algorithm": "bm25"}}})
-	if err != nil || !strings.Contains(out, `"recallAtK": 1`) {
+	if err != nil || !strings.Contains(out, `"recallAtK":1`) {
 		t.Fatalf("mcp run: %v %s", err, out)
 	}
 	if _, err = tools.mcpCallTool(ctx, "run_eval", map[string]interface{}{"collection": "kb", "configs": "x"}); err == nil {

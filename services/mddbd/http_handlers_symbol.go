@@ -23,6 +23,7 @@ func (s *Server) handleSymbol(w http.ResponseWriter, r *http.Request) {
 		}
 		req.Limit, _ = strconv.Atoi(q.Get("limit"))
 		req.IncludeContent = q.Get("includeContent") == "true"
+		req.ExcludeTests = q.Get("excludeTests") == "true"
 	case http.MethodPost:
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			bad(w, err)

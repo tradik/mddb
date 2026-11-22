@@ -57,7 +57,7 @@ func semanticDefinitions(r *factReader, req SymbolRequest, defined []*sourceText
 	var out []semanticDef
 	seen := map[string]bool{}
 	for _, st := range definitionCandidates(r, req, defined) {
-		if st.facts == nil || seen[st.doc.ID] || (req.Path != "" && docPath(st.doc) != req.Path) {
+		if st.facts == nil || seen[st.doc.ID] || !req.inPath(docPath(st.doc)) {
 			continue
 		}
 		seen[st.doc.ID] = true
@@ -222,6 +222,17 @@ func (a semanticAnswer) source() string {
 	}
 	sort.Strings(out)
 	return strings.Join(out, ",")
+}
+
+// allIn reports whether path names the one file holding every definition
+// found: the caller chose, so the answer is not ambiguous.
+func (a semanticAnswer) allIn(path string) bool {
+	for _, d := range a.defs {
+		if path == "" || docPath(d.st.doc) != path {
+			return false
+		}
+	}
+	return true
 }
 
 // candidates lists the definitions an ambiguous name could mean.

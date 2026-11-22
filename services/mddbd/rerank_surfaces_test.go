@@ -82,7 +82,7 @@ func TestRerank_MCP(t *testing.T) {
 	} {
 		c.args["rerank"] = on
 		out, err := tools.mcpCallTool(ctx, c.tool, c.args)
-		if err != nil || !strings.Contains(out, `"model": "fake-rerank"`) || !strings.Contains(out, `"moves"`) {
+		if err != nil || !strings.Contains(out, `"model":"fake-rerank"`) || !strings.Contains(out, `"moves"`) {
 			t.Fatalf("%s: %v %s", c.tool, err, out)
 		}
 		if strings.Index(out, `"gamma"`) > strings.Index(out, `"alpha"`) && strings.Contains(out, `"alpha"`) {

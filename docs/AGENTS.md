@@ -15,7 +15,7 @@ measure.
 
 ## 1. Connect over MCP
 
-`mddbd` has a built-in MCP server with 114 tools ([MCP.md](MCP.md)). It serves
+`mddbd` has a built-in MCP server with 116 tools ([MCP.md](MCP.md)). It serves
 the 2026-07-28 and 2025-11-25 revisions side by side
 ([MCP-REVISIONS.md](MCP-REVISIONS.md)).
 
@@ -42,8 +42,8 @@ OAuth 2.1 (`MDDB_MCP_OAUTH_ENABLED=true`); each token stands for an MCP API
 key ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)).
 
 Each built-in tool belongs to one of eleven toolsets: `search` (16 tools),
-`code` (6), `documents` (13), `ingest` (7), `memory` (6), `schema` (5),
-`admin` (37), `geo` (6), `automation` (8), `webhooks` (3), `wordpress` (2).
+`code` (7), `documents` (13), `ingest` (8), `memory` (6), `schema` (5),
+`admin` (42), `geo` (6), `automation` (8), `webhooks` (3), `wordpress` (2).
 Every tool schema is in the model's context on every turn, so give an agent
 only what its work needs:
 
@@ -65,7 +65,9 @@ and calling it returns JSON-RPC `-32601` ([MCP.md](MCP.md#toolsets-v2188)).
 
 Operators can add their own tools and prompts in YAML
 ([CUSTOM-TOOLS.md](CUSTOM-TOOLS.md)), and replace the server's instructions
-with `MDDB_MCP_INSTRUCTIONS_FILE`.
+with `MDDB_MCP_INSTRUCTIONS_FILE`. Without instructions of its own, a server
+that holds code tells an agent which code tool answers which question
+(2.19.13); `MDDB_MCP_INSTRUCTIONS=none` turns that off.
 
 ## 2. Give the agent its instructions
 
@@ -172,7 +174,9 @@ curl -X PUT http://localhost:11023/v1/collection-config \
 cuts one in half, and says so with `contextTruncated: true`; the first result
 is always kept ([API.md](API.md#retrieval-defaults-v2120)). Separately, the
 server returns at most `MDDB_SEARCH_MAX_LIMIT` results (default 1000), and a
-capped response carries `limitCapped: true`.
+capped response carries `limitCapped: true`. One passage cut around a hit
+holds at most 500 tokens (2.19.13); `passageTokens` (`passage_tokens` on MCP)
+changes the bound, up to 8000, and a cut passage carries `truncated: true`.
 
 Other ways to narrow a search on the MCP tools:
 
@@ -197,6 +201,15 @@ For a code collection, two calls replace most search-then-read loops
   (`Conn.Close`), references per definition (`target`), and implementations
   of an interface. A name with several definitions returns `ambiguous: true`
   and `candidates`; ask again with the candidate's `name` and `path`.
+  (2.19.13) `format: "lines"` answers as `path:line` lines with a count per
+  relation instead of JSON, `exclude_tests: true` leaves test files out,
+  `path` may be a directory, and `totals` says how many passages a cut
+  relation had.
+- **`code_search`** (MCP only, 2.19.13) answers everything that is not a
+  known symbol, in lines: `mode: "exact"` for an identifier or literal (every
+  line that holds it, like `grep -i`), `words` (default) for keywords,
+  `meaning` for a description. A count of `N of N` means the list is
+  complete ([MCP.md](MCP.md#line-answers-for-agents-v21913)).
 - **`code_graph`** (`GET /v1/code-graph?collection=…&key=…&direction=in`)
   answers the file-level question: what depends on this document (`in`), what
   it depends on (`out`), or both, up to 3 hops.
@@ -208,6 +221,7 @@ Kubernetes, OpenShift, Kustomize and Ansible files; the server's table is at
 
 ```json
 {"name": "code_symbol", "arguments": {"collection": "repo", "name": "SearchHybrid", "include": ["definitions", "callers", "tests"]}}
+{"name": "code_search", "arguments": {"collection": "repo", "query": "ShmBytes", "mode": "exact", "path": "internal/"}}
 ```
 
 Other projects' code can sit next to yours as read-only reference

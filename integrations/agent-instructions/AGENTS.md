@@ -76,10 +76,15 @@ collection, searched like any other. Writes to it are refused with
 
 ## Before changing code
 
-Ask `code_symbol` about the function, type or selector first: one call returns
-where it is defined (path and lines), every place it is used and from inside
-which definition, what it calls and which tests touch it. Read those passages,
-not the files around them. `code_graph` answers the file-level question —
+For a symbol you can name, ask `code_symbol` with `format: "lines"` and
+`include` set to the relations you need (definitions, references, callers,
+callees, tests, implementations); add exclude_tests: true to leave tests out.
+One call returns where it is defined, where it is used and from inside which
+definition. For everything else ask `code_search`: mode "exact" for an
+identifier or literal, "words" for keywords, "meaning" for a description.
+Both answer as path:line lines and end with a count; "N of N" means the list
+is complete, so do not search again with grep. Read those lines, not the
+files around them. `code_graph` answers the file-level question —
 which documents depend on which. When the answer says `ambiguous: true`, pick
 one of its `candidates` and ask again with that `name` and `path`; with
 `precision: semantic` the references are exact, and `implementations` lists
@@ -130,7 +135,8 @@ waste; if you genuinely need the record again, `search_documents` by key beats
 a fresh full-text or semantic query.
 
 **Do not use `semantic_search` for identifiers.** Embeddings blur exact
-strings; a function name or an error code belongs in `full_text_search`.
+strings; a function name or an error code belongs in `full_text_search`, or in
+a code collection in `code_search` with mode exact.
 
 ## Conversation memory
 

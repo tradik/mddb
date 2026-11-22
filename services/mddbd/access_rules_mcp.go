@@ -55,6 +55,7 @@ var mcpToolAccessRules = map[string]accessRule{
 	"find_duplicates":     ruleRead,
 	"code_graph":          ruleRead,
 	"code_symbol":         ruleRead,
+	"code_search":         ruleRead,
 	"search_advisor":      ruleRead,
 	"get_indexing_status": ruleRead,
 	"geo_search":          ruleRead,

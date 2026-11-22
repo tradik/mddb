@@ -19,7 +19,7 @@ func (s *MCPToolServer) toolGetCollectionConfig(ctx context.Context, args map[st
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -112,7 +112,7 @@ func (s *MCPToolServer) toolListCollectionConfigs(ctx context.Context, args map[
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -174,9 +174,9 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 		return "", err
 	}
 	if resp.Passages != nil {
-		return mcpPassagesJSON(resp.Passages), nil
+		return mcpPassagesFor(args, resp.Passages), nil
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -221,7 +221,7 @@ func (s *MCPToolServer) toolAggregate(ctx context.Context, args map[string]inter
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -240,7 +240,7 @@ func (s *MCPToolServer) toolFindDuplicates(ctx context.Context, args map[string]
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -273,7 +273,7 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -396,6 +396,6 @@ func (s *MCPToolServer) toolUploadFile(ctx context.Context, args map[string]inte
 	if err != nil {
 		return "", err
 	}
-	out, _ := json.MarshalIndent(result, "", "  ")
+	out, _ := json.Marshal(result)
 	return string(out), nil
 }

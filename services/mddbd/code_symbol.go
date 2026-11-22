@@ -56,7 +56,8 @@ type SymbolRequest struct {
 	// documents carry semantic facts.
 	Name string `json:"name"`
 	// Path picks the definition in this file (meta.path) when a name has
-	// several (CODE-012).
+	// several (CODE-012), or keeps the definitions under this directory
+	// (internal/session) when it names one.
 	Path string `json:"path,omitempty"`
 	// Include limits the relations returned; empty means all of them.
 	Include []string `json:"include,omitempty"`
@@ -67,6 +68,10 @@ type SymbolRequest struct {
 	// their line; definitions, callers and callees carry their whole span
 	// only when asked, since that is where the size is.
 	IncludeContent bool `json:"includeContent,omitempty"`
+	// ExcludeTests leaves out every passage in a test file, before Limit is
+	// applied: "implementations outside tests" is then one call, not a list
+	// of test doubles to read past.
+	ExcludeTests bool `json:"excludeTests,omitempty"`
 }
 
 // SymbolResult is the answer: one list of passages per relation.
@@ -89,8 +94,11 @@ type SymbolResult struct {
 	Ambiguous  bool              `json:"ambiguous,omitempty"`
 	Candidates []SymbolCandidate `json:"candidates,omitempty"`
 	// Truncated says some relation held more than Limit.
-	Truncated   bool `json:"truncated,omitempty"`
-	LimitReport      // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
+	Truncated bool `json:"truncated,omitempty"`
+	// Totals is how many passages each cut relation held before Limit, so a
+	// caller knows what a second call would bring, and whether to make it.
+	Totals      map[string]int `json:"totals,omitempty"`
+	LimitReport                // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 var errSymbolRequest = errors.New("collection and name are required")
@@ -110,6 +118,15 @@ func (r *SymbolRequest) normalize() error {
 		}
 	}
 	return nil
+}
+
+// inPath reports whether p is the file Path names, or lies under the
+// directory it names; every path is, without one.
+func (r *SymbolRequest) inPath(p string) bool {
+	if r.Path == "" || p == r.Path {
+		return true
+	}
+	return strings.HasPrefix(p, strings.TrimSuffix(r.Path, "/")+"/")
 }
 
 func (r *SymbolRequest) wants(rel string) bool {
@@ -176,10 +193,13 @@ func (s *Server) LookupSymbol(req SymbolRequest) (*SymbolResult, error) {
 	}
 	res.Precision = precision(req, len(sem.defs) > 0, len(hDefs)+len(hRefs)+len(hCallees) > 0)
 	res.SemanticSource = sem.source()
-	if req.Path == "" && len(sem.defs) > 1 {
+	if len(sem.defs) > 1 && !sem.allIn(req.Path) {
 		res.Ambiguous, res.Candidates = true, sem.candidates()
 	}
-	res.Truncated = found.cut || cutRelations(res, req.Limit)
+	if req.ExcludeTests {
+		dropTestPassages(res)
+	}
+	res.Truncated = cutRelations(res, req.Limit) || found.cut
 	return res, nil
 }
 
@@ -219,14 +239,50 @@ func (s *Server) symbolDocuments(req SymbolRequest) symbolDocs {
 	return out
 }
 
-// cutRelations trims every relation to limit and reports whether any held
-// more.
+// relations lists a result's relations by name, in the order they are
+// documented and rendered.
+func (res *SymbolResult) relations() []symbolRelation {
+	return []symbolRelation{{RelDefinitions, &res.Definitions}, {RelReferences, &res.References},
+		{RelCallers, &res.Callers}, {RelCallees, &res.Callees}, {RelTests, &res.Tests},
+		{RelSiblings, &res.Siblings}, {RelImplementations, &res.Implementations}}
+}
+
+type symbolRelation struct {
+	name string
+	list *[]Passage
+}
+
+// dropTestPassages removes what lies in test files from every relation and
+// from the candidates.
+func dropTestPassages(res *SymbolResult) {
+	for _, rel := range res.relations() {
+		if *rel.list != nil {
+			*rel.list = filterPassages(*rel.list, func(p Passage) bool { return !isTestPath(p.Path) })
+		}
+	}
+	kept := res.Candidates[:0]
+	for _, c := range res.Candidates {
+		if !isTestPath(c.Path) {
+			kept = append(kept, c)
+		}
+	}
+	res.Candidates = kept
+	if res.Definitions == nil {
+		res.Definitions = []Passage{}
+	}
+}
+
+// cutRelations trims every relation to limit, records in Totals what each
+// cut one held, and reports whether any held more.
 func cutRelations(res *SymbolResult, limit int) bool {
 	cut := false
-	for _, list := range []*[]Passage{&res.Definitions, &res.References, &res.Callers, &res.Callees, &res.Tests,
-		&res.Siblings, &res.Implementations} {
-		if len(*list) > limit {
-			*list = (*list)[:limit]
+	for _, rel := range res.relations() {
+		if n := len(*rel.list); n > limit {
+			if res.Totals == nil {
+				res.Totals = map[string]int{}
+			}
+			res.Totals[rel.name] = n
+			*rel.list = (*rel.list)[:limit]
 			cut = true
 		}
 	}

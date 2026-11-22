@@ -70,7 +70,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.19.12"
+  version: "2.19.13"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb
@@ -5261,7 +5261,7 @@ paths:
         - name: path
           in: query
           required: false
-          description: (v2.19.3) The file (meta.path) of the one definition wanted.
+          description: (v2.19.3) The file (meta.path) of the one definition wanted. (v2.19.13) A directory keeps the definitions under it.
           schema: { type: string, example: internal/net/conn.go }
         - name: include
           in: query
@@ -5276,6 +5276,11 @@ paths:
         - name: includeContent
           in: query
           required: false
+          schema: { type: boolean, default: false }
+        - name: excludeTests
+          in: query
+          required: false
+          description: (v2.19.13) Leave out every passage in a test file, before the limit is applied.
           schema: { type: boolean, default: false }
       responses:
         "200":
@@ -12367,6 +12372,11 @@ components:
             description: "fts, vector, hybrid, cross, or a symbol relation.",
           }
         tokens: { type: integer, description: Estimated tokens of content. }
+        truncated:
+          {
+            type: boolean,
+            description: "(v2.19.13) content was cut to the passage token bound; lines is what is left, and a hit line cut short ends in ' […]'.",
+          }
         images:
           type: array
           items: { $ref: "#/components/schemas/ImageRef" }
@@ -12443,7 +12453,7 @@ components:
         path:
           {
             type: string,
-            description: "(v2.19.3) The file (meta.path) of the one definition wanted.",
+            description: "(v2.19.3) The file (meta.path) of the one definition wanted. (v2.19.13) A directory (internal/session) keeps the definitions under it.",
           }
         include:
           type: array
@@ -12467,6 +12477,11 @@ components:
           maximum: 200
           description: Per relation; also never above MDDB_SEARCH_MAX_LIMIT or the collection's retrieval.maxTopK (v2.18.10+).
         includeContent: { type: boolean }
+        excludeTests:
+          {
+            type: boolean,
+            description: "(v2.19.13) Leave out every passage in a test file, before limit is applied.",
+          }
     SymbolResult:
       type: object
       properties:
@@ -12518,9 +12533,15 @@ components:
           description: >
             One flag for the whole response: at least one relation (or
             candidates) held more than limit, or a lookup stopped at its scan
-            bound of 500 documents or facts. It does not say which relation
-            was cut or by how much, and the response carries no total. Omitted
-            when nothing was cut.
+            bound of 500 documents or facts. Omitted when nothing was cut;
+            totals says which relations were cut and by how much.
+        totals:
+          type: object
+          additionalProperties: { type: integer }
+          description: >
+            (v2.19.13) Per relation the limit cut, how many passages it held
+            before the limit, e.g. {"references": 32}. Absent when no
+            relation was cut.
     GraphExpandOptions:
       type: object
       description: Tunes retrievalMode "graph" (SRCH-006; graphKinds CODE-008).
@@ -13932,6 +13953,11 @@ components:
           minimum: 0
           maximum: 200
           description: Lines of context on each side of a hit (default 10); a hit inside a shorter definition returns the definition.
+        passageTokens:
+          type: integer
+          minimum: 0
+          maximum: 8000
+          description: "(v2.19.13) The most tokens one passage may hold. Unset, a passage cut around a hit holds at most 500; chunks and vector hits are cut only when this is set. A passage over it loses context lines, then the end of its hit line, and carries truncated: true."
         graphExpand:
           $ref: "#/components/schemas/GraphExpandOptions"
         readLevel:
@@ -14675,6 +14701,11 @@ components:
           minimum: 0
           maximum: 200
           description: Lines of context on each side of a hit (default 10); a hit inside a shorter definition returns the definition.
+        passageTokens:
+          type: integer
+          minimum: 0
+          maximum: 8000
+          description: "(v2.19.13) The most tokens one passage may hold. Unset, a passage cut around a hit holds at most 500; chunks and vector hits are cut only when this is set. A passage over it loses context lines, then the end of its hit line, and carries truncated: true."
         groupBy:
           $ref: "#/components/schemas/GroupBy"
         collection:
@@ -15666,6 +15697,11 @@ components:
           minimum: 0
           maximum: 200
           description: Lines of context on each side of a hit (default 10); a hit inside a shorter definition returns the definition.
+        passageTokens:
+          type: integer
+          minimum: 0
+          maximum: 8000
+          description: "(v2.19.13) The most tokens one passage may hold. Unset, a passage cut around a hit holds at most 500; chunks and vector hits are cut only when this is set. A passage over it loses context lines, then the end of its hit line, and carries truncated: true."
         readLevel:
           type: string
           enum: [indexed, indexedPlusPending]
@@ -19182,6 +19218,11 @@ components:
           minimum: 0
           maximum: 200
           description: Lines of context on each side of a hit (default 10); a hit inside a shorter definition returns the definition.
+        passageTokens:
+          type: integer
+          minimum: 0
+          maximum: 8000
+          description: "(v2.19.13) The most tokens one passage may hold. Unset, a passage cut around a hit holds at most 500; chunks and vector hits are cut only when this is set. A passage over it loses context lines, then the end of its hit line, and carries truncated: true."
         waitForIndex:
           type: integer
           minimum: 0

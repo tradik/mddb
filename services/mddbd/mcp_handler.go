@@ -193,12 +193,19 @@ func (h *MCPHandler) handleInitialize(ctx context.Context, req map[string]interf
 
 // instructionsFor is what initialize and server/discover send as
 // instructions: the composed prompt of the chat scenario the request's MCP
-// API key is bound to (#439), else the server's own.
+// API key is bound to (#439), else the operator's own, else the default for
+// a server that holds code (mcp_default_instructions.go).
 func (h *MCPHandler) instructionsFor(ctx context.Context) string {
 	if dc, ok := h.client.(*DirectClient); ok && dc.server != nil {
 		if prompt, bound := dc.server.keyScenarioInstructions(ctx); bound {
 			return prompt
 		}
+	}
+	switch h.instructions {
+	case "":
+		return h.defaultInstructions(ctx)
+	case mcpInstructionsNone:
+		return ""
 	}
 	return h.instructions
 }

@@ -98,7 +98,7 @@ func TestCovCAutomationLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err := c.TestAutomation(ctx, fts.ID)
-	if err != nil || !strings.Contains(out, `"total": 1`) || !strings.Contains(out, `"name": "zebras"`) {
+	if err != nil || !strings.Contains(out, `"total":1`) || !strings.Contains(out, `"name":"zebras"`) {
 		t.Fatalf("TestAutomation = %s, %v", out, err)
 	}
 

@@ -32,11 +32,11 @@ func TestCodeSymbolSemantic_Surfaces(t *testing.T) {
 
 	tools := &MCPToolServer{client: NewDirectClient(s)}
 	out, err := tools.toolCodeSymbol(ctx, map[string]interface{}{"collection": semColl, "name": "Close"})
-	if err != nil || !strings.Contains(out, `"ambiguous": true`) || !strings.Contains(out, `"name": "Buffer.Close"`) {
+	if err != nil || !strings.Contains(out, `"ambiguous":true`) || !strings.Contains(out, `"name":"Buffer.Close"`) {
 		t.Fatalf("MCP: %v %s", err, out)
 	}
 	out, err = tools.toolCodeSymbol(ctx, map[string]interface{}{"collection": semColl, "name": "Close", "path": "buf/buf.go"})
-	if err != nil || strings.Contains(out, `"ambiguous"`) || !strings.Contains(out, `"container": "Buffer"`) {
+	if err != nil || strings.Contains(out, `"ambiguous"`) || !strings.Contains(out, `"container":"Buffer"`) {
 		t.Fatalf("MCP with path: %v %s", err, out)
 	}
 

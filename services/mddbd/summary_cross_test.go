@@ -187,7 +187,7 @@ func TestSummaryCross_MCPAndGRPC(t *testing.T) {
 		}
 		out, err = tools.mcpCallTool(ctx, "cross_search", map[string]any{"target_collections": targets, "query": generalQuery,
 			"threshold": 0.3, "format": "passages"})
-		if err != nil || strings.Count(out, `"key": "plant"`) != wantPassages || strings.Contains(out, `"depot"`) {
+		if err != nil || strings.Count(out, `"key":"plant"`) != wantPassages || strings.Contains(out, `"depot"`) {
 			t.Fatalf("mcp passages %s: %v %s", mode, err, out)
 		}
 		cr, err := g.CrossSearch(ctx, &proto.CrossSearchRequest{TargetCollections: []string{"sum", "plain"}, Query: generalQuery,

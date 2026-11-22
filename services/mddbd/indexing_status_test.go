@@ -152,7 +152,7 @@ func TestIndexing_ReadLevelIndexedPlusPending(t *testing.T) {
 		"collection": "notes", "query": "pelican", "read_level": "indexedPlusPending",
 		"wait_for_index": 20, "wait_for_keys": []interface{}{"p1"},
 	})
-	if err != nil || !strings.Contains(out, `"pendingEmbedding": true`) || !strings.Contains(out, `"timedOut": true`) {
+	if err != nil || !strings.Contains(out, `"pendingEmbedding":true`) || !strings.Contains(out, `"timedOut":true`) {
 		t.Fatalf("MCP: %v %s", err, out)
 	}
 
@@ -164,7 +164,7 @@ func TestIndexing_ReadLevelIndexedPlusPending(t *testing.T) {
 		t.Fatalf("hybrid: %d %s", rec.Code, rec.Body.String())
 	}
 	out, err = tools.toolHybridSearch(context.Background(), map[string]interface{}{"collection": "notes", "query": "pelican"})
-	if err != nil || !strings.Contains(out, `"pendingEmbedding": true`) {
+	if err != nil || !strings.Contains(out, `"pendingEmbedding":true`) {
 		t.Fatalf("MCP hybrid: %v %s", err, out)
 	}
 
@@ -177,7 +177,7 @@ func TestIndexing_ReadLevelIndexedPlusPending(t *testing.T) {
 	out, err = tools.toolCrossSearch(context.Background(), map[string]interface{}{
 		"query": "pelican", "target_collections": []interface{}{"notes"}, "wait_for_index": 10,
 	})
-	if err != nil || !strings.Contains(out, `"timedOut": true`) {
+	if err != nil || !strings.Contains(out, `"timedOut":true`) {
 		t.Fatalf("MCP cross: %v %s", err, out)
 	}
 }
@@ -235,13 +235,13 @@ func TestIndexing_StatusSurfaces(t *testing.T) {
 	// MCP
 	tools := &MCPToolServer{client: NewDirectClient(s)}
 	out, err := tools.toolGetIndexingStatus(context.Background(), map[string]interface{}{"collection": "notes"})
-	if err != nil || !strings.Contains(out, `"indexed": false`) {
+	if err != nil || !strings.Contains(out, `"indexed":false`) {
 		t.Fatalf("MCP: %v %s", err, out)
 	}
 	out, err = tools.toolAddDocument(context.Background(), map[string]interface{}{
 		"collection": "notes", "key": "y", "lang": "en", "content_md": "another",
 	})
-	if err != nil || !strings.Contains(out, `"embeddingQueued": true`) {
+	if err != nil || !strings.Contains(out, `"embeddingQueued":true`) {
 		t.Fatalf("MCP add: %v %s", err, out)
 	}
 

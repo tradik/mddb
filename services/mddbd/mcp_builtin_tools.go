@@ -42,6 +42,7 @@ func mcpBuiltinTools() []MCPTool {
 	t := mcpBuiltinToolsCore()
 	t = append(t, mcpBuiltinToolsAdvanced()...)
 	t = append(t, mcpReferenceTools()...)
+	t = append(t, mcpCodeSearchTool())
 	t = append(t, mcpEvalTools()...)
 	t = append(t, mcpGainTool())
 	t = append(t, mcpCorpusTools()...)
@@ -87,6 +88,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"filter":          mcpFilterSchema,
 					"format":          mcpFormatSchema,
 					"passage_lines":   mcpPassageLinesSchema,
+					"passage_tokens":  mcpPassageTokensSchema,
 					"sort":            map[string]interface{}{"type": "string"},
 					"limit":           map[string]interface{}{"type": "integer"},
 					"offset":          map[string]interface{}{"type": "integer"},
@@ -155,6 +157,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"filter":              mcpFilterSchema,
 					"format":              mcpFormatSchema,
 					"passage_lines":       mcpPassageLinesSchema,
+					"passage_tokens":      mcpPassageTokensSchema,
 					"include_images":      mcpIncludeImagesSchema,
 					"group_by":            mcpGroupBySchema,
 					"read_level":          mcpReadLevelSchema,
@@ -254,6 +257,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"filter":           mcpFilterSchema,
 					"format":           mcpFormatSchema,
 					"passage_lines":    mcpPassageLinesSchema,
+					"passage_tokens":   mcpPassageTokensSchema,
 					"include_images":   mcpIncludeImagesSchema,
 					"group_by":         mcpGroupBySchema,
 					"disable_stem":     map[string]interface{}{"type": "boolean", "description": "(v2.18.1) Turn stemming off for this query. For source code and exact identifiers."},
@@ -552,26 +556,26 @@ func mcpBuiltinToolsCore() []MCPTool {
 		},
 		{
 			Name: "code_symbol",
-			Description: "Everything about one symbol (function, type, class, CSS selector, Terraform resource) in a " +
-				"code collection, as path + line passages: definitions (with the span start-end), references " +
-				"(each use, with the definition it sits in), callers, callees, tests that touch it and siblings " +
-				"(other definitions in the same directory). Use it before changing a symbol instead of " +
-				"searching for its name and reading files. When the collection was indexed with " +
-				"`mddb-cli autoindex --semantic`, the answer comes from a language server's facts and says " +
-				"precision: semantic (mixed when only some files have facts; absent or heuristic otherwise): " +
-				"qualified names (Server.Close), references per definition (passage target), and " +
-				"implementations of an interface, which need those facts. A name with several definitions " +
-				"returns ambiguous: true and candidates; ask again with name and path.",
+			Description: "One symbol (function, type, class, CSS selector, Terraform resource) in a code collection: " +
+				"definitions, references (each use and the definition it sits in), callers, callees, tests, siblings " +
+				"(definitions in the same directory) and implementations. Use it before changing a symbol instead of " +
+				"searching for its name and reading files. format lines answers as path:line lines with a count per " +
+				"relation, at a fraction of the JSON's size. With `mddb-cli autoindex --semantic` the answer comes from " +
+				"a language server's facts (precision: semantic; mixed when only some files have them): qualified names " +
+				"(Server.Close), references per definition, and implementations, which need those facts. A name with " +
+				"several definitions returns ambiguous and candidates; ask again with path.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
 					"collection": map[string]interface{}{"type": "string"},
-					"name":       map[string]interface{}{"type": "string", "description": "Symbol name as written: SearchHybrid, .hero-banner, aws_instance.web; or qualified, Server.Close, with semantic facts"},
-					"path":       map[string]interface{}{"type": "string", "description": "File (meta.path) of the one definition wanted, e.g. a candidate's path"},
+					"name":       map[string]interface{}{"type": "string", "description": "As written: SearchHybrid, .hero-banner, aws_instance.web; or qualified: Server.Close"},
+					"path":       map[string]interface{}{"type": "string", "description": "File of the definition wanted, or a directory holding it"},
 					"include": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string",
 						"enum": allRelations}, "description": "Relations to return; default all"},
-					"limit":           map[string]interface{}{"type": "integer", "description": "Passages per relation (default 20, max 200)"},
-					"include_content": map[string]interface{}{"type": "boolean", "description": "Add the text of definitions, callers and callees (references always carry their line)"},
+					"limit":           map[string]interface{}{"type": "integer", "description": "Per relation (default 20, max 200); totals says what a cut relation held"},
+					"exclude_tests":   map[string]interface{}{"type": "boolean", "description": "Leave out what is in test files"},
+					"include_content": map[string]interface{}{"type": "boolean", "description": "Add the text of definitions, callers and callees"},
+					"format":          map[string]interface{}{"type": "string", "enum": []string{"json", FormatLines}, "description": "json (default) or lines"},
 				},
 				"required": []string{"collection", "name"},
 			},
@@ -725,6 +729,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"filter":              mcpFilterSchema,
 					"format":              mcpFormatSchema,
 					"passage_lines":       mcpPassageLinesSchema,
+					"passage_tokens":      mcpPassageTokensSchema,
 					"include_images":      mcpIncludeImagesSchema,
 					"group_by":            mcpGroupBySchema,
 					"read_level":          mcpReadLevelSchema,
@@ -1144,6 +1149,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"filter":             mcpFilterSchema,
 					"format":             mcpFormatSchema,
 					"passage_lines":      mcpPassageLinesSchema,
+					"passage_tokens":     mcpPassageTokensSchema,
 					"include_images":     mcpIncludeImagesSchema,
 					"group_by":           mcpGroupBySchema,
 					"read_level":         mcpReadLevelSchema,
@@ -1463,6 +1469,10 @@ var (
 		"type": "integer", "minimum": 0, "maximum": maxPassageLines,
 		"description": "Lines of context on each side of a hit in a passage (default 10); a hit inside a shorter definition returns the definition",
 	}
+	mcpPassageTokensSchema = map[string]interface{}{
+		"type": "integer", "minimum": 0, "maximum": maxPassageTokens,
+		"description": "Max tokens per passage (default 500); a cut passage says truncated",
+	}
 )
 
 // mcpReferenceTools are the reference coding tools (AGT-003).
@@ -1477,9 +1487,10 @@ func mcpReferenceTools() []MCPTool {
 				"definition, text). Check the collection's licence before copying.",
 			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{
 				"query": map[string]interface{}{"type": "string"}, "collections": collections,
-				"search_type":   map[string]interface{}{"type": "string", "enum": []string{CrossSearchHybrid, CrossSearchFTS, CrossSearchVector}},
-				"top_k":         map[string]interface{}{"type": "integer"},
-				"passage_lines": mcpPassageLinesSchema, "filter": mcpFilterSchema,
+				"search_type":    map[string]interface{}{"type": "string", "enum": []string{CrossSearchHybrid, CrossSearchFTS, CrossSearchVector}},
+				"top_k":          map[string]interface{}{"type": "integer"},
+				"passage_lines":  mcpPassageLinesSchema,
+				"passage_tokens": mcpPassageTokensSchema, "filter": mcpFilterSchema,
 			}, "required": []string{"query"}},
 		},
 		{

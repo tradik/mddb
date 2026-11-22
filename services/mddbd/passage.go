@@ -51,6 +51,9 @@ type Passage struct {
 	Source string `json:"source,omitempty"`
 	// Tokens estimates Content's size with the context budget's estimator.
 	Tokens int `json:"tokens"`
+	// Truncated says Content was cut to the passage token bound: Lines is
+	// what is left, and a hit line cut short ends in " […]".
+	Truncated bool `json:"truncated,omitempty"`
 	// Images are the document's images, with includeImages (RAG-010).
 	Images []ImageRef `json:"images,omitempty"`
 	// docTokens is the whole document's estimate, for the gain counters

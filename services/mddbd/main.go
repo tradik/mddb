@@ -47,7 +47,7 @@ import (
 // constant on purpose: scripts/bump-version.sh writes it and
 // scripts/check-version.sh guards it, so builds take no -X flag (OPS-022);
 // the release checks the artifact with `mddbd -version`.
-const VERSION = "2.19.12"
+const VERSION = "2.19.13"
 
 // versionLine is what `mddbd -version` prints.
 func versionLine() string { return "mddbd version " + VERSION }
@@ -161,6 +161,7 @@ type Server struct {
 	Training        *trainingManager          // Model training: datasets and runs of the operator's trainers
 	MCPInfo         MCPServerInfo             // Customizable MCP server profile
 	MCPInstructions string                    // System prompt for LLM — how to use this server
+	codeProbe       codeProbe                 // whether any collection holds code, for the default MCP instructions
 	mcpKeyStore     *mcpAPIKeyStore           // BoltDB-backed MCP API key store
 	mcpAuth         *MCPAPIKeyMiddleware      // MCP API key middleware (for cache invalidation)
 	mcpOAuth        atomic.Pointer[mcpOAuth]  // #440: the MCP OAuth server once the listener runs it; nil when OAuth is off

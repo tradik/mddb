@@ -576,7 +576,7 @@ Customize the MCP server profile returned in the `initialize` response. Useful f
 | `MDDB_MCP_SERVER_DESCRIPTION` | `""` | string | Human-readable server description |
 | `MDDB_MCP_SERVER_VENDOR` | `""` | string | Organization / vendor name |
 | `MDDB_MCP_SERVER_HOMEPAGE` | `""` | string | URL to server documentation or homepage |
-| `MDDB_MCP_INSTRUCTIONS` | `""` | string | System prompt for LLM — tells the AI how to use this server |
+| `MDDB_MCP_INSTRUCTIONS` | `""` | string | System prompt for LLM — tells the AI how to use this server. Unset, a server that holds code sends a short default naming the code tools (`code_symbol` with `format: "lines"`, `code_search`) to a key bound to no chat scenario that may use the `code` toolset; `none` turns the default off (v2.19.13) |
 | `MDDB_MCP_INSTRUCTIONS_FILE` | `""` | string | Path to a file with the instructions, read at startup; `MDDB_MCP_INSTRUCTIONS` wins when both are set (v2.18.1) |
 
 Or via YAML config:

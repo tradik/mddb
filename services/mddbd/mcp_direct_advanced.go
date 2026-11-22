@@ -88,7 +88,7 @@ func (c *DirectClient) TestAutomation(ctx context.Context, id string) (string, e
 		"matches": matches,
 		"total":   len(matches),
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 

@@ -17,33 +17,33 @@ func TestChatSkillMCPLifecycle(t *testing.T) {
 	s := chatServer(t)
 	ts, admin := chatMCP(s), asClaims(root)
 	out, err := ts.mcpCallTool(admin, "chat_skill_put", map[string]interface{}{"name": "tone", "content": toneSkillMD})
-	if err != nil || !strings.Contains(out, `"created": true`) || !strings.Contains(out, `"description": "Friendly answers"`) ||
-		!strings.Contains(out, `"content": "Be kind."`) {
+	if err != nil || !strings.Contains(out, `"created":true`) || !strings.Contains(out, `"description":"Friendly answers"`) ||
+		!strings.Contains(out, `"content":"Be kind."`) {
 		t.Fatalf("put: %s, %v", out, err)
 	}
 	source := map[string]interface{}{"url": "https://example.com/SKILL.md", "commit": "abc", "fetchedAt": "2026-11-11T10:00:00Z"}
 	out, err = ts.mcpCallTool(admin, "chat_skill_put", map[string]interface{}{"name": "tone", "content": "Be kind and brief.",
 		"description": "Brief", "source": source})
-	if err != nil || !strings.Contains(out, `"created": false`) || !strings.Contains(out, `"version": 2`) ||
-		!strings.Contains(out, `"fetchedAt": "2026-11-11T10:00:00Z"`) {
+	if err != nil || !strings.Contains(out, `"created":false`) || !strings.Contains(out, `"version":2`) ||
+		!strings.Contains(out, `"fetchedAt":"2026-11-11T10:00:00Z"`) {
 		t.Fatalf("version 2: %s, %v", out, err)
 	}
 	// A source without a time is fetched now.
 	out, err = ts.mcpCallTool(admin, "chat_skill_put", map[string]interface{}{"name": "other", "content": "x",
 		"source": map[string]interface{}{"url": "https://example.com/o"}})
-	if err != nil || !strings.Contains(out, `"url": "https://example.com/o"`) {
+	if err != nil || !strings.Contains(out, `"url":"https://example.com/o"`) {
 		t.Fatalf("a source without a time: %s, %v", out, err)
 	}
 	out, err = ts.mcpCallTool(admin, "chat_skill_list", nil)
-	if err != nil || !strings.Contains(out, `"version": 3`) || strings.Contains(out, `"content"`) || !strings.Contains(out, `"bytes": 18`) {
+	if err != nil || !strings.Contains(out, `"version":3`) || strings.Contains(out, `"content"`) || !strings.Contains(out, `"bytes":18`) {
 		t.Fatalf("list: %s, %v", out, err)
 	}
 	out, err = ts.mcpCallTool(admin, "chat_skill_get", map[string]interface{}{"name": "tone"})
-	if err != nil || !strings.Contains(out, `"content": "Be kind and brief."`) || !strings.Contains(out, `"history"`) {
+	if err != nil || !strings.Contains(out, `"content":"Be kind and brief."`) || !strings.Contains(out, `"history"`) {
 		t.Fatalf("get: %s, %v", out, err)
 	}
 	out, err = ts.mcpCallTool(admin, "chat_skill_get", map[string]interface{}{"name": "tone", "version": float64(1)})
-	if err != nil || !strings.Contains(out, `"content": "Be kind."`) {
+	if err != nil || !strings.Contains(out, `"content":"Be kind."`) {
 		t.Fatalf("get version 1: %s, %v", out, err)
 	}
 
@@ -90,7 +90,7 @@ func TestChatSkillMCPLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err = ts.mcpCallTool(admin, "chat_scenario_get", map[string]interface{}{"name": "support"})
-	if err != nil || !strings.Contains(out, `Skill tone — Brief:\nBe kind and brief.`) || !strings.Contains(out, `"missingSkills": [`) ||
+	if err != nil || !strings.Contains(out, `Skill tone — Brief:\nBe kind and brief.`) || !strings.Contains(out, `"missingSkills":[`) ||
 		!strings.Contains(out, `"approxTokens"`) || !strings.Contains(out, `"bytes"`) || strings.Contains(out, `"warning"`) {
 		t.Fatalf("scenario get: %s, %v", out, err)
 	}

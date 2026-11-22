@@ -244,7 +244,7 @@ func TestImages_QueryImage(t *testing.T) {
 	// MCP, gRPC and GraphQL run the same search.
 	out, err := (&MCPToolServer{client: NewDirectClient(s), globalMode: ModeRW}).mcpCallTool(ctx, "semantic_search",
 		map[string]interface{}{"collection": "mm", "query_image": b64})
-	if err != nil || !strings.Contains(out, `"algorithm": "image"`) || !strings.Contains(out, "manual/images/wiring.jpg") {
+	if err != nil || !strings.Contains(out, `"algorithm":"image"`) || !strings.Contains(out, "manual/images/wiring.jpg") {
 		t.Fatalf("mcp: %v %s", err, out)
 	}
 	mp, err := NewDirectClient(s).VectorSearch(ctx, &MCPVectorSearchRequest{Collection: "mm", QueryImage: b64, PassageOptions: PassageOptions{Format: FormatPassages}})

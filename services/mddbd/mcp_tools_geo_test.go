@@ -32,10 +32,10 @@ func TestMCPToolGeoSearch_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, `"total": 0`) {
+	if !strings.Contains(out, `"total":0`) {
 		t.Errorf("expected total=0 in output, got: %s", out)
 	}
-	if !strings.Contains(out, `"algorithm": "rtree"`) {
+	if !strings.Contains(out, `"algorithm":"rtree"`) {
 		t.Errorf("expected algorithm=rtree, got: %s", out)
 	}
 }
@@ -68,7 +68,7 @@ func TestMCPToolGeoWithin_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, `"total": 0`) {
+	if !strings.Contains(out, `"total":0`) {
 		t.Errorf("expected total=0, got: %s", out)
 	}
 }
@@ -80,7 +80,7 @@ func TestMCPToolGeoStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, `"ready": true`) {
+	if !strings.Contains(out, `"ready":true`) {
 		t.Errorf("expected ready=true, got: %s", out)
 	}
 }

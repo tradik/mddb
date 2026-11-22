@@ -101,7 +101,7 @@ func (s *MCPToolServer) symbolAcross(ctx context.Context, args map[string]interf
 		out.Precision = combinePrecision(out.Precision, res.Precision, i == 0)
 		out.Truncated = out.Truncated || res.Truncated
 	}
-	data, _ := json.MarshalIndent(out, "", "  ")
+	data, _ := json.Marshal(out)
 	return string(data), nil
 }
 
@@ -135,6 +135,6 @@ func (s *MCPToolServer) toolReferenceDependencies(ctx context.Context, args map[
 		}
 	}
 	res.Edges = edges
-	data, _ := json.MarshalIndent(res, "", "  ")
+	data, _ := json.Marshal(res)
 	return string(data), nil
 }

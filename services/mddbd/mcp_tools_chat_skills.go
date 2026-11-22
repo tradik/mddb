@@ -60,7 +60,7 @@ func (s *MCPToolServer) toolChatSkillList(ctx context.Context, _ map[string]inte
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(chatSkillList{Skills: list, Version: version}, "", "  ")
+	data, _ := json.Marshal(chatSkillList{Skills: list, Version: version})
 	return string(data), nil
 }
 
@@ -73,7 +73,7 @@ func (s *MCPToolServer) toolChatSkillGet(ctx context.Context, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(sk, "", "  ")
+	data, _ := json.Marshal(sk)
 	return string(data), nil
 }
 
@@ -95,7 +95,7 @@ func (s *MCPToolServer) toolChatSkillPut(ctx context.Context, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]any{"skill": view, "created": created}, "", "  ")
+	data, _ := json.Marshal(map[string]any{"skill": view, "created": created})
 	return string(data), nil
 }
 

@@ -199,13 +199,13 @@ func TestPassages_ProfileDefaultAndWindow(t *testing.T) {
 
 	// A hit outside any definition gets the window; radius 2 → 5 lines.
 	doc := addTestDoc(t, s, "notes", "n.md", "en", "a\nb\nc\nd\ne\nf\ng\nh\n", nil)
-	p := passageAround("notes", &doc, 4, 2, 0.5, "fts")
+	p := passageAround("notes", &doc, 4, 2, 0, 0.5, "fts")
 	if p.Lines.Start != 2 || p.Lines.End != 6 || p.Content != "b\nc\nd\ne\nf" || p.Score != 0.5 {
 		t.Fatalf("window: %+v", p)
 	}
 	// A definition longer than the window is not returned whole.
 	long := addTestDoc(t, s, "notes", "big.go", "en", "package x\n\nfunc Big() {\n"+strings.Repeat("\tx()\n", 40)+"}\n", nil)
-	p = passageAround("notes", &long, 20, 3, 0, "fts")
+	p = passageAround("notes", &long, 20, 3, 0, 0, "fts")
 	if p.Lines.End-p.Lines.Start != 6 || p.Symbol != "Big" {
 		t.Fatalf("long definition: %+v", p)
 	}

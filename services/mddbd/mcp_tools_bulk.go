@@ -60,7 +60,7 @@ func (s *MCPToolServer) toolBulkIngestSubmit(_ context.Context, args map[string]
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(job, "", "  ")
+	data, _ := json.Marshal(job)
 	return string(data), nil
 }
 
@@ -78,7 +78,7 @@ func (s *MCPToolServer) toolBulkIngestStatus(_ context.Context, args map[string]
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(job, "", "  ")
+	data, _ := json.Marshal(job)
 	return string(data), nil
 }
 
@@ -92,10 +92,10 @@ func (s *MCPToolServer) toolBulkIngestList(_ context.Context, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]interface{}{
+	data, _ := json.Marshal(map[string]interface{}{
 		"jobs":  jobs,
 		"total": len(jobs),
-	}, "", "  ")
+	})
 	return string(data), nil
 }
 
@@ -136,6 +136,6 @@ func (s *MCPToolServer) toolAutocomplete(_ context.Context, args map[string]inte
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }

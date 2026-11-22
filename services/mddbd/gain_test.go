@@ -207,7 +207,7 @@ func TestGain_HTTPAndMCP(t *testing.T) {
 	}
 	tools := &MCPToolServer{client: NewDirectClient(s)}
 	out, err := tools.mcpCallTool(context.Background(), "get_gain", map[string]interface{}{"window": "1d"})
-	if err != nil || !strings.Contains(out, `"bm25": 1`) {
+	if err != nil || !strings.Contains(out, `"bm25":1`) {
 		t.Fatalf("mcp: %v %s", err, out)
 	}
 	if _, err := tools.mcpCallTool(context.Background(), "get_gain", map[string]interface{}{"window": "0d"}); err == nil {
