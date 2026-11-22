@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Blog:** "Keep Your Agent's Code Index Live" — `autoindex --watch` and `hook install` on a local checkout, a project skill that makes the agent search first, measured delays (1.5–2.1 s from save to searchable, 0.16–0.22 s per commit) and token estimates per lookup.
+
+### Fixed
+
+- **`mddb-cli autoindex hook run`** wrote the CLI usage text into `.git/mddb-autoindex.log` after an error; the log now holds only the error.
+
 ## [2.19.10] - 2026-11-22
 
 ### Added

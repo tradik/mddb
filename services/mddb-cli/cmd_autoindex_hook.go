@@ -92,7 +92,9 @@ func newHookRunCmd() *cobra.Command {
 		Use:    "run [path]",
 		Short:  "What the hooks run: index the files changed since the commit last indexed",
 		Hidden: true,
-		Args:   cobra.MaximumNArgs(1),
+		// The log holds what went wrong, not the usage text after it.
+		SilenceUsage: true,
+		Args:         cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			o.root = rootArg(args)
 			return hookRun(context.Background(), newClient(), o)
