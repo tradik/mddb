@@ -51,7 +51,7 @@ func featureGRPCError(err error) error {
 
 // featureToProto converts one module's state.
 func featureToProto(st FeatureState) *proto.FeatureProto {
-	p := &proto.FeatureProto{Name: st.Name, Description: st.Description, Enabled: st.Enabled, Configured: st.Configured,
+	p := &proto.FeatureProto{Name: st.Name, Title: st.Title, Summary: st.Summary, Description: st.Description, Enabled: st.Enabled, Configured: st.Configured,
 		DefaultEnabled: st.Default, Requires: st.Requires, LockedBy: st.LockedBy, BlockedBy: st.BlockedBy, UpdatedBy: st.UpdatedBy}
 	if st.UpdatedAt != nil {
 		p.UpdatedAt = st.UpdatedAt.Unix()

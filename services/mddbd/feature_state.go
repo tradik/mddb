@@ -5,7 +5,11 @@ import "time"
 // FeatureState is one module as GET /v1/features, ListFeatures and
 // feature_list show it (GO-049).
 type FeatureState struct {
-	Name        string `json:"name"`
+	Name string `json:"name"`
+	// Title and Summary (2.19.11) are the plain name and sentence the panel
+	// shows; Description is the technical detail behind its help control.
+	Title       string `json:"title"`
+	Summary     string `json:"summary"`
 	Description string `json:"description"`
 	// Enabled is whether the module works now: its switch is on, the
 	// environment does not force it off, and every module it requires is on.
@@ -86,7 +90,7 @@ func (f *FeatureManager) List() []FeatureState {
 // state builds a module's description, under the read lock.
 func (f *FeatureManager) state(d featureDef) FeatureState {
 	s := f.setting(d)
-	st := FeatureState{Name: d.Name, Description: d.Description, Enabled: f.enabled(d), Configured: s.Enabled,
+	st := FeatureState{Name: d.Name, Title: d.Title, Summary: d.Summary, Description: d.Description, Enabled: f.enabled(d), Configured: s.Enabled,
 		Default: d.defaultOn(), Requires: append([]string{}, d.Requires...), UpdatedBy: s.UpdatedBy}
 	if f.forced(d.Name) {
 		st.LockedBy = featuresForceOffEnv

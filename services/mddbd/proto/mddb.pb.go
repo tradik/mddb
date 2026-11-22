@@ -20143,6 +20143,8 @@ type FeatureProto struct {
 	BlockedBy      []string               `protobuf:"bytes,8,rep,name=blocked_by,json=blockedBy,proto3" json:"blocked_by,omitempty"`  // required modules that are off
 	UpdatedAt      int64                  `protobuf:"varint,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // Unix seconds; 0 when never switched
 	UpdatedBy      string                 `protobuf:"bytes,10,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
+	Title          string                 `protobuf:"bytes,11,opt,name=title,proto3" json:"title,omitempty"`     // (v2.19.11+) short plain name, e.g. "Geo search"
+	Summary        string                 `protobuf:"bytes,12,opt,name=summary,proto3" json:"summary,omitempty"` // (v2.19.11+) one plain sentence; description holds the technical detail
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -20243,6 +20245,20 @@ func (x *FeatureProto) GetUpdatedAt() int64 {
 func (x *FeatureProto) GetUpdatedBy() string {
 	if x != nil {
 		return x.UpdatedBy
+	}
+	return ""
+}
+
+func (x *FeatureProto) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *FeatureProto) GetSummary() string {
+	if x != nil {
+		return x.Summary
 	}
 	return ""
 }
@@ -26527,7 +26543,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12%\n" +
 	"\x0eretention_days\x18\x02 \x01(\x05R\rretentionDays\x12\x1b\n" +
 	"\x06redact\x18\x03 \x01(\bH\x00R\x06redact\x88\x01\x01B\t\n" +
-	"\a_redact\"\xbd\x02\n" +
+	"\a_redact\"\xed\x02\n" +
 	"\fFeatureProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x18\n" +
@@ -26544,7 +26560,9 @@ const file_mddb_proto_rawDesc = "" +
 	"updated_at\x18\t \x01(\x03R\tupdatedAt\x12\x1d\n" +
 	"\n" +
 	"updated_by\x18\n" +
-	" \x01(\tR\tupdatedBy\"\x15\n" +
+	" \x01(\tR\tupdatedBy\x12\x14\n" +
+	"\x05title\x18\v \x01(\tR\x05title\x12\x18\n" +
+	"\asummary\x18\f \x01(\tR\asummary\"\x15\n" +
 	"\x13ListFeaturesRequest\"`\n" +
 	"\x14ListFeaturesResponse\x12.\n" +
 	"\bfeatures\x18\x01 \x03(\v2\x12.mddb.FeatureProtoR\bfeatures\x12\x18\n" +
