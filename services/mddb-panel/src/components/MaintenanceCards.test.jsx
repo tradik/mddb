@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-// System page maintenance: a collection's checksum, export and revision
-// truncation (behind a confirmation naming the collection), and backup now /
-// restore (behind a confirmation naming the file).
+// Maintenance: a collection's checksum, export and revision truncation
+// (behind a confirmation naming the collection, off on a read-only
+// collection), and backup now / restore (behind a confirmation naming the
+// file and saying what a restore replaces).
+import { useState } from 'react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react';
 
@@ -74,23 +76,48 @@ describe('CollectionMaintenanceCard', () => {
     expect(mddbClient.truncate).toHaveBeenLastCalledWith({ collection: 'docs', keepRevs: 0 });
   });
 
+  test('a read-only collection cannot be truncated, and says why', () => {
+    useStore.setState({ collectionConfigs: { kb: { readOnly: true } } });
+    render(<CollectionMaintenanceCard />);
+    expect(screen.getByRole('button', { name: 'Truncate revisions' }).disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'kb' } });
+    expect(screen.getByRole('button', { name: 'Truncate revisions' }).disabled).toBe(true);
+    expect(screen.getByText('This collection is read-only, so its history cannot be changed.')).toBeTruthy();
+  });
+
+  test('each action has its sentence and a help control', () => {
+    render(<CollectionMaintenanceCard />);
+    for (const title of ['Checksum', 'Export', 'Truncate revisions']) {
+      expect(screen.getByRole('button', { name: `About ${title}` })).toBeTruthy();
+    }
+    expect(screen.getByText(/A fingerprint of the collection/)).toBeTruthy();
+  });
+
   test('without collections nothing can run', () => {
-    useStore.setState({ stats: null });
+    useStore.setState({ stats: null, collectionConfigs: null });
     render(<CollectionMaintenanceCard />);
     expect(screen.getByRole('button', { name: 'Checksum' }).disabled).toBe(true);
   });
 });
 
+/** The card with the restore field owned by its parent, as on the page. */
+function Card({ onBackedUp = vi.fn(), disabled }) {
+  const [from, setFrom] = useState('');
+  return <BackupRestoreCard from={from} onFromChange={setFrom} onBackedUp={onBackedUp} disabled={disabled} />;
+}
+
 describe('BackupRestoreCard', () => {
   test('backs up now, offers that file for restore, restores after a confirmation', async () => {
     mddbClient.backup.mockResolvedValueOnce({ backup: 'backup-1.db' }).mockResolvedValueOnce({ backup: 'nightly.db' });
     mddbClient.restore.mockResolvedValueOnce({ restored: 'nightly.db' });
-    render(<BackupRestoreCard />);
+    const onBackedUp = vi.fn();
+    render(<Card onBackedUp={onBackedUp} />);
     expect(screen.getByRole('button', { name: 'Restore' }).disabled).toBe(true);
     await click('Back up now');
     expect(mddbClient.backup).toHaveBeenCalledWith(undefined);
-    expect(screen.getByRole('status').textContent).toBe('Backup written: backup-1.db. Restore takes this file name.');
+    expect(screen.getByRole('status').textContent).toBe('Backup written: backup-1.db. It is ready to restore below.');
     expect(screen.getByLabelText('Restore from file').value).toBe('backup-1.db');
+    expect(onBackedUp).toHaveBeenCalledWith('backup-1.db');
     fireEvent.change(screen.getByLabelText('Backup file name (optional)'), { target: { value: ' nightly.db ' } });
     await click('Back up now');
     expect(mddbClient.backup).toHaveBeenLastCalledWith('nightly.db');
@@ -99,6 +126,7 @@ describe('BackupRestoreCard', () => {
     await click('Restore');
     const dialog = screen.getByRole('alertdialog', { name: 'Restore the database' });
     expect(within(dialog).getByText('nightly.db')).toBeTruthy();
+    expect(dialog.textContent).toContain('Whatever was written after the backup was taken is lost.');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(mddbClient.restore).not.toHaveBeenCalled();
     await click('Restore');
@@ -109,9 +137,16 @@ describe('BackupRestoreCard', () => {
 
   test('a refused backup says not permitted', async () => {
     mddbClient.backup.mockRejectedValueOnce(apiError(403, 'admin access required'));
-    render(<BackupRestoreCard />);
+    render(<Card />);
     await click('Back up now');
     expect(screen.getByText('Not permitted')).toBeTruthy();
     expect(screen.getByText('admin access required')).toBeTruthy();
+  });
+
+  test('an account that may not back up finds both buttons off', () => {
+    render(<Card disabled />);
+    fireEvent.change(screen.getByLabelText('Restore from file'), { target: { value: 'nightly.db' } });
+    expect(screen.getByRole('button', { name: 'Back up now' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Restore' }).disabled).toBe(true);
   });
 });
