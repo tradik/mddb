@@ -110,14 +110,14 @@ func (r codeSearchRequest) passageOptions() PassageOptions {
 // rankedLines renders the passages of a ranked search, at most hits of them.
 func (r codeSearchRequest) rankedLines(p *PassagesResponse) string {
 	if p == nil {
-		return passageLines(nil, false)
+		return passageLines(nil, false, nil)
 	}
 	shown := p.Passages
 	more := len(shown) > r.hits()
 	if more {
 		shown = shown[:r.hits()]
 	}
-	return passageLines(shown, more)
+	return passageLines(shown, more, queryTerms(r.query))
 }
 
 // codeSearchWords is the full-text search, ranked.
@@ -178,7 +178,7 @@ func (s *MCPToolServer) codeSearchExact(ctx context.Context, r codeSearchRequest
 	if limit <= 0 {
 		limit = codeSearchExactLines
 	}
-	out := exactLines(files, limit)
+	out := exactLines(files, limit, r.query)
 	if scanned < total {
 		out += fmt.Sprintf("; read %d of %d files, narrow with path", scanned, total)
 	}
@@ -210,8 +210,9 @@ func exactFiles(docs []MCPDocument, literal string) []exactFile {
 }
 
 // exactLines renders the matching lines, "path:line: [Enclosing.Func] text",
-// up to limit, and counts all of them.
-func exactLines(files []exactFile, limit int) string {
+// up to limit, and counts all of them. A line too long to show whole is cut
+// around the literal.
+func exactLines(files []exactFile, limit int, literal string) string {
 	w := &lineWriter{}
 	shown, total := 0, 0
 	for _, f := range files {
@@ -220,7 +221,7 @@ func exactLines(files []exactFile, limit int) string {
 				continue
 			}
 			shown++
-			text := lineText(f.st.lines[n-1])
+			text := lineText(f.st.lines[n-1], literal)
 			if sym := f.st.symbolAt(n); sym != "" {
 				text = "[" + sym + "] " + text
 			}

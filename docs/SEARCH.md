@@ -1707,8 +1707,9 @@ against 4 KB for the stylesheet it came from.
   (marked ` […]`), and carries `truncated: true`; its `lines` are the lines
   returned. Chunks (`chunk` and `window` modes, vector hits) keep the
   collection's chunk size as their bound and are cut only when
-  `passageTokens` is set. gRPC and GraphQL apply the default and have no
-  field to change it yet.
+  `passageTokens` is set. A single line over the bound is cut around the
+  first term that matched, with ` […]` at each cut end. gRPC takes
+  `passage_tokens` and GraphQL `passageTokens`.
 - (v2.19.13) On the MCP search tools, `fields` with `format: "passages"`
   returns the passages without their text, unless `include_content: true` is
   passed. Before, `fields` was ignored in this format.

@@ -337,7 +337,7 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		FilterMeta:     gql.MapMetaInputToInternal(input.FilterMeta),
 		Filter:         filter,
 		GroupBy:        groupByFromGQL(input.GroupBy),
-		PassageOptions: passageOptionsFromGQL(input.Format, input.PassageLines),
+		PassageOptions: passageOptionsFromGQL(input.Format, input.PassageLines, input.PassageTokens),
 		TopK:           derefInt(input.TopK, 5),
 		Threshold:      derefFloat64(input.Threshold, 0),
 		IncludeContent: derefBool(input.IncludeContent, false),
@@ -439,7 +439,7 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 		Query:          input.Query,
 		Limit:          derefInt(input.Limit, 50),
 		IncludeContent: true,
-		PassageOptions: passageOptionsFromGQL(input.Format, input.PassageLines),
+		PassageOptions: passageOptionsFromGQL(input.Format, input.PassageLines, input.PassageTokens),
 		ImageOptions:   ImageOptions{IncludeImages: derefBool(input.IncludeImages, false)}, // RAG-010
 		RerankRequest:  rerankFromGQL(input.Rerank),                                        // RAG-011
 	})
@@ -528,6 +528,6 @@ func clampUint(n uint64) int {
 }
 
 // passageOptionsFromGQL converts the GraphQL format inputs (AGT-002).
-func passageOptionsFromGQL(format *string, lines *int) PassageOptions {
-	return PassageOptions{Format: derefString(format), PassageLines: derefInt(lines, 0)}
+func passageOptionsFromGQL(format *string, lines, tokens *int) PassageOptions {
+	return PassageOptions{Format: derefString(format), PassageLines: derefInt(lines, 0), PassageTokens: derefInt(tokens, 0)}
 }

@@ -556,6 +556,7 @@ message VectorSearchRequest {
   GroupBy group_by = 11;                         // (v2.18.8)
   string format = 12;                            // (v2.18.8) "passages"
   int32 passage_lines = 13;                      // (v2.18.8)
+  int32 passage_tokens = 30;                    // (v2.19.13) most tokens per passage (default 500, max 8000); a cut passage says truncated
   int32 wait_for_index_ms = 14;                  // (v2.18.8) wait up to this long (max 30000) for queued embeddings
   repeated string wait_for_keys = 15;             // (v2.18.8) wait only for these keys
   string read_level = 16;                         // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
@@ -765,6 +766,7 @@ message FTSRequest {
   GroupBy group_by = 12;                         // (v2.18.8) at most per_group results per metadata value or document
   string format = 13;                            // (v2.18.8) "passages" returns passages instead of documents
   int32 passage_lines = 14;                      // (v2.18.8) context lines around a passage's hit
+  int32 passage_tokens = 19;                    // (v2.19.13) most tokens per passage (default 500, max 8000); a cut passage says truncated
   optional double bm25_k1 = 15;                  // (v2.18.8, SRCH-018) BM25 k1 for this query; unset = collection profile, then 1.2
   optional double bm25_b = 16;                   // (v2.18.8, SRCH-018) BM25 b for this query; unset = collection profile, then 0.75
   bool include_images = 17;                      // (v2.18.9, RAG-010) attach each hit's images
@@ -859,6 +861,7 @@ message HybridSearchRequest {
   GroupBy group_by = 20;                         // (v2.18.8)
   string format = 21;                            // (v2.18.8) "passages"
   int32 passage_lines = 22;                      // (v2.18.8)
+  int32 passage_tokens = 38;                    // (v2.19.13) most tokens per passage (default 500, max 8000); a cut passage says truncated
   int32 wait_for_index_ms = 23;                  // (v2.18.8) wait up to this long (max 30000) for queued embeddings
   repeated string wait_for_keys = 24;             // (v2.18.8) wait only for these keys
   string read_level = 25;                         // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
@@ -1625,6 +1628,7 @@ message CrossSearchRequest {
   GroupBy group_by = 13;                         // (v2.18.8) key may be "collection"
   string format = 14;                            // (v2.18.8) "passages"
   int32 passage_lines = 15;                      // (v2.18.8)
+  int32 passage_tokens = 29;                    // (v2.19.13) most tokens per passage (default 500, max 8000); a cut passage says truncated
   string search_type = 16;                       // (v2.18.8) "vector" (default), "fts" or "hybrid"; targets may be "role:reference"
   int32 wait_for_index_ms = 17;                  // (v2.18.8) wait up to this long (max 30000) for queued embeddings
   repeated string wait_for_keys = 18;             // (v2.18.8) wait only for these keys
@@ -2434,6 +2438,7 @@ message Passage {
   repeated ImageRef images = 13;                 // (v2.18.9, RAG-010) the document's images, with include_images
   string container = 14;                         // (v2.19.3, CODE-012) type or class holding the definition, from semantic facts
   string target = 15;                            // (v2.19.3, CODE-012) "<path>#<qualified name>" of the looked-up definition this passage is about
+  bool truncated = 16;                           // (v2.19.13) content was cut to the passage token bound; start_line and end_line are what is left
 }
 
 // How long a search waited for queued embeddings (GO-042).
@@ -2450,7 +2455,8 @@ message CodeSymbolRequest {
   repeated string include = 3;                   // relations to return; empty = all
   int32 limit = 4;                               // passages per relation (default 20, max 200)
   bool include_content = 5;
-  string path = 6;                               // (v2.19.3, CODE-012) the file (meta.path) of the one definition wanted
+  string path = 6;                               // (v2.19.3, CODE-012) the file (meta.path) of the one definition wanted; (v2.19.13) or a directory holding it
+  bool exclude_tests = 7;                        // (v2.19.13) leave out every passage in a test file, before limit
 }
 
 // A definition an ambiguous name may mean (v2.19.3, CODE-012).
@@ -2477,6 +2483,7 @@ message CodeSymbolResponse {
   string semantic_source = 14;                   // (v2.19.3, CODE-012) language servers behind the facts, e.g. gopls/0.24.0
   bool ambiguous = 15;                           // (v2.19.3, CODE-012) several definitions and no path chose one
   repeated SymbolCandidate candidates = 16;      // (v2.19.3, CODE-012) the definitions an ambiguous name may mean
+  map<string, int32> totals = 17;                // (v2.19.13) passages each cut relation held before limit
 }
 
 // ---- v2.18.8: retrieval evaluation (SRCH-019) ----
