@@ -27,7 +27,7 @@ const images = { name: 'images', enabled: true, default: false, updatedAt: '2026
 async function renderWith(features = [geo, chat, chatExternalMcp, temporal, images], version = 3) {
   vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features, version });
   render(<FeaturesPanel />);
-  await screen.findByText(`version ${version}`);
+  await screen.findByText(`Switches saved: version ${version}.`);
   await screen.findByRole('region', { name: 'Modules' });
 }
 
@@ -43,12 +43,12 @@ describe('the list', () => {
   test('one switch per module with its state, default, requirements and history', async () => {
     await renderWith();
     expect(toggle('Geo search').checked).toBe(true);
-    expect(toggle('Chat').checked).toBe(false);
+    expect(toggle('Chat assistants').checked).toBe(false);
     expect(screen.getByText('Geo search over document coordinates.')).toBeTruthy();
     expect(screen.getByText(/Changed 2026-11-11 \d\d:\d\d by admin/)).toBeTruthy();
     expect(screen.getByText('Changed by ops')).toBeTruthy();
     expect(screen.getByText(/^Changed 2026-11-11 \d\d:\d\d$/)).toBeTruthy();
-    expect(screen.getByText(/requires chat/)).toBeTruthy();
+    expect(screen.getByText(/Needs Chat assistants/)).toBeTruthy();
     expect(screen.getAllByText('Running')).toHaveLength(2);
     // images has no `configured`: the switch follows `enabled`.
     expect(toggle('Image documents').checked).toBe(true);
@@ -56,13 +56,13 @@ describe('the list', () => {
 
   test('a blocked dependant keeps its stored setting and says what it waits for', async () => {
     await renderWith();
-    expect(toggle('Chat: external MCP servers').checked).toBe(true);
-    expect(screen.getByText('Off until Chat is turned on.')).toBeTruthy();
+    expect(toggle('Tools from other MCP servers').checked).toBe(true);
+    expect(screen.getByText('Off until Chat assistants is turned on.')).toBeTruthy();
   });
 
   test('a locked module cannot be switched and names the lock', async () => {
     await renderWith();
-    const locked = toggle('Temporal analytics');
+    const locked = toggle('Activity over time');
     expect(locked.disabled).toBe(true);
     expect(locked.checked).toBe(false);
     expect(screen.getByText(/Forced off by MDDB_FEATURES_FORCE_OFF/)).toBeTruthy();
@@ -83,16 +83,16 @@ describe('switching', () => {
     fireEvent.click(toggle('Geo search'));
     expect(mddbClient.setFeature).toHaveBeenCalledWith('geo', false);
     expect((await screen.findByRole('status')).textContent).toBe('Geo search turned off.');
-    await screen.findByText('version 4');
+    await screen.findByText('Switches saved: version 4.');
     expect(toggle('Geo search').checked).toBe(false);
   });
 
   test('turning a module on says so', async () => {
     await renderWith();
     vi.mocked(mddbClient.setFeature).mockResolvedValue({});
-    fireEvent.click(toggle('Chat'));
+    fireEvent.click(toggle('Chat assistants'));
     expect(mddbClient.setFeature).toHaveBeenCalledWith('chat', true);
-    expect((await screen.findByRole('status')).textContent).toBe('Chat turned on.');
+    expect((await screen.findByRole('status')).textContent).toBe('Chat assistants turned on.');
   });
 
   test('a 409 names the lock', async () => {
@@ -137,7 +137,7 @@ describe('a list that cannot be loaded', () => {
     );
     vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features: [geo], version: 5 });
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
-    await screen.findByText('version 5');
+    await screen.findByText('Switches saved: version 5.');
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
     expect(toggle('Geo search')).toBeTruthy();
   });

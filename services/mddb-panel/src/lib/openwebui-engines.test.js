@@ -25,7 +25,7 @@ describe('openWebUIEngineSections', () => {
 
   test('each says which Features module to switch on, by its Features page label', () => {
     for (const s of sections) {
-      expect(s.steps.at(-1)).toContain(`"${FEATURE_LABELS[s.id]}" module under Features`);
+      expect(s.steps.at(-1)).toContain(`Switch on "${FEATURE_LABELS[s.id]}" under Features`);
     }
   });
 });

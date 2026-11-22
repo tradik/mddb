@@ -81,7 +81,7 @@ export default function ChatLogRow({ turn }) {
               <Detail label="Latency and tokens">{`${turn.latencyMs ? `${turn.latencyMs} ms` : '—'} · ${tokens}`}</Detail>
               <Detail label="Rating">{ratingText(turn.rating)}{turn.comment ? ` — ${turn.comment}` : ''}</Detail>
               <Detail label="Conversation">{`${turn.conversationId} / ${turn.messageId}`}</Detail>
-              {turn.loopStopped && <Detail label="Loop guard">The answer repeated itself and was stopped where the repetition began (#413).</Detail>}
+              {turn.loopStopped && <Detail label="Loop guard">The answer repeated itself and was stopped where the repetition began.</Detail>}
             </dl>
             <h4 className="mb-1 mt-3 text-xs font-semibold text-fg">Tools</h4>
             <ToolCalls calls={turn.toolCalls} />

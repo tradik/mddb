@@ -39,6 +39,15 @@ describe('the map', () => {
     expect(featureLabel('codeIntel')).toBe('Code intelligence');
     expect(featureLabel('newThing')).toBe('newThing');
   });
+
+  test("the server's title wins once the list has loaded", async () => {
+    vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features: [{ name: 'geo', title: 'Maps', enabled: true }, { name: 'chat' }], version: 1 });
+    await loadFeatures();
+    expect(featureLabel('geo')).toBe('Maps');
+    expect(featureLabel('chat')).toBe('Chat assistants');
+    resetFeatures();
+    expect(featureLabel('geo')).toBe('Geo search');
+  });
 });
 
 describe('helpers', () => {
