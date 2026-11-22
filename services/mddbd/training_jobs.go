@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -79,6 +80,17 @@ func (m *trainingManager) update(j *trainingJob, change func()) {
 	if err := m.saveJob(j); err != nil {
 		slog.Warn("saving a training job failed", "job", j.ID, "err", err)
 	}
+}
+
+// view is a job as JSON, taken under the lock: the job a submit returns is
+// the live one its goroutine keeps changing, so an answer must not read it
+// unguarded.
+func (m *trainingManager) view(j *trainingJob) json.RawMessage {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	// A struct of plain fields: marshalling it cannot fail.
+	data, _ := json.Marshal(j)
+	return data
 }
 
 // progress records a progress line, writing the record once a second.

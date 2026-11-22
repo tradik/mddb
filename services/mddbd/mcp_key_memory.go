@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -42,15 +43,21 @@ const (
 // its namespace exactly as on one that does not exist.
 var errMemorySessionNotFound = errors.New("session not found")
 
+// memoryNamespaceLabel is the fixed message the key signs to name its
+// namespace: a label of this purpose, so the value is of no use elsewhere.
+const memoryNamespaceLabel = "mddb memory namespace v1"
+
 // keyMemoryNamespace is the namespace of the key: its explicit name when
-// set, else 128 bits of the key's SHA-256, which identify it without
-// revealing anything usable as the key.
+// set, else 128 bits of HMAC-SHA-256 keyed by the API key over a fixed
+// label. An API key is random and long, not a password to be stretched; the
+// keyed form identifies it without revealing anything usable as the key.
 func keyMemoryNamespace(key, explicit string) string {
 	if explicit != "" {
 		return memoryNamespaceNamedPrefix + explicit
 	}
-	sum := sha256.Sum256([]byte(key))
-	return memoryNamespaceKeyPrefix + hex.EncodeToString(sum[:16])
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(memoryNamespaceLabel)) // a hash's Write never fails
+	return memoryNamespaceKeyPrefix + hex.EncodeToString(mac.Sum(nil)[:16])
 }
 
 // memoryNamespaceFromContext is the namespace the request's memory calls are
