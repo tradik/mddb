@@ -15,13 +15,13 @@ import NavGroup from './NavGroup';
  * moving to a page in a folded group unfolds that group. A group with nothing
  * to show is left out.
  */
-export default function NavMenu({ authEnabled = false, clusterEnabled = false, automationsEnabled = true }) {
+export default function NavMenu({ authEnabled = false, clusterEnabled = false, automationsEnabled = true, mcpEnabled = true }) {
   const { viewMode } = useStore();
   const { features } = useFeatures();
   const { collapsed, toggle, expand } = useCollapsedGroups();
   const [query, setQuery] = useState('');
   const searching = query.trim() !== '';
-  const groups = visibleGroups({ features, authEnabled, clusterEnabled, automationsEnabled }, query);
+  const groups = visibleGroups({ features, authEnabled, clusterEnabled, automationsEnabled, mcpEnabled }, query);
   const activeGroup = groupOfView(viewMode);
   const shownGroup = useRef(activeGroup);
 

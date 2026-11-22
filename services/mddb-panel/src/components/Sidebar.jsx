@@ -7,6 +7,7 @@ import CreateCollectionModal from './CreateCollectionModal';
 import CollectionConfigModal from './CollectionConfigModal';
 // 2.19.0: the menu, grouped and searchable.
 import NavMenu from './NavMenu';
+import { navConditions } from '../lib/nav-groups';
 // The panel's own version, read from package.json at build time, so a release
 // bump (scripts/bump-version.sh) shows up here with no further edit.
 import { version as panelVersion } from '../../package.json';
@@ -65,8 +66,6 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
   };
 
   const collections = stats?.collections || [];
-  const authEnabled = config?.authEnabled ?? false;
-  const clusterEnabled = !!config?.replicationRole;
 
   const handleDeleteCollection = async (collectionName, e) => {
     e.stopPropagation();
@@ -277,11 +276,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
 
       {/* Menu: grouped, searchable, built from nav-groups.js */}
       <div className="p-4 border-t border-line">
-        <NavMenu
-          authEnabled={authEnabled}
-          clusterEnabled={clusterEnabled}
-          automationsEnabled={config?.automationsEnabled !== false}
-        />
+        <NavMenu {...navConditions(config)} />
       </div>
 
       {/* Version Footer */}

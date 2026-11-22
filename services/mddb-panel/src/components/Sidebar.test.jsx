@@ -240,11 +240,12 @@ describe('administration menu', () => {
     await renderSidebar();
     for (const name of ['Users', 'Groups', 'Cluster']) expect(screen.queryByRole('button', { name })).toBeNull();
     expect(screen.getByRole('button', { name: 'Automation' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'LLM Connections' })).toBeTruthy();
     expect(screen.getByText(/Server v\.\.\./)).toBeTruthy();
 
-    act(() => useStore.setState({ config: { authEnabled: true, replicationRole: 'leader', automationsEnabled: false, version: '2.19.0' } }));
+    act(() => useStore.setState({ config: { authEnabled: true, replicationRole: 'leader', automationsEnabled: false, protocols: { mcp: { enabled: false } }, version: '2.19.0' } }));
     for (const name of ['Users', 'Groups', 'Cluster']) expect(screen.getByRole('button', { name })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Automation' })).toBeNull();
+    for (const name of ['Automation', 'LLM Connections']) expect(screen.queryByRole('button', { name })).toBeNull();
     expect(screen.getByText(/Server v2\.19\.0/)).toBeTruthy();
   });
 

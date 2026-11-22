@@ -13,7 +13,7 @@ export const ACCESS_LINKS = [
 
 /**
  * The links whose view the sidebar shows for `context` ({ features,
- * authEnabled, clusterEnabled, automationsEnabled }): the sidebar's own rule,
+ * authEnabled, clusterEnabled, automationsEnabled, mcpEnabled }): the sidebar's own rule,
  * visibleGroups, not a copy of its conditions.
  */
 export function accessLinks(context, links = ACCESS_LINKS) {

@@ -1,7 +1,7 @@
 // nav-groups (2.19.0): the menu data and the pure helpers that pick what the
 // sidebar shows — conditions, module switches, the search and group lookup.
 import { describe, test, expect } from 'vitest';
-import { NAV_GROUPS, foldText, isEntryAvailable, visibleGroups, groupOfView } from './nav-groups';
+import { NAV_GROUPS, foldText, isEntryAvailable, visibleGroups, groupOfView, navConditions } from './nav-groups';
 
 const everything = { features: {}, authEnabled: true, clusterEnabled: true, automationsEnabled: true };
 const plain = { features: {}, authEnabled: false, clusterEnabled: false, automationsEnabled: true };
@@ -62,5 +62,22 @@ describe('helpers', () => {
     expect(groupOfView('stopwords')).toBe('search');
     expect(groupOfView('cluster')).toBe('system');
     expect(groupOfView('documents')).toBeNull();
+  });
+});
+
+describe('navConditions', () => {
+  test('reads the conditions from /v1/config; an unreported setting hides only auth and cluster pages', () => {
+    expect(navConditions(undefined)).toEqual({ authEnabled: false, clusterEnabled: false, automationsEnabled: true, mcpEnabled: true });
+    expect(navConditions({ authEnabled: true, replicationRole: 'leader', automationsEnabled: false, protocols: { mcp: { enabled: false } } }))
+      .toEqual({ authEnabled: true, clusterEnabled: true, automationsEnabled: false, mcpEnabled: false });
+  });
+
+  test('MCP off hides LLM Connections; an omitted mcpEnabled or automationsEnabled counts as on', () => {
+    const mcp = { mode: 'mcp', when: 'mcp' };
+    expect(isEntryAvailable(mcp, { ...plain, mcpEnabled: false })).toBe(false);
+    expect(isEntryAvailable(mcp, { features: {} })).toBe(true);
+    expect(isEntryAvailable({ mode: 'automation', when: 'automations' }, { features: {} })).toBe(true);
+    const chat = visibleGroups({ ...plain, mcpEnabled: false }).find((g) => g.id === 'chat');
+    expect(chat.items.map((i) => i.mode)).not.toContain('mcp');
   });
 });

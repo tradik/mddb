@@ -4,8 +4,9 @@
  *
  * An entry's `when` names a condition beyond its server module (GO-049,
  * features.js): `auth` (pages that exist only with authentication),
- * `cluster` (a server with replication) or `automations` (unless the server
- * reports automations disabled).
+ * `cluster` (a server with replication), `automations` (unless the server
+ * reports automations disabled) or `mcp` (unless the MCP listener is off,
+ * `protocols.mcp.enabled: false`). navConditions reads them from /v1/config.
  */
 import {
   Server, Settings, Network, Users, UsersIcon, Sliders, GitBranch, BookOpen, Ban, Zap, Globe, Shuffle,
@@ -44,7 +45,7 @@ export const NAV_GROUPS = [
     id: 'chat', label: 'Chat', items: [
       { mode: 'chat', icon: MessageSquare, label: 'Chat' },
       { mode: 'memory', icon: MessagesSquare, label: 'Agent Memory' },
-      { mode: 'mcp', icon: Brain, label: 'LLM Connections' },
+      { mode: 'mcp', icon: Brain, label: 'LLM Connections', when: 'mcp' },
     ],
   },
   {
@@ -82,11 +83,31 @@ export function foldText(text) {
 }
 
 /**
+ * The `when` conditions from the server's /v1/config. A setting the server
+ * does not report (an older server, the config not loaded yet) hides nothing
+ * except auth and cluster pages, which need the server to say they exist.
+ */
+export function navConditions(config) {
+  return {
+    authEnabled: config?.authEnabled ?? false,
+    clusterEnabled: !!config?.replicationRole,
+    automationsEnabled: config?.automationsEnabled !== false,
+    mcpEnabled: config?.protocols?.mcp?.enabled !== false,
+  };
+}
+
+/**
  * The menu entries the server and the user allow. `context` is
- * `{ features, authEnabled, clusterEnabled, automationsEnabled }`.
+ * `{ features, authEnabled, clusterEnabled, automationsEnabled, mcpEnabled }`;
+ * an omitted `automationsEnabled` or `mcpEnabled` counts as on.
  */
 export function isEntryAvailable(item, context) {
-  const conditions = { auth: context.authEnabled, cluster: context.clusterEnabled, automations: context.automationsEnabled };
+  const conditions = {
+    auth: context.authEnabled,
+    cluster: context.clusterEnabled,
+    automations: context.automationsEnabled !== false,
+    mcp: context.mcpEnabled !== false,
+  };
   return (item.when === undefined || !!conditions[item.when]) && isViewEnabled(item.mode, context.features);
 }
 
