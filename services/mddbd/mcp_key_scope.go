@@ -25,11 +25,16 @@ import (
 //   - a collection rule: when every collection the call names (after alias
 //     and role resolution) is in the scope; when it names none, only when the
 //     rule's fallback targets resolve inside the scope; a write is refused to
-//     a read-only key, as is any tool read-only mode would refuse;
+//     a read-only key, as is any tool read-only mode would refuse, and to a
+//     call naming one of readOnlyCollections (AGT-007);
 //   - an "every collection" rule: only when collections are not limited;
-//   - admin, handler and memory rules: never. A handler authorizes inside
-//     with main-auth claims a key does not have, and the memory store holds
-//     every user's sessions whatever the collections.
+//   - a memory rule: only to a limited key, inside its own memory namespace
+//     (AGT-008, mcp_key_memory.go), and only the reads to a read-only key;
+//   - admin and handler rules: never. A handler authorizes inside with
+//     main-auth claims a key does not have.
+//
+// The memory collections are never in a scope's reach, so a limited key
+// cannot read the store around its namespace with the document tools.
 
 // mcpKeyScope is what a key is confined to, as stored or configured.
 type mcpKeyScope struct {
@@ -38,9 +43,16 @@ type mcpKeyScope struct {
 	collections []string
 	// readOnly refuses every tool read-only mode refuses.
 	readOnly bool
+	// readOnlyCollections are names among collections the key may read but
+	// not write (AGT-007), resolved as collections are.
+	readOnlyCollections []string
 	// scenario binds the key to a chat scenario: its allowedCollections,
 	// always read-only, intersected with collections when both are set.
 	scenario string
+	// memoryNamespace is the part of the memory store a limited key reads
+	// and writes (AGT-008): derived from the key, or the key's explicit
+	// memoryNamespace. It does not make a key scoped.
+	memoryNamespace string
 }
 
 // scoped reports whether the scope limits anything: a key without any of the
@@ -86,14 +98,20 @@ func keyScopeMayCall(k mcpKeyScope, tool string, rule accessRule) bool {
 		return false // admin, handler, unclassified
 	}
 	switch {
-	case len(rule.fixed) > 0: // the memory store
-		return false
-	case k.reads() && (rule.op != PermRead || (tool != "" && !toolIsReadOnly(tool))):
+	case len(rule.fixed) > 0: // the memory store: a limited key's own namespace
+		return k.limited() && k.memoryNamespace != "" && (rule.op == PermRead || !k.reads())
+	case k.reads() && keyScopeWrites(tool, rule):
 		return false
 	case rule.all && k.limited():
 		return false
 	}
 	return true
+}
+
+// keyScopeWrites reports whether a call of tool under rule counts as a write
+// for a key's scope: a write rule, or a tool read-only mode would refuse.
+func keyScopeWrites(tool string, rule accessRule) bool {
+	return rule.op != PermRead || (tool != "" && !toolIsReadOnly(tool))
 }
 
 // toolIsReadOnly reports whether a built-in tool is one read-only mode lets
@@ -122,8 +140,8 @@ func (s *Server) authorizeKeyScope(ctx context.Context, tool string, rule access
 	if err != nil || !keyScopeMayCall(k, tool, rule) {
 		return ErrForbidden
 	}
-	if rule.class != accessCollection || !k.limited() {
-		return nil
+	if rule.class != accessCollection || !k.limited() || len(rule.fixed) > 0 {
+		return nil // the memory tools confine a limited key to its namespace
 	}
 	colls := s.expandCollections(s.resolveScopeNames(names))
 	if len(colls) == 0 {
@@ -132,8 +150,12 @@ func (s *Server) authorizeKeyScope(ctx context.Context, tool string, rule access
 	if len(colls) == 0 {
 		return ErrForbidden // every collection
 	}
+	var readOnly map[string]bool
+	if keyScopeWrites(tool, rule) {
+		readOnly = s.collectionSet(k.readOnlyCollections)
+	}
 	for _, c := range colls {
-		if !reach[c] {
+		if !reach[c] || readOnly[c] {
 			return ErrForbidden
 		}
 	}
@@ -159,17 +181,19 @@ func (s *Server) keyScopeReach(k mcpKeyScope) (map[string]bool, error) {
 		}
 		reach = s.collectionSet(sc.AllowedCollections)
 	}
-	if len(k.collections) == 0 {
-		return reach, nil
-	}
-	own := s.collectionSet(k.collections)
-	if reach == nil {
-		return own, nil
-	}
-	for c := range reach {
-		if !own[c] {
-			delete(reach, c)
+	if len(k.collections) > 0 {
+		own := s.collectionSet(k.collections)
+		if reach == nil {
+			reach = own
 		}
+		for c := range reach {
+			if !own[c] {
+				delete(reach, c)
+			}
+		}
+	}
+	for _, c := range memoryCollections {
+		delete(reach, c) // reached through the namespace only (AGT-008)
 	}
 	return reach, nil
 }

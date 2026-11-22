@@ -52,11 +52,17 @@ type MCPAPIKey struct {
 	Collections []string `json:"collections,omitempty"`
 	ReadOnly    bool     `json:"readOnly,omitempty"`
 	Scenario    string   `json:"scenario,omitempty"`
+	// ReadOnlyCollections are names among Collections the key may only read
+	// (AGT-007); MemoryNamespace names the memory a limited key shares with
+	// other keys of that name (AGT-008), else it has one of its own.
+	ReadOnlyCollections []string `json:"readOnlyCollections,omitempty"`
+	MemoryNamespace     string   `json:"memoryNamespace,omitempty"`
 }
 
 // scope is the key's scope as the middleware carries it.
 func (k *MCPAPIKey) scope() mcpKeyScope {
-	return mcpKeyScope{collections: k.Collections, readOnly: k.ReadOnly, scenario: k.Scenario}
+	return mcpKeyScope{collections: k.Collections, readOnly: k.ReadOnly, scenario: k.Scenario,
+		readOnlyCollections: k.ReadOnlyCollections, memoryNamespace: keyMemoryNamespace(k.Key, k.MemoryNamespace)}
 }
 
 // mcpAPIKeyStore provides CRUD for MCP API keys in BoltDB.
@@ -180,6 +186,9 @@ func (s *mcpAPIKeyStore) List() ([]MCPAPIKeySummary, error) {
 				Collections: ak.Collections,
 				ReadOnly:    ak.ReadOnly,
 				Scenario:    ak.Scenario,
+
+				ReadOnlyCollections: ak.ReadOnlyCollections,
+				MemoryNamespace:     ak.MemoryNamespace,
 			})
 			return nil
 		})
@@ -255,6 +264,9 @@ type MCPAPIKeySummary struct {
 	Collections []string `json:"collections,omitempty"`
 	ReadOnly    bool     `json:"readOnly,omitempty"`
 	Scenario    string   `json:"scenario,omitempty"`
+	// AGT-007 and AGT-008, as stored.
+	ReadOnlyCollections []string `json:"readOnlyCollections,omitempty"`
+	MemoryNamespace     string   `json:"memoryNamespace,omitempty"`
 }
 
 // ---- HTTP Handlers (mounted on main HTTP port, requires admin auth) ----
@@ -286,7 +298,8 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// name, expiresAt, toolsets (MCP-003), collections, readOnly and
-	// scenario (#439); the key itself and the dates are the server's.
+	// scenario (#439), readOnlyCollections (AGT-007) and memoryNamespace
+	// (AGT-008); the key itself and the dates are the server's.
 	var req MCPAPIKey
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
@@ -315,6 +328,9 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 		"collections": apiKey.Collections,
 		"readOnly":    apiKey.ReadOnly,
 		"scenario":    apiKey.Scenario,
+
+		"readOnlyCollections": apiKey.ReadOnlyCollections,
+		"memoryNamespace":     apiKey.MemoryNamespace,
 	}
 	// The key is created either way, so a client that sets the variable
 	// afterwards keeps it — but the caller learns now that no listener on
@@ -327,9 +343,14 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // createMCPAPIKey stores a key after checking the scenario it is bound to
-// names a stored scenario (#439). Its collections are kept as given: an alias
-// or a "role:" target is resolved when a call is checked.
+// names a stored scenario (#439) and its readOnlyCollections and
+// memoryNamespace fit its scope (validateKeyScopeSpec). Its collections are
+// kept as given: an alias or a "role:" target is resolved when a call is
+// checked.
 func (s *Server) createMCPAPIKey(spec MCPAPIKey) (*MCPAPIKey, string, error) {
+	if err := s.validateKeyScopeSpec(&spec); err != nil {
+		return nil, "", err
+	}
 	if spec.Scenario != "" {
 		if s.ChatScenarios == nil {
 			return nil, "", errChatScenariosUnavailable
