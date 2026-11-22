@@ -1,6 +1,9 @@
 /**
- * The sidebar menu as data (2.19.0): six collapsible groups and the pages in
+ * The sidebar menu as data (2.19.0): collapsible groups and the pages in
  * each. The Sidebar renders from this list, so placing a page is one line.
+ * A page sits in the group of what it acts on (2.19.11): collection tools
+ * first, under the collection list, then search, its tuning, chat,
+ * integrations, security and the server itself.
  *
  * An entry's `when` names a condition beyond its server module (GO-049,
  * features.js): `auth` (pages that exist only with authentication),
@@ -17,28 +20,35 @@ import { isViewEnabled } from './features';
 
 export const NAV_GROUPS = [
   {
+    // Right under the sidebar's collection list: what acts on collections.
+    id: 'data', label: 'Collections', items: [
+      // Corpus packs, then Model training, go first in this group.
+      { mode: 'import', icon: Import, label: 'Import' },
+      { mode: 'aliases', icon: Link2, label: 'Collection Aliases' },
+      { mode: 'schemas', icon: FileCheck, label: 'Collection Schemas' },
+      { mode: 'embeddings', icon: Brain, label: 'Embedding Models' },
+      { mode: 'duplicates', icon: CopyX, label: 'Duplicates' },
+      { mode: 'temporal', icon: Clock, label: 'Temporal Analytics' },
+    ],
+  },
+  {
     id: 'search', label: 'Search', items: [
       { mode: 'vectors', icon: Database, label: 'Vector Search' },
       { mode: 'crossSearch', icon: Shuffle, label: 'Cross Search' },
       { mode: 'geo', icon: Globe, label: 'Geo Search' },
-      { mode: 'vectorSpace', icon: ScatterChart, label: 'Vector Space' },
+      { mode: 'codeSymbols', icon: Code2, label: 'Code Symbols' },
+    ],
+  },
+  {
+    // What changes how search ranks and reads queries, and how to measure it.
+    id: 'tuning', label: 'Search Tuning', items: [
       { mode: 'searchAdvisor', icon: Compass, label: 'Search Advisor' },
       { mode: 'eval', icon: Gauge, label: 'Retrieval Evaluation' },
-      { mode: 'codeSymbols', icon: Code2, label: 'Code Symbols' },
       { mode: 'synonyms', icon: BookOpen, label: 'Synonyms' },
       { mode: 'stopwords', icon: Ban, label: 'Stop Words' },
       { mode: 'curation', icon: Pin, label: 'Curation Rules' },
       { mode: 'spellcheck', icon: Type, label: 'Spell Checker' },
-    ],
-  },
-  {
-    id: 'data', label: 'Data', items: [
-      { mode: 'aliases', icon: Link2, label: 'Collection Aliases' },
-      { mode: 'schemas', icon: FileCheck, label: 'Collection Schemas' },
-      { mode: 'embeddings', icon: Brain, label: 'Embedding Models' },
-      { mode: 'import', icon: Import, label: 'Import' },
-      { mode: 'duplicates', icon: CopyX, label: 'Duplicates' },
-      { mode: 'temporal', icon: Clock, label: 'Temporal Analytics' },
+      { mode: 'vectorSpace', icon: ScatterChart, label: 'Vector Space' },
     ],
   },
   {
@@ -60,7 +70,7 @@ export const NAV_GROUPS = [
       { mode: 'users', icon: Users, label: 'Users', when: 'auth' },
       { mode: 'groups', icon: UsersIcon, label: 'Groups', when: 'auth' },
       { mode: 'account', icon: UserRound, label: 'My Account', when: 'auth' },
-      { mode: 'tenants', icon: Building2, label: 'Tenants' }, // GO-054
+      { mode: 'tenants', icon: Building2, label: 'Tenants' },
       { mode: 'security', icon: Shield, label: 'Security' },
       { mode: 'encryption', icon: Lock, label: 'Encryption' },
       { mode: 'auditLog', icon: FileSearch, label: 'Audit Log' },
