@@ -4010,16 +4010,17 @@ curl http://localhost:11023/v1/collection-configs
 
 ### Corpus packs: /v1/corpus
 
-A corpus pack is one collection — documents, full-text index, vectors, geo
-points — shipped as a `.mddbpack` file and installed read-only on any server
-(v2.18.10). Building, installing and removing need the admin permission. The
+A corpus pack is one collection, or several (v2.19.11) — documents, full-text
+index, vectors, geo points — shipped as a `.mddbpack` file and installed
+read-only on any server (v2.18.10). Building, installing and removing need the admin permission. The
 full guide: [CORPUS-PACKS.md](CORPUS-PACKS.md).
 
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | `GET` | `/v1/corpus` | — | `{"packs":[{"collection","readOnly","corpus":{…}}],"total"}` |
-| `POST` | `/v1/corpus/build` | `{"collection","license","version","description","sources":[{"repo","commit","license"}]}` | the pack, `application/zstd` |
-| `POST` | `/v1/corpus/install` | multipart/form-data, field `pack` | `{"name","version","license","docCount","vectorsDisabled","warnings"}` |
+| `POST` | `/v1/corpus/build` | `{"collection","license","version","description","sources":[{"repo","commit","license"}]}`, or `"name"` and `"collections":["a",{"name":"b","license","sources"}]` instead of `"collection"` | the pack, `application/zstd` |
+| `POST` | `/v1/corpus/install` | multipart/form-data, field `pack` | `{"name","version","license","docCount","vectorsDisabled","warnings","collections"}` |
+| `POST` | `/v1/corpus/inspect` | multipart/form-data, field `pack` (the pack or its first megabytes) | `{"manifest":{…},"conflicts":[…]}`; nothing is installed |
 | `POST` | `/v1/corpus/remove` | `{"name"}` | `{"status":"removed","name","deleted"}` |
 
 ```bash
@@ -4029,10 +4030,13 @@ curl -X POST http://localhost:11023/v1/corpus/install -F pack=@k8s-docs-1.31.mdd
 ```
 
 `build` answers 400 without a licence, for an encrypted collection or one
-whose documents live in S3 or memory, and 404 for a collection without
-documents. `install` answers 400 for anything that is not a valid pack — a
+whose documents live in S3 or memory, for both `collection` and
+`collections`, and for several collections without a `name`; 404 for a
+collection without documents. `install` answers 400 for anything that is not a valid pack — a
 checksum that does not match, a newer storage format, keys of another
-collection — and 409 when a collection of that name already holds data.
+collection — and 409 when a pack of that name is installed or a collection of
+the pack already holds data. `inspect` answers the same 400s and lists the
+409 reasons in `conflicts`.
 
 An installed pack's config carries `readOnly: true` and `corpus`. Every write
 to it is refused: `403` with `{"code":"READ_ONLY","collection":"…"}` over

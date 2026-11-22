@@ -89,6 +89,7 @@ func TestCorpusEndpointsNeedAdmin(t *testing.T) {
 	no, yes := false, true
 	for name, h := range map[string]http.HandlerFunc{
 		"build": s.handleCorpusBuild, "install": s.handleCorpusInstall, "remove": s.handleCorpusRemove, "list": s.handleCorpusList,
+		"inspect": s.handleCorpusInspect,
 	} {
 		if rec := corpusCall(h, http.MethodPost, "{}", &no); rec.Code != http.StatusForbidden {
 			t.Errorf("%s let a non-admin in: %d", name, rec.Code)

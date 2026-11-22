@@ -55,7 +55,7 @@ func (g *GRPCServer) InstallCorpusPack(stream proto.MDDB_InstallCorpusPackServer
 		return corpusGRPCError(err)
 	}
 	return stream.SendAndClose(&proto.InstallCorpusPackResponse{Name: res.Name, Version: res.Version, License: res.License,
-		DocCount: int64(res.DocCount), VectorsDisabled: res.VectorsDisabled, Warnings: res.Warnings})
+		DocCount: int64(res.DocCount), VectorsDisabled: res.VectorsDisabled, Warnings: res.Warnings, Collections: res.Collections})
 }
 
 // RemoveCorpusPack removes an installed pack, as POST /v1/corpus/remove.
@@ -96,10 +96,11 @@ func (g *GRPCServer) BuildCorpusPack(req *proto.BuildCorpusPackRequest, stream p
 
 // corpusBuildFromProto is the REST body of a build request.
 func corpusBuildFromProto(req *proto.BuildCorpusPackRequest) corpusBuildRequest {
-	out := corpusBuildRequest{Collection: req.GetCollection(), Version: req.GetVersion(),
-		Description: req.GetDescription(), License: req.GetLicense()}
-	for _, src := range req.GetSources() {
-		out.Sources = append(out.Sources, corpusSource{Repo: src.GetRepo(), Commit: src.GetCommit(), License: src.GetLicense()})
+	out := corpusBuildRequest{Collection: req.GetCollection(), Name: req.GetName(), Version: req.GetVersion(),
+		Description: req.GetDescription(), License: req.GetLicense(), Sources: corpusSourcesFromProto(req.GetSources())}
+	for _, c := range req.GetCollections() {
+		out.Collections = append(out.Collections, corpusBuildCollection{Name: c.GetName(), License: c.GetLicense(),
+			Sources: corpusSourcesFromProto(c.GetSources())})
 	}
 	return out
 }

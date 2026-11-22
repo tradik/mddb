@@ -74,16 +74,16 @@ func TestCheckPackFileRefusals(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := checkPackFile(packBolt(t, tc.fill), m, []byte("docs"))
+			err := checkPackFile(packBolt(t, tc.fill), m.parts()[0], []byte("docs"))
 			if !errors.Is(err, errCorpusInvalid) || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v, want %q", err, tc.want)
 			}
 		})
 	}
-	if err := checkPackFile(junkFile(t), m, []byte("docs")); !errors.Is(err, errCorpusInvalid) {
+	if err := checkPackFile(junkFile(t), m.parts()[0], []byte("docs")); !errors.Is(err, errCorpusInvalid) {
 		t.Fatalf("a missing file was checked: %v", err)
 	}
-	if err := checkPackFile(packBolt(t, docs), m, []byte("docs")); err != nil {
+	if err := checkPackFile(packBolt(t, docs), m.parts()[0], []byte("docs")); err != nil {
 		t.Fatalf("a valid file was refused: %v", err)
 	}
 }
@@ -167,13 +167,13 @@ func assertInstallConflictKeepsConfig(t *testing.T, dst *Server, pack []byte) {
 
 func TestAttachCorpusFailures(t *testing.T) {
 	m := validManifest()
-	if err := (&Server{}).attachCorpus(m, "x", false); err == nil {
+	if err := (&Server{}).attachCorpus(m, m.parts()[0], "x", false); err == nil {
 		t.Fatal("installed without collection configs")
 	}
 	s, cleanup := newHandlerTestServer(t)
 	t.Cleanup(cleanup)
 	_ = s.DB.Close()
-	if err := s.attachCorpus(m, "x", false); err == nil {
+	if err := s.attachCorpus(m, m.parts()[0], "x", false); err == nil {
 		t.Fatal("installed with a closed database")
 	}
 }
