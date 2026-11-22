@@ -19,6 +19,9 @@ const (
 	// staleLock is how old a lock may be before a run takes it over: the run
 	// that held it died without removing it.
 	staleLock = time.Hour
+	// hookMode is a new hook's mode: read, write and execute for its owner,
+	// who is the one git runs it as.
+	hookMode = 0o700
 )
 
 // defaultHookEvents are the hooks install writes when not told otherwise:
@@ -100,11 +103,17 @@ func installHook(dir, event, block string) error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
+	mode := os.FileMode(hookMode)
+	if st, err := os.Stat(file); err == nil {
+		mode = st.Mode().Perm() | 0o100
+	}
+	// A new hook is the owner's alone; an existing one keeps its mode.
 	// #nosec G306 G703 -- git runs a hook only when it is executable; the path is from git rev-parse
-	if err := os.WriteFile(file, []byte(withBlock(string(old), block)), 0o755); err != nil {
+	if err := os.WriteFile(file, []byte(withBlock(string(old), block)), hookMode); err != nil {
 		return err
 	}
-	return os.Chmod(file, 0o755) // #nosec G302 -- an existing hook keeps its mode on WriteFile
+	// git runs a hook only when its owner may execute it.
+	return os.Chmod(file, mode) // #nosec G302 -- the hook's own mode plus the owner's execute bit
 }
 
 // uninstallHook takes the block out of the named hook, and removes the hook
@@ -126,7 +135,7 @@ func uninstallHook(dir, event string) (bool, error) {
 	if rest == "#!/bin/sh\n" {
 		return true, os.Remove(file)
 	}
-	return true, os.WriteFile(file, []byte(rest), 0o755) // #nosec G306 G703 -- a hook stays executable; the path is from git rev-parse
+	return true, os.WriteFile(file, []byte(rest), hookMode) // #nosec G306 G703 -- an existing file keeps its mode; the path is from git rev-parse
 }
 
 // hookInstalled reports whether the named hook holds the block.

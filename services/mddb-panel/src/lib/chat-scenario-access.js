@@ -50,7 +50,8 @@ export function sortReaders(users = []) {
 
 /** Whether two collection lists hold the same names, order aside. */
 export function sameCollections(a = [], b = []) {
-  const left = [...a].sort();
-  const right = [...b].sort();
+  const byName = (x, y) => x.localeCompare(y);
+  const left = [...a].sort(byName);
+  const right = [...b].sort(byName);
   return left.length === right.length && left.every((name, i) => name === right[i]);
 }
