@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"mddb/internal/boltx"
 	json "mddb/internal/jsonx"
+	"slices"
 	"sync"
 	"time"
 
@@ -672,56 +673,57 @@ func (am *AuthManager) CheckPermission(ctx context.Context, collection string, o
 
 	am.mu.RLock()
 	defer am.mu.RUnlock()
+	if am.grantLocked(claims.Username, collection, operation) != "" {
+		return nil
+	}
+	return ErrForbidden
+}
 
-	username := claims.Username
+// grantLocked names the grant that gives username operation on collection, in
+// CheckPermission's order after the tenant gate and the admin bypass: "user"
+// (a direct grant on the collection), "user:*" (a direct grant on "*"),
+// "group:<name>" and "group:<name>:*". It returns "" when nothing grants it.
+// Among the user's groups the first by name wins, so the answer does not
+// depend on map order. The caller holds am.mu.
+func (am *AuthManager) grantLocked(username, collection string, operation PermissionType) string {
 	perms := am.permissions[username]
-
-	// Check user's direct collection-specific permission
 	for _, p := range perms {
 		if p.Collection == collection && p.HasPermission(operation) {
-			return nil
+			return "user"
 		}
 	}
-
-	// Check user's direct wildcard permission
 	for _, p := range perms {
 		if p.Collection == "*" && p.HasPermission(operation) {
-			return nil
+			return "user:*"
 		}
 	}
-
-	// Check group permissions
-	for _, g := range am.groups {
-		// Check if user is a member of this group
-		isMember := false
-		for _, member := range g.Members {
-			if member == username {
-				isMember = true
-				break
-			}
-		}
-
-		if !isMember {
+	best, via := "", ""
+	for name, g := range am.groups {
+		if (best != "" && name >= best) || !slices.Contains(g.Members, username) {
 			continue
 		}
-
-		// Check group's collection-specific permission
-		groupPerms := am.groupPermissions[g.Name]
-		for _, gp := range groupPerms {
-			if gp.Collection == collection && gp.HasPermission(operation) {
-				return nil
-			}
-		}
-
-		// Check group's wildcard permission
-		for _, gp := range groupPerms {
-			if gp.Collection == "*" && gp.HasPermission(operation) {
-				return nil
-			}
+		if suffix, ok := groupGrant(am.groupPermissions[name], collection, operation); ok {
+			best, via = name, "group:"+name+suffix
 		}
 	}
+	return via
+}
 
-	return ErrForbidden
+// groupGrant reports whether a group's permissions give operation on
+// collection, with suffix "" for a grant on the collection or ":*" for one on
+// "*".
+func groupGrant(perms []*GroupPermission, collection string, operation PermissionType) (suffix string, ok bool) {
+	for _, gp := range perms {
+		if gp.Collection == collection && gp.HasPermission(operation) {
+			return "", true
+		}
+	}
+	for _, gp := range perms {
+		if gp.Collection == "*" && gp.HasPermission(operation) {
+			return ":*", true
+		}
+	}
+	return "", false
 }
 
 // UserTenant returns the tenant of a user, or "" for unknown/global users.
@@ -738,6 +740,11 @@ func (am *AuthManager) UserTenant(username string) string {
 func (am *AuthManager) IsAdmin(username string) bool {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
+	return am.isAdminLocked(username)
+}
+
+// isAdminLocked is IsAdmin for a caller that holds am.mu.
+func (am *AuthManager) isAdminLocked(username string) bool {
 
 	// Only admin on "*" is global. It becomes the Admin flag of login and
 	// API-key tokens, which CheckPermission lets through on every collection;

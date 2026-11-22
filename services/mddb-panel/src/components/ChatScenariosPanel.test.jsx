@@ -11,6 +11,7 @@ vi.mock('../lib/mddb-client', () => ({
     putChatScenario: vi.fn(),
     deleteChatScenario: vi.fn(),
     getChatScenarioPrompt: vi.fn(),
+    getChatScenarioAccess: vi.fn(),
     listChatSkills: vi.fn(),
     listChatMcpSecrets: vi.fn(),
     putChatMcpSecret: vi.fn(),
@@ -59,6 +60,7 @@ beforeEach(() => {
   vi.mocked(mddbClient.putChatScenario).mockResolvedValue({});
   vi.mocked(mddbClient.deleteChatScenario).mockResolvedValue({ deleted: true });
   vi.mocked(mddbClient.listMCPAPIKeys).mockResolvedValue({ keys: [] });
+  vi.mocked(mddbClient.getChatScenarioAccess).mockResolvedValue({ scenario: 'support', authEnabled: false, collections: [], users: [] });
   vi.mocked(mddbClient.listChatMcpSecrets).mockResolvedValue({ secrets: [{ name: 'wiki', set: true }] });
   vi.mocked(mddbClient.putChatMcpSecret).mockResolvedValue({ set: true });
   vi.mocked(mddbClient.listChatSkills).mockResolvedValue({ skills: [{ name: 'triage' }, { name: 'refunds', description: 'Money back' }], version: 4 });
@@ -105,6 +107,16 @@ describe('editing a stored scenario', () => {
     expect(mddbClient.getChatScenarioPrompt).toHaveBeenCalledWith('support');
     expect(screen.getByRole('heading', { name: 'Try it' })).toBeTruthy();
     expect(screen.getByText(/needs the chat service \(mddb-chat\) connected/)).toBeTruthy();
+  });
+
+  test('#441: the Access card says "Saved state" only while the form\'s collections differ', async () => {
+    await renderWith();
+    fireEvent.click(screen.getByRole('button', { name: /support/ }));
+    expect(await screen.findByRole('heading', { name: 'Access' })).toBeTruthy();
+    expect(mddbClient.getChatScenarioAccess).toHaveBeenCalledWith('support');
+    expect(screen.queryByText('Saved state. Save the scenario to refresh.')).toBeNull();
+    fireEvent.click(field('runbooks'));
+    expect(screen.getByText('Saved state. Save the scenario to refresh.')).toBeTruthy();
   });
 
   test('saves every changed field as one scenario and reloads', async () => {

@@ -1164,6 +1164,11 @@ class MDDBClient {
     return this.request(`/chat/scenarios/${encodeURIComponent(name)}/prompt`, { method: 'GET' });
   }
 
+  /** Who can read a stored scenario (admin on "*", #441): `{ scenario, authEnabled, collections, users: [{ username, admin, disabled, full, grants: [{ collection, via }] }] }`. */
+  async getChatScenarioAccess(name) {
+    return this.request(`/chat/scenarios/${encodeURIComponent(name)}/access`, { method: 'GET' });
+  }
+
   // ---- Chat skills (#404, 2.19.0+): admin on "*" for every call ----
 
   /** Every skill without content: `{ skills: [...], version }`. */

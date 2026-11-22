@@ -86,6 +86,18 @@ describe('MCPConfigPanel Server Domain', () => {
 });
 
 describe('MCPConfigPanel tabs', () => {
+  test('#441: opens on the tab a link asked for, then forgets it; an unknown tab is ignored', async () => {
+    useStore.setState({ viewTarget: 'claude' });
+    await renderWith({ protocols: { mcp: { domain: 'db.example.com', addr: ':9000' } } });
+    expect(code()).toContain('claude mcp add');
+    expect(useStore.getState().viewTarget).toBeNull();
+    cleanup();
+    useStore.setState({ viewTarget: 'nope' });
+    await renderWith({});
+    expect(screen.getByText('mcp_config.yaml')).toBeTruthy();
+    expect(useStore.getState().viewTarget).toBeNull();
+  });
+
   test('every tab has an example; the MCP tab falls back to the generated one', async () => {
     vi.mocked(mddbClient.getMCPConfigText).mockRejectedValue(new Error('down'));
     await renderWith({ protocols: { mcp: { domain: 'db.example.com', addr: ':9000' } } });
