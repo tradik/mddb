@@ -14,6 +14,12 @@ const restoreFromBackupDescription = "Restore from backup"
 // every catalogue it appears in.
 const runAutomationDescription = "Run a sync or backup rule now"
 
+// Methods of an endpoint that answers several, as the catalogue lists them.
+const (
+	methodsGetPost       = "GET/POST"
+	methodsGetPostDelete = "GET/POST/DELETE"
+)
+
 // ---- Request/Response types ----
 
 // EndpointsResponse contains all available HTTP, gRPC, and MCP endpoints.
@@ -258,7 +264,7 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 // agree, and now something checks that they do.
 func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 	endpoints := []HTTPEndpoint{
-		{Method: "GET/POST", Path: "/v1/health", Description: "Server health check", RequiresAuth: false},
+		{Method: methodsGetPost, Path: "/v1/health", Description: "Server health check", RequiresAuth: false},
 		{Method: "GET", Path: "/v1/stats", Description: "Database statistics", RequiresAuth: authEnabled},
 		{Method: "GET", Path: "/metrics", Description: "Prometheus metrics", RequiresAuth: false},
 
@@ -290,10 +296,10 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 
 		// Model training (admin, module off by default)
 		{Method: "GET", Path: "/v1/training/profiles", Description: "Trainer profiles the operator configured", RequiresAuth: authEnabled},
-		{Method: "GET/POST", Path: "/v1/training/datasets", Description: "List training datasets / build one from collections", RequiresAuth: authEnabled},
+		{Method: methodsGetPost, Path: "/v1/training/datasets", Description: "List training datasets / build one from collections", RequiresAuth: authEnabled},
 		{Method: "GET/DELETE", Path: "/v1/training/datasets/{id}", Description: "Dataset status and summary / delete it; /download?part=train|validation", RequiresAuth: authEnabled},
-		{Method: "GET/POST", Path: "/v1/training/jobs", Description: "List training runs / start one with a profile", RequiresAuth: authEnabled},
-		{Method: "GET/POST/DELETE", Path: "/v1/training/jobs/{id}", Description: "Run status and log / cancel, evaluate, download, delete", RequiresAuth: authEnabled},
+		{Method: methodsGetPost, Path: "/v1/training/jobs", Description: "List training runs / start one with a profile", RequiresAuth: authEnabled},
+		{Method: methodsGetPostDelete, Path: "/v1/training/jobs/{id}", Description: "Run status and log / cancel, evaluate, download, delete", RequiresAuth: authEnabled},
 
 		// Vector search
 		{Method: "POST", Path: "/v1/vector-search", Description: "Semantic search using embeddings", RequiresAuth: authEnabled},
@@ -314,10 +320,10 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 		{Method: "POST", Path: "/v1/import-url", Description: "Import markdown from URL", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/set-ttl", Description: "Set document time-to-live", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/fts", Description: "Full-text search (with in-graph metadata filtering)", RequiresAuth: authEnabled},
-		{Method: "GET/POST", Path: "/v1/code-graph", Description: "Code connection graph: which documents define, use or import a symbol", RequiresAuth: authEnabled},
+		{Method: methodsGetPost, Path: "/v1/code-graph", Description: "Code connection graph: which documents define, use or import a symbol", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/hybrid-search", Description: "Hybrid sparse+dense search (FTS + vector)", RequiresAuth: authEnabled},
-		{Method: "GET/POST/DELETE", Path: "/v1/synonyms", Description: "Manage FTS synonyms", RequiresAuth: authEnabled},
-		{Method: "GET/POST/DELETE", Path: "/v1/stopwords", Description: "Manage FTS stop words", RequiresAuth: authEnabled},
+		{Method: methodsGetPostDelete, Path: "/v1/synonyms", Description: "Manage FTS synonyms", RequiresAuth: authEnabled},
+		{Method: methodsGetPostDelete, Path: "/v1/stopwords", Description: "Manage FTS stop words", RequiresAuth: authEnabled},
 
 		// Metadata & checksum
 		{Method: "GET", Path: "/v1/meta-keys", Description: "List unique metadata keys and values", RequiresAuth: authEnabled},
@@ -391,7 +397,7 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 	// (TEST-002).
 	if s != nil && s.AutomationManager != nil {
 		endpoints = append(endpoints,
-			HTTPEndpoint{Method: "GET/POST", Path: "/v1/automation", Description: "List/create automation rules", RequiresAuth: authEnabled},
+			HTTPEndpoint{Method: methodsGetPost, Path: "/v1/automation", Description: "List/create automation rules", RequiresAuth: authEnabled},
 			HTTPEndpoint{Method: "GET/PUT/DELETE", Path: "/v1/automation/{id}", Description: "Get/update/delete automation rule", RequiresAuth: authEnabled},
 			HTTPEndpoint{Method: "POST", Path: "/v1/automation/{id}/test", Description: "Test trigger (dry run)", RequiresAuth: authEnabled},
 			HTTPEndpoint{Method: "POST", Path: "/v1/automation/{id}/run", Description: runAutomationDescription, RequiresAuth: authEnabled},
@@ -414,9 +420,9 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 
 	if s != nil && s.SpellManager != nil {
 		endpoints = append(endpoints,
-			HTTPEndpoint{Method: "GET/POST", Path: "/v1/spell-suggest", Description: "Spelling suggestions for a query", RequiresAuth: authEnabled},
+			HTTPEndpoint{Method: methodsGetPost, Path: "/v1/spell-suggest", Description: "Spelling suggestions for a query", RequiresAuth: authEnabled},
 			HTTPEndpoint{Method: "POST", Path: "/v1/spell-cleanup", Description: "Rebuild the spelling dictionary", RequiresAuth: authEnabled},
-			HTTPEndpoint{Method: "GET/POST", Path: "/v1/spell-dictionary", Description: "Inspect or extend the spelling dictionary", RequiresAuth: authEnabled},
+			HTTPEndpoint{Method: methodsGetPost, Path: "/v1/spell-dictionary", Description: "Inspect or extend the spelling dictionary", RequiresAuth: authEnabled},
 		)
 	}
 
