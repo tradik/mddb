@@ -18,6 +18,8 @@ vi.mock('../lib/mddb-client', () => ({
     listAutomationLogs: vi.fn(),
   },
 }));
+// The default forge tokens card has its own suite (ForgeTokensCard.test.jsx).
+vi.mock('./ForgeTokensCard', () => ({ default: () => <div data-testid="forge-tokens" /> }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
@@ -436,6 +438,16 @@ describe('AutomationPanel: edit, toggle, delete, test', () => {
     fireEvent.click(within(rowOf('Bare')).getByTitle('Test trigger'));
     expect(await screen.findByText('no webhook')).toBeTruthy();
     expect(screen.queryByText('Test Results')).toBeNull();
+  });
+});
+
+describe('AutomationPanel: forge tokens tab (INT-023)', () => {
+  test('the Forge tokens tab opens the default tokens card', async () => {
+    await renderLoaded();
+    fireEvent.click(screen.getByRole('button', { name: 'Forge tokens' }));
+    expect(screen.getByTestId('forge-tokens')).toBeTruthy();
+    expect(screen.queryByText('Rules (7)')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Forge tokens' }).className).toContain('border-blue-600');
   });
 });
 

@@ -998,6 +998,26 @@ class MDDBClient {
   }
 
   /**
+   * Refresh the syncs writing to a collection now (INT-023): `{ collection,
+   * number? }` → `{ collection, runs: [{ ruleId, status, added, updated, … }] }`;
+   * a 429 when every rule ran under 30 s ago, a 404 when no sync writes there.
+   */
+  async syncRefresh(collection, number) {
+    const body = number ? { collection, number } : { collection };
+    return this.request('/sync/refresh', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  /** The server's default forge tokens (INT-023): `{ defaults: { host: secretName } }`. */
+  async getForgeTokens() {
+    return this.request('/forge-tokens', { method: 'GET' });
+  }
+
+  /** Replaces the default forge tokens with `defaults`, `{ host: secretName }`; admin only. */
+  async setForgeTokens(defaults) {
+    return this.request('/forge-tokens', { method: 'PUT', body: JSON.stringify({ defaults }) });
+  }
+
+  /**
    * List automation logs
    */
   async listAutomationLogs({ limit = 50, cursor = '', ruleId = '', status = '' } = {}) {

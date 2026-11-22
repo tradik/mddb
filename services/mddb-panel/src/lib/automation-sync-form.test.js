@@ -68,3 +68,54 @@ describe('git helpers', () => {
     expect(shortCommit(undefined)).toBe('');
   });
 });
+
+// INT-023: a forge repository's issues and pull requests as a synced source,
+// and a git or issues repository resolved from a collection instead of a URL.
+describe('issues sync payload (INT-023)', () => {
+  const issues = {
+    ...EMPTY_SYNC,
+    source: 'issues',
+    collection: 'docs-issues',
+    repositoryFrom: 'docs',
+    state: 'open',
+    since: '2026-01-01',
+    includePulls: true,
+    comments: false,
+    tokenSecretRef: 'gh',
+  };
+
+  test('kinds become a list, comments is always sent, an empty URL is left out', () => {
+    expect(buildSync(issues)).toEqual({
+      source: 'issues', collection: 'docs-issues', lang: 'en', repositoryFrom: 'docs', state: 'open',
+      since: '2026-01-01', include: ['issues', 'pulls'], comments: false, tokenSecretRef: 'gh',
+    });
+  });
+
+  test('a self-hosted URL sends its forge; no kind ticked leaves include to the server', () => {
+    const out = buildSync({ ...EMPTY_SYNC, source: 'issues', collection: 'i', url: 'https://git.example.com/a/b', forge: 'gitea', includeIssues: false });
+    expect(out).toEqual({ source: 'issues', collection: 'i', lang: 'en', url: 'https://git.example.com/a/b', forge: 'gitea', state: 'all', comments: true });
+  });
+
+  test('a stored issues sync reads back into the form and round-trips', () => {
+    const form = syncToForm(buildSync(issues));
+    expect(form).toMatchObject({ include: '', includeIssues: true, includePulls: true, comments: false, state: 'open', since: '2026-01-01', repositoryFrom: 'docs' });
+    expect(buildSync(form)).toEqual(buildSync(issues));
+    expect(syncToForm({ source: 'issues', collection: 'i', lang: 'en' })).toMatchObject({
+      includeIssues: true, includePulls: false, comments: true, state: 'all', since: '', repositoryFrom: '',
+    });
+    expect(syncToForm({ source: 'issues', collection: 'i', lang: 'en', include: ['pulls'] })).toMatchObject({ includeIssues: false, includePulls: true });
+  });
+
+  test('a git sync names the collection its repository comes from', () => {
+    const out = buildSync({ ...EMPTY_SYNC, source: 'git', collection: 'd', repositoryFrom: 'code' });
+    expect(out).toEqual({ source: 'git', collection: 'd', lang: 'en', repositoryFrom: 'code' });
+    expect(syncToForm(out)).toMatchObject({ repositoryFrom: 'code', url: '', includeIssues: true, includePulls: false });
+  });
+
+  test('the source line says where an unnamed repository comes from', () => {
+    expect(syncSourceText({ source: 'git', collection: 'd', repositoryFrom: 'code' })).toBe('the repository of code @ default branch');
+    expect(syncSourceText({ source: 'issues', collection: 'd' })).toBe('the repository of d, issues (all)');
+    expect(syncSourceText({ source: 'issues', url: 'https://github.com/a/b', include: ['issues', 'pulls'], state: 'open' }))
+      .toBe('https://github.com/a/b, issues and pulls (open)');
+  });
+});

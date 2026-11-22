@@ -1,10 +1,12 @@
 // The fields of a cron rule: its schedule and its one action — fire a webhook,
-// take a backup (OPS-023) or sync a sitemap, URL list, S3 prefix or git
-// repository (2.19.5, #421) into a collection (INT-022). Laid out in the
+// take a backup (OPS-023) or sync a sitemap, URL list, S3 prefix, git
+// repository (2.19.5, #421) or a repository's issues and pull requests
+// (INT-023) into a collection (INT-022). Laid out in the
 // AutomationPanel form grid; the controls are CronFormControls'.
 
 import { Check, Select, Text, TextArea } from './CronFormControls';
 import GitSyncFields from './GitSyncFields';
+import IssuesSyncFields from './IssuesSyncFields';
 
 /** Endpoint, region, keys and TLS of an S3-compatible store. */
 function StorageFields({ value, onChange }) {
@@ -64,6 +66,7 @@ function SyncFields({ value, onChange, collections }) {
         <option value="urls">List of URLs</option>
         <option value="s3">S3 prefix (read only)</option>
         <option value="git">Git repository (branch, tag or latest release)</option>
+        <option value="issues">Issues and pull requests (read-only mirror)</option>
       </Select>
       <Select name="Into collection" value={value.collection} onChange={set('collection')}>
         <option value="">Select collection</option>
@@ -81,7 +84,8 @@ function SyncFields({ value, onChange, collections }) {
           <StorageFields value={value.storageConfig} onChange={set('storageConfig')} />
         </>
       )}
-      {value.source === 'git' && <GitSyncFields value={value} onChange={onChange} />}
+      {value.source === 'git' && <GitSyncFields value={value} onChange={onChange} collections={collections} />}
+      {value.source === 'issues' && <IssuesSyncFields value={value} onChange={onChange} collections={collections} />}
       <Text name="Max documents per run" type="number" value={value.maxDocuments} onChange={set('maxDocuments')} placeholder="1000 (max 50000)" />
       <Text name="Max MiB per document" type="number" value={value.maxMiB} onChange={set('maxMiB')} placeholder="10 (max 100)" />
       <Check wide checked={value.prune} onChange={set('prune')}>

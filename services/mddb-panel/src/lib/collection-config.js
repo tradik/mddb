@@ -10,6 +10,8 @@
  * evaluation set (kept by the server) are not sent.
  */
 
+import { needsForge } from './automation-sync-form';
+
 /** Retrieval keys the dialog edits; every other stored key is kept. */
 export const EDITED_RETRIEVAL_KEYS = [
   'defaultSearchType', 'topK', 'retrievalMode', 'hybridStrategy', 'hybridAlpha', 'hybridAlphaSet',
@@ -133,4 +135,48 @@ export function applyAdvanced(payload, advanced, stored = {}) {
   const quota = buildQuota(advanced.quota);
   if (!sameQuota(quota, stored.quota)) payload.quota = quota;
   return payload;
+}
+
+/** The dialog's state for a stored repository block (INT-023). */
+export function repositoryFromConfig(cfg = {}) {
+  const r = cfg.repository || {};
+  return { url: r.url || '', forge: r.forge || '', tokenSecretRef: r.tokenSecretRef || '' };
+}
+
+/**
+ * The repository block to send (INT-023): the URL, the forge only for a host
+ * the server does not know, and the token's secret name — never a value.
+ * An empty URL removes a stored block (`{}`) and sends nothing otherwise
+ * (undefined: the server keeps what it has, which is nothing).
+ */
+export function buildRepository(form, stored) {
+  const url = form.url.trim();
+  if (!url) return stored?.url ? {} : undefined;
+  const out = { url };
+  if (needsForge(url) && form.forge) out.forge = form.forge;
+  if (form.tokenSecretRef) out.tokenSecretRef = form.tokenSecretRef;
+  return out;
+}
+
+/**
+ * The cron rule "Create issues sync" adds (INT-023): every 15 minutes, all
+ * issues and pull requests with comments of the collection's repository,
+ * mirrored into `<collection>-issues`.
+ */
+export function issuesSyncRule(collection) {
+  return {
+    type: 'cron',
+    name: `${collection} issues`,
+    schedule: '*/15 * * * *',
+    enabled: true,
+    sync: {
+      source: 'issues',
+      collection: `${collection}-issues`,
+      lang: 'en',
+      repositoryFrom: collection,
+      state: 'all',
+      include: ['issues', 'pulls'],
+      comments: true,
+    },
+  };
 }
