@@ -398,6 +398,7 @@ What a scoped key may call, by the tool's access class (`mcpToolAccessRules`):
 | Collection read or write | For a key limited to collections or a scenario: allowed when every collection the call names, after alias and `role:` resolution, is in the scope; a call that names no collection is refused, unless the tool's default targets are in the scope (`reference_*` with `role:reference` in the scope). A write is refused to a read-only key, and (v2.19.11) a write that names any of `readOnlyCollections` — in `collection`, `collections`, `source_collection` or `target_collections`, by name or alias — is refused too; a write counts as any tool read-only mode refuses. The memory collections are never in a scope. |
 | Every collection at once (`get_stats`, `vector_stats`, `list_schemas`, `bulk_ingest_status`, …) | Refused when the key is limited to collections or a scenario; allowed to a key that is only read-only, when the tool reads. |
 | Administration (`create_backup`, `chat_skill_*`, automations, …) | Refused. |
+| `sync_refresh` (2.19.11) | A collection write: allowed to a key limited to collections when the collection it names is in the scope; refused to a read-only key. It runs only the sync rules writing to that collection; `run_automation` stays administration. |
 | Handled inside the tool (`chat_scenario_get`, `chat_conversation_*`) | Refused. |
 | Memory store (`memory_*`) | (v2.19.11) For a key limited to collections or a scenario: allowed inside the key's [memory namespace](#memory-namespaces-v21911); to a read-only key only `memory_recall`, `memory_list_sessions` and `memory_session_history`. Refused to a key that is only read-only: it is not limited, so it has no namespace. |
 | No collection data (`fts_languages`, `geo_encode`, `feature_list`, …) | Allowed; to a read-only key only when read-only mode allows the tool. |
@@ -783,7 +784,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
 | `search` | `search_documents`, `aggregate`, `semantic_search`, `full_text_search`, `hybrid_search`, `cross_search`, `autocomplete`, `fts_languages`, `search_advisor`, `get_indexing_status`, `run_eval`, `add_eval_query`, `get_gain`, `find_duplicates`, `classify_document`, `get_meta_keys` |
 | `code` | `code_graph`, `code_symbol`, `reference_search`, `reference_symbol`, `reference_examples`, `reference_dependencies` |
 | `documents` | `add_document`, `update_document`, `delete_document`, `get_document_meta`, `set_ttl`, `add_documents_batch`, `delete_documents_batch`, `export_documents`, `list_revisions`, `restore_revision`, `delete_where`, `update_where`, `set_ttl_where` |
-| `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*` |
+| `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*`, `sync_refresh` |
 | `memory` | `memory_*` |
 | `schema` | `set_schema`, `get_schema`, `delete_schema`, `list_schemas`, `validate_document` |
 | `admin` | stats, reindexing, backups, collection deletion and configs, synonyms, stopwords, curation rules, corpus packs (`corpus_list`, `corpus_install`, `corpus_remove`), chat conversations, read-only (`chat_conversation_list`, `chat_conversation_get`), the chat conversation log, read-only, global admin (`chat_log_list`, `chat_gaps`), chat scenarios (`chat_scenario_list`, `chat_scenario_get`, `chat_scenario_put`, `chat_scenario_delete`), chat skills (`chat_skill_list`, `chat_skill_get`, `chat_skill_put`, `chat_skill_delete`), chat MCP secrets (`chat_mcp_secret_list`, `chat_mcp_secret_put`, `chat_mcp_secret_delete`), module switches (`feature_list`, `feature_set`) |
@@ -951,6 +952,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `get_automation_logs` | List automation execution logs with optional filtering by rule ID and status. |
 | `run_automation` | (2.19.0) Run a cron rule's sync or backup now, as its schedule would; returns the run's `jobId`. Fails while the previous run is still going. |
 
+`create_automation` takes `source: "issues"` since 2.19.11 — a read-only mirror of a forge's issues and pull requests, with `state`, `since`, `include` (`issues`, `pulls`), `comments` and `repositoryFrom` — see [AUTOMATIONS.md](AUTOMATIONS.md#issues-and-pull-requests).
+
 ### Webhooks
 
 | Tool | Description |
@@ -994,6 +997,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `bulk_ingest_status` | Return the current status record (counters, timestamps, up to 50 errors) for a previously-submitted bulk ingest job. |
 | `bulk_ingest_list` | List bulk ingest jobs newest-first, optionally filtered by collection. |
 | `bulk_ingest_cancel` | Cancel a pending bulk ingest job. |
+| `sync_refresh` | (2.19.11) `{collection, number?}`: refresh a synced collection now — with `number`, that one issue or pull request of the issues sync writing to it; without, an incremental run of each sync rule writing to it. At most once every 30 s per rule; the answer says when each rule last ran. A key limited to the collection may call it. See [AUTOMATIONS.md](AUTOMATIONS.md#issues-and-pull-requests). |
 
 ### Ops
 

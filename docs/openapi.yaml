@@ -4497,10 +4497,13 @@ paths:
   /v1/automation/{id}/hook:
     post:
       tags: [ Automation ]
-      summary: Run a git sync from a forge webhook
+      summary: Run a git sync, or refresh an issue, from a forge webhook
       operationId: hookAutomationRule
       description: (2.19.5) A forge's push or release webhook runs a git
-        sync's rule now, as POST /v1/automation/{id}/run does. The route
+        sync's rule now, as POST /v1/automation/{id}/run does. For an
+        issues sync (2.19.11) an event about an issue, a comment or a pull
+        request refreshes that one document and answers 200 with what it
+        did; an event naming no item runs an incremental pass. The route
         takes no mddb credentials; the request is verified against the
         rule's hookSecretRef secret instead — X-Hub-Signature-256
         (sha256=<hex HMAC-SHA256 of the body>; GitHub, also sent by Gitea
@@ -4520,14 +4523,14 @@ paths:
         - {name: X-GitHub-Event, in: header, required: false, schema: {type: string}, description: "ping answers 200 without a run"}
       requestBody:
         required: false
-        description: The forge's event, verified as it arrived; its content is not read.
+        description: The forge's event, verified as it arrived; an issues sync reads the item it names.
         content:
           application/json:
             schema:
               type: object
       responses:
         "200":
-          description: GitHub's ping, verified
+          description: GitHub's ping, verified; or (2.19.11) the one item an issues sync refreshed
           content:
             application/json:
               schema:
@@ -4535,7 +4538,14 @@ paths:
                 properties:
                   status:
                     type: string
-                    enum: [ pong ]
+                    enum: [ pong, success, error ]
+                  ruleId: {type: string}
+                  key: {type: string, example: issue-31}
+                  error: {type: string}
+                  added: {type: integer}
+                  updated: {type: integer}
+                  unchanged: {type: integer}
+                  deleted: {type: integer}
         "202":
           description: The run started
           content:
@@ -4548,6 +4558,101 @@ paths:
         "409": {description: "The previous run of the rule is still going", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
         "413": {description: "The body is over 25 MB", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
         "503": {description: "The secret cannot be opened, or no cron scheduler runs", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+
+  /v1/sync/refresh:
+    post:
+      tags: [ Automation ]
+      summary: Refresh a synced collection now
+      operationId: syncRefresh
+      description: (2.19.11, INT-023) Refreshes the sync rules writing to the
+        collection — with number, that one issue or pull request of each
+        issues sync, at once; without, an incremental run of each sync rule
+        (as POST /v1/automation/{id}/run). Gated as a write of the
+        collection, so an MCP key limited to it may call it (MCP tool
+        sync_refresh); it never runs a rule writing elsewhere. At most once
+        every 30 s per rule. See docs/AUTOMATIONS.md#issues-and-pull-requests.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ collection ]
+              properties:
+                collection:
+                  type: string
+                number:
+                  type: integer
+                  minimum: 0
+                  description: The issue or pull request to refresh; omitted runs an incremental pass
+      responses:
+        "200":
+          description: What each rule's refresh did
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncRefreshResult"
+        "400": {description: "No collection, or a negative number", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {description: "No sync rule writes to the collection (with number, no issues sync)", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "405": {description: "Method not allowed (POST only)", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "429":
+          description: Every rule was refreshed less than 30 s ago; Retry-After says when to try again
+          headers:
+            Retry-After: {schema: {type: integer}, description: Seconds until the first rule may be refreshed}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: {type: string}
+                  runs: {type: array, items: {$ref: "#/components/schemas/SyncRefreshRun"}}
+
+  /v1/forge-tokens:
+    get:
+      tags: [ Automation ]
+      summary: The default forge tokens
+      operationId: getForgeTokens
+      description: (2.19.11, INT-023) Host → the stored secret a git or issues
+        sync on that host reads with when neither its rule nor its
+        collection's repository names one. Kept with the stored secrets.
+        Global admin.
+      responses:
+        "200":
+          description: The map
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForgeTokens"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "503": {description: "The secret store is not loaded", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+    put:
+      tags: [ Automation ]
+      summary: Replace the default forge tokens
+      operationId: setForgeTokens
+      description: (2.19.11) Replaces the whole map. A host is a lower-case
+        host name with an optional port, compared exactly with a repository
+        URL's host; every secret must exist and cannot be deleted while
+        named (409 usedBy "default:<host>"). Global admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgeTokens"
+      responses:
+        "200":
+          description: The map as stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForgeTokens"
+        "400": {description: "A host that is not a host name, an unknown secret, or more than 100 hosts", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "503": {description: "The secret store is not loaded", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
 
   /v1/automation/{id}/test:
     post:
@@ -7804,6 +7909,8 @@ paths:
                   $ref: "#/components/schemas/CollectionFTS"
                 quota:
                   $ref: "#/components/schemas/CollectionQuota"
+                repository:
+                  $ref: "#/components/schemas/CollectionRepository"
                 trackAccess:
                   type: boolean
                   description: Record per-read access events for temporal analytics
@@ -16200,10 +16307,19 @@ components:
         documents also carry `syncRef` / `syncCommit`. A commit the last
         successful run of the unchanged rule read is not downloaded again.
         See docs/AUTOMATIONS.md#git-repositories.
+
+        Since 2.19.11 an `issues` source mirrors a forge repository's issues
+        and pull requests, read-only: one document per item (key
+        issue-<n> / pull-<n>), Markdown with a section per comment, flat
+        meta. Runs are incremental (the items updated since the last run,
+        conditional on each listing page's ETag); the rate limit ends a run
+        with its reset time and deletes nothing. A git or issues rule may
+        leave url and tokenSecretRef to a collection's repository and the
+        default forge tokens. See docs/AUTOMATIONS.md#issues-and-pull-requests.
       properties:
         source:
           type: string
-          enum: [ sitemap, urls, s3, git ]
+          enum: [ sitemap, urls, s3, git, issues ]
         collection:
           type: string
         lang:
@@ -16212,7 +16328,8 @@ components:
           type: string
           format: uri
           description: sitemap — a sitemap or sitemap index, plain or gzipped;
-            git (2.19.5) — the repository over https
+            git (2.19.5), issues (2.19.11) — the repository over https; may be
+            empty when a collection's repository resolves it
         urls:
           type: array
           items:
@@ -16258,7 +16375,9 @@ components:
             type: string
           description: (2.19.5) git — globs over repository-relative paths, as
             mddb-cli autoindex --include (the path or the file name; dir/**
-            is everything under dir). Empty takes every file.
+            is everything under dir). Empty takes every file. issues
+            (2.19.11) — the kinds mirrored, issues and/or pulls; default
+            [issues].
           example: [ "*.md" ]
         exclude:
           type: array
@@ -16286,6 +16405,82 @@ components:
           default: false
           description: (2.19.5) git — take over documents of the same key
             that no sync wrote (a collection seeded by mddb-cli autoindex)
+        repositoryFrom:
+          type: string
+          description: (2.19.11) git, issues — the collection whose
+            repository a rule without url reads; empty is the rule's own
+            collection
+        state:
+          type: string
+          enum: [ open, closed, all ]
+          default: all
+          description: (2.19.11) issues — the items mirrored by state
+        since:
+          type: string
+          description: (2.19.11) issues — only items updated on or after it, a
+            date (2026-01-02) or an RFC 3339 time
+          example: "2026-01-01"
+        comments:
+          type: boolean
+          default: true
+          description: (2.19.11) issues — append each comment to its item's
+            document
+
+    CollectionRepository:
+      type: object
+      description: (2.19.11, INT-023) The forge repository a collection is
+        read from; a git or issues sync without its own url reads it. The
+        token is a stored secret's name, never a value. In a PUT, omitted
+        keeps the stored one and {} removes it.
+      properties:
+        url:
+          type: string
+          format: uri
+          example: https://github.com/acme/shop-api
+        forge:
+          type: string
+          enum: [ github, gitlab, gitea, forgejo ]
+        tokenSecretRef:
+          type: string
+
+    ForgeTokens:
+      type: object
+      properties:
+        defaults:
+          type: object
+          additionalProperties:
+            type: string
+          example: {github.com: github-token}
+
+    SyncRefreshRun:
+      type: object
+      properties:
+        ruleId: {type: string}
+        status:
+          type: string
+          enum: [ done, started, throttled, running, error ]
+        lastRunAt:
+          type: integer
+          format: int64
+          description: When the rule last ran before this refresh (unix seconds)
+        retryAfter: {type: integer, description: "throttled: seconds until it may be refreshed"}
+        jobId: {type: string, description: "started: the run on GET /v1/jobs/stream"}
+        error: {type: string}
+        added: {type: integer}
+        updated: {type: integer}
+        unchanged: {type: integer}
+        deleted: {type: integer}
+        failed: {type: integer}
+
+    SyncRefreshResult:
+      type: object
+      properties:
+        collection: {type: string}
+        number: {type: integer}
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncRefreshRun"
 
     BackupAction:
       type: object
@@ -16722,6 +16917,8 @@ components:
           $ref: "#/components/schemas/WordPressTargetConfig"
         quota:
           $ref: "#/components/schemas/CollectionQuota"
+        repository:
+          $ref: "#/components/schemas/CollectionRepository"
         evalSet:
           type: array
           readOnly: true
