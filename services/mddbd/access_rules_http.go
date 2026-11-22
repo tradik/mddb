@@ -129,7 +129,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/curation":             ruleHandler, // a rule looked up by id
 	"/v1/aliases":              ruleHandler, // the alias's old and new collection
 	"/v1/aliases/":             ruleHandler,
-	"/v1/chat/scenarios/":      ruleHandler, // #403: admin to write, the scenario's collections to read
+	"/v1/chat/scenarios/":      ruleHandler, // #403: admin to write, the scenario's collections to read; /access is admin (#441)
 	"/v1/features/":            ruleHandler, // GO-049: PUT needs admin, checked in the handler
 	"/v1/tenants/":             ruleHandler, // GO-054: a global admin, or for reads the tenant's own admin
 	"/v1/chat/conversations":   ruleHandler, // the chat collection of the caller's tenant (#405)

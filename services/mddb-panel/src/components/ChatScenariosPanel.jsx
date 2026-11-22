@@ -7,6 +7,8 @@ import { secretsEncryptionReady } from '../lib/chat-mcp';
 import ChatScenarioForm from './ChatScenarioForm';
 import ChatScenarioList from './ChatScenarioList';
 import ChatScenarioPreview from './ChatScenarioPreview';
+import ChatScenarioAccess from './ChatScenarioAccess';
+import { sameCollections } from '../lib/chat-scenario-access';
 import ChatScenarioMcpKeys from './ChatScenarioMcpKeys';
 import ChatSkillsPanel from './ChatSkillsPanel';
 import ChatTabs from './ChatTabs';
@@ -166,6 +168,11 @@ function ScenariosView() {
             ) : (
               <div className="space-y-4">
                 <ChatScenarioPreview name={stored} version={version} />
+                <ChatScenarioAccess
+                  name={stored}
+                  version={version}
+                  stale={!sameCollections(form.allowedCollections, scenarios.find((sc) => sc.name === stored)?.allowedCollections)}
+                />
                 <ChatScenarioMcpKeys key={stored} scenario={stored} />
               </div>
             )}

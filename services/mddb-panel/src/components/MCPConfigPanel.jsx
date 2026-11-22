@@ -93,8 +93,12 @@ function SetupSteps({ variant }) {
 }
 
 export default function MCPConfigPanel() {
-  const { config } = useStore();
-  const [activeTab, setActiveTab] = useState('mcp');
+  const { config, viewTarget, clearViewTarget } = useStore();
+  // #441: a link elsewhere (openView('mcp', 'api-keys')) picks the first tab.
+  const [activeTab, setActiveTab] = useState(() => (TABS.some((t) => t.id === viewTarget) ? viewTarget : 'mcp'));
+  useEffect(() => {
+    if (viewTarget !== null) clearViewTarget();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [copied, setCopied] = useState(false);
   const [variantId, setVariantId] = useState(null);
   const [mcpYaml, setMcpYaml] = useState(null);

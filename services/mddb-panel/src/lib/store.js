@@ -96,6 +96,9 @@ export const useStore = create((set, get) => ({
 
   // View mode (documents, system, config, mcp, endpoints, users, groups)
   viewMode: 'system',
+  // A tab to open in the next view (#441): set by openView, read and cleared
+  // by the view that owns the tab. null: the view's default tab.
+  viewTarget: null,
 
   // System info
   systemInfo: null,
@@ -236,7 +239,9 @@ export const useStore = create((set, get) => ({
   setSidebarCollapsed: (c) => { localStorage.setItem('sidebarCollapsed', c); set({ sidebarCollapsed: c }); },
 
   // View mode actions
-  setViewMode: (mode) => set({ viewMode: mode }),
+  setViewMode: (mode) => set({ viewMode: mode, viewTarget: null }),
+  openView: (mode, target = null) => set({ viewMode: mode, viewTarget: target }),
+  clearViewTarget: () => set({ viewTarget: null }),
 
   // Audit log filter preset (used by Security dashboard → Audit Log drill-down)
   auditFilterPreset: null,

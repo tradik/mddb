@@ -16,6 +16,7 @@ import (
 //	PUT    /v1/chat/scenarios/{name}          create (201) or replace (200)
 //	DELETE /v1/chat/scenarios/{name}          remove
 //	GET    /v1/chat/scenarios/{name}/prompt   the composed system prompt, its size and missing skills
+//	GET    /v1/chat/scenarios/{name}/access   who can read the scenario (admin, #441)
 //
 // Writes need a global administrator. Reads need read permission on every
 // collection the scenario allows; the list leaves out what the caller may
@@ -37,6 +38,8 @@ func (s *Server) handleChatScenarios(w http.ResponseWriter, r *http.Request) {
 		ok(w, chatScenarioList{Scenarios: s.ListChatScenarios(r.Context()), Version: s.ChatScenariosVersion()})
 	case get && name == "version" && verb == "":
 		ok(w, map[string]uint64{"version": s.ChatScenariosVersion()})
+	case get && name != "" && verb == "access":
+		s.getChatScenarioAccess(w, r, name)
 	case get && (verb == "" || verb == "prompt"):
 		s.getChatScenario(w, r, name, verb == "prompt")
 	case r.Method == http.MethodPut && name != "" && verb == "":

@@ -136,6 +136,7 @@ describe('chat scenarios', () => {
     ['putChatScenario', (c) => c.putChatScenario(odd, scenario), `/v1/chat/scenarios/${oddEnc}`, PUT, scenario],
     ['deleteChatScenario', (c) => c.deleteChatScenario(odd), `/v1/chat/scenarios/${oddEnc}`, DELETE],
     ['getChatScenarioPrompt', (c) => c.getChatScenarioPrompt(odd), `/v1/chat/scenarios/${oddEnc}/prompt`, GET],
+    ['getChatScenarioAccess', (c) => c.getChatScenarioAccess(odd), `/v1/chat/scenarios/${oddEnc}/access`, GET],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });
 
