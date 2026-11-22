@@ -108,6 +108,7 @@ MDDB (Markdown Database) is an **AI-native embedded document database** for mark
 - **[Replication](REPLICATION.md)** — leader-follower binlog streaming for read scaling
 - **[Backup, restore & repair](BACKUP.md)** — consistent, integrity-checked backups; `mddbd -verify-db` and `-repair-db` for a damaged database file
 - **[Corpus packs](CORPUS-PACKS.md)** — a collection built once and installed read-only anywhere, without re-embedding or reindexing
+- **[Model training](MODEL-TRAINING.md)** — collections exported as a training dataset, and the trainer commands your operator configured started as jobs, with trial runs and before/after evaluation; MDDB itself trains nothing. New to model files? [The step-by-step guide](MODEL-TRAINING-GUIDE.md)
 - **[Open WebUI engines](OPENWEBUI.md)** — Open WebUI's external web search, reranker and document loader settings pointed at MDDB (`/v1/web-search`, `/v1/rerank`, `/v1/extract`), each a module that starts off
 - **[Elasticsearch-compatible subset](ELASTICSEARCH-COMPAT.md)** — Elasticsearch clients search and write MDDB under `/es` (`MDDB_ES_COMPAT=true`), with every unsupported clause refused by name
 - **[Qdrant-compatible point query](QDRANT_COMPAT.md)** — `qdrant-client`'s `query_points`, and so Open WebUI's External Knowledge Source (Qdrant provider), searches a collection under `/qdrant` (`MDDB_QDRANT_COMPAT=true`)
