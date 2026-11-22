@@ -181,6 +181,14 @@ poll_seconds = 10
 secret = ""
 required = false
 
+# The OpenAI-compatible API (#448): GET /v1/models and POST /v1/chat/completions,
+# one model per enabled scenario in mddbd that the caller's key may read. The
+# key is an mddbd API key or JWT, checked against mddbd on every request
+# (mddbd's authentication must be on). Off by default; then the routes do not
+# exist. MDDB_CHAT_OPENAI_API_ENABLED=true|false overrides this.
+[openai_api]
+enabled = false
+
 [scenarios.assistant]
 name = "Documentation Assistant"
 system_prompt = """You are a helpful documentation assistant for our product.

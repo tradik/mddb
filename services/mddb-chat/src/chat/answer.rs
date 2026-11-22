@@ -7,10 +7,9 @@ use tracing::error;
 
 use crate::chat::loop_guard::report::{StopSite, report};
 use crate::chat::loop_guard::{self, LoopDetected, LoopDetector, LoopGuardSettings, MARKER};
-use crate::chat::outbound::{Sender, send_error, send_json};
+use crate::chat::outbound::Outlet;
 use crate::error::AppError;
 use crate::llm::provider::{ApiMsg, CallParams};
-use crate::session::types::WsOutgoing;
 use crate::state::AppState;
 
 /// An answer and whether the loop guard cut it short.
@@ -60,7 +59,7 @@ pub fn guard_content(
 /// cancels the request: the model stops generating what nobody will read.
 pub async fn stream(
     state: &AppState,
-    out: &mut Sender,
+    out: &mut dyn Outlet,
     (api_messages, params): (&[ApiMsg], &CallParams),
     guard: Option<LoopGuardSettings>,
     site: &StopSite<'_>,
@@ -83,15 +82,14 @@ pub async fn stream(
                     return Ok(stop(out, &full_response, sent, &found).await);
                 }
                 if full_response.len() > state.config.session.max_response_length {
-                    let content = "\n\n[Response truncated]".to_string();
-                    send_json(out, &WsOutgoing::Chunk { content }).await;
+                    out.chunk("\n\n[Response truncated]".to_string()).await;
                     break;
                 }
-                send_json(out, &WsOutgoing::Chunk { content: text }).await;
+                out.chunk(text).await;
             }
             Err(e) => {
                 error!(error = %e, "LLM stream error");
-                send_error(out, "error generating response").await;
+                out.error("error generating response").await;
                 break;
             }
         }
@@ -103,12 +101,11 @@ pub async fn stream(
 /// up to the loop it has not been sent yet, then the marker. What it was
 /// already sent of the repeat stays on its screen — at most a window's worth
 /// — while the answer kept for the session and the log ends at the loop.
-async fn stop(out: &mut Sender, full: &str, sent: usize, found: &LoopDetected) -> Reply {
+async fn stop(out: &mut dyn Outlet, full: &str, sent: usize, found: &LoopDetected) -> Reply {
     let unsent = full
         .get(sent..loop_guard::cut_at(full, found))
         .unwrap_or_default();
-    let content = format!("{unsent}\n\n{MARKER}");
-    send_json(out, &WsOutgoing::Chunk { content }).await;
+    out.chunk(format!("{unsent}\n\n{MARKER}")).await;
     Reply {
         text: loop_guard::stopped_answer(full, found),
         loop_stopped: true,

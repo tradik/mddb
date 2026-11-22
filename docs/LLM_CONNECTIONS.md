@@ -635,7 +635,7 @@ print(ask("Czym jest MDDB?"))
 
 ## Open WebUI
 
-Open WebUI can use MDDB in two ways. The panel's **Open WebUI** tab shows both,
+Open WebUI can use MDDB in four ways. The panel's **Open WebUI** tab shows both,
 with this server's addresses filled in.
 
 ### External Knowledge Source (no code)
@@ -675,11 +675,44 @@ What the server does with these calls:
   this API. Documents are written with `/v1/add` and the other endpoints.
   OpenAI `filters` are accepted and ignored.
 
+### External Knowledge Source, Qdrant provider (#447)
+
+Start mddbd with `MDDB_QDRANT_COMPAT=true`, then add an External Knowledge
+Source with provider **Qdrant**: Endpoint `http://<mddb-host>:11023/qdrant`
+(always include the port: the Qdrant client adds 6333 to a URL without one,
+so behind TLS write `https://host:443/qdrant`), API Key an MDDB API key with
+read on the collection, Collection the MDDB collection name, and leave
+Content Field `payload.text`, Vector Field empty, Metadata Field
+`payload.metadata` and Document ID Field `id` at their defaults. Open WebUI
+embeds the question with its own embedding model, so it must use the same
+model (and dimension) as MDDB; a different dimension is refused with a 400
+naming both. See [QDRANT_COMPAT.md](QDRANT_COMPAT.md).
+
 ### Function (pipe)
 
 The tab's `mddb_model.py` is an Open WebUI function: **Admin → Functions →
 Add new function**, paste the script, save it, and set its Valves for your
 LLM provider (`llmProvider`, `llmApiUrl`, `llmApiKey`).
+
+### A chat scenario as a model (mddb-chat, #448)
+
+`mddb-chat` can serve its chat scenarios over an OpenAI-compatible API, one
+model per enabled scenario the key may read. Turn it on with
+`[openai_api] enabled = true` (or `MDDB_CHAT_OPENAI_API_ENABLED=true`); mddbd
+must run with `MDDB_AUTH_ENABLED=true`.
+
+In Open WebUI, *Admin → Settings → Connections → OpenAI API*, add a connection:
+
+| Field | Value |
+|-------|-------|
+| URL | `http://<mddb-chat host>:11030/v1` |
+| Key | an mddbd API key (`mddb_live_…`, from `POST /v1/auth/api-key` as the user whose read permissions decide which scenarios appear) |
+| Prefix ID (optional) | e.g. `mddb` — keeps scenario names apart from other connections' model ids |
+
+Each answer runs the scenario exactly as the widget does: its composed prompt
+and guardrails, its collections and tools, its LLM settings. Open WebUI's own
+system prompt, tools and images are not passed on (images are refused with
+400). Details and limits: [mddb-chat README](../services/mddb-chat/README.md#openai-compatible-api).
 
 ## Generic REST API Integration
 

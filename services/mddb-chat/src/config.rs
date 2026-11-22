@@ -17,6 +17,32 @@ pub struct Config {
     pub webhooks: Vec<WebhookConfig>,
     #[serde(default)]
     pub identity: IdentityConfig,
+    #[serde(default)]
+    pub openai_api: OpenAiApiConfig,
+}
+
+/// The OpenAI-compatible API (#448): `GET /v1/models` and
+/// `POST /v1/chat/completions`, one model per chat scenario.
+///
+/// Off by default: the routes do not exist until an operator turns them on,
+/// here or with `MDDB_CHAT_OPENAI_API_ENABLED=true`.
+#[derive(Debug, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct OpenAiApiConfig {
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+impl OpenAiApiConfig {
+    /// `MDDB_CHAT_OPENAI_API_ENABLED` over the TOML: `true` or `1` turns the
+    /// API on, `false` or `0` off, anything else — or nothing — keeps the
+    /// file's value.
+    pub fn apply_env(&mut self, value: Option<&str>) {
+        match value.map(str::trim) {
+            Some("true" | "1") => self.enabled = true,
+            Some("false" | "0") => self.enabled = false,
+            _ => {}
+        }
+    }
 }
 
 /// The fewest bytes an `[identity] secret` may have, as docs/API.md asks of
@@ -349,6 +375,9 @@ impl Config {
         {
             config.identity.secret = secret;
         }
+        // #448: a switch, not a secret, so the environment wins either way.
+        let openai_api = std::env::var("MDDB_CHAT_OPENAI_API_ENABLED").ok();
+        config.openai_api.apply_env(openai_api.as_deref());
         config.validate()?;
 
         // Ensure default scenario exists

@@ -76,40 +76,47 @@ impl std::fmt::Display for AppError {
 
 impl std::error::Error for AppError {}
 
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        let (status, message) = match &self {
-            AppError::SessionFull => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
-            AppError::SessionNotFound => (StatusCode::NOT_FOUND, self.to_string()),
-            AppError::InvalidMessage(_) => (StatusCode::BAD_REQUEST, self.to_string()),
-            AppError::RateLimited => (StatusCode::TOO_MANY_REQUESTS, self.to_string()),
-            AppError::MessageTooLong => (StatusCode::BAD_REQUEST, self.to_string()),
-            AppError::NameTooLong => (StatusCode::BAD_REQUEST, self.to_string()),
+impl AppError {
+    /// The HTTP status this error answers with: what a client acts on, so a
+    /// retryable failure and a permanent refusal must not look alike. Shared
+    /// by the JSON errors below and the OpenAI-compatible API (#448).
+    pub fn status(&self) -> StatusCode {
+        match self {
+            AppError::SessionFull => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::SessionNotFound => StatusCode::NOT_FOUND,
+            AppError::InvalidMessage(_) => StatusCode::BAD_REQUEST,
+            AppError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
+            AppError::MessageTooLong => StatusCode::BAD_REQUEST,
+            AppError::NameTooLong => StatusCode::BAD_REQUEST,
             // 403 rather than 429: the limit is a property of the scenario and
             // waiting does not lift it, so Retry-After would be a lie.
-            AppError::TurnLimitReached(_) => (StatusCode::FORBIDDEN, self.to_string()),
+            AppError::TurnLimitReached(_) => StatusCode::FORBIDDEN,
             // Refusal, not backpressure: the conversation is over rather than
             // busy, so there is nothing to retry.
-            AppError::TokenBudgetExceeded(_) => (StatusCode::FORBIDDEN, self.to_string()),
+            AppError::TokenBudgetExceeded(_) => StatusCode::FORBIDDEN,
             // Waiting helps: the window slides.
-            AppError::SessionRateLimited(_) => (StatusCode::TOO_MANY_REQUESTS, self.to_string()),
+            AppError::SessionRateLimited(_) => StatusCode::TOO_MANY_REQUESTS,
             // An operator switched it off; asking again changes nothing.
-            AppError::ScenarioDisabled => (StatusCode::FORBIDDEN, self.to_string()),
+            AppError::ScenarioDisabled => StatusCode::FORBIDDEN,
             // The whole service is switched off until an administrator turns
             // it back on, which is what 503 says.
-            AppError::ChatDisabled => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
-            AppError::GrpcError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
+            AppError::ChatDisabled => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::GrpcError(_) => StatusCode::BAD_GATEWAY,
             // Waiting helps: the link comes up on its own.
-            AppError::MddbUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
-            AppError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
-            AppError::ConversationNotFound => (StatusCode::NOT_FOUND, self.to_string()),
-            AppError::ConversationEnded => (StatusCode::CONFLICT, self.to_string()),
-            AppError::LlmError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
-            AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-        };
+            AppError::MddbUnavailable => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            AppError::ConversationNotFound => StatusCode::NOT_FOUND,
+            AppError::ConversationEnded => StatusCode::CONFLICT,
+            AppError::LlmError(_) => StatusCode::BAD_GATEWAY,
+            AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
 
-        let body = axum::Json(json!({ "error": message }));
-        (status, body).into_response()
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let body = axum::Json(json!({ "error": self.to_string() }));
+        (self.status(), body).into_response()
     }
 }
 

@@ -95,7 +95,7 @@ npm run build
 ### Chat Server Environment Variables
 
 The chat server (`services/mddb-chat`) is configured by its TOML file, see
-`services/mddb-chat/config.example.toml`. It reads six environment variables;
+`services/mddb-chat/config.example.toml`. It reads seven environment variables;
 the five secrets apply only when the matching TOML value is empty:
 
 ```bash
@@ -109,6 +109,7 @@ MDDB_CHAT_WEBHOOK_SECRET=            # [security] webhook_secret
 MDDB_CHAT_AUTH_USERNAME=admin        # [mddb] auth_username
 MDDB_CHAT_AUTH_PASSWORD=             # [mddb] auth_password; never commit a real password
 MDDB_CHAT_IDENTITY_SECRET=           # [identity] secret (2.19.0): signs join tokens of signed-in users
+MDDB_CHAT_OPENAI_API_ENABLED=        # [openai_api] enabled (2.19.10): true|false, wins over the file
 ```
 
 Everything else is a TOML key, not an environment variable:
@@ -346,6 +347,52 @@ tools `chat_log_list` and `chat_gaps`.
   user's logged turns as well.
 - **Webhooks are unchanged**: the `message`, `answer` and `feedback` events
   (#399) fire whether or not a scenario logs.
+
+## OpenAI-compatible API
+
+Since 2.19.10 `mddb-chat` can also serve its scenarios to any client of OpenAI's
+chat completions (#448) — for example Open WebUI's *Connections → OpenAI API*,
+which takes a base URL and a key. Each enabled scenario the key may read is one
+model.
+
+```toml
+[openai_api]
+enabled = true          # or MDDB_CHAT_OPENAI_API_ENABLED=true; off by default (the routes answer 404)
+```
+
+| | |
+|-|-|
+| Base URL | `http://<mddb-chat>:11030/v1` |
+| Key | `Authorization: Bearer <mddbd API key or JWT>`, checked against mddbd on every request; needs `MDDB_AUTH_ENABLED=true` on mddbd (503 otherwise) |
+| `GET /v1/models` | The scenarios stored in mddbd that the key may read (every collection of the scenario readable, as `GET /v1/chat/scenarios` filters them) and mddb-chat serves enabled; `name` is the scenario's description |
+| `POST /v1/chat/completions` | `model` = scenario name, `messages`, `stream`; whole `chat.completion` with `usage`, or `text/event-stream` chunks ending in `data: [DONE]` |
+
+```bash
+curl http://localhost:11030/v1/chat/completions \
+  -H "Authorization: Bearer $MDDB_API_KEY" -H "Content-Type: application/json" \
+  -d '{"model":"support","stream":false,"messages":[{"role":"user","content":"How does failover work?"}]}'
+```
+
+- **Same turn as the widget.** The scenario's composed prompt and guardrails,
+  its `allowedCollections` and tools, its `llm` overrides and the loop guard
+  apply; the `message` and `answer` webhooks and the turn log fire with the
+  completion id as the session.
+- **Stateless.** The client sends the whole conversation; no session is made
+  and nothing is stored in mddbd's conversations. Earlier messages reach the
+  model as restored context, not instructions.
+- **What the request may change.** `max_tokens` / `max_completion_tokens`
+  only lower the scenario's length. `temperature`, `tools` and other fields
+  are ignored; client `system` messages are dropped; image and audio parts are
+  refused with 400.
+- **Limits.** `maxTurns` over the user messages sent (403), the token budget
+  against the request's size in bytes / 4 (403), `rateLimit.messagesPerMinute`
+  and `[security] rate_limit_per_minute` per key (429). `max_concurrent` does
+  not apply.
+- **Sources** appear in the answer text as the scenario's `citationTemplate`
+  makes the model write them; no structured citation field is sent.
+- **`chat` module off** in mddbd: 503, as a `join` is refused.
+
+The field-by-field reference is in [services/mddb-chat/README.md](../services/mddb-chat/README.md#openai-compatible-api).
 
 ## LLM Provider Examples
 
