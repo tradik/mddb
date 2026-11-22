@@ -167,6 +167,8 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/placement":                     ruleAdmin, // GO-052: the map names every collection
 	"/v1/placement/move":                ruleAdmin,
 	"/v1/restore":                       ruleAdmin,
+	"/v1/backups":                       ruleAdmin, // FE-024: the backup files and their downloads
+	"/v1/backups/":                      ruleAdmin,
 	"/v1/geo-reindex":                   ruleAdmin,
 	"/v1/embedding-configs":             ruleAdmin,
 	"/v1/chat/skills":                   ruleAdmin, // #404: a skill's text is part of system prompts, so reads are admin too

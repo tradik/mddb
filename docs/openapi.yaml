@@ -1261,6 +1261,129 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /v1/backups:
+    get:
+      tags:
+        - Export
+      summary: List backup files
+      description: >
+        The backup files in the server's backup directory (MDDB_BACKUP_DIR),
+        newest first: regular files ending in .db in the directory itself,
+        never a folder inside it, a symlink, a checksum or temporary file, or
+        the live database. Backups a scheduled rule stores in object storage
+        are not listed. Admin on "*". See docs/BACKUP.md.
+      operationId: listBackups
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 100, at most 1000)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip (default 0)
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: One page of the backup files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backups:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BackupFile"
+                  total:
+                    type: integer
+                    description: Backup files in the directory
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+                  note:
+                    type: string
+                    description: What the list leaves out
+        "401":
+          description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not an administrator of "*"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The backup directory could not be read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/backups/{name}/download:
+    get:
+      tags:
+        - Export
+      summary: Download a backup file
+      description: >
+        One backup file listed by GET /v1/backups, with Content-Length and
+        Content-Disposition attachment; range requests are answered with 206.
+        In the per-collection layout the download is the main file only.
+        Every download, served or refused, is audit-logged as
+        backup.download. Admin on "*".
+      operationId: downloadBackup
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: A single file name from the list; no path separator, "..", absolute path or NUL
+          schema:
+            type: string
+            example: mddb-20261122T030000Z.db
+      responses:
+        "200":
+          description: The backup file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "206":
+          description: The requested range of the backup file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not an administrator of "*"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not a listed backup (the same answer for every such name)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /v1/truncate:
     post:
       tags:
@@ -16830,6 +16953,35 @@ components:
               detail:
                 type: string
                 example: data directory is on tmpfs; writes will not survive a restart
+
+    BackupFile:
+      type: object
+      description: One backup file in MDDB_BACKUP_DIR (GET /v1/backups).
+      properties:
+        name:
+          type: string
+          description: The file name a download and POST /v1/restore take
+          example: mddb-20261122T030000Z.db
+        path:
+          type: string
+          description: Its full path on the server, as GET /v1/backup answers it and a scheduled run logs it
+        bytes:
+          type: integer
+          format: int64
+          description: Size of the main file
+        modifiedAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum: [checksummed, unknown]
+          description: >
+            checksummed when a <name>.sha256 file lies beside it, which a
+            scheduled run writes after the integrity check; unknown otherwise.
+            The list never re-checks a file.
+        collectionFiles:
+          type: integer
+          description: Files in <name>.d/ (per-collection layout); not part of a download
 
     ErrorResponse:
       type: object
