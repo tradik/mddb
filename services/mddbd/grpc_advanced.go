@@ -156,6 +156,10 @@ func syncActionToProto(a *SyncAction) *proto.SyncActionProto {
 		TokenSecretRef: a.TokenSecretRef,
 		HookSecretRef:  a.HookSecretRef,
 		Adopt:          a.Adopt,
+		State:          a.State,
+		Since:          a.Since,
+		Comments:       a.Comments,
+		RepositoryFrom: a.RepositoryFrom,
 	}
 }
 
@@ -179,7 +183,8 @@ func syncActionFromProto(p *proto.SyncActionProto) *SyncAction {
 		MaxBytes:      p.GetMaxBytes(),
 		GitSyncFields: GitSyncFields{Ref: p.GetRef(), Include: p.GetInclude(), Exclude: p.GetExclude(),
 			Forge: p.GetForge(), TokenSecretRef: p.GetTokenSecretRef(), HookSecretRef: p.GetHookSecretRef(),
-			Adopt: p.GetAdopt()},
+			Adopt: p.GetAdopt(), RepositoryFrom: p.GetRepositoryFrom()},
+		IssuesSyncFields: IssuesSyncFields{State: p.GetState(), Since: p.GetSince(), Comments: p.Comments},
 	}
 }
 
@@ -496,6 +501,9 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	}
 	if err := g.applyQuota(ctx, req, cfg); err != nil {
 		return nil, err
+	}
+	if err := g.server.applyRepositoryProto(cfg, req.Repository); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	if err := applyRetrievalProto(cfg, req.Retrieval); err != nil {

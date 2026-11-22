@@ -27,18 +27,21 @@ var mcpToolAccessRules = map[string]accessRule{
 	"import_url":             ruleWrite,
 	"set_ttl":                ruleWrite,
 	"ingest_documents":       ruleWrite,
-	"upload_file":            ruleWrite,
-	"bulk_ingest_submit":     ruleWrite,
-	"delete_where":           ruleWrite, // a dry run too: the tool has no read-only path
-	"update_where":           ruleWrite,
-	"set_ttl_where":          ruleWrite,
-	"get_document_meta":      ruleRead,
-	"get_meta_keys":          ruleRead,
-	"get_checksum":           ruleRead,
-	"list_revisions":         ruleRead,
-	"export_documents":       ruleRead,
-	"validate_document":      ruleRead,
-	"wordpress_publish":      ruleRead, // publishes a document of the collection
+	// INT-023: refreshes the sync rules writing to the collection, as
+	// POST /v1/sync/refresh; run_automation stays admin.
+	"sync_refresh":       ruleWrite,
+	"upload_file":        ruleWrite,
+	"bulk_ingest_submit": ruleWrite,
+	"delete_where":       ruleWrite, // a dry run too: the tool has no read-only path
+	"update_where":       ruleWrite,
+	"set_ttl_where":      ruleWrite,
+	"get_document_meta":  ruleRead,
+	"get_meta_keys":      ruleRead,
+	"get_checksum":       ruleRead,
+	"list_revisions":     ruleRead,
+	"export_documents":   ruleRead,
+	"validate_document":  ruleRead,
+	"wordpress_publish":  ruleRead, // publishes a document of the collection
 
 	// Search.
 	"search_documents":    ruleRead,

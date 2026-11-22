@@ -160,7 +160,10 @@ func (am *AutomationManager) validateCronAction(rule *AutomationRule) error {
 		if err := rule.Sync.normalize(); err != nil {
 			return err
 		}
-		return am.checkSyncSecrets(rule.Sync)
+		if err := am.checkSyncSecrets(rule.Sync); err != nil {
+			return err
+		}
+		return am.checkSyncRepository(rule.Sync)
 	case rule.WebhookID == "":
 		return errors.New("webhookId, backup or sync is required for cron")
 	case am.GetWebhook(rule.WebhookID) == nil:

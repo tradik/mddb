@@ -103,33 +103,33 @@ func TestGitForgeURLs(t *testing.T) {
 	gl, _ := parseGitRepo("https://gitlab.com/g/sub/r", "")
 	cb, _ := parseGitRepo("https://codeberg.org/o/r", "")
 	cases := map[string]string{
-		gh.infoRefsURL():              "https://github.com/tradik/mddb.git/info/refs?service=git-upload-pack",
-		gh.latestReleaseURL():         "https://api.github.com/repos/tradik/mddb/releases/latest",
-		gh.archiveURL("c1", false):    "https://codeload.github.com/tradik/mddb/tar.gz/c1",
-		gh.archiveURL("c1", true):     "https://api.github.com/repos/tradik/mddb/tarball/c1",
-		gh.commitURL("c1"):            "https://github.com/tradik/mddb/commit/c1",
-		ghes.latestReleaseURL():       "https://ghe.example.com/api/v3/repos/a/b/releases/latest",
-		ghes.archiveURL("c1", false):  "https://ghe.example.com/api/v3/repos/a/b/tarball/c1",
-		gl.latestReleaseURL():         "https://gitlab.com/api/v4/projects/g%2Fsub%2Fr/releases?order_by=released_at&sort=desc&per_page=1",
-		gl.archiveURL("c1", false):    "https://gitlab.com/api/v4/projects/g%2Fsub%2Fr/repository/archive.tar.gz?sha=c1",
-		gl.commitURL("c1"):            "https://gitlab.com/g/sub/r/-/commit/c1",
-		cb.latestReleaseURL():         "https://codeberg.org/api/v1/repos/o/r/releases/latest",
-		cb.archiveURL("c1", false):    "https://codeberg.org/api/v1/repos/o/r/archive/c1.tar.gz",
-		cb.commitURL("c1"):            "https://codeberg.org/o/r/commit/c1",
-		cb.header("", false).Get("A"): "",
+		gh.infoRefsURL():                      "https://github.com/tradik/mddb.git/info/refs?service=git-upload-pack",
+		gh.latestReleaseURL():                 "https://api.github.com/repos/tradik/mddb/releases/latest",
+		gh.archiveURL("c1", false):            "https://codeload.github.com/tradik/mddb/tar.gz/c1",
+		gh.archiveURL("c1", true):             "https://api.github.com/repos/tradik/mddb/tarball/c1",
+		gh.commitURL("c1"):                    "https://github.com/tradik/mddb/commit/c1",
+		ghes.latestReleaseURL():               "https://ghe.example.com/api/v3/repos/a/b/releases/latest",
+		ghes.archiveURL("c1", false):          "https://ghe.example.com/api/v3/repos/a/b/tarball/c1",
+		gl.latestReleaseURL():                 "https://gitlab.com/api/v4/projects/g%2Fsub%2Fr/releases?order_by=released_at&sort=desc&per_page=1",
+		gl.archiveURL("c1", false):            "https://gitlab.com/api/v4/projects/g%2Fsub%2Fr/repository/archive.tar.gz?sha=c1",
+		gl.commitURL("c1"):                    "https://gitlab.com/g/sub/r/-/commit/c1",
+		cb.latestReleaseURL():                 "https://codeberg.org/api/v1/repos/o/r/releases/latest",
+		cb.archiveURL("c1", false):            "https://codeberg.org/api/v1/repos/o/r/archive/c1.tar.gz",
+		cb.commitURL("c1"):                    "https://codeberg.org/o/r/commit/c1",
+		cb.header(cb.web, "", false).Get("A"): "",
 	}
 	for got, want := range cases {
 		if got != want {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	}
-	if h := gh.header("tok", true).Get("Authorization"); h != "Basic eC1hY2Nlc3MtdG9rZW46dG9r" {
+	if h := gh.header(gh.infoRefsURL(), "tok", true).Get("Authorization"); h != "Basic eC1hY2Nlc3MtdG9rZW46dG9r" {
 		t.Errorf("github smart HTTP: %s", h)
 	}
-	if h := gl.header("tok", false).Get("Authorization"); h != "Bearer tok" {
+	if h := gl.header(gl.latestReleaseURL(), "tok", false).Get("Authorization"); h != "Bearer tok" {
 		t.Errorf("gitlab API: %s", h)
 	}
-	if h := cb.header("", false); h.Get("Authorization") != "" || h.Get("User-Agent") != syncUserAgent {
+	if h := cb.header(cb.web, "", false); h.Get("Authorization") != "" || h.Get("User-Agent") != syncUserAgent {
 		t.Errorf("no token: %v", h)
 	}
 	s3 := &SyncAction{Source: SyncSourceS3}

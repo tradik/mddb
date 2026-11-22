@@ -94,13 +94,16 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/stopwords":         ruleReadWrite,
 	"/v1/spell-dictionary":  ruleReadWrite,
 	"/v1/collection-config": ruleReadWrite,
-	"/v1/eval-queries":      ruleReadWrite,
-	"/v1/schema/set":        ruleWrite,
-	"/v1/schema/delete":     ruleWrite,
-	"/v1/schema/get":        ruleRead,
-	"/v1/vector-reindex":    ruleWrite,
-	"/v1/vector-compact":    ruleWrite,
-	"/v1/fts-reindex":       ruleWrite,
+	// INT-023: refreshes the sync rules writing to the collection named in
+	// the body, never another rule.
+	"/v1/sync/refresh":   ruleWrite,
+	"/v1/eval-queries":   ruleReadWrite,
+	"/v1/schema/set":     ruleWrite,
+	"/v1/schema/delete":  ruleWrite,
+	"/v1/schema/get":     ruleRead,
+	"/v1/vector-reindex": ruleWrite,
+	"/v1/vector-compact": ruleWrite,
+	"/v1/fts-reindex":    ruleWrite,
 
 	// Every collection at once.
 	"/v1/stats":              ruleAllListing,
@@ -169,6 +172,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/chat/skills":                   ruleAdmin, // #404: a skill's text is part of system prompts, so reads are admin too
 	"/v1/chat/skills/":                  ruleAdmin,
 	"/v1/chat/mcp-secrets":              ruleAdmin, // MCP-005: write-only credentials of external MCP servers
+	"/v1/forge-tokens":                  ruleAdmin, // INT-023: host → the stored secret a sync reads with
 	"/v1/chat/mcp-secrets/":             ruleAdmin,
 	"/v1/chat/mcp/inspect":              ruleAdmin,
 	"/v1/chat/log":                      ruleAdmin, // #406: every user's turns

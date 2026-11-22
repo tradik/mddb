@@ -51,6 +51,7 @@ func mcpBuiltinTools() []MCPTool {
 	t = append(t, mcpChatMcpTools()...)
 	t = append(t, mcpChatConversationTools()...)
 	t = append(t, mcpChatLogTools()...)
+	t = append(t, syncRefreshTool()) // INT-023
 	return append(t, mcpWhereTools()...)
 }
 

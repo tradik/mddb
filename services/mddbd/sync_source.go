@@ -5,11 +5,13 @@ import (
 	"errors"
 	"mime"
 	"net/url"
+
+	"mddb/internal/automationlog"
 )
 
 // What every source of a sync (INT-022) provides: a listing and a fetch that
 // skips what has not changed. sync_http.go, sync_s3.go and sync_git.go
-// implement it.
+// implement it, and sync_issues.go.
 
 // errSourceGone is a source that answers 404 or 410, or an object that has
 // vanished between the listing and the fetch.
@@ -43,7 +45,7 @@ type syncFetched struct {
 }
 
 // syncSource is where a sync reads from: a sitemap or URL list over HTTP(S),
-// an S3 prefix, or a git repository.
+// an S3 prefix, a git repository, or its forge's issues.
 type syncSource interface {
 	// list returns the sources up to the action's maxDocuments, and whether
 	// there were more.
@@ -58,6 +60,23 @@ type resolver interface {
 	resolve() (ref, commit string)
 }
 
+// cursorer is a source that leaves the next run where to start: an issues
+// source's cursor and the listing pages it read (INT-023).
+type cursorer interface {
+	cursor() (string, *automationlog.SyncPages)
+}
+
+// partialLister is a source whose listing may leave out sources that still
+// exist — an issues source refreshing one item — so nothing is pruned for
+// not being listed.
+type partialLister interface {
+	partial() bool
+}
+
+// errSyncRateLimited is a source that refuses more requests for now. A run
+// that meets it prunes nothing.
+var errSyncRateLimited = errors.New("the forge's rate limit is reached")
+
 // newSyncSource connects to the source a rule's sync names.
 func (s *Server) newSyncSource(rule AutomationRule) (syncSource, error) {
 	a := rule.Sync
@@ -66,6 +85,8 @@ func (s *Server) newSyncSource(rule AutomationRule) (syncSource, error) {
 		return newS3SyncSource(a)
 	case SyncSourceGit:
 		return s.newGitSyncSource(rule)
+	case SyncSourceIssues:
+		return s.newIssuesSyncSource(rule, nil)
 	}
 	return &httpSyncSource{action: a}, nil
 }

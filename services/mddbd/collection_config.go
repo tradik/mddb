@@ -83,6 +83,11 @@ type CollectionConfig struct {
 	// Corpus describes the corpus pack the collection was installed from
 	// (AGT-005), nil for any other collection. Kept by Set like ReadOnly.
 	Corpus *CorpusInfo `json:"corpus,omitempty"`
+	// Repository is the forge repository the collection is read from
+	// (INT-023): a git or issues sync without a url reads it. Kept by Set
+	// when a config is written without one; one with an empty url removes
+	// it. See sync_repository.go.
+	Repository *CollectionRepository `json:"repository,omitempty"`
 }
 
 // CodeConfigDef configures how source documents in a collection are read.
@@ -226,9 +231,15 @@ func (cm *CollectionManager) Set(collection string, cfg *CollectionConfig) error
 		if cfg.Quota == nil {
 			cfg.Quota = stored.Quota
 		}
+		if cfg.Repository == nil {
+			cfg.Repository = stored.Repository
+		}
 	}
 	if cfg.Quota.isZero() {
 		cfg.Quota = nil
+	}
+	if cfg.Repository != nil && cfg.Repository.URL == "" {
+		cfg.Repository = nil
 	}
 	return cm.put(collection, cfg)
 }
@@ -316,6 +327,7 @@ type SetCollectionConfigRequest struct {
 	Embedding       *EmbeddingChunkingDef  `json:"embedding,omitempty"`       // chunk size and mode for embeddings (#325)
 	FTS             *CollectionFTSDef      `json:"fts,omitempty"`             // full-text indexing on or off (#335)
 	Quota           *CollectionQuota       `json:"quota,omitempty"`           // limits (GO-043); omitted keeps the stored quota, {} removes it
+	Repository      *CollectionRepository  `json:"repository,omitempty"`      // forge repository (INT-023); omitted keeps the stored one, {} removes it
 	// Temporal tracking and spell correction. These live in CollectionConfig
 	// and are read on every request, but were missing here — so the panel's
 	// toggles sent values the handler ignored, and every config save silently
@@ -413,6 +425,10 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		writeQuotaChangeError(w, err)
 		return
 	}
+	if err := s.checkRepositorySecret(req.Repository); err != nil {
+		bad(w, err)
+		return
+	}
 
 	cfg := req.config()
 	// GO-035: a client that read this config back saw masked credentials, so
@@ -468,6 +484,9 @@ func (req *SetCollectionConfigRequest) validate() error {
 	if err := req.Code.Validate(); err != nil {
 		return err
 	}
+	if err := req.Repository.normalize(); err != nil {
+		return err
+	}
 	// RAG-002: this text is prepended to prompts automatically, so an
 	// unbounded value would silently eat the context the answer needs.
 	if err := ValidateResponsePrompt(req.ResponsePrompt); err != nil {
@@ -521,6 +540,7 @@ func (req *SetCollectionConfigRequest) config() *CollectionConfig {
 		Embedding:       req.Embedding,
 		FTS:             req.FTS,
 		Quota:           req.Quota,
+		Repository:      req.Repository,
 	}
 }
 

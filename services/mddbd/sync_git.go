@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"mddb/internal/automationlog"
 )
 
 // A git repository as a synced source (#421). A run resolves the rule's ref
@@ -95,7 +97,8 @@ func (g *gitSyncSource) list(ctx context.Context) ([]syncItem, bool, error) {
 
 // readArchive downloads the commit's archive and reads the included files.
 func (g *gitSyncSource) readArchive(ctx context.Context) ([]gitFile, bool, error) {
-	resp, err := openOutbound(ctx, gitSyncClient(), g.repo.archiveURL(g.commit, g.token != ""), g.repo.header(g.token, false))
+	archive := g.repo.archiveURL(g.commit, g.token != "")
+	resp, err := openOutbound(ctx, forgeClient(), archive, g.repo.header(archive, g.token, false))
 	if err != nil {
 		return nil, false, err
 	}
@@ -197,12 +200,19 @@ func (g *gitSyncSource) fileMeta(f gitFile, format string) map[string][]string {
 // that run was of the rule as it is now (the same fingerprint): "" when
 // there is none, so the run reads the archive.
 func (s *Server) lastGitCommit(rule AutomationRule) string {
+	return s.lastSyncCounts(rule).Commit
+}
+
+// lastSyncCounts is what the newest successful run of rule left — a git
+// source's commit, an issues source's cursor — when that run was of the rule
+// as it is now (the same fingerprint); zero when there is none.
+func (s *Server) lastSyncCounts(rule AutomationRule) automationlog.SyncCounts {
 	if s.AutomationLogStore == nil {
-		return ""
+		return automationlog.SyncCounts{}
 	}
 	logs, _, err := s.AutomationLogStore.List(1, "", rule.ID, "success")
 	if err != nil || len(logs) == 0 || logs[0].Sync == nil || logs[0].Sync.Fingerprint != rule.Sync.fingerprint() {
-		return ""
+		return automationlog.SyncCounts{}
 	}
-	return logs[0].Sync.Commit
+	return *logs[0].Sync
 }

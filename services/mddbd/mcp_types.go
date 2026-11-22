@@ -1063,6 +1063,7 @@ type MCPClient interface {
 	TestAutomation(ctx context.Context, id string) (string, error)
 	ListAutomationLogs(ctx context.Context, limit int, cursor, ruleID, status string) (*MCPAutomationLogListResponse, error)
 	RunAutomation(ctx context.Context, id string) (*AutomationRun, error)
+	SyncRefresh(ctx context.Context, collection string, number int) (*SyncRefreshResult, error)
 	// Revisions
 	ListRevisions(ctx context.Context, collection, key, lang string) (*RevisionListResponse, error)
 	RestoreRevision(ctx context.Context, collection, key, lang string, timestamp int64) (*MCPDocument, error)

@@ -57,6 +57,23 @@ type SyncCounts struct {
 	// Fingerprint identifies the rule's settings at the run: a commit is
 	// only skipped for a rule read the same way.
 	Fingerprint string `json:"fingerprint,omitempty"`
+	// Cursor and Pages are where an issues source (INT-023) left off: the
+	// newest updatedAt it read, from which the next run lists, and the
+	// listing pages it read with their ETag, which the next run sends back
+	// so an unchanged page answers 304. Pages is a pointer so that the
+	// counts stay comparable.
+	Cursor string     `json:"cursor,omitempty"`
+	Pages  *SyncPages `json:"pages,omitempty"`
+}
+
+// SyncPages are the listing pages of a run, by URL.
+type SyncPages map[string]SyncPage
+
+// SyncPage is one listing page an issues source read: its ETag, and the
+// page after it, which a 304 does not name again.
+type SyncPage struct {
+	ETag string `json:"etag"`
+	Next string `json:"next,omitempty"`
 }
 
 // Store persists and queries automation execution logs in BoltDB.

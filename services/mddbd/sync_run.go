@@ -42,13 +42,24 @@ type syncRun struct {
 	server *Server
 	rule   AutomationRule
 	action *SyncAction
-	job    *BulkIngestJob
-	mu     sync.Mutex
-	out    syncOutcome
+	// only is the one item an issues source refreshes (INT-023); nil for
+	// a run of the whole source.
+	only *issueTarget
+	job  *BulkIngestJob
+	mu   sync.Mutex
+	out  syncOutcome
+	// limited is set by a source that met errSyncRateLimited.
+	limited bool
 }
 
 // runSourceSync syncs rule's source once. now names the run's job.
 func (s *Server) runSourceSync(rule AutomationRule, now time.Time) (syncOutcome, error) {
+	return s.runSync(rule, now, nil)
+}
+
+// runSync is a run of rule's source, or, with only, of one item of an
+// issues source.
+func (s *Server) runSync(rule AutomationRule, now time.Time, only *issueTarget) (syncOutcome, error) {
 	start := time.Now()
 	if _, running := syncRuns.LoadOrStore(rule.ID, true); running {
 		s.logSync(rule, start, syncOutcome{}, errSyncRunning)
@@ -56,7 +67,7 @@ func (s *Server) runSourceSync(rule AutomationRule, now time.Time) (syncOutcome,
 	}
 	defer syncRuns.Delete(rule.ID)
 
-	r := &syncRun{server: s, rule: rule, action: rule.Sync, job: &BulkIngestJob{
+	r := &syncRun{server: s, rule: rule, action: rule.Sync, only: only, job: &BulkIngestJob{
 		ID:          actionJobID(actionSync, rule.ID, now),
 		Collection:  rule.Sync.Collection,
 		Status:      BulkJobProcessing,
@@ -82,11 +93,11 @@ func (s *Server) runSourceSync(rule AutomationRule, now time.Time) (syncOutcome,
 // execute lists the source, syncs every source in it and prunes. Its error
 // is the run's: the listing failed, sources failed, or a prune was withheld.
 func (r *syncRun) execute(ctx context.Context) error {
-	a := r.action
-	src, err := r.server.newSyncSource(r.rule)
+	src, err := r.connect()
 	if err != nil {
 		return fmt.Errorf("connecting to the source: %w", err)
 	}
+	a := r.action
 	items, truncated, err := r.list(ctx, src)
 	if err != nil || r.out.counts.UpToDate {
 		return err
@@ -122,23 +133,54 @@ func (r *syncRun) execute(ctx context.Context) error {
 	if f := r.out.counts.Failed; f > 0 {
 		errs = append(errs, fmt.Errorf("%d of %d sources failed", f, len(items)))
 	}
-	if a.Prune {
+	switch {
+	case a.Prune && r.limited:
+		errs = append(errs, errors.New("the forge's rate limit was reached: nothing pruned"))
+	case a.Prune && isPartial(src):
+	case a.Prune:
 		errs = append(errs, r.prune(listed, truncated))
-	} else if truncated {
+	case truncated:
 		errs = append(errs, fmt.Errorf("the source lists more than maxDocuments (%d): synced the first %d", a.MaxDocuments, len(items)))
 	}
 	return errors.Join(errs...)
 }
 
-// list lists the source and notes what a git source resolved. A commit the
-// last run already read ends the run with nothing to do (UpToDate).
+// connect resolves the repository of a git or issues source (INT-023,
+// sync_repository.go), which the run then reads as its action, and connects
+// to the source.
+func (r *syncRun) connect() (syncSource, error) {
+	a, err := r.server.resolvedSync(r.action)
+	if err != nil {
+		return nil, err
+	}
+	r.action, r.rule.Sync = a, a
+	if r.only != nil {
+		return r.server.newIssuesSyncSource(r.rule, r.only)
+	}
+	return r.server.newSyncSource(r.rule)
+}
+
+// isPartial reports whether a source's listing may leave out sources that
+// still exist.
+func isPartial(src syncSource) bool {
+	p, ok := src.(partialLister)
+	return ok && p.partial()
+}
+
+// list lists the source and notes what a git source resolved and where an
+// issues source left off. A commit the last run already read ends the run
+// with nothing to do (UpToDate).
 func (r *syncRun) list(ctx context.Context, src syncSource) ([]syncItem, bool, error) {
 	items, truncated, err := src.list(ctx)
+	c := &r.out.counts
 	if rs, ok := src.(resolver); ok {
-		c := &r.out.counts
 		c.Ref, c.Commit = rs.resolve()
 		c.Fingerprint = r.action.fingerprint()
 		c.UpToDate = errors.Is(err, errSyncUpToDate)
+	}
+	if cs, ok := src.(cursorer); ok {
+		c.Cursor, c.Pages = cs.cursor()
+		c.Fingerprint = r.action.fingerprint()
 	}
 	switch {
 	case errors.Is(err, errSyncUpToDate):
@@ -285,6 +327,7 @@ func (r *syncRun) remove(key, lang, ref string) {
 // failed counts a source that could not be synced and keeps its reason.
 func (r *syncRun) failed(ref string, err error) {
 	r.counted(func(c *automationlog.SyncCounts) {
+		r.limited = r.limited || errors.Is(err, errSyncRateLimited)
 		c.Failed++
 		r.job.Failed++
 		if len(r.out.errors) < maxSyncErrors {

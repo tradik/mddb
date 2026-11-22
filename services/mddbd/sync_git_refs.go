@@ -50,7 +50,7 @@ type gitRefs struct {
 
 // readGitRefs fetches and parses the ref advertisement.
 func readGitRefs(ctx context.Context, repo gitRepo, token string) (gitRefs, error) {
-	res, err := readOutbound(ctx, gitSyncClient(), repo.infoRefsURL(), maxGitRefsBytes, repo.header(token, true))
+	res, err := readOutbound(ctx, forgeClient(), repo.infoRefsURL(), maxGitRefsBytes, repo.header(repo.infoRefsURL(), token, true))
 	switch {
 	case err != nil:
 		return gitRefs{}, err
@@ -200,7 +200,7 @@ func newer(a, b [3]int) bool {
 // repository has no release (or the forge does not say), so the caller
 // falls back to the highest semver tag.
 func latestReleaseTag(ctx context.Context, repo gitRepo, token string) (string, error) {
-	res, err := readOutbound(ctx, gitSyncClient(), repo.latestReleaseURL(), maxGitReleaseBytes, repo.header(token, false))
+	res, err := readOutbound(ctx, forgeClient(), repo.latestReleaseURL(), maxGitReleaseBytes, repo.header(repo.latestReleaseURL(), token, false))
 	switch {
 	case err != nil:
 		return "", err

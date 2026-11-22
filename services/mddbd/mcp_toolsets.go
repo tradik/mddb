@@ -49,7 +49,7 @@ var mcpToolsets = map[string][]string{
 	ToolsetDocuments: {"add_document", "update_document", "delete_document", "get_document_meta", "set_ttl",
 		"add_documents_batch", "delete_documents_batch", "export_documents", "list_revisions", "restore_revision", "delete_where", "update_where", "set_ttl_where"},
 	ToolsetIngest: {"import_url", "upload_file", "ingest_documents", "bulk_ingest_submit", "bulk_ingest_status",
-		"bulk_ingest_list", "bulk_ingest_cancel"},
+		"bulk_ingest_list", "bulk_ingest_cancel", "sync_refresh"},
 	ToolsetMemory: {"memory_start_session", "memory_add_message", "memory_recall", "memory_summarize",
 		"memory_list_sessions", "memory_session_history"},
 	ToolsetSchema: {"set_schema", "get_schema", "delete_schema", "list_schemas", "validate_document"},
