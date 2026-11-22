@@ -2001,6 +2001,7 @@ means editing a TOML file and restarting a service.
 | `PUT` | `/v1/chat/scenarios/{name}` | the stored scenario; `201` when created, `200` when replaced |
 | `DELETE` | `/v1/chat/scenarios/{name}` | `{"deleted":true,"version":N}` |
 | `GET` | `/v1/chat/scenarios/{name}/prompt` | `{"name","prompt","version","bytes","approxTokens","warning","missingSkills"}` — the composed system prompt and its size |
+| `GET` | `/v1/chat/scenarios/{name}/access` | `{"scenario","authEnabled","collections","users"}` — who can read the scenario (2.19.10, admin on `"*"`) |
 
 ```bash
 curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{
@@ -2022,6 +2023,37 @@ curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{
 curl http://localhost:11023/v1/chat/scenarios/support/prompt
 curl http://localhost:11023/v1/chat/scenarios/version
 ```
+
+**Who can read a scenario (2.19.10, #441).** A scenario is offered only to an
+account that can read every collection in its `allowedCollections`.
+`GET /v1/chat/scenarios/{name}/access` lists every user, by name, with what
+they can read of those collections (aliases resolved):
+
+```json
+{
+  "scenario": "support",
+  "authEnabled": true,
+  "collections": ["docs", "runbooks"],
+  "users": [
+    {"username": "admin", "admin": true, "full": true,
+     "grants": [{"collection": "docs", "via": "admin"}, {"collection": "runbooks", "via": "admin"}]},
+    {"username": "bot", "admin": false, "full": false,
+     "grants": [{"collection": "docs", "via": "group:readers"}]}
+  ]
+}
+```
+
+`full` is true when the user can read every collection, which is always the
+case for a scenario with none. `via` names the rule that matched, in the
+order the server checks them: `admin` (admin on `"*"`), `user` (the user's
+own grant on the collection), `user:*` (their grant on `"*"`),
+`group:<name>`, `group:<name>:*`. When several groups match, the first group
+by name is reported. A tenant user reads only inside the tenant's namespace,
+and a disabled user is marked `"disabled": true`. When authentication is off,
+`authEnabled` is false and `users` is empty. The route needs admin on `"*"`.
+A caller without it gets `403` whether the scenario exists or not; an admin
+asking for an unknown scenario gets `404`. It returns no password or key
+hashes.
 
 | Field | Values | Default |
 |---|---|---|

@@ -333,6 +333,19 @@ up a saved scenario without a restart.
   approximate tokens (bytes ÷ 4), the server's warning past 75% of
   `MDDB_CHAT_PROMPT_MAX_BYTES`, and the skill names it skipped because no
   such skill is stored. It reloads after a save and on *Reload*.
+- **Access** (2.19.10): who can use the saved scenario. Links open the screens
+  that decide it — *Connect an MCP client* and *MCP API keys* (LLM
+  Connections, on the API Keys tab), *Users and permissions*, *Groups* and
+  *My API keys* — each only when the sidebar shows that page. Below them, a
+  table from `GET /v1/chat/scenarios/{name}/access`: every user, *All
+  collections* / *n of m collections* / *None*, and the rule that grants it
+  (admin, own grant, own grant on "*", group …), users with all collections
+  first. mddb-chat sees the scenario only through the account in
+  `[mddb] auth_username`, which must be listed with *All collections*. With
+  authentication off the card says everyone can read every collection; a
+  user who is not admin on "*" sees the links and a note that the list needs
+  admin. While the form's allowed collections differ from the saved ones, the
+  card says it shows the saved state.
 - **MCP keys** (2.19.9): below the composed prompt, the MCP API keys bound to
   the saved scenario. *Create key* makes one bound to it and shows the key
   once; each key can be disabled or deleted. A bound key gives an MCP client
@@ -642,6 +655,14 @@ open, so a first visit shows the same pages as before.
 | Integrations | Automation, Webhooks, API Endpoints |
 | Security | Users, Groups, My Account (with authentication), Tenants (2.19.8), Security, Encryption, Audit Log |
 | System | System Info, Cluster (with replication), Configuration, Features, Client Settings |
+
+A page is listed only when the server has it on. A module switched off on the
+*Features* page hides its pages. Users, Groups and My Account need
+authentication, and Cluster needs replication. Automation is hidden when the
+server reports automations disabled. From 2.19.10, LLM Connections is hidden
+when the MCP listener is off (`protocols.mcp.enabled: false` in
+`/v1/config`, `MDDB_MCP_ENABLED=false`). A setting an older server does not
+report hides nothing.
 
 - **Search the menu**: the box above the groups filters pages by name,
   ignoring case and accents, and opens every group with a match; Escape

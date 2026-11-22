@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.10] - 2026-11-22
+
+### Added
+
+- **Who can read a chat scenario (#441).** `GET /v1/chat/scenarios/{name}/access` (admin on `"*"`) lists every user, by name, with what they can read of the scenario's allowed collections (aliases resolved). `full` means the user can read all of them, so the scenario is offered to them. `via` names the rule that matched: `admin`, `user`, `user:*`, `group:<name>` or `group:<name>:*`; when several groups match, the first by name. A tenant user reads only inside the tenant's namespace, and a disabled user is marked. With authentication off, `users` is empty. A caller without admin gets `403` whether the scenario exists or not; an unknown scenario gives `404`. No password or key hashes are returned. Docs: docs/API.md, docs/AUTHENTICATION.md, openapi.yaml.
+- **Panel, Chat → scenario: an *Access* card (#441).** It links to the screens that decide who can use the scenario: *Connect an MCP client*, *MCP API keys* (opens LLM Connections on the API Keys tab), *Users and permissions*, *Groups* and *My API keys*. Each link is shown only when the sidebar shows that page. Below, a table of who can read the saved scenario and through which rule, with a reminder that mddb-chat sees a scenario only through its `[mddb] auth_username` account. With authentication off, or for a user who is not admin on `"*"`, the card says so instead of showing the table. The store gained `openView(mode, target)`, so a link can open a view on a given tab.
+
+### Changed
+
+- **Panel sidebar:** *LLM Connections* is hidden when the MCP listener is off (`protocols.mcp.enabled: false` in `/v1/config`). An older server that does not report it hides nothing. The sidebar and the Access card read the conditions from one function, `navConditions`.
+- **`AuthManager.CheckPermission`:** the grant lookup after the tenant gate and the admin check (own grant, own grant on `"*"`, group, group on `"*"`) is one function, which the new route reuses. Same answers as before; when several groups match, the first by name is now the one checked first.
+
+### Fixed
+
+- **docs/AUTHENTICATION.md** listed the permission lookup order without the group step.
+
 ## [2.19.9] - 2026-11-21
 
 ### Added
