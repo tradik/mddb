@@ -295,33 +295,11 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 // destructive tool.
 func (s *MCPToolServer) gateTool(ctx context.Context, name string, args map[string]interface{}) error {
 	// Enforce read-only mode: per-protocol override takes precedence, then global mode.
-	em := effectiveMode(s.globalMode, s.mode)
-	if em == ModeRead {
-		if !s.isToolReadOnly(name) {
-			return fmt.Errorf("tool %q is not available in read-only mode", name)
-		}
+	if effectiveMode(s.globalMode, s.mode) == ModeRead && !s.isToolReadOnly(name) {
+		return fmt.Errorf("tool %q is not available in read-only mode", name)
 	}
-	// GO-049: a tool of a disabled module is refused (and left out of
-	// tools/list); a custom tool, when it calls its action.
-	if dc, ok := s.client.(*DirectClient); ok && dc.server != nil {
-		if err := dc.server.toolFeatureError(name); err != nil {
-			return fmt.Errorf("tool %q: %w", name, err)
-		}
-	}
-	// GO-044: an alias in the arguments becomes its collection here, once,
-	// before any tool reads it.
-	if dc, ok := s.client.(*DirectClient); ok && args != nil {
-		dc.server.Aliases.resolveAliasArgs(args)
-	}
-	// SEC-019: the tool's rule, on the collections the aliases resolved to.
 	if dc, ok := s.client.(*DirectClient); ok {
-		if err := dc.server.authorizeTool(ctx, name, args); err != nil {
-			return fmt.Errorf("tool %q: %w", name, err)
-		}
-	}
-	// #333: writes wait while the freelist is rebuilt; reads do not.
-	if dc, ok := s.client.(*DirectClient); ok && !s.isToolReadOnly(name) {
-		if err := dc.server.writeBlocked(); err != nil {
+		if err := s.gateServerRules(ctx, dc.server, name, args); err != nil {
 			return fmt.Errorf("tool %q: %w", name, err)
 		}
 	}
@@ -329,6 +307,33 @@ func (s *MCPToolServer) gateTool(ctx context.Context, name string, args map[stri
 	// behind the client before anything happens, when the operator enabled it
 	// and the client can be asked (mcp_confirm.go).
 	return confirmDestructive(ctx, name, args)
+}
+
+// gateServerRules applies the rules of the server a direct client runs in:
+// the module switches, the aliases, the access rules and the freelist
+// rebuild holding writes.
+func (s *MCPToolServer) gateServerRules(ctx context.Context, srv *Server, name string, args map[string]interface{}) error {
+	// GO-049: a tool of a disabled module is refused (and left out of
+	// tools/list); a custom tool, when it calls its action.
+	if srv != nil {
+		if err := srv.toolFeatureError(name); err != nil {
+			return err
+		}
+	}
+	// GO-044: an alias in the arguments becomes its collection here, once,
+	// before any tool reads it.
+	if args != nil {
+		srv.Aliases.resolveAliasArgs(args)
+	}
+	// SEC-019: the tool's rule, on the collections the aliases resolved to.
+	if err := srv.authorizeTool(ctx, name, args); err != nil {
+		return err
+	}
+	// #333: writes wait while the freelist is rebuilt; reads do not.
+	if !s.isToolReadOnly(name) {
+		return srv.writeBlocked()
+	}
+	return nil
 }
 
 // --- arg helpers ---

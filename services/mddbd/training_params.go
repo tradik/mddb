@@ -63,20 +63,46 @@ func (p *trainerParam) validate() error {
 	if !paramNamePattern.MatchString(p.Name) {
 		return errors.New("name: a letter, then up to 63 letters, digits or '_'")
 	}
+	if err := p.validateType(); err != nil {
+		return err
+	}
+	if err := p.validateLimits(); err != nil {
+		return err
+	}
+	if err := p.compilePattern(); err != nil {
+		return err
+	}
+	return p.validateUse()
+}
+
+// validateType checks the type, and an enum's values.
+func (p *trainerParam) validateType() error {
 	switch p.Type {
 	case paramString, paramInt, paramFloat, paramBool:
+		return nil
 	case paramEnum:
-		if len(p.Values) == 0 {
-			return errors.New("an enum needs values")
-		}
-		for _, v := range p.Values {
-			if !safeValuePattern.MatchString(v) || len(v) > defaultParamMaxLength {
-				return fmt.Errorf("enum value %q: letters, digits and . _ , : + = @ -, not starting with '-'", v)
-			}
-		}
+		return validEnumValues(p.Values)
 	default:
 		return fmt.Errorf("type %q: string, int, float, bool or enum", p.Type)
 	}
+}
+
+// validEnumValues checks an enum's values against the conservative set.
+func validEnumValues(values []string) error {
+	if len(values) == 0 {
+		return errors.New("an enum needs values")
+	}
+	for _, v := range values {
+		if !safeValuePattern.MatchString(v) || len(v) > defaultParamMaxLength {
+			return fmt.Errorf("enum value %q: letters, digits and . _ , : + = @ -, not starting with '-'", v)
+		}
+	}
+	return nil
+}
+
+// validateLimits checks min against max and maxLength, giving a string the
+// default length.
+func (p *trainerParam) validateLimits() error {
 	if p.Min != nil && p.Max != nil && *p.Min > *p.Max {
 		return errors.New("min is above max")
 	}
@@ -86,14 +112,26 @@ func (p *trainerParam) validate() error {
 	if p.MaxLength == 0 && p.Type == paramString {
 		p.MaxLength = defaultParamMaxLength
 	}
+	return nil
+}
+
+// compilePattern sets the pattern a value is held to: the profile's, or the
+// conservative set.
+func (p *trainerParam) compilePattern() error {
 	p.pattern = safeValuePattern
-	if p.Pattern != "" {
-		re, err := regexp.Compile(p.Pattern)
-		if err != nil {
-			return fmt.Errorf("pattern: %w", err)
-		}
-		p.pattern = re
+	if p.Pattern == "" {
+		return nil
 	}
+	re, err := regexp.Compile(p.Pattern)
+	if err != nil {
+		return fmt.Errorf("pattern: %w", err)
+	}
+	p.pattern = re
+	return nil
+}
+
+// validateUse checks the argument template and the default.
+func (p *trainerParam) validateUse() error {
 	if len(p.Args) == 0 {
 		return errors.New("args: the argument template the value goes into, e.g. [\"--" + p.Name + "\", \"{value}\"]")
 	}
@@ -191,84 +229,4 @@ func numberValue(v any) (float64, bool) {
 	default:
 		return 0, false
 	}
-}
-
-// findParam is the declaration named name, or nil.
-func findParam(params []*trainerParam, name string) *trainerParam {
-	for _, p := range params {
-		if p.Name == name {
-			return p
-		}
-	}
-	return nil
-}
-
-// paramArgs is one parameter's argument template and the value it takes.
-type paramArgs struct {
-	templates []string
-	value     string
-}
-
-// resolveParams checks a request's values against the declarations and
-// returns the values used, as text, and their argument templates in
-// declaration order. overrides (a trial's trialParameters) win over values.
-// A name the profile does not declare is refused.
-func resolveParams(params []*trainerParam, values, overrides map[string]any) (map[string]string, []paramArgs, error) {
-	for name := range values {
-		if findParam(params, name) == nil {
-			return nil, nil, fmt.Errorf("unknown parameter %q", name)
-		}
-	}
-	used := map[string]string{}
-	var args []paramArgs
-	for _, p := range params {
-		v, ok := overrides[p.Name]
-		if !ok {
-			v, ok = values[p.Name]
-		}
-		if !ok || v == nil {
-			v, ok = p.Default, p.Default != nil
-		}
-		if !ok {
-			if p.Required {
-				return nil, nil, fmt.Errorf("%s: required", p.Name)
-			}
-			continue
-		}
-		text, err := p.check(v)
-		if err != nil {
-			return nil, nil, err
-		}
-		used[p.Name] = text
-		if p.Type == paramBool && text == "false" {
-			continue
-		}
-		args = append(args, paramArgs{templates: p.Args, value: text})
-	}
-	return used, args, nil
-}
-
-// buildArgv is the command's arguments: the fixed ones, then each
-// parameter's, every element expanded in one pass, so text a value brings
-// in is never expanded again.
-func buildArgv(fixed []string, params []paramArgs, places map[string]string) []string {
-	argv := expandArgs(fixed, places, "")
-	for _, p := range params {
-		argv = append(argv, expandArgs(p.templates, places, p.value)...)
-	}
-	return argv
-}
-
-// expandArgs replaces the placeholders of templates, {value} with value.
-func expandArgs(templates []string, places map[string]string, value string) []string {
-	pairs := make([]string, 0, 2*len(places)+2)
-	for k, v := range places {
-		pairs = append(pairs, k, v)
-	}
-	r := strings.NewReplacer(append(pairs, "{value}", value)...)
-	out := make([]string, len(templates))
-	for i, t := range templates {
-		out[i] = r.Replace(t)
-	}
-	return out
 }
