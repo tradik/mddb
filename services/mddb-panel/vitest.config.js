@@ -321,6 +321,10 @@ const coverageFiles = [
   'src/lib/use-backup-files.js',
   'src/components/CollectionMaintenancePanel.jsx',
   'src/components/MaintenanceAction.jsx',
+  // 2.19.11: the model training pages.
+  'src/lib/training.js',
+  'src/components/TrainingDatasetForm.jsx',
+  'src/components/TrainingEvaluation.jsx',
 ];
 
 export default mergeConfig(

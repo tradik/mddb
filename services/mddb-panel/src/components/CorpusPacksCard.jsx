@@ -124,7 +124,7 @@ export default function CorpusPacksCard({ packs, loadError, canManage, highlight
           ))}
         </ul>
       )}
-      {busy && !removing && <p role="status" className="mt-2 text-sm text-fg-muted">Preparing the download… a large pack takes a while.</p>}
+      {busy && !removing && <output className="mt-2 block text-sm text-fg-muted">Preparing the download… a large pack takes a while.</output>}
       {removing && (
         <ConfirmDialog
           title="Remove a corpus pack"
