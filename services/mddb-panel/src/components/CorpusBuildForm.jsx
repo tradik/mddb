@@ -14,22 +14,26 @@ import ApiErrorNotice from './ApiErrorNotice';
 const inputClass = 'w-full px-2 py-1.5 border border-line-strong rounded text-sm bg-surface text-fg focus:outline-none focus:ring-2 focus:ring-focus';
 const emptyForm = { name: '', version: '', description: '', license: '', sources: [], licenses: {} };
 
+/** An id for a new source row, unused by the rows there are; it keys the React list. */
+const nextRowId = (sources) => sources.reduce((max, s) => Math.max(max, s.id), -1) + 1;
+
 function SourceRows({ sources, onChange }) {
-  const set = (i, field, value) => onChange(sources.map((s, j) => (j === i ? { ...s, [field]: value } : s)));
+  const set = (id, field, value) => onChange(sources.map((s) => (s.id === id ? { ...s, [field]: value } : s)));
+  const add = () => onChange([...sources, { id: nextRowId(sources), repo: '', commit: '', license: '' }]);
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm text-fg-soft">Where the documents came from (optional)</legend>
       {sources.map((s, i) => (
-        <div key={i} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_auto] gap-2">
-          <input aria-label={`Source ${i + 1} address`} value={s.repo} onChange={(e) => set(i, 'repo', e.target.value)} placeholder="https://…" className={inputClass} />
-          <input aria-label={`Source ${i + 1} version or commit`} value={s.commit} onChange={(e) => set(i, 'commit', e.target.value)} placeholder="version (optional)" className={inputClass} />
-          <input aria-label={`Source ${i + 1} licence`} value={s.license} onChange={(e) => set(i, 'license', e.target.value)} placeholder="licence (default: the pack's)" className={inputClass} />
-          <button type="button" onClick={() => onChange(sources.filter((_, j) => j !== i))} aria-label={`Remove source ${i + 1}`} className="justify-self-start rounded p-1.5 text-fg-soft hover:bg-surface-subtle">
+        <div key={s.id} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_auto] gap-2">
+          <input aria-label={`Source ${i + 1} address`} value={s.repo} onChange={(e) => set(s.id, 'repo', e.target.value)} placeholder="https://…" className={inputClass} />
+          <input aria-label={`Source ${i + 1} version or commit`} value={s.commit} onChange={(e) => set(s.id, 'commit', e.target.value)} placeholder="version (optional)" className={inputClass} />
+          <input aria-label={`Source ${i + 1} licence`} value={s.license} onChange={(e) => set(s.id, 'license', e.target.value)} placeholder="licence (default: the pack's)" className={inputClass} />
+          <button type="button" onClick={() => onChange(sources.filter((r) => r.id !== s.id))} aria-label={`Remove source ${i + 1}`} className="justify-self-start rounded p-1.5 text-fg-soft hover:bg-surface-subtle">
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...sources, { repo: '', commit: '', license: '' }])} className="flex items-center gap-1 text-sm text-info-strong hover:text-fg">
+      <button type="button" onClick={add} className="flex items-center gap-1 text-sm text-info-strong hover:text-fg">
         <Plus className="h-4 w-4" aria-hidden="true" /> Add a source
       </button>
     </fieldset>
@@ -77,17 +81,17 @@ export default function CorpusBuildForm({ collections, preset }) {
       </fieldset>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {several && (
-          <label className="text-sm text-fg-soft">Pack name (required for several collections)
+          <label className="text-sm text-fg-soft"><span>Pack name (required for several collections)</span>
             <input {...field('name')} placeholder="handbook" className={inputClass} />
           </label>
         )}
-        <label className="text-sm text-fg-soft">Version (optional)
+        <label className="text-sm text-fg-soft"><span>Version (optional)</span>
           <input {...field('version')} placeholder="1.0" className={inputClass} />
         </label>
-        <label className="text-sm text-fg-soft sm:col-span-2">Description (optional)
+        <label className="text-sm text-fg-soft sm:col-span-2"><span>Description (optional)</span>
           <input {...field('description')} className={inputClass} />
         </label>
-        <label className="text-sm text-fg-soft sm:col-span-2">Licence (required)
+        <label className="text-sm text-fg-soft sm:col-span-2"><span>Licence (required)</span>
           <input {...field('license')} placeholder="CC-BY-4.0" aria-describedby="corpus-license-why" className={inputClass} />
           <span id="corpus-license-why" className="block text-xs text-fg-subtle mt-1">
             A pack is made to be shared. Say under which terms its documents may be used — put in only what you may share.
@@ -110,7 +114,7 @@ export default function CorpusBuildForm({ collections, preset }) {
         <PackagePlus className="w-4 h-4 mr-1.5" aria-hidden="true" />
         {busy ? 'Creating…' : 'Create and download'}
       </button>
-      {busy && <p role="status" className="text-sm text-fg-muted">Taking a snapshot of the collections… a large pack takes a while before the download starts.</p>}
+      {busy && <output className="block text-sm text-fg-muted">Taking a snapshot of the collections… a large pack takes a while before the download starts.</output>}
     </form>
   );
 }

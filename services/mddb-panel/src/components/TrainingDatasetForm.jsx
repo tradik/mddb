@@ -117,7 +117,7 @@ export default function TrainingDatasetForm({ onBuilt }) {
       </div>
       <label className="mt-3 flex items-start gap-2 text-sm text-fg">
         <input type="checkbox" className="mt-1" checked={form.acknowledgeUnlicensed} onChange={set('acknowledgeUnlicensed')} />
-        I have checked that I may train on collections that record no licence.
+        <span>I have checked that I may train on collections that record no licence.</span>
       </label>
       <button type="submit" className={`${primaryButton} mt-4`} disabled={busy || form.collections.length === 0}>
         {busy ? 'Building…' : 'Build dataset'}

@@ -66,6 +66,14 @@ describe('TrainingPanel', () => {
     expect(screen.getByText('No runs yet.')).toBeTruthy();
   });
 
+  test('before the stats load there is no collection to choose', async () => {
+    useStore.setState({ stats: null });
+    render(<TrainingPanel />);
+    const list = await screen.findByLabelText('Collections');
+    expect(list.querySelectorAll('option')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Build dataset' }).disabled).toBe(true);
+  });
+
   test('a failed load is shown, and Reload tries again', async () => {
     vi.mocked(client.getTrainingProfiles).mockRejectedValueOnce(new Error('API Error (404): feature disabled'));
     render(<TrainingPanel />);
