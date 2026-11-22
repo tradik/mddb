@@ -148,6 +148,12 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/corpus/install", s.guardWrite(s.handleCorpusInstall))
 	mux.HandleFunc("/v1/corpus/inspect", s.handleCorpusInspect) // FE-022
 	mux.HandleFunc("/v1/corpus/remove", s.guardWrite(s.handleCorpusRemove))
+	// Model training: datasets for, and runs of, the operator's trainers.
+	mux.HandleFunc("/v1/training/profiles", s.training(s.handleTrainingProfiles))
+	mux.HandleFunc("/v1/training/datasets", s.training(s.handleTrainingDatasets))
+	mux.HandleFunc("/v1/training/datasets/", s.training(s.handleTrainingDataset))
+	mux.HandleFunc("/v1/training/jobs", s.training(s.handleTrainingJobs))
+	mux.HandleFunc("/v1/training/jobs/", s.training(s.handleTrainingJob))
 	mux.HandleFunc("/v1/curation", s.handleCuration)
 	mux.HandleFunc("/v1/events", s.handleSSE)
 	// Memory RAG endpoints

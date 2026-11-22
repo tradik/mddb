@@ -158,6 +158,7 @@ type Server struct {
 	SpellManager    *spell.SpellManager       // Spell correction for FTS queries and document content
 	SSEHub          *SSEHub                   // Server-Sent Events for real-time document change notifications
 	BulkIngest      *BulkIngestManager        // Async bulk ingest job manager
+	Training        *trainingManager          // Model training: datasets and runs of the operator's trainers
 	MCPInfo         MCPServerInfo             // Customizable MCP server profile
 	MCPInstructions string                    // System prompt for LLM — how to use this server
 	mcpKeyStore     *mcpAPIKeyStore           // BoltDB-backed MCP API key store
@@ -454,6 +455,9 @@ func runServer(srvCfg ServerConfig) int {
 	// and spins up the single worker that drains the in-memory queue.
 	s.BulkIngest = NewBulkIngestManager(s, 64)
 	s.BulkIngest.Start()
+	// Model training: reads the trainer profiles and marks the jobs a previous
+	// process left running as interrupted, whether the module is on or not.
+	s.Training = newTrainingManager(s)
 
 	// Mark server as ready — health check will now return "healthy" instead of "warming_up"
 	s.Ready = true

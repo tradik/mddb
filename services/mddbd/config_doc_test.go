@@ -15,7 +15,11 @@ const configDocPath = "../../docs/config.md"
 // settings, so docs/config.md leaves them out: the encryption format's magic
 // bytes (notConfigKeys) and the integrity check's child-process marker, which
 // the server sets for itself (db_integrity.go).
-var configDocNotSettings = map[string]bool{"MDDB_INTERNAL_VERIFY_DB": true}
+// The MDDB_TRAIN_* and MDDB_EVAL_* names are what the server sets for a
+// trainer or evaluate command (docs/MODEL-TRAINING.md), not settings.
+var configDocNotSettings = map[string]bool{"MDDB_INTERNAL_VERIFY_DB": true,
+	"MDDB_TRAIN_DATASET": true, "MDDB_TRAIN_VALIDATION": true, "MDDB_TRAIN_OUTPUT_DIR": true, "MDDB_TRAIN_JOB_ID": true,
+	"MDDB_TRAIN_TRIAL": true, "MDDB_EVAL_DATASET": true, "MDDB_EVAL_MODEL": true, "MDDB_EVAL_OUTPUT": true}
 
 // configDocOtherComponents are names docs/config.md may mention that another
 // component reads, not mddbd: the CLI (services/mddb-cli), the chat service

@@ -286,6 +286,13 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 		{Method: "POST", Path: "/v1/corpus/inspect", Description: "Read an uploaded corpus pack's manifest without installing it", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/corpus/remove", Description: "Remove an installed corpus pack", RequiresAuth: authEnabled},
 
+		// Model training (admin, module off by default)
+		{Method: "GET", Path: "/v1/training/profiles", Description: "Trainer profiles the operator configured", RequiresAuth: authEnabled},
+		{Method: "GET/POST", Path: "/v1/training/datasets", Description: "List training datasets / build one from collections", RequiresAuth: authEnabled},
+		{Method: "GET/DELETE", Path: "/v1/training/datasets/{id}", Description: "Dataset status and summary / delete it; /download?part=train|validation", RequiresAuth: authEnabled},
+		{Method: "GET/POST", Path: "/v1/training/jobs", Description: "List training runs / start one with a profile", RequiresAuth: authEnabled},
+		{Method: "GET/POST/DELETE", Path: "/v1/training/jobs/{id}", Description: "Run status and log / cancel, evaluate, download, delete", RequiresAuth: authEnabled},
+
 		// Vector search
 		{Method: "POST", Path: "/v1/vector-search", Description: "Semantic search using embeddings", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/vector-reindex", Description: "Re-embed collection documents", RequiresAuth: authEnabled},
