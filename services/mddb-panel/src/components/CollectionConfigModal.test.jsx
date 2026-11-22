@@ -16,6 +16,17 @@ vi.mock('./CollectionSources', () => ({
   default: ({ collection }) => <div data-testid="collection-sources">{collection}</div>,
 }));
 
+// So has the repository section (CollectionRepository.test.jsx); this stand-in
+// edits its URL and shows what the dialog passes it.
+vi.mock('./CollectionRepository', () => ({
+  default: ({ value, onChange, savedUrl }) => (
+    <label>
+      Repository stand-in {savedUrl || 'unsaved'}
+      <input value={value.url} onChange={(e) => onChange({ ...value, url: e.target.value })} />
+    </label>
+  ),
+}));
+
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
 const { default: CollectionConfigModal } = await import('./CollectionConfigModal');
@@ -418,6 +429,27 @@ describe('CollectionConfigModal editing', () => {
     expect(prompt.value).toHaveLength(4096);
     fireEvent.change(prompt, { target: { value: 'short' } });
     expect(screen.getByText('5 / 4096 characters').className).toContain('text-fg-faint');
+  });
+});
+
+describe('CollectionConfigModal repository (INT-023)', () => {
+  const repository = { url: 'https://github.com/acme/docs', tokenSecretRef: 'gh' };
+
+  test('a stored repository is kept on save, and the section learns it is saved', async () => {
+    await open({ configured: true, config: { repository } });
+    expect(screen.getByLabelText(/Repository stand-in https:\/\/github.com\/acme\/docs/).value).toBe(repository.url);
+    expect((await save()).repository).toEqual(repository);
+  });
+
+  test('clearing the URL removes a stored repository; none stored sends none', async () => {
+    await open({ configured: true, config: { repository } });
+    fireEvent.change(screen.getByLabelText(/Repository stand-in/), { target: { value: '' } });
+    expect((await save()).repository).toEqual({});
+    cleanup();
+    vi.mocked(mddbClient.setCollectionConfig).mockClear();
+    await open({ configured: false });
+    expect(screen.getByLabelText(/Repository stand-in unsaved/)).toBeTruthy();
+    expect('repository' in (await save())).toBe(false);
   });
 });
 

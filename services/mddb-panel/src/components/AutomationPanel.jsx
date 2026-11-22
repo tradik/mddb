@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Zap,
   Clock,
@@ -15,6 +15,7 @@ import {
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import AutomationLogsTab from './AutomationLogsTab';
+import ForgeTokensCard from './ForgeTokensCard';
 import CronActionFields from './CronActionFields';
 import { EMPTY_RULE, buildPayload, ruleToForm, describeCronAction, isRunnable } from '../lib/automation-form';
 import { LastRunResult, RunNowButton } from './CronRunNow';
@@ -30,6 +31,20 @@ const EVENT_OPTIONS = [
   { value: 'update', label: 'UPDATE (doc changed)' },
   { value: 'delete', label: 'DELETE (doc removed)' },
 ];
+
+/** One rule-type filter above the rules table, with its rule count. */
+function FilterTab({ type, label, count, active, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(type)}
+      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+        active ? 'bg-info-muted text-info' : 'text-fg-subtle hover:bg-surface-subtle'
+      }`}
+    >
+      {label} ({count})
+    </button>
+  );
+}
 
 export default function AutomationPanel() {
   const { stats } = useStore();
@@ -66,15 +81,7 @@ export default function AutomationPanel() {
   const [testing, setTesting] = useState(null);
   const [testResults, setTestResults] = useState(null);
 
-  useEffect(() => {
-    loadRules();
-  }, [filterType]);
-
-  useEffect(() => {
-    loadDropdownData();
-  }, []);
-
-  const loadRules = async () => {
+  const loadRules = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -86,9 +93,9 @@ export default function AutomationPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterType]);
 
-  const loadDropdownData = async () => {
+  const loadDropdownData = useCallback(async () => {
     try {
       const data = await mddbClient.listAutomation();
       const all = Array.isArray(data) ? data : data.rules || [];
@@ -97,7 +104,15 @@ export default function AutomationPanel() {
     } catch (err) {
       console.error('Failed to load dropdown data:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadRules();
+  }, [loadRules]);
+
+  useEffect(() => {
+    loadDropdownData();
+  }, [loadDropdownData]);
 
   // ---- Counts for filter tabs (always from full unfiltered list) ----
   const allCount = allRules.length;
@@ -193,17 +208,8 @@ export default function AutomationPanel() {
   };
 
   // ---- Render helpers ----
-  const FilterTab = ({ type, label, count }) => (
-    <button
-      onClick={() => setFilterType(type)}
-      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-        filterType === type
-          ? 'bg-info-muted text-info'
-          : 'text-fg-subtle hover:bg-surface-subtle'
-      }`}
-    >
-      {label} ({count})
-    </button>
+  const filterTab = (type, label, count) => (
+    <FilterTab type={type} label={label} count={count} active={filterType === type} onSelect={setFilterType} />
   );
 
   const TypeBadge = ({ type }) => {
@@ -311,9 +317,10 @@ export default function AutomationPanel() {
                   <label key={ev.value} className="flex items-center gap-1.5 text-sm">
                     <input
                       type="checkbox"
-                      checked={(form.events || []).includes(ev.value)}
+                      checked={form.events.includes(ev.value)}
                       onChange={() => {
-                        const current = form.events || [];
+                        // Always a list: EMPTY_RULE and ruleToForm set one.
+                        const current = form.events;
                         const next = current.includes(ev.value)
                           ? current.filter((e) => e !== ev.value)
                           : [...current, ev.value];
@@ -490,6 +497,8 @@ export default function AutomationPanel() {
       <div className="bg-surface border-b px-6 flex items-center gap-4">
         <button onClick={() => setActiveTab('rules')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rules' ? 'border-blue-600 text-info' : 'border-transparent text-fg-faint hover:text-fg-muted'}`}>Rules</button>
         {logsEnabled && <button onClick={() => setActiveTab('logs')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'logs' ? 'border-blue-600 text-info' : 'border-transparent text-fg-faint hover:text-fg-muted'}`}>Logs</button>}
+        {/* INT-023: the server-wide tokens git and issues syncs fall back to */}
+        <button onClick={() => setActiveTab('forgeTokens')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'forgeTokens' ? 'border-blue-600 text-info' : 'border-transparent text-fg-faint hover:text-fg-muted'}`}>Forge tokens</button>
       </div>
 
       {/* Main content */}
@@ -497,10 +506,10 @@ export default function AutomationPanel() {
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Type filter tabs */}
           <div className="flex items-center gap-2">
-            <FilterTab type="" label="All" count={allCount} />
-            <FilterTab type="webhook" label="Webhooks" count={webhookCount} />
-            <FilterTab type="trigger" label="Triggers" count={triggerCount} />
-            <FilterTab type="cron" label="Crons" count={cronCount} />
+            {filterTab('', 'All', allCount)}
+            {filterTab('webhook', 'Webhooks', webhookCount)}
+            {filterTab('trigger', 'Triggers', triggerCount)}
+            {filterTab('cron', 'Crons', cronCount)}
           </div>
 
           {/* Error alert */}
@@ -836,6 +845,7 @@ export default function AutomationPanel() {
         </div>
       </div>}
       {activeTab === 'logs' && logsEnabled && <AutomationLogsTab />}
+      {activeTab === 'forgeTokens' && <ForgeTokensCard />}
     </div>
   );
 }

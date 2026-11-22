@@ -4,7 +4,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   EDITED_RETRIEVAL_KEYS, QUOTA_FIELDS, omit, preservedConfig, advancedFromConfig, buildQuota, applyAdvanced,
-  rerankFromProfile, buildRerank,
+  rerankFromProfile, buildRerank, repositoryFromConfig, buildRepository, issuesSyncRule,
 } from './collection-config.js';
 
 const emptyQuota = { maxDocuments: '', maxBytes: '', maxVectors: '', embeddingCallsPerDay: '', embeddingTokensPerDay: '' };
@@ -189,5 +189,34 @@ describe('applyAdvanced', () => {
 
   test('stored defaults to {} when omitted', () => {
     expect(applyAdvanced({}, advanced({ quota: { ...emptyQuota, maxBytes: '1' } })).quota).toEqual({ maxBytes: 1 });
+  });
+});
+
+// INT-023: a collection's repository block — URL, forge for an unknown host,
+// token by secret name — and the issues sync it can start.
+describe('repository block (INT-023)', () => {
+  test('a stored block reads into the form; none reads as blanks', () => {
+    expect(repositoryFromConfig({ repository: { url: 'https://github.com/a/b', tokenSecretRef: 'gh' } }))
+      .toEqual({ url: 'https://github.com/a/b', forge: '', tokenSecretRef: 'gh' });
+    expect(repositoryFromConfig()).toEqual({ url: '', forge: '', tokenSecretRef: '' });
+  });
+
+  test('a known host sends no forge; a self-hosted one does; blanks are left out', () => {
+    expect(buildRepository({ url: ' https://github.com/a/b ', forge: 'gitea', tokenSecretRef: '' })).toEqual({ url: 'https://github.com/a/b' });
+    expect(buildRepository({ url: 'https://git.example.com/a/b', forge: 'gitea', tokenSecretRef: 'tok' }))
+      .toEqual({ url: 'https://git.example.com/a/b', forge: 'gitea', tokenSecretRef: 'tok' });
+    expect(buildRepository({ url: 'https://git.example.com/a/b', forge: '', tokenSecretRef: '' })).toEqual({ url: 'https://git.example.com/a/b' });
+  });
+
+  test('an empty URL removes a stored block and sends nothing otherwise', () => {
+    expect(buildRepository({ url: ' ', forge: '', tokenSecretRef: 'gh' }, { url: 'https://github.com/a/b' })).toEqual({});
+    expect(buildRepository({ url: '', forge: '', tokenSecretRef: '' }, undefined)).toBeUndefined();
+  });
+
+  test('the issues sync mirrors into <collection>-issues from the collection\'s repository', () => {
+    expect(issuesSyncRule('docs')).toEqual({
+      type: 'cron', name: 'docs issues', schedule: '*/15 * * * *', enabled: true,
+      sync: { source: 'issues', collection: 'docs-issues', lang: 'en', repositoryFrom: 'docs', state: 'all', include: ['issues', 'pulls'], comments: true },
+    });
   });
 });

@@ -144,6 +144,7 @@ describe('ruleToForm', () => {
       source: 'sitemap', collection: 'd', lang: 'en', url: '', urls: '', bucket: '', prefix: '', prune: false,
       maxDocuments: '', maxMiB: '', storageConfig: { ...EMPTY_SYNC.storageConfig, useTLS: false },
       ref: '', include: '', exclude: '', forge: '', tokenSecretRef: '', hookSecretRef: '', adopt: false,
+      repositoryFrom: '', state: 'all', since: '', includeIssues: true, includePulls: false, comments: true,
     });
   });
 

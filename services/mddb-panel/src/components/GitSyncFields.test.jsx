@@ -56,6 +56,15 @@ describe('GitSyncFields', () => {
     await screen.findAllByRole('option', { name: 'forge-token (set)' });
   });
 
+  test('the URL may be left empty when a collection supplies the repository (INT-023)', async () => {
+    client.listChatMcpSecrets.mockResolvedValue(secrets);
+    const seen = renderSync({ source: 'git' });
+    expect(screen.getByText(/Leave empty to use a collection's repository/)).toBeTruthy();
+    change(/^Repository from collection/, 'docs');
+    expect(last(seen)).toMatchObject({ url: '', repositoryFrom: 'docs' });
+    await screen.findAllByRole('option', { name: 'forge-token (set)' });
+  });
+
   test('a self-hosted host asks for its forge', async () => {
     client.listChatMcpSecrets.mockResolvedValue(secrets);
     const seen = renderSync({ source: 'git', url: 'https://git.example.com/acme/docs' });

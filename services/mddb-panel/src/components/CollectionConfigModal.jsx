@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Settings2, Plus, Trash2 } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
-import { advancedFromConfig, applyAdvanced, omit, preservedConfig } from '../lib/collection-config';
+import { advancedFromConfig, applyAdvanced, buildRepository, omit, preservedConfig, repositoryFromConfig } from '../lib/collection-config';
 import CollectionAdvancedSettings from './CollectionAdvancedSettings';
 import QuotaUsage from './QuotaUsage';
 import CollectionSources from './CollectionSources';
+import CollectionRepository from './CollectionRepository';
 import ReadOnlyNotice from './ReadOnlyNotice';
 
 const COLLECTION_TYPES = [
@@ -55,17 +56,15 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
   // they are, so saving never erases them (see lib/collection-config.js).
   const [stored, setStored] = useState({});
   const [advanced, setAdvanced] = useState(() => advancedFromConfig());
+  // INT-023: the repository git and issues syncs fall back to
+  const [repository, setRepository] = useState(() => repositoryFromConfig());
   // What the collection uses of its quota (GO-043); sent only with a quota.
   const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadConfig();
-  }, [collection]);
-
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -103,6 +102,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
         setResponsePrompt(cfg.responsePrompt || '');
         setStored(cfg);
         setAdvanced(advancedFromConfig(cfg));
+        setRepository(repositoryFromConfig(cfg));
         setUsage(data.usage || null);
       }
     } catch (err) {
@@ -110,7 +110,11 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [collection]);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -160,6 +164,8 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
       payload.retrieval = retrieval;
       applyAdvanced(payload, advanced, stored);
       payload.responsePrompt = responsePrompt.trim() || undefined;
+      // An omitted repository keeps the stored one; {} removes it (INT-023).
+      payload.repository = buildRepository(repository, stored.repository);
       if (storageBackend === 's3') {
         payload.storageConfig = omit(storageConfig, ['secretKeySet']);
       } else {
@@ -614,6 +620,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* 2.19.0: syncs writing to and triggers watching this collection */}
               <CollectionSources collection={collection} />
+
+              {/* INT-023: the repository syncs fall back to, and its issues sync */}
+              <CollectionRepository collection={collection} value={repository} onChange={setRepository} savedUrl={stored.repository?.url} />
 
               {/* Response prompt (RAG-002, v2.12.0+) */}
               <div>
