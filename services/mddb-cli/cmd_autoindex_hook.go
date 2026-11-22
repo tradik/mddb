@@ -18,6 +18,9 @@ import (
 // `mddb-cli autoindex hook` (AGT-006): keep a collection in step with a
 // repository's commits through git hooks.
 
+// executable is the binary a hook runs: this one. A variable for tests.
+var executable = os.Executable
+
 func newAutoindexHookCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hook",
@@ -50,7 +53,7 @@ func newHookInstallCmd() *cobra.Command {
 			if cmd.Root().PersistentFlags().Changed("server") {
 				flags = append([]string{"--server", serverURL}, flags...)
 			}
-			exe, err := os.Executable()
+			exe, err := executable()
 			if err != nil {
 				return err
 			}
@@ -207,15 +210,10 @@ func hookRun(ctx context.Context, client *mddb.Client, o autoindexOptions) error
 	if o.watch || o.dryRun {
 		return errors.New("hook run does not take --watch or --dry-run")
 	}
-	root, err := filepath.Abs(o.root)
+	p, err := repoHookPaths(o.root)
 	if err != nil {
 		return err
 	}
-	p, err := repoHookPaths(root)
-	if err != nil {
-		return err
-	}
-	o.root = root
 	ok, err := takeLock(p.lock)
 	if err != nil {
 		return err
@@ -226,7 +224,7 @@ func hookRun(ctx context.Context, client *mddb.Client, o autoindexOptions) error
 	defer func() { _ = os.Remove(p.lock) }()
 	for {
 		_ = os.Remove(p.dirty)
-		if err := hookPass(ctx, client, o, root, p.state); err != nil {
+		if err := hookPass(ctx, client, o, p.state); err != nil {
 			return err
 		}
 		if _, err := os.Stat(p.dirty); err != nil {
@@ -238,31 +236,30 @@ func hookRun(ctx context.Context, client *mddb.Client, o autoindexOptions) error
 // hookPass runs once from the commit in the state file — all files when
 // there is none or it is gone (a rebase, a gc) — and records HEAD when
 // everything reached the server.
-func hookPass(ctx context.Context, client *mddb.Client, o autoindexOptions, root, stateFile string) error {
+func hookPass(ctx context.Context, client *mddb.Client, o autoindexOptions, stateFile string) error {
 	start := time.Now()
 	since := ""
 	if data, err := os.ReadFile(stateFile); err == nil { // #nosec G304 -- under the repository's git directory
 		since = strings.TrimSpace(string(data))
 	}
 	if since != "" {
-		if _, err := runGit(root, "cat-file", "-e", since+"^{commit}"); err != nil {
+		if _, err := runGit(o.root, "cat-file", "-e", since+"^{commit}"); err != nil {
 			since = ""
 		}
 	}
 	o.changedSince = since
-	head := detectGit(root)
+	head := detectGit(o.root)
 	fmt.Printf("%s autoindex since %s\n", start.Format(time.RFC3339), orAll(since))
 	rep, err := autoindexPass(ctx, client, o)
 	if err != nil {
 		return err
 	}
-	if err := printAutoindex(rep, start); err != nil {
-		return err
+	if !rep.sendFailed && head != nil && head.Commit != "" {
+		if err := os.WriteFile(stateFile, []byte(head.Commit+"\n"), 0o600); err != nil {
+			rep.Errors = append(rep.Errors, "state: "+err.Error())
+		}
 	}
-	if rep.sendFailed || head == nil || head.Commit == "" {
-		return nil
-	}
-	return os.WriteFile(stateFile, []byte(head.Commit+"\n"), 0o600)
+	return printAutoindex(rep, start)
 }
 
 // orAll names the start of a run for the log.

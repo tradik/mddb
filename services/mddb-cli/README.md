@@ -133,7 +133,14 @@ mddb-cli autoindex [path] [-c collection] [--lang en] [--include glob]... [--exc
                    [--semantic[=go,python,php,c,cpp,rust]] [--semantic-timeout 20m]
                    [--semantic-concurrency 4] [--semantic-memory-mb N]
                    [--compile-commands build/]
+                   [--changed-since REF] [--watch [--interval 2s]]
+mddb-cli autoindex hook install|uninstall|status [path] [--events post-commit,...] [-- autoindex flags]
 ```
+
+`--changed-since REF`, `--watch` and `autoindex hook install` (v2.19.10+)
+send only what changed while you work: since a commit, on every save, or after
+each commit in the background. The hook reads the API key from `MDDB_API_KEY`.
+See [docs/BULK-IMPORT.md](../../docs/BULK-IMPORT.md#keeping-a-collection-current---changed-since---watch-hook-v21910).
 
 `--semantic` runs a language server over the checkout (gopls, basedpyright or
 pyrefly, phpactor or PHPantom, clangd for C and C++, rust-analyzer for Rust)

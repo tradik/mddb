@@ -173,6 +173,24 @@ image links name (inside the indexed tree, at most 2 MB each); the server
 stores them, and the pictures of PDFs, as image documents with their alt text
 and captions searchable (v2.18.9).
 .TP
+.BR \-\-changed\-since " " \fIREF\fR
+Send only the files git lists as changed between REF and the working tree,
+and the untracked ones; with \fB\-\-prune\fR delete the documents of the
+deleted ones (v2.19.10).
+.TP
+.B \-\-watch
+Index, then every \fB\-\-interval\fR (default 2s) send the files whose size
+or modification time changed, until interrupted (v2.19.10).
+.TP
+.BR \-\-interval " " \fIDURATION\fR
+How often \fB\-\-watch\fR looks (default 2s).
+.TP
+.BR "hook install" " [\fIPATH\fR] [\fB\-\-events\fR \fILIST\fR] [\fB\-\-\fR \fIFLAGS\fR]"
+Add a block to the repository's post\-commit, post\-merge, post\-checkout
+and post\-rewrite hooks that runs the changed files through autoindex in the
+background, from the commit last indexed; existing hooks are kept.
+\fBhook uninstall\fR removes the block, \fBhook status\fR shows it (v2.19.10).
+.TP
 .B \-\-no\-frontmatter
 Store Markdown files as they are; do not read frontmatter as meta (v2.19.0).
 .TP
@@ -1352,6 +1370,9 @@ Disabled by default. Enable via \fBMDDB_PPROF_ENABLED=true\fR.
 .TP
 .B MDDB_SERVER
 Default server URL (overridden by \fB\-\-server\fR)
+.TP
+.B MDDB_API_KEY
+Default API key (overridden by \fB\-\-api\-key\fR); what a git hook uses
 .SH REPLICATION
 MDDB supports leader-follower replication allowing horizontal scaling of read operations.
 When configuring an MDDB server, you can set the node role using environment variables:

@@ -143,7 +143,9 @@ func TestWatch_CLIAndOutput(t *testing.T) {
 		t.Fatal("lookAt with git outside a repository: no error")
 	}
 	// A retry that fails as the last one did prints nothing.
-	if out := captureStdout(t, func() { printWatchPass(&autoindexReport{sendFailed: true, Errors: []string{"down"}}, 1, time.Now(), "down") }); out != "" {
+	if out := captureStdout(t, func() {
+		printWatchPass(&autoindexReport{sendFailed: true, Errors: []string{"down"}}, 1, time.Now(), "down")
+	}); out != "" {
 		t.Fatalf("repeated failure printed: %q", out)
 	}
 }

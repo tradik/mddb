@@ -100,7 +100,7 @@ func installHook(dir, event, block string) error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	// #nosec G306 -- git runs a hook only when it is executable
+	// #nosec G306 G703 -- git runs a hook only when it is executable; the path is from git rev-parse
 	if err := os.WriteFile(file, []byte(withBlock(string(old), block)), 0o755); err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func uninstallHook(dir, event string) (bool, error) {
 	if rest == "#!/bin/sh\n" {
 		return true, os.Remove(file)
 	}
-	return true, os.WriteFile(file, []byte(rest), 0o755) // #nosec G306 -- a hook stays executable
+	return true, os.WriteFile(file, []byte(rest), 0o755) // #nosec G306 G703 -- a hook stays executable; the path is from git rev-parse
 }
 
 // hookInstalled reports whether the named hook holds the block.
@@ -138,19 +138,25 @@ func hookInstalled(dir, event string) bool {
 // takeLock creates the lock file, taking over one older than staleLock. It
 // reports false when another run holds it.
 func takeLock(file string) (bool, error) {
-	for range 2 {
-		f, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) // #nosec G304 -- under the repository's git directory
-		if err == nil {
-			return true, f.Close()
-		}
-		if !os.IsExist(err) {
-			return false, err
-		}
-		st, statErr := os.Stat(file)
-		if statErr != nil || time.Since(st.ModTime()) < staleLock {
-			return false, nil
-		}
+	ok, err := createLock(file)
+	if ok || err != nil {
+		return ok, err
+	}
+	if st, err := os.Stat(file); err == nil && time.Since(st.ModTime()) >= staleLock {
 		_ = os.Remove(file)
+		return createLock(file)
 	}
 	return false, nil
+}
+
+// createLock creates file if it does not exist; false, nil when it does.
+func createLock(file string) (bool, error) {
+	f, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) // #nosec G304 -- under the repository's git directory
+	if os.IsExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, f.Close()
 }
