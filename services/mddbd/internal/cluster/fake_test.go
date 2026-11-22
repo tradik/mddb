@@ -112,15 +112,20 @@ func (f *fakeLog) hooks() Hooks {
 // The test cluster's heartbeat and election timeout. Windows sleeps and
 // timers have a resolution near 15.6 ms, which turns a 10 ms heartbeat into
 // one every 15–30 ms and leaves a 45 ms lease two heartbeats deep, so a
-// leader lost its lease to scheduling noise; there both are five times longer.
+// leader lost its lease to scheduling noise. Five times longer still lost a
+// term on a loaded runner (TestPromotionHandsOverFromTheLeader, 2.19.10), so
+// there both are ten times longer, and so is every wait for a leader.
 var (
 	hb = scaledForTimers(10 * time.Millisecond)
 	et = scaledForTimers(60 * time.Millisecond)
 )
 
+// windowsTimerScale is how much longer the test timings are on Windows.
+const windowsTimerScale = 10
+
 func scaledForTimers(d time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
-		return 5 * d
+		return windowsTimerScale * d
 	}
 	return d
 }
@@ -181,7 +186,7 @@ func (g *group) stop(id string) {
 // leader waits for exactly one writable node among the reachable ones.
 func (g *group) leader(within time.Duration) *Node {
 	g.t.Helper()
-	deadline := time.Now().Add(within)
+	deadline := time.Now().Add(scaledForTimers(within))
 	for time.Now().Before(deadline) {
 		if n := g.singleLeader(); n != nil {
 			return n

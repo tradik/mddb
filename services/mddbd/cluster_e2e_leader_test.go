@@ -18,7 +18,7 @@ import (
 
 // stableFor is how long a leader must hold before a test relies on it: two
 // election timeouts, longer than any follower waits before it stands.
-const stableFor = 2 * testElection
+var stableFor = 2 * testElection
 
 // maxLeaderMoves bounds how often writeAll follows leadership: a cluster
 // that keeps re-electing is a failure, not noise.
@@ -28,7 +28,7 @@ const maxLeaderMoves = 5
 // poll that no two nodes lead in the same term.
 func (tc *testCluster) leader(within time.Duration) *testNode {
 	tc.t.Helper()
-	deadline := time.Now().Add(within)
+	deadline := time.Now().Add(e2eScaled(within))
 	for time.Now().Before(deadline) {
 		tc.checkOneLeaderPerTerm()
 		var writable []*testNode
@@ -51,7 +51,7 @@ func (tc *testCluster) leader(within time.Duration) *testNode {
 // nodes lead the same term.
 func (tc *testCluster) stableLeader(within time.Duration) *testNode {
 	tc.t.Helper()
-	deadline := time.Now().Add(within)
+	deadline := time.Now().Add(e2eScaled(within))
 	var held *testNode
 	var heldTerm uint64
 	var since time.Time
