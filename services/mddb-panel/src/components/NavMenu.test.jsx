@@ -31,9 +31,9 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('groups', () => {
-  test('six disclosure headers, all open, each controlling its list', async () => {
+  test('seven disclosure headers, all open, each controlling its list', async () => {
     await renderMenu({ authEnabled: true, clusterEnabled: true });
-    for (const label of ['Search', 'Data', 'Chat', 'Integrations', 'Security', 'System']) {
+    for (const label of ['Collections', 'Search', 'Search Tuning', 'Chat', 'Integrations', 'Security', 'System']) {
       const h = header(label);
       expect(h.getAttribute('aria-expanded')).toBe('true');
       expect(document.getElementById(h.getAttribute('aria-controls')).hidden).toBe(false);
@@ -44,13 +44,13 @@ describe('groups', () => {
 
   test('a header folds its group, and the fold survives a new mount', async () => {
     const { unmount } = await renderMenu();
-    fireEvent.click(header('Search'));
-    expect(header('Search').getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(header('Search Tuning'));
+    expect(header('Search Tuning').getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('button', { name: 'Stop Words' })).toBeNull();
     unmount();
     await renderMenu();
-    expect(header('Search').getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(header('Search'));
+    expect(header('Search Tuning').getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(header('Search Tuning'));
     expect(screen.getByRole('button', { name: 'Stop Words' })).toBeTruthy();
   });
 
@@ -73,7 +73,7 @@ describe('groups', () => {
     await renderMenu();
     expect(header('System').getAttribute('aria-expanded')).toBe('false');
     act(() => useStore.setState({ viewMode: 'embeddings' }));
-    expect(header('Data').getAttribute('aria-expanded')).toBe('true');
+    expect(header('Collections').getAttribute('aria-expanded')).toBe('true');
     expect(JSON.parse(localStorage.getItem('mddb.nav.collapsed'))).toEqual(['system']);
     act(() => useStore.setState({ viewMode: 'documents' }));
     act(() => useStore.setState({ viewMode: 'import' }));
@@ -118,12 +118,12 @@ describe('groups', () => {
 
 describe('search', () => {
   test('filters by label without regard to case or accents, opening folded groups', async () => {
-    localStorage.setItem('mddb.nav.collapsed', '["search","security"]');
+    localStorage.setItem('mddb.nav.collapsed', '["tuning","security"]');
     await renderMenu();
     fireEvent.change(box(), { target: { value: 'STÓP' } });
     expect(screen.getByRole('button', { name: 'Stop Words' })).toBeTruthy();
-    expect(header('Search').getAttribute('aria-expanded')).toBe('true');
-    expect(screen.queryByRole('button', { name: 'Data group' })).toBeNull();
+    expect(header('Search Tuning').getAttribute('aria-expanded')).toBe('true');
+    expect(screen.queryByRole('button', { name: 'Collections group' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'System Info' })).toBeNull();
   });
 
@@ -143,6 +143,6 @@ describe('search', () => {
     localStorage.setItem('mddb.nav.collapsed', '["data"]');
     await renderMenu();
     fireEvent.change(box(), { target: { value: '   ' } });
-    expect(header('Data').getAttribute('aria-expanded')).toBe('false');
+    expect(header('Collections').getAttribute('aria-expanded')).toBe('false');
   });
 });
