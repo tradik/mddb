@@ -1920,6 +1920,7 @@ backups are core and cannot be switched off.
 | `vectorStores` | **off** | `/v1/vector_stores`, `/v1/vector_stores/{id}/search` (v2.19.10, #446) |
 | `esCompat` | **off**, on with `MDDB_ES_COMPAT=true` | `/es`, `/es/…` (the Elasticsearch-compatible subset; module since v2.19.10) |
 | `qdrantCompat` | **off**, on with `MDDB_QDRANT_COMPAT=true` | `/qdrant`, `/qdrant/…` (v2.19.10, #447) |
+| `modelTraining` | **off** | `/v1/training/profiles`, `/v1/training/datasets`, `/v1/training/datasets/{id}`, `/v1/training/jobs`, `/v1/training/jobs/{id}` (v2.19.11; [Model training](MODEL-TRAINING.md)) |
 
 A server that never touched a switch behaves as before 2.19.0.
 

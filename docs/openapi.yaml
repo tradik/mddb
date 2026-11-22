@@ -173,6 +173,8 @@ tags:
     description: Per-collection type, description, icon, color, and custom metadata
   - name: Tenants
     description: Tenant quotas, request limits and usage (v2.19.8+, GO-054)
+  - name: Model Training
+    description: Training datasets from collections and runs of the operator's trainer commands (module modelTraining, admin)
   - name: Features
     description: Module switches (v2.19.0+, GO-049) — optional modules such as
       chat, geo or temporal an administrator turns on and off; a disabled
@@ -8686,6 +8688,315 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /v1/training/profiles:
+    get:
+      tags:
+        - Model Training
+      summary: List the trainer profiles the operator configured
+      description: >-
+        The profiles of MDDB_TRAINERS_CONFIG with the parameters each declares, and
+        any profile the server refused. The command line, the argument templates and
+        the environment allowlist are never shown. Admin only; module `modelTraining`
+        (off by default). REST only: no gRPC method, GraphQL field or MCP tool.
+      operationId: listTrainerProfiles
+      responses:
+        "200":
+          description: The profiles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  profiles:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TrainerProfile"
+                  errors:
+                    type: array
+                    items:
+                      type: string
+        "403":
+          description: Admin access required, or a scoped MCP key
+        "404":
+          description: The modelTraining module is off
+
+  /v1/training/datasets:
+    get:
+      tags:
+        - Model Training
+      summary: List training datasets
+      operationId: listTrainingDatasets
+      responses:
+        "200":
+          description: Every dataset, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingJobList"
+        "403":
+          description: Admin access required
+        "404":
+          description: The modelTraining module is off
+    post:
+      tags:
+        - Model Training
+      summary: Build a training dataset from collections
+      description: >-
+        Starts a job that exports one or several collections as JSON Lines (`text` or
+        `pairs`) into the job's directory, split into a training and a validation part.
+        A collection without licence information needs `acknowledgeUnlicensed: true`.
+      operationId: buildTrainingDataset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingDatasetRequest"
+      responses:
+        "202":
+          description: The dataset job was accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingJobAccepted"
+        "400":
+          description: An invalid request, or collections without licence information not acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Admin access required
+        "404":
+          description: The modelTraining module is off
+        "507":
+          description: Not enough free disk space under MDDB_TRAINING_DIR
+
+  /v1/training/datasets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^ds_[0-9a-f]{16}$"
+    get:
+      tags:
+        - Model Training
+      summary: A dataset's status, summary and preview
+      operationId: getTrainingDataset
+      responses:
+        "200":
+          description: The dataset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingJobDetail"
+        "404":
+          description: No such dataset, or the module is off
+    delete:
+      tags:
+        - Model Training
+      summary: Delete a dataset and its files
+      operationId: deleteTrainingDataset
+      responses:
+        "200":
+          description: Deleted
+        "404":
+          description: No such dataset
+        "409":
+          description: The dataset is still being built, or a running job uses it
+
+  /v1/training/datasets/{id}/download:
+    get:
+      tags:
+        - Model Training
+      summary: Download a part of a completed dataset
+      operationId: downloadTrainingDataset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: part
+          in: query
+          schema:
+            type: string
+            enum: [train, validation]
+            default: train
+      responses:
+        "200":
+          description: The JSON Lines file
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: An unknown part
+        "404":
+          description: No such dataset
+        "409":
+          description: The dataset is not completed
+
+  /v1/training/jobs:
+    get:
+      tags:
+        - Model Training
+      summary: List training runs
+      operationId: listTrainingRuns
+      responses:
+        "200":
+          description: Every run, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingJobList"
+        "403":
+          description: Admin access required
+        "404":
+          description: The modelTraining module is off
+    post:
+      tags:
+        - Model Training
+      summary: Start a run of a trainer profile
+      description: >-
+        Starts the profile's command on a built dataset (`datasetId`) or on one built
+        for the run (`dataset`). Only parameter values travel: each is checked against
+        the profile's declaration and passed as its own argument, never through a shell.
+        `trial: true` runs on a small cut of the dataset with the profile's
+        `trialParameters`. When the profile has an evaluate command and the dataset is
+        `pairs` with a validation part, the base model and the result are scored.
+      operationId: startTrainingRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingRunRequest"
+      responses:
+        "202":
+          description: The run was accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingJobAccepted"
+        "400":
+          description: Unknown profile or parameter, a refused value, or an invalid dataset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: No trainer is configured, or the profile runs as many jobs as it allows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/training/jobs/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^run_[0-9a-f]{16}$"
+    get:
+      tags:
+        - Model Training
+      summary: A run's status, stage, progress, evaluation and log tail
+      operationId: getTrainingRun
+      responses:
+        "200":
+          description: The run and the last 16 KiB of its log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingJobDetail"
+        "404":
+          description: No such run
+    delete:
+      tags:
+        - Model Training
+      summary: Delete a finished run and its directory, result included
+      operationId: deleteTrainingRun
+      responses:
+        "200":
+          description: Deleted
+        "404":
+          description: No such run
+        "409":
+          description: The run is still going
+
+  /v1/training/jobs/{id}/cancel:
+    post:
+      tags:
+        - Model Training
+      summary: Cancel a run
+      description: Ends the command's process group (SIGTERM, then SIGKILL after a grace period; on Windows the process is killed).
+      operationId: cancelTrainingRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Cancelling
+        "404":
+          description: No such run
+        "409":
+          description: The run has ended
+
+  /v1/training/jobs/{id}/evaluate:
+    post:
+      tags:
+        - Model Training
+      summary: Evaluate a finished run again
+      operationId: evaluateTrainingRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: The evaluation started
+        "400":
+          description: The profile has no evaluate command, or is gone
+        "409":
+          description: The run has no result, is still going, or the profile is busy
+
+  /v1/training/jobs/{id}/download:
+    get:
+      tags:
+        - Model Training
+      summary: Download a run's result file
+      description: Serves only a regular file in the run's output directory whose name matches the profile's output pattern.
+      operationId: downloadTrainingResult
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The result file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: No such run, or it has no result
+
   /v1/chat/conversations:
     post:
       tags:
@@ -10876,6 +11187,170 @@ paths:
 
 components:
   schemas:
+    TrainerParameter:
+      type: object
+      properties:
+        name: { type: string }
+        type: { type: string, enum: [string, int, float, bool, enum] }
+        description: { type: string }
+        min: { type: number }
+        max: { type: number }
+        values: { type: array, items: { type: string } }
+        default: {}
+        required: { type: boolean }
+        maxLength: { type: integer }
+        pattern: { type: string }
+    TrainerProfile:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        parameters: { type: array, nullable: true, items: { $ref: "#/components/schemas/TrainerParameter" } }
+        timeout: { type: string }
+        output: { type: string, example: "*.gguf" }
+        maxConcurrent: { type: integer }
+        progress: { type: string }
+        trialRecords: { type: integer }
+        trialParameters: { type: object, additionalProperties: true }
+        trialTimeout: { type: string }
+        running: { type: integer }
+        evaluate:
+          type: object
+          properties:
+            parameters: { type: array, nullable: true, items: { $ref: "#/components/schemas/TrainerParameter" } }
+            timeout: { type: string }
+            baseline: { type: boolean }
+    TrainingDatasetRequest:
+      type: object
+      required: [collections, format]
+      properties:
+        name: { type: string }
+        collections: { type: array, minItems: 1, maxItems: 16, items: { type: string } }
+        format: { type: string, enum: [text, pairs] }
+        filterMeta: { type: object, additionalProperties: { type: array, items: { type: string } } }
+        lang: { type: string }
+        maxRecords: { type: integer, minimum: 0, maximum: 1000000 }
+        shuffle: { type: boolean }
+        seed: { type: integer }
+        validationRatio: { type: number, minimum: 0, maximum: 0.5 }
+        dedupe: { type: boolean, default: true }
+        pairs:
+          type: object
+          description: "Templates over {content}, {key}, {lang}, {collection} and {meta.<name>}"
+          properties:
+            input: { type: string }
+            output: { type: string }
+            system: { type: string }
+        acknowledgeUnlicensed: { type: boolean }
+    TrainingRunRequest:
+      type: object
+      required: [profile]
+      properties:
+        name: { type: string }
+        profile: { type: string }
+        datasetId: { type: string }
+        dataset: { $ref: "#/components/schemas/TrainingDatasetRequest" }
+        parameters: { type: object, additionalProperties: true }
+        trial: { type: boolean }
+        evaluate: { type: boolean }
+        evaluateParameters: { type: object, additionalProperties: true }
+    TrainingEvalStage:
+      type: object
+      properties:
+        status: { type: string }
+        error: { type: string }
+        exitCode: { type: integer }
+        report:
+          type: object
+          properties:
+            total: { type: integer }
+            correct: { type: integer }
+            score: { type: number, minimum: 0, maximum: 1 }
+            metrics: { type: object, additionalProperties: { type: number } }
+            samples:
+              type: array
+              maxItems: 20
+              items:
+                type: object
+                properties:
+                  input: { type: string }
+                  expected: { type: string }
+                  actual: { type: string }
+                  correct: { type: boolean }
+    TrainingJob:
+      type: object
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [dataset, run] }
+        name: { type: string }
+        status: { type: string, enum: [pending, processing, completed, completedWithWarnings, failed, cancelled, interrupted] }
+        stage: { type: string, enum: [dataset, trial, evaluate-base, training, evaluate-result] }
+        profile: { type: string }
+        parameters: { type: object, additionalProperties: { type: string } }
+        datasetId: { type: string }
+        trial: { type: boolean }
+        progress: { type: number }
+        progressMessage: { type: string }
+        user: { type: string }
+        submittedAt: { type: integer }
+        startedAt: { type: integer }
+        completedAt: { type: integer }
+        exitCode: { type: integer }
+        error: { type: string }
+        warnings: { type: array, items: { type: string } }
+        result:
+          type: object
+          properties:
+            file: { type: string }
+            bytes: { type: integer }
+        outputPattern: { type: string }
+        summary:
+          type: object
+          properties:
+            format: { type: string }
+            records: { type: integer }
+            trainRecords: { type: integer }
+            validationRecords: { type: integer }
+            bytes: { type: integer }
+            unlicensedAcknowledged: { type: array, items: { type: string } }
+            collections:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  license: { type: string }
+                  documents: { type: integer }
+                  records: { type: integer }
+                  duplicates: { type: integer }
+                  skipped: { type: integer }
+            preview: { type: array, items: { type: object } }
+            options: { $ref: "#/components/schemas/TrainingDatasetRequest" }
+        evaluation:
+          type: object
+          properties:
+            skipped: { type: string }
+            base: { $ref: "#/components/schemas/TrainingEvalStage" }
+            result: { $ref: "#/components/schemas/TrainingEvalStage" }
+            delta: { type: number }
+            notes: { type: array, items: { type: string } }
+        format: { type: string }
+        validationRecords: { type: integer }
+    TrainingJobList:
+      type: object
+      properties:
+        jobs: { type: array, items: { $ref: "#/components/schemas/TrainingJob" } }
+        total: { type: integer }
+    TrainingJobAccepted:
+      type: object
+      properties:
+        jobId: { type: string }
+        job: { $ref: "#/components/schemas/TrainingJob" }
+    TrainingJobDetail:
+      type: object
+      properties:
+        job: { $ref: "#/components/schemas/TrainingJob" }
+        log: { type: string }
     ExtractedDocument:
       type: object
       description: One document /v1/extract/process made of a file (issue 451).

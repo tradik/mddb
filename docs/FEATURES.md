@@ -401,6 +401,13 @@ See [Cluster Guide](CLUSTER.md) for leader election and placement.
 - **Streaming** - Memory-efficient for large datasets
 - **Restore** - Restore from backup file
 
+### Model Training (module `modelTraining`, off by default)
+- **Training datasets** - One or several collections exported as JSON Lines: `text` (one record per document) or `pairs` (input and output from templates over the content and metadata), with filter, language, limit, seeded shuffle, validation split and exact-duplicate removal
+- **Licences** - Each record carries its collection's licence when known; collections without one need an explicit acknowledgement
+- **Operator's trainers** - Starts the trainer commands listed in `MDDB_TRAINERS_CONFIG` (no shell, checked parameter values, per-profile concurrency, timeout, cancel, durable job list, log and result download); MDDB itself trains nothing
+- **Trial run and evaluation** - A quick run on a small sample, and the operator's evaluate command scoring the model before and after
+- See [MODEL-TRAINING.md](MODEL-TRAINING.md) and the [step-by-step guide](MODEL-TRAINING-GUIDE.md)
+
 ### Database Maintenance
 - **Truncate Revisions** - Remove old revisions to save space
 - **Keep N Revisions** - Configurable retention policy
