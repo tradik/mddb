@@ -772,9 +772,9 @@ curl -X POST http://localhost:11023/v1/automation \
 
 | `sync` field | Default | Description |
 |---|---|---|
-| `source` | (required) | `sitemap`, `urls`, `s3` or `git` (2.19.5, see [Git repositories](#git-repositories)) |
+| `source` | (required) | `sitemap`, `urls`, `s3`, `git` (2.19.5, see [Git repositories](#git-repositories)) or `issues` (2.19.11, see [Issues and pull requests](#issues-and-pull-requests)) |
 | `collection`, `lang` | (required) | where the documents go |
-| `url` | | `sitemap`: a sitemap or sitemap index, plain or gzipped; `git`: the repository's https URL |
+| `url` | | `sitemap`: a sitemap or sitemap index, plain or gzipped; `git`, `issues`: the repository's https URL, or empty for [the repository of a collection](#the-repository-of-a-collection) |
 | `urls` | | `urls`: the pages |
 | `bucket` | `storageConfig.bucket` | `s3`: the bucket. It must exist: a sync only reads it and never creates it |
 | `prefix` | `storageConfig.prefix` | `s3`: the objects synced are the keys under it |
@@ -916,11 +916,12 @@ curl -X POST http://localhost:11023/v1/automation \
 
 | `sync` field (`git`) | Default | Description |
 |---|---|---|
-| `url` | (required) | the repository over https, no credentials or query in it: `https://github.com/owner/repo(.git)` |
+| `url` | the resolved repository | the repository over https, no credentials or query in it: `https://github.com/owner/repo(.git)`; may be left to [the repository of a collection](#the-repository-of-a-collection) (2.19.11) |
+| `repositoryFrom` | the rule's collection | (2.19.11) the collection whose `repository` a rule without `url` reads |
 | `ref` | the default branch | a branch (`main`), a tag (`v1.2.0`), a full ref (`refs/heads/main`), a commit id, or `latest-release`: the forge's latest release, else the highest `v1.2.3` / `1.2.3` tag (pre-releases left out) |
 | `include`, `exclude` | every file / none | globs over repository-relative paths, exactly as `mddb-cli autoindex --include/--exclude`: a glob matches the path or the file name, `dir/**` everything under `dir` |
 | `forge` | known by host | `github` (GitHub Enterprise Server), `gitlab`, `gitea` or `forgejo` — needed for any host but github.com, gitlab.com and codeberg.org; an unknown host without it is refused with the list of what is supported |
-| `tokenSecretRef` | | a stored secret holding the token of a private repository |
+| `tokenSecretRef` | the resolved one | a stored secret holding the token of a private repository; without it, the collection's or the host's default (2.19.11) |
 | `hookSecretRef` | | a stored secret that `POST /v1/automation/{id}/hook` verifies webhooks with; empty: no hook |
 | `adopt` | `false` | take over documents with the same key that no sync wrote — a collection seeded by `mddb-cli autoindex` |
 
@@ -1002,6 +1003,191 @@ the secret's value and content type `application/json`.
 `token_secret_ref`, `hook_secret_ref`, `adopt`) and
 `AutomationRunResultProto` 10–13 (`ref`, `commit`, `commit_url`,
 `up_to_date`); over MCP the same names in the `sync` object.
+
+#### Issues and pull requests
+
+Since 2.19.11 (INT-023) a sync can mirror a forge repository's issues and
+pull requests (GitLab: merge requests) into a collection, read-only: one
+document per item, refreshed on a schedule, by the forge's webhook and on
+demand. mddbd never writes to the forge; create, comment and close there.
+[Work Tracking for Agents](WORK-TRACKING.md) shows how an agent uses it.
+
+```bash
+curl -X POST http://localhost:11023/v1/automation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "cron", "name": "shop-api issues", "schedule": "*/15 * * * *", "enabled": true,
+    "sync": {
+      "source": "issues", "repositoryFrom": "shop-api",
+      "collection": "shop-api-issues", "lang": "en",
+      "state": "all", "include": ["issues", "pulls"], "comments": true,
+      "hookSecretRef": "forge-hook"
+    }
+  }'
+```
+
+| `sync` field (`issues`) | Default | Description |
+|---|---|---|
+| `url` | the resolved repository | the repository over https, as for `git`; may be left to a collection's repository (below) |
+| `repositoryFrom` | the rule's collection | the collection whose `repository` a rule without `url` reads |
+| `forge` | known by host | as for `git`: `github`, `gitlab`, `gitea` or `forgejo` for a host other than github.com, gitlab.com and codeberg.org |
+| `state` | `all` | `open`, `closed` or `all` |
+| `since` | none | only items updated on or after it: `2026-01-02` or an RFC 3339 time |
+| `include` | `["issues"]` | `issues`, `pulls` or both |
+| `comments` | `true` | append each comment to its item's document |
+| `tokenSecretRef`, `hookSecretRef` | | stored secrets, as for `git`; a public repository needs no token |
+| `prune` | `false` | delete the documents of items the forge no longer lists |
+
+**One document per item.** Key `issue-<number>` or `pull-<number>`
+(GitLab numbers issues and merge requests apart, so both can exist). The
+content is Markdown: `# <title>`, the body, then one `## Comment by
+<login> on <YYYY-MM-DD>` section per comment, oldest first, so a passage
+points at the comment that matched; GitLab's system notes are left out.
+Meta, flat for filters and aggregations: `title`, `number`, `kind`
+(`issue` or `pull`), `state` (`open` or `closed`), `stateReason`
+(`merged` for a merged pull request, else what GitHub sends:
+`completed`, `not_planned`), `labels`, `assignees`, `author`,
+`milestone`, `createdAt`, `updatedAt`, `closedAt` (RFC 3339, UTC),
+`comments` (the forge's count), `url`, `linkedIssues` (numbers written
+`#123`, and links to the repository's issues), `linkedPulls` (links to
+its pull or merge requests, and GitLab's `!123`; on GitHub and Gitea, which
+number both alike, a `#123` may be either and is listed in
+`linkedIssues`), `paths` (file paths the text names — a path with a
+directory and an extension, or a file name whose extension the code index
+knows — at most 50), and `syncRule`, `syncSource` (the item's page),
+`syncHash`, `syncEtag` as for every source.
+
+**Incremental.** The forge is asked for the items updated since the
+newest one the last successful run of the unchanged rule read — a second
+earlier, so an item changed in that second is not missed — oldest change
+first (GitHub `GET /repos/{o}/{r}/issues?since=…&sort=updated`, GitLab
+`/projects/:id/issues` and `/merge_requests?updated_after=…`, Gitea and
+Forgejo `/repos/{o}/{r}/issues?since=…`), following the `Link` header's
+`next` pages. Each listing page is sent back with the ETag the last run got
+for it: an unchanged page answers `304` and lists nothing, so a run with
+nothing new costs one request per page and writes nothing. An item whose
+`updatedAt` is the one its document was written from is not fetched again;
+any other is written with its comments (one more request per page of
+comments). The cursor and the pages' ETags are kept in the run's automation
+log entry (`sync.cursor`, `sync.pages`); a rule changed since, or a log
+entry gone with `MDDB_AUTOMATION_LOGS_TTL`, lists everything again — which
+writes only what differs.
+
+**Bounds.** A run reads at most `maxDocuments` items. On GitHub and GitLab,
+which list the oldest change first, the next run goes on where it stopped;
+on Gitea and Forgejo, which list in an order of their own, a cut listing is
+reported as an error, as for every source: raise `maxDocuments`.
+
+**Prune.** Off by default: an item the forge no longer has (deleted, or
+transferred to another repository) keeps its document. With `prune: true`
+every run lists every item — a deletion only shows as an item no longer
+listed — without conditional requests, and the documents of items not
+listed are deleted, with the guards every source has: a listing that is
+cut, empty, or met the rate limit deletes nothing. `state: "open"` with
+`prune` mirrors the open items only: a closed one is deleted.
+
+**Rate limit.** A `429`, or a `403` that says no requests remain
+(`X-RateLimit-Remaining: 0`, `RateLimit-Remaining: 0` or `Retry-After`),
+ends the run with `status: error` and a message that says when the limit
+resets (from `Retry-After`, `X-RateLimit-Reset` or `RateLimit-Reset`);
+nothing is deleted and the next run starts from the same cursor. Another
+`401` or `403` says the token cannot read the repository's issues.
+
+**Webhook.** Point the forge's webhook at `POST /v1/automation/{id}/hook`,
+verified exactly as for `git`, with the events for issues, issue comments
+and pull requests (GitHub and Gitea: `issues`, `issue_comment`,
+`pull_request`; GitLab: Issue, Note and Merge Request events). An event
+about one item refreshes that one document — one request for the item and
+one per page of its comments — and answers `200` with `{ruleId, key,
+status, added, updated, unchanged, deleted}` (`status: "error"` and
+`error` when the forge refused); `409` while a run of the rule is going.
+A refreshed item is rebuilt even when its `updatedAt` did not move: an
+edited comment does not always move it. An event that names no item (a
+push) runs an incremental pass, as for `git`.
+
+**On demand.** `POST /v1/sync/refresh` with `{"collection": "...",
+"number": 123}` refreshes item 123 of every issues rule writing to the
+collection, at once, and answers what it did; without `number` it starts
+an incremental run of every sync rule writing to it (`status: "started"`
+and the `jobId`). Each rule is refreshed at most once every 30 s; a rule
+refreshed sooner answers `status: "throttled"` with `retryAfter`, and when
+every rule is throttled the answer is `429` with `Retry-After`. Each run
+in the answer carries `lastRunAt`, the start of the rule's last run before
+this one. `404` when no sync rule writes to the collection. It is gated as
+a write of the collection, not as administration, so a user with write
+permission on the collection, or an MCP key limited to it, may call it;
+it never runs a rule writing elsewhere. Over MCP it is `sync_refresh`
+(toolset `ingest`).
+
+```bash
+curl -X POST http://localhost:11023/v1/sync/refresh -d '{"collection": "shop-api-issues", "number": 31}'
+# {"collection":"shop-api-issues","number":31,"runs":[{"ruleId":"3f9c2a1b7d4e5f60","status":"done",
+#  "lastRunAt":1795400000,"added":0,"updated":1,"unchanged":0,"deleted":0,"failed":0}]}
+```
+
+Over gRPC the fields are `SyncActionProto` 19–22 (`state`, `since`,
+`comments`, `repository_from`) and `include` (13) holds the kinds; over MCP
+the same names in the `sync` object.
+
+#### The repository of a collection
+
+Since 2.19.11 (INT-023) a collection can carry the repository it is read
+from, so the link and the token are set once — on the code collection —
+and every `git` or `issues` rule reading that repository leaves `url` and
+`tokenSecretRef` empty:
+
+```bash
+curl -X PUT http://localhost:11023/v1/collection-config -d '{
+  "collection": "shop-api",
+  "repository": {"url": "https://github.com/acme/shop-api", "tokenSecretRef": "forge-token"}
+}'
+```
+
+`repository` takes `url` (an https repository URL a sync could read, as
+for `git`), `forge` (for a host not known by name) and `tokenSecretRef` (a
+stored secret's name — never a token). A config write that does not name
+`repository` keeps the stored one; `"repository": {}` removes it. A secret
+it names must exist and cannot be deleted while it does (`409`, `usedBy:
+["collection:<name>"]`). Over gRPC it is `CollectionConfigProto.repository`
+(25) and `SetCollectionConfigRequest.repository` (24),
+`CollectionRepositoryProto`.
+
+**Where a rule's repository comes from** (`git` and `issues`):
+
+| | Taken from, first that is set |
+|---|---|
+| url, forge | the rule's `url` (and `forge`) → the `repository` of the collection `repositoryFrom` names → the `repository` of the rule's own collection |
+| token | the rule's `tokenSecretRef` → the `tokenSecretRef` of the collection the url came from → the default forge token of the url's host |
+
+A rule with no url anywhere is refused when it is saved, with a message
+that says where to set one, and a run whose repository has since been
+removed fails with the same message. The resolution is made at every run,
+so changing the collection's repository changes what its rules read. A rule
+with its own `url` and `tokenSecretRef` behaves exactly as before 2.19.11.
+
+**Default forge tokens.** A server-wide map from a host to a stored secret,
+for the repositories whose rule and collection name no token:
+
+```bash
+curl -X PUT http://localhost:11023/v1/forge-tokens -d '{"defaults": {"github.com": "github-token"}}'
+curl http://localhost:11023/v1/forge-tokens     # {"defaults":{"github.com":"github-token"}}
+```
+
+A `PUT` replaces the whole map; a host is a lower-case host name with an
+optional port (`git.example.com:8443`), and every secret must exist. Both
+calls are administration. The map is kept with the stored secrets (backed
+up and replicated with them), and a secret it names cannot be deleted
+(`409`, `usedBy: ["default:<host>"]`).
+
+**A token stays on its host.** A token is sent only to the forge of the
+url it was resolved for: a default is used only when the repository URL's
+host equals the registered host exactly (lower case, port included —
+`github.com` does not match `gitlab.com`, `github.com.evil.example` or
+`api.github.com`), and a collection's token only with that collection's
+url. On the wire a request carries the token only when it goes to the
+repository's own host or, for github.com, to `api.github.com` and
+`codeload.github.com`, where github.com serves its API and archives; a
+redirect to any other host drops the `Authorization` header.
 
 ---
 
