@@ -60,7 +60,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
 | `MDDB_METRICS_PUBLIC` | `"false"` | bool | With `MDDB_AUTH_ENABLED=true`, serve `/metrics` without credentials (SEC-009). No effect when auth is off ([TELEMETRY.md](TELEMETRY.md)) |
 | `MDDB_SEARCH_STATS` | `"true"` | bool | Include `searchStats` in search responses |
-| `MDDB_FEATURES_FORCE_OFF` | `""` | list | Optional modules kept off whatever the panel says (v2.19.0, GO-049), comma-separated, e.g. `geo,chat`: `chat`, `chatExternalMcp`, `geo`, `temporal`, `spell`, `curation`, `automation`, `memory`, `codeIntel`, `eval`, `corpus`, `classify`, `duplicates`, `images`, `webhooks`, `schemas`, `aliases`, `crossSearch`, `searchTuning`, `ftsTuning`, `webSearch`, `rerankApi`, `extractApi`, `vectorStores`, `esCompat`, `qdrantCompat`. Such a module is shown as locked and `PUT /v1/features/{name}` answers `409`. Unknown names are ignored. See [API.md](API.md#features-v1features) |
+| `MDDB_FEATURES_FORCE_OFF` | `""` | list | Optional modules kept off whatever the panel says (v2.19.0, GO-049), comma-separated, e.g. `geo,chat`: `chat`, `chatExternalMcp`, `geo`, `temporal`, `spell`, `curation`, `automation`, `memory`, `codeIntel`, `eval`, `corpus`, `classify`, `duplicates`, `images`, `webhooks`, `schemas`, `aliases`, `crossSearch`, `searchTuning`, `ftsTuning`, `webSearch`, `rerankApi`, `extractApi`, `vectorStores`, `esCompat`, `qdrantCompat`, `modelTraining`. Such a module is shown as locked and `PUT /v1/features/{name}` answers `409`. Unknown names are ignored. See [API.md](API.md#features-v1features) |
 
 ---
 
@@ -114,6 +114,8 @@ Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is s
 | `MDDB_MCP_DOMAIN` | `""` | string | — | MCP server domain |
 | `MDDB_MCP_PUBLIC_URL` | `""` | string | — | Base URL clients dial behind a proxy or tunnel, without `/mcp` (v2.19.9): an absolute `http`/`https` URL, trailing slash and a trailing `/mcp` removed, other values ignored. Reported as `protocols.mcp.publicUrl` in `GET /v1/config`; unset, the OAuth issuer is reported while OAuth runs |
 | `MDDB_MCP_CONFIG` | `""` | string | — | Path to YAML with custom MCP tool definitions |
+| `MDDB_TRAINERS_CONFIG` | `""` | string | — | Path to the trainer profile file (YAML or JSON) of the `modelTraining` module (v2.19.11): the commands a run may start, their fixed arguments, declared parameters, timeouts and environment allowlist. Read at startup; unset, datasets can still be built and a run answers `409`. See [MODEL-TRAINING.md](MODEL-TRAINING.md) |
+| `MDDB_TRAINING_DIR` | `training` beside the database | string | — | Where training jobs keep their directories: datasets, trial cuts, results, evaluation reports and logs (v2.19.11) |
 | `MDDB_MCP_BUILTIN_TOOLS` | `true` | bool | — | Set to `false` to expose only custom YAML tools |
 | `MDDB_MCP_TOOLSETS` | `all` | list | `search`, `code`, `documents`, `ingest`, `memory`, `schema`, `admin`, `geo`, `automation`, `webhooks`, `wordpress`, `all` | Built-in tool groups to expose (v2.18.8, MCP-003); tools outside them are neither listed nor callable |
 | `MDDB_MCP_MODE` | `"wr"` | string | — | MCP access mode: `"read"`, `"write"`, or `"wr"` |

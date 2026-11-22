@@ -649,6 +649,38 @@ full-text and vector search, auth and backups are always on and not listed.
   (a server without `/v1/features`, a network error), every module counts as
   on, so the panel behaves as it did before.
 
+### Model Training (2.19.11)
+
+**Data → Model Training**, shown while the `modelTraining` module is on and
+for administrators. The page says what the module does and does not do,
+whether it is on and which trainers the server's operator configured (and
+any profile the server refused), with a link to the
+[step-by-step guide](MODEL-TRAINING-GUIDE.md).
+
+- **Build a dataset**: **Collections** (several at once), **Format** (*Pairs*,
+  the default, or *Text*), for pairs **Input**, **Output** and **System
+  text** templates over `{content}`, `{key}`, `{lang}`, `{collection}` and
+  `{meta.name}`, a metadata filter (**Metadata key**, **Value**),
+  **Language**, **Most records**, **Validation share** (one tenth for pairs
+  by default), **Shuffle** with a **Shuffle seed**, **Remove exact
+  duplicates**, and the licence acknowledgement. Each dataset then shows its
+  records and split, what each collection gave under which licence, its
+  first records, and **Training part** / **Validation part** downloads.
+- **Start a run**: **Trainer**, **Dataset**, **Name**, and the parameters the
+  profile declares as fields of their type (numbers with the profile's
+  minimum and maximum, a list for an enum, a switch for a yes/no). **Start**
+  runs it; **Trial run** runs it on a small sample with the trainer's trial
+  settings first. A checkbox chooses whether the model is scored before and
+  after.
+- **Runs**: status, stage, progress, exit code, the end of the log, the
+  before/after scores with their difference, metrics and sample rows (a
+  warning when the tuned score is not higher), and **Cancel**, the result's
+  download, **Evaluate again** and delete. The page reads a running job every
+  two seconds.
+
+No command, path or environment variable can be set on this page: trainers
+are configured on the server only ([MODEL-TRAINING.md](MODEL-TRAINING.md)).
+
 ### Tenants: quotas, request limits and usage (2.19.8)
 
 "Tenants" in the menu's Security group shows what each tenant uses and what
