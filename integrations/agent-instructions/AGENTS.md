@@ -147,6 +147,36 @@ the calls:
 
 Record decisions and constraints, not transcripts.
 
+## Work tracking
+
+A project may keep its backlog, release plans and progress notes in a
+`<repo>-work` collection and a read-only mirror of its issues in
+`<repo>-issues` (docs/WORK-TRACKING.md). When they exist, ask them instead of
+reading plan files or the forge.
+
+1. **Start.** One call for the next row: `mddb-cli plan next` takes the first
+   todo row and marks it doing, so a parallel session gets another one.
+   Without a shell, `search_documents` on `<repo>-work` with
+   `filter: {"kind": "backlog", "status": "todo"}`, `include_content: false`
+   and a small limit; take the lowest `meta.order` and mark it doing with
+   `update_document` and its revision as `expected_revision` (a conflict
+   means another session took it). Then `memory_recall` with the task as the
+   query and `limit: 3`.
+2. **Issues.** `search_documents` on `<repo>-issues` with a `filter` on
+   `state`, `labels`, `paths` or `number`; `hybrid_search` with
+   `format: "passages"` for words in the discussion. After changing an issue
+   on the forge, call `sync_refresh` with the collection and the number
+   before reading it again.
+3. **The forge stays the forge.** Create, comment on and close issues and
+   pull requests through the forge's own tools; the mirror is never written.
+4. **End.** `mddb-cli plan done <slug> --commit <sha> --note "..."` marks
+   the row done and writes the progress note: what was done, what is left,
+   what not to do. Then `memory_summarize` and one `memory_add_message` with
+   the same hand-over.
+
+Store summaries, never transcripts: a transcript holds tool output, which
+can include secrets, and costs more to write than it saves to read.
+
 ## Writing
 
 - To delete, retag or expire many documents, use `delete_where`,
