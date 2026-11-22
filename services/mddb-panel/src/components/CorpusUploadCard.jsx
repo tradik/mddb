@@ -69,7 +69,7 @@ export default function CorpusUploadCard({ onInstalled }) {
     await onInstalled();
   });
 
-  const ready = inspected && inspected.conflicts.length === 0;
+  const ready = inspected?.conflicts.length === 0;
   return (
     <section aria-labelledby="corpus-upload" className="bg-surface rounded-lg shadow p-4 sm:p-6 space-y-3">
       <h3 id="corpus-upload" className="flex items-center gap-2 text-lg font-semibold text-fg">
@@ -87,7 +87,7 @@ export default function CorpusUploadCard({ onInstalled }) {
         <Upload className="w-4 h-4 mr-1.5" aria-hidden="true" />
         {busy && file ? 'Working…' : 'Install'}
       </button>
-      {busy && file && <p role="status" className="text-sm text-fg-muted">Reading and checking the pack… a large pack takes a while.</p>}
+      {busy && file && <output className="block text-sm text-fg-muted">Reading and checking the pack… a large pack takes a while.</output>}
     </section>
   );
 }

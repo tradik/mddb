@@ -5,6 +5,13 @@ import { hintClass } from './training-styles';
 /** A metric's value, or a dash when that side has none. */
 const metric = (v) => (typeof v === 'number' ? v.toFixed(3) : '–');
 
+/** The difference in points, with its sign, or a dash when there is none. */
+function deltaText(delta) {
+  if (delta === null) return '–';
+  const sign = delta > 0 ? '+' : '';
+  return `${sign}${(delta * 100).toFixed(1)} pts`;
+}
+
 /**
  * The before/after of a run: the base model's score, the tuned model's, the
  * difference and the named metrics, with a few scored records. All of it is
@@ -28,7 +35,7 @@ export default function TrainingEvaluation({ evaluation }) {
         </div>
         <div className="rounded bg-surface-muted p-2">
           <div className={hintClass}>Difference</div>
-          <div className="text-lg font-semibold text-fg">{view.delta === null ? '–' : `${view.delta > 0 ? '+' : ''}${(view.delta * 100).toFixed(1)} pts`}</div>
+          <div className="text-lg font-semibold text-fg">{deltaText(view.delta)}</div>
         </div>
       </div>
       {[...view.notes, ...view.errors].map((n) => (

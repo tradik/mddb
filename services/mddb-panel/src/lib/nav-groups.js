@@ -15,8 +15,8 @@ import {
   Server, Settings, Network, Users, UsersIcon, Sliders, GitBranch, BookOpen, Ban, Zap, Globe, Shuffle,
   Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2,
   MessageSquare, ToggleRight, Brain, Database, MessagesSquare, FileCheck, Import, CopyX, UserRound, Building2, Package, GraduationCap,
+  Archive, Wrench,
 } from 'lucide-react';
-import { Archive, Wrench } from 'lucide-react';
 import { isViewEnabled } from './features';
 
 export const NAV_GROUPS = [

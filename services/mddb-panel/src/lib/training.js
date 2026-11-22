@@ -128,7 +128,7 @@ export function evaluationView(evaluation) {
   if (!evaluation) return null;
   const before = evaluation.base?.report || null;
   const after = evaluation.result?.report || null;
-  const names = [...new Set([...Object.keys(before?.metrics || {}), ...Object.keys(after?.metrics || {})])].sort();
+  const names = [...new Set([...Object.keys(before?.metrics || {}), ...Object.keys(after?.metrics || {})])].sort((a, b) => a.localeCompare(b));
   return {
     skipped: evaluation.skipped || '',
     before,

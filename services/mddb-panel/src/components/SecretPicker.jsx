@@ -78,7 +78,7 @@ function PasteSecret({ name, encryptionReady, onSaved }) {
       <legend className="px-1 text-xs text-fg-subtle">Paste a token for {name}</legend>
       <Text name="New secret name" value={key} onChange={setKey} placeholder="forge-token" />
       <label className="block text-xs text-fg-subtle">
-        Token value
+        <span>Token value</span>
         <input type="password" autoComplete="new-password" value={token} onChange={(e) => setToken(e.target.value)} className={field} />
       </label>
       <button

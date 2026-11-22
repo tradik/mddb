@@ -15,7 +15,7 @@ export function backupRules(data) {
 
 /** The last part of a path or key: what a person calls the backup. */
 export function fileName(where = '') {
-  return where.split('/').filter(Boolean).at(-1) || where;
+  return where.split('/').findLast(Boolean) || where;
 }
 
 /**

@@ -47,10 +47,15 @@ describe('CorpusBuildForm', () => {
     type('Licence of docs', 'MIT');
     fireEvent.click(screen.getByRole('button', { name: 'Add a source' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add a source' }));
-    type('Source 1 address', 'https://example.org/r');
+    type('Source 1 address', 'https://example.org/old');
+    type('Source 2 address', 'https://example.org/r');
+    // Removing the first row keeps what the second holds: rows are keyed by
+    // an id of their own, not by their place.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove source 1' }));
+    expect(screen.getByLabelText('Source 1 address').value).toBe('https://example.org/r');
+    expect(screen.queryByLabelText('Source 2 address')).toBeNull();
     type('Source 1 version or commit', 'v2');
     type('Source 1 licence', 'Apache-2.0');
-    fireEvent.click(screen.getByRole('button', { name: 'Remove source 2' }));
     fireEvent.click(submit());
     await waitFor(() => expect(saveBlob).toHaveBeenCalledWith(file, 'kb.mddbpack'));
     expect(mddbClient.buildCorpus).toHaveBeenCalledWith({
