@@ -99,6 +99,22 @@ func TestCorpusMemberNames(t *testing.T) {
 	}
 }
 
+// The install checks names before it attaches; attaching over data anyway
+// (a write in between) is refused and puts the earlier config back.
+func TestAttachCorpusOverDataKeepsTheConfig(t *testing.T) {
+	t.Setenv("MDDB_STORAGE_LAYOUT", "single")
+	s := corpusServer(t, 256)
+	seedCorpus(t, s)
+	_ = s.CollectionManager.Set("docs", &CollectionConfig{Description: "kept"})
+	m := validManifest()
+	if err := s.attachCorpus(m, m.parts()[0], "unused", false); !errors.Is(err, errCorpusConflict) {
+		t.Fatalf("err = %v", err)
+	}
+	if cfg, _ := s.CollectionManager.Get("docs"); cfg.Description != "kept" || cfg.ReadOnly {
+		t.Fatalf("config after the refused attach: %+v", cfg)
+	}
+}
+
 func TestCorpusBuildFromProtoCollections(t *testing.T) {
 	req := corpusBuildFromProto(&proto.BuildCorpusPackRequest{Name: "kb", License: "MIT",
 		Sources: []*proto.CorpusSourceProto{{Repo: "r", License: "MIT"}},
