@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Compatibility floor (VERSIONING.md):** MDDB keeps compatibility with every release from 2.19.0 onward. Behaviour kept only for releases before 2.19.0 may change in a minor release, is kept where that is cheap and safe, and each such change is listed here. Databases from older releases still open, and a security fix may change behaviour of any age.
 - **A key limited to collections no longer reaches the memory collections with the document tools**, even when they were listed in its `collections`: its memory is its namespace.
 - **Scenario-bound keys** now list and may call `memory_recall`, `memory_list_sessions` and `memory_session_history`, inside their own namespace.
 

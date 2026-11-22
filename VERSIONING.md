@@ -81,6 +81,29 @@ every database, configuration and API call from 2.18.x works unchanged; the
 change is announced in the CHANGELOG under Upgrading and in
 [LICENSING.md](LICENSING.md).
 
+## The compatibility floor: 2.19.0
+
+MDDB keeps compatibility with every release from **2.19.0** onward. What
+worked in 2.19.0 or later keeps working in later 2.x releases: an API call
+and the shape of its answer, a configuration key or environment variable, a
+stored database, a corpus pack, an MCP tool and its arguments, and the
+client libraries' calls. New things are added beside the old ones; when
+something from that range has to change, the deprecation rule above applies
+and the CHANGELOG says what changes and what replaces it.
+
+Behaviour that exists only for releases **before 2.19.0** — an old request
+shape still accepted, an old default kept, a fallback for a format no
+supported release writes — may be changed or removed in a minor release. It
+is kept anyway where that costs little and does not weaken security, and
+each removal is listed under *Changed* or *Removed* in the CHANGELOG.
+
+Two things sit outside this rule:
+
+- **Databases.** A database written by an older release still opens; the
+  upgrade fixtures in `test/upgrade-fixtures/` are checked on every run.
+- **Security.** A fix that closes a hole may change behaviour in any
+  release, however old the behaviour is. The CHANGELOG says so plainly.
+
 ## Bumping the version
 
 ```bash
