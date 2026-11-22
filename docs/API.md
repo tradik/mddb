@@ -3645,6 +3645,16 @@ curl "http://localhost:11023/v1/collection-config?collection=blog"
 
 Also supports **PUT** to set config and **DELETE** to remove config for a collection.
 
+##### Repository (v2.19.11)
+
+`repository: {"url": "https://github.com/acme/shop-api", "forge": "", "tokenSecretRef": "forge-token"}`
+is the forge repository the collection is read from: a `git` or `issues`
+sync without its own `url` reads it, and its token (a stored secret's
+name, never a value). A `PUT` that does not name `repository` keeps the
+stored one; `"repository": {}` removes it. `400` for a URL a sync could not
+read or a secret that does not exist. See
+[AUTOMATIONS.md](AUTOMATIONS.md#the-repository-of-a-collection).
+
 ##### Quota usage (v2.18.10)
 
 A collection with a [quota](#quotas-v2189) also gets `usage`: what it uses of each
@@ -4975,7 +4985,26 @@ too), `X-Gitea-Signature` / `X-Forgejo-Signature: <hex>`, or
 `{"status":"pong"}` for GitHub's `X-GitHub-Event: ping`, `401` for a
 missing or wrong signature, `404` for an id without a hook, `409` while
 the previous run is going, `413` for a body over 25 MB, `503` when the
-secret cannot be opened or no cron scheduler runs.
+secret cannot be opened or no cron scheduler runs. For an `issues` sync
+(2.19.11) an event about an issue, a comment or a pull request refreshes
+that one document and answers `200` with what it did
+([AUTOMATIONS.md](AUTOMATIONS.md#issues-and-pull-requests)).
+
+**POST /v1/sync/refresh** (2.19.11) — `{"collection": "...", "number": 123}`:
+refresh item 123 of each issues sync writing to the collection now, or,
+without `number`, start an incremental run of each sync rule writing to
+it. Permission: `write` on the collection (an MCP key limited to it may
+call it; MCP tool `sync_refresh`). At most once every 30 s per rule: `200`
+with `runs` (each `done`, `started`, `throttled`, `running` or `error`,
+with `lastRunAt`), `429` with `Retry-After` when every rule was refreshed
+too recently, `404` when no sync rule writes to the collection. See
+[AUTOMATIONS.md](AUTOMATIONS.md#issues-and-pull-requests).
+
+**GET/PUT /v1/forge-tokens** (2.19.11) — the default forge tokens,
+`{"defaults": {"github.com": "github-token"}}`: host → the stored secret a
+`git` or `issues` sync on that host reads with when neither its rule nor
+its collection's repository names one. A `PUT` replaces the map. Global
+admin. See [AUTOMATIONS.md](AUTOMATIONS.md#the-repository-of-a-collection).
 
 **POST /v1/automation/:id/test** — Test a trigger rule:
 ```json

@@ -28,32 +28,53 @@ refresh the mirror.
 
 ## 1. Mirror the issues
 
-Store a token that can read issues as a secret, then add a sync rule
-([Automations](AUTOMATIONS.md#synced-sources)):
+Store a token that can read issues as a secret
+(`PUT /v1/chat/mcp-secrets/forge-token` with `{"value": "..."}`), then give
+the code collection its repository — once, for every rule that reads it
+([the repository of a collection](AUTOMATIONS.md#the-repository-of-a-collection)):
+
+```bash
+curl -X PUT http://localhost:11023/v1/collection-config -d '{
+  "collection": "shop-api",
+  "repository": {"url": "https://github.com/acme/shop-api", "tokenSecretRef": "forge-token"}
+}'
+```
+
+and add a sync rule that writes next to it and takes the repository from it
+([Automations](AUTOMATIONS.md#issues-and-pull-requests)):
 
 ```bash
 curl -X POST http://localhost:11023/v1/automation -d '{
   "type": "cron", "name": "shop-api issues", "schedule": "*/15 * * * *", "enabled": true,
   "sync": {
-    "source": "issues",
-    "url": "https://github.com/acme/shop-api",
+    "source": "issues", "repositoryFrom": "shop-api",
     "collection": "shop-api-issues", "lang": "en",
     "state": "all", "include": ["issues", "pulls"], "comments": true,
-    "tokenSecretRef": "forge-token", "hookSecretRef": "forge-hook"
+    "hookSecretRef": "forge-hook"
   }
 }'
 ```
 
+The panel does both: *Collection settings → Repository* holds the link and
+the token (a stored secret picked by name, or a token pasted once and stored
+as one), and its *Create issues sync* button adds this rule for
+`<collection>-issues`. A rule may also name everything itself — `"url":
+"https://github.com/acme/shop-api", "tokenSecretRef": "forge-token"` — and
+a server-wide default token per host (`PUT /v1/forge-tokens`, *Automations →
+Forge tokens* in the panel) serves the repositories that name none. A token
+is only ever sent to the forge of the URL it was resolved for.
+
 | `sync` field (`issues`) | Default | Description |
 |---|---|---|
-| `url` | (required) | the repository over https, as for `git` |
+| `url` | the collection's repository | the repository over https, as for `git` |
+| `repositoryFrom` | the rule's collection | the collection whose repository a rule without `url` reads |
 | `forge` | known by host | `github`, `gitlab`, `gitea` or `forgejo`, for a host that is not recognised |
 | `state` | `all` | `open`, `closed` or `all` |
 | `since` | none | only items updated on or after this date |
 | `include` | `["issues"]` | `issues`, `pulls` or both |
 | `comments` | `true` | append each comment to its item's document |
-| `tokenSecretRef`, `hookSecretRef` | | stored secrets, as for `git`; a public repository needs no token |
-| `prune` | `false` | delete the documents of items that no longer exist; only on a full listing |
+| `tokenSecretRef`, `hookSecretRef` | the repository's, then the host's default | stored secrets, as for `git`; a public repository needs no token |
+| `prune` | `false` | delete the documents of items that no longer exist; a rule with prune lists everything on every run |
 
 **One document per item.** Key `issue-<number>` or `pull-<number>`. The
 content is Markdown: the title as a heading, the body, then one section per
@@ -67,7 +88,9 @@ in the code collection.
 **Runs are incremental.** A run asks the forge for the items updated since
 the last one and sends conditional requests; nothing changed means nothing
 written. When the forge's rate limit is reached the run ends with an error
-that says when the limit resets, and deletes nothing.
+that says when the limit resets, and deletes nothing. A rule with `prune`
+lists every item on every run instead, since a deleted item only shows as
+one no longer listed.
 
 **Three ways to refresh:**
 
@@ -76,9 +99,11 @@ that says when the limit resets, and deletes nothing.
   events for issues, issue comments and pull requests: one event refreshes
   one document;
 - on demand: `sync_refresh` over MCP (`POST /v1/sync/refresh`) with the
-  collection and, optionally, a number. A key limited to the collection may
-  call it, at most once every 30 s per rule. `run_automation` remains an
-  administration tool.
+  collection and, optionally, a number: with a number it re-reads that item
+  at once, without it starts an incremental run. A key limited to the
+  collection may call it (it is a write of the collection, so not a
+  read-only key), at most once every 30 s per rule, and the answer says when
+  each rule last ran. `run_automation` remains an administration tool.
 
 ## 2. Ask the mirror instead of the forge
 
