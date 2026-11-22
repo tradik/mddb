@@ -14,7 +14,7 @@
 import {
   Server, Settings, Network, Users, UsersIcon, Sliders, GitBranch, BookOpen, Ban, Zap, Globe, Shuffle,
   Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2,
-  MessageSquare, ToggleRight, Brain, Database, MessagesSquare, FileCheck, Import, CopyX, UserRound, Building2,
+  MessageSquare, ToggleRight, Brain, Database, MessagesSquare, FileCheck, Import, CopyX, UserRound, Building2, Package,
 } from 'lucide-react';
 import { isViewEnabled } from './features';
 
@@ -23,6 +23,7 @@ export const NAV_GROUPS = [
     // Right under the sidebar's collection list: what acts on collections.
     id: 'data', label: 'Collections', items: [
       // Corpus packs, then Model training, go first in this group.
+      { mode: 'corpus', icon: Package, label: 'Corpus Packs' },
       { mode: 'import', icon: Import, label: 'Import' },
       { mode: 'aliases', icon: Link2, label: 'Collection Aliases' },
       { mode: 'schemas', icon: FileCheck, label: 'Collection Schemas' },

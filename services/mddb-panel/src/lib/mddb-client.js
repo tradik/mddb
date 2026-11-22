@@ -88,6 +88,9 @@ export function dispositionFilename(header) {
   return match ? match[1] : null;
 }
 
+/** How much of a pack file inspectCorpus sends: the manifest is in its first megabytes. */
+export const CORPUS_INSPECT_BYTES = 4 * 1024 * 1024;
+
 class MDDBClient {
   constructor(baseUrl = API_BASE) {
     this.baseUrl = baseUrl;
@@ -1284,14 +1287,25 @@ class MDDBClient {
     return this.request('/corpus', { method: 'GET' });
   }
 
-  /** Installs a `.mddbpack` file as a read-only collection (admin on "*"). */
+  /** Installs a `.mddbpack` file: its collections, read-only (admin on "*"). */
   async installCorpus(file, { signal } = {}) {
     const formData = new FormData();
     formData.append('pack', file);
     return this.postForm('/corpus/install', formData, { signal });
   }
 
-  /** Removes an installed pack and its collection (admin on "*"). */
+  /**
+   * What a pack file holds, before it is installed: `{ manifest, conflicts }`
+   * (FE-022, admin on "*"). Only the file's first megabytes are sent — the
+   * manifest comes first in a pack.
+   */
+  async inspectCorpus(file, { signal } = {}) {
+    const formData = new FormData();
+    formData.append('pack', file.slice(0, CORPUS_INSPECT_BYTES), file.name);
+    return this.postForm('/corpus/inspect', formData, { signal });
+  }
+
+  /** Removes an installed pack and its collections (admin on "*"). */
   async removeCorpus(name) {
     return this.request('/corpus/remove', {
       method: 'POST',
@@ -1300,13 +1314,12 @@ class MDDBClient {
   }
 
   /**
-   * Builds a pack of a collection and returns it as `{ blob, filename }`.
-   * The server refuses a pack without a licence.
+   * Builds a pack of a collection — or of several: `collections` and the
+   * pack's `name` (FE-022) — and returns it as `{ blob, filename }`. The
+   * server refuses a pack without a licence. Empty fields are left out.
    */
-  async buildCorpus({ collection, license, version, description }) {
-    const body = { collection, license };
-    if (version) body.version = version;
-    if (description) body.description = description;
+  async buildCorpus(request) {
+    const body = Object.fromEntries(Object.entries(request).filter(([, v]) => v !== undefined && v !== ''));
     return this.requestBlob('/corpus/build', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

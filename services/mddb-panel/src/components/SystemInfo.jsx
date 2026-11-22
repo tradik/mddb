@@ -3,7 +3,7 @@ import { Server, Cpu, HardDrive, Clock, Package, Network } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import GainCard from './GainCard';
-import CorpusPacksCard from './CorpusPacksCard';
+import { openCorpusPage } from '../lib/corpus-intent';
 import DiagnoseCard from './DiagnoseCard';
 import ServerEdgeCard from './ServerEdgeCard';
 import IndexingStatusCard from './IndexingStatusCard';
@@ -250,7 +250,10 @@ export default function SystemInfo() {
         {/* 2.18.2: where the bytes of the database file are */}
         <StorageCard />
 
-        <CorpusPacksCard />
+        {/* FE-022: corpus packs have their own page, beside the collections */}
+        <p className="mb-6 text-sm text-fg-soft">
+          Corpus packs are on their own page: <button type="button" onClick={() => openCorpusPage()} className="underline text-info-strong hover:text-fg">Corpus packs</button>.
+        </p>
 
         <DiagnoseCard />
 
