@@ -651,7 +651,7 @@ full-text and vector search, auth and backups are always on and not listed.
 
 ### Model Training (2.19.11)
 
-**Data → Model Training**, shown while the `modelTraining` module is on and
+**Collections → Model Training**, shown while the `modelTraining` module is on and
 for administrators. The page says what the module does and does not do,
 whether it is on and which trainers the server's operator configured (and
 any profile the server refused), with a link to the
@@ -1077,7 +1077,7 @@ Both development and production servers proxy `/v1/*` requests to mddbd:
 A corpus pack is a copy of one or more collections in a single file, ready to
 install on another server, where they are read-only
 ([CORPUS-PACKS.md](CORPUS-PACKS.md)). The **Corpus Packs** page sits in the
-menu's Data group, beside the collections (2.19.11). Ways in:
+menu's Collections group, beside the collections (2.19.11). Ways in:
 
 - the package button beside the *Collections* title in the sidebar;
 - a collection's row: *Create pack from this collection* (shown on hover or
