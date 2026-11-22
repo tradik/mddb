@@ -1690,7 +1690,7 @@ against 4 KB for the stylesheet it came from.
 |---|---|
 | `retrievalMode` `chunk` / `window` | the chunk or window, as those modes already cut it |
 | vector, `parent` mode | the document's best-scoring chunk |
-| everything else | around the first line the query's terms match, `passageLines` (default 10) on each side; a hit inside a definition no longer than that window returns the definition |
+| everything else | around the first line the query's terms match, `passageLines` (default 10) on each side; a hit inside a definition no longer than that window returns the definition. (v2.19.13) A hit on a Markdown heading starts at the heading and runs down, so the passage holds the text under it, not the end of the section before |
 
 - `symbol` is the innermost definition holding the hit (code documents; see
   [Code Documents](API.md#one-symbol-everywhere-it-matters-v2188) for the
@@ -1701,6 +1701,17 @@ against 4 KB for the stylesheet it came from.
   `"results"`, responses are exactly as before.
 - A collection's retrieval profile may set `format: "passages"` as its
   default; the search advisor recommends it for code collections.
+- (v2.19.13) A passage cut around a hit holds at most 500 tokens.
+  `passageTokens` (`passage_tokens` on MCP) sets the bound, 1 to 8000. A
+  passage over it loses context lines first, then the end of its hit line
+  (marked ` […]`), and carries `truncated: true`; its `lines` are the lines
+  returned. Chunks (`chunk` and `window` modes, vector hits) keep the
+  collection's chunk size as their bound and are cut only when
+  `passageTokens` is set. gRPC and GraphQL apply the default and have no
+  field to change it yet.
+- (v2.19.13) On the MCP search tools, `fields` with `format: "passages"`
+  returns the passages without their text, unless `include_content: true` is
+  passed. Before, `fields` was ignored in this format.
 
 ## Searching What You Just Wrote (v2.18.8+)
 

@@ -26,19 +26,19 @@ func TestChatScenarioMCPLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err := ts.mcpCallTool(admin, "chat_scenario_put", map[string]interface{}{"name": "support", "scenario": scenario})
-	if err != nil || !strings.Contains(out, `"created": true`) || !strings.Contains(out, `"name": "support"`) {
+	if err != nil || !strings.Contains(out, `"created":true`) || !strings.Contains(out, `"name":"support"`) {
 		t.Fatalf("put: %s, %v", out, err)
 	}
 	out, err = ts.mcpCallTool(admin, "chat_scenario_put", map[string]interface{}{"name": "support", "scenario": scenario})
-	if err != nil || !strings.Contains(out, `"created": false`) {
+	if err != nil || !strings.Contains(out, `"created":false`) {
 		t.Fatalf("replace: %s, %v", out, err)
 	}
 	out, err = ts.mcpCallTool(asClaims(alice), "chat_scenario_list", nil)
-	if err != nil || !strings.Contains(out, `"version": 2`) || !strings.Contains(out, `"operatorPrompt": "You are Ada."`) {
+	if err != nil || !strings.Contains(out, `"version":2`) || !strings.Contains(out, `"operatorPrompt":"You are Ada."`) {
 		t.Fatalf("list: %s, %v", out, err)
 	}
 	out, err = ts.mcpCallTool(asClaims(alice), "chat_scenario_get", map[string]interface{}{"name": "support"})
-	if err != nil || !strings.Contains(out, `"prompt": "You are Ada.\n\nGuardrails`) || !strings.Contains(out, `"scenario"`) {
+	if err != nil || !strings.Contains(out, `"prompt":"You are Ada.\n\nGuardrails`) || !strings.Contains(out, `"scenario"`) {
 		t.Fatalf("get: %s, %v", out, err)
 	}
 

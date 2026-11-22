@@ -97,7 +97,7 @@ func (s *MCPToolServer) toolChatScenarioList(ctx context.Context, _ map[string]i
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(chatScenarioList{Scenarios: list, Version: version}, "", "  ")
+	data, _ := json.Marshal(chatScenarioList{Scenarios: list, Version: version})
 	return string(data), nil
 }
 
@@ -129,7 +129,7 @@ func (s *MCPToolServer) toolChatScenarioGet(ctx context.Context, args map[string
 	if len(p.McpServers) > 0 {
 		out["mcpServers"] = p.McpServers
 	}
-	data, _ := json.MarshalIndent(out, "", "  ")
+	data, _ := json.Marshal(out)
 	return string(data), nil
 }
 
@@ -152,7 +152,7 @@ func (s *MCPToolServer) toolChatScenarioPut(ctx context.Context, args map[string
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]any{"scenario": &sc, "created": created}, "", "  ")
+	data, _ := json.Marshal(map[string]any{"scenario": &sc, "created": created})
 	return string(data), nil
 }
 

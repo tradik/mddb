@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// The spec described some answers as a bare `"200": OK`, so a generated
+// The spec described some answers as a bare `"200":OK`, so a generated
 // client got an untyped blob and a reader had to guess the fields. This guard
 // holds each listed path's 200 schema to the Go struct the handler answers
 // with: every JSON field the server writes is a documented property.

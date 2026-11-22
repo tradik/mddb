@@ -58,7 +58,7 @@ func (s *MCPToolServer) toolMemoryStartSession(ctx context.Context, args map[str
 		"title":     title,
 		"createdAt": doc.AddedAt,
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return fmt.Sprintf("Memory session created:\n%s", string(data)), nil
 }
 
@@ -116,7 +116,7 @@ func (s *MCPToolServer) toolMemoryAddMessage(ctx context.Context, args map[strin
 		"role":      role,
 		"createdAt": doc.AddedAt,
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return fmt.Sprintf("Message added to session:\n%s", string(data)), nil
 }
 
@@ -196,11 +196,11 @@ func (s *MCPToolServer) memoryRecallViaSemantic(ctx context.Context, query strin
 		results = append(results, item)
 	}
 
-	data, _ := json.MarshalIndent(map[string]interface{}{
+	data, _ := json.Marshal(map[string]interface{}{
 		"strategy": "semantic",
 		"total":    len(results),
 		"results":  results,
-	}, "", "  ")
+	})
 	return string(data), nil
 }
 
@@ -239,11 +239,11 @@ func (s *MCPToolServer) memoryRecallViaFTS(ctx context.Context, query string, to
 		}
 	}
 
-	data, _ := json.MarshalIndent(map[string]interface{}{
+	data, _ := json.Marshal(map[string]interface{}{
 		"strategy": "keyword",
 		"total":    len(results),
 		"results":  results,
-	}, "", "  ")
+	})
 	return string(data), nil
 }
 
@@ -278,11 +278,11 @@ func (s *MCPToolServer) memoryRecallViaHybrid(ctx context.Context, query string,
 		results = append(results, item)
 	}
 
-	data, _ := json.MarshalIndent(map[string]interface{}{
+	data, _ := json.Marshal(map[string]interface{}{
 		"strategy": "hybrid",
 		"total":    len(results),
 		"results":  results,
-	}, "", "  ")
+	})
 	return string(data), nil
 }
 
@@ -357,7 +357,7 @@ func (s *MCPToolServer) toolMemorySummarize(ctx context.Context, args map[string
 		"createdAt": doc.AddedAt,
 		"summary":   summary,
 	}
-	data, _ := json.MarshalIndent(result, "", "  ")
+	data, _ := json.Marshal(result)
 	return fmt.Sprintf("Session summarized:\n%s", string(data)), nil
 }
 
@@ -409,10 +409,10 @@ func (s *MCPToolServer) toolMemoryListSessions(ctx context.Context, args map[str
 		})
 	}
 
-	data, _ := json.MarshalIndent(map[string]interface{}{
+	data, _ := json.Marshal(map[string]interface{}{
 		"total":    resp.Total,
 		"sessions": sessions,
-	}, "", "  ")
+	})
 	return string(data), nil
 }
 
@@ -468,11 +468,11 @@ func (s *MCPToolServer) toolMemorySessionHistory(ctx context.Context, args map[s
 		messages = []map[string]interface{}{}
 	}
 
-	data, _ := json.MarshalIndent(map[string]interface{}{
+	data, _ := json.Marshal(map[string]interface{}{
 		"sessionId": sessionID,
 		"total":     total,
 		"messages":  messages,
-	}, "", "  ")
+	})
 	return string(data), nil
 }
 

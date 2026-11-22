@@ -145,7 +145,7 @@ func TestSyncRefreshScopedKey(t *testing.T) {
 	readOnly := withKeyScope(context.Background(), mcpKeyScope{collections: []string{"repo-issues"}, readOnly: true})
 
 	res, err := ts.mcpCallTool(in, "sync_refresh", map[string]any{"collection": "repo-issues", "number": float64(1)})
-	if err != nil || !strings.Contains(res, `"status": "done"`) {
+	if err != nil || !strings.Contains(res, `"status":"done"`) {
 		t.Fatalf("in scope: %s, %v", res, err)
 	}
 	if _, err := ts.mcpCallTool(in, "sync_refresh", map[string]any{"collection": "repo-issues", "number": float64(1)}); err == nil ||

@@ -52,7 +52,7 @@ func (s *MCPToolServer) toolCorpusList(ctx context.Context, _ map[string]interfa
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]any{"packs": packs, "total": len(packs)}, "", "  ")
+	data, _ := json.Marshal(map[string]any{"packs": packs, "total": len(packs)})
 	return string(data), nil
 }
 
@@ -65,7 +65,7 @@ func (s *MCPToolServer) toolCorpusInstall(ctx context.Context, args map[string]i
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(res, "", "  ")
+	data, _ := json.Marshal(res)
 	return string(data), nil
 }
 

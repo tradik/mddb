@@ -50,7 +50,7 @@ func (s *MCPToolServer) toolFeatureList(_ context.Context, _ map[string]interfac
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(srv.FeaturesList(), "", "  ")
+	data, _ := json.Marshal(srv.FeaturesList())
 	return string(data), nil
 }
 
@@ -68,6 +68,6 @@ func (s *MCPToolServer) toolFeatureSet(ctx context.Context, args map[string]inte
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]any{"feature": st, "version": srv.Features.Version()}, "", "  ")
+	data, _ := json.Marshal(map[string]any{"feature": st, "version": srv.Features.Version()})
 	return string(data), nil
 }

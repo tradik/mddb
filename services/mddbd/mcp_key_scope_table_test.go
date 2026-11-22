@@ -34,7 +34,7 @@ var pinnedKeyScopeTable = map[string][]string{
 	// Reads of the collections named — and sync_refresh (INT-023), which
 	// brings a sync rule's mirror up to date for whoever may read it,
 	// read-only keys included.
-	"1101111111": {"aggregate", "autocomplete", "bulk_ingest_list", "classify_document", "code_graph", "code_symbol",
+	"1101111111": {"aggregate", "autocomplete", "bulk_ingest_list", "classify_document", "code_graph", "code_search", "code_symbol",
 		"cross_search", "export_documents", "find_duplicates", "full_text_search", "geo_polygon", "geo_search",
 		"geo_within", "get_checksum", "get_collection_config", "get_document_meta", "get_indexing_status",
 		"get_meta_keys", "get_schema", "hybrid_search", "list_curation_rules", "list_revisions", "list_stopwords",

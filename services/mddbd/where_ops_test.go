@@ -194,10 +194,10 @@ func TestWhere_Surfaces(t *testing.T) {
 	tools := &MCPToolServer{client: NewDirectClient(s)}
 	out, err := tools.mcpCallTool(ctx, "update_where", map[string]interface{}{"collection": "c",
 		"filter": map[string]interface{}{"kind": map[string]interface{}{"in": []interface{}{"page"}}}, "meta": map[string]interface{}{"y": []interface{}{"2"}}})
-	if err != nil || !strings.Contains(out, `"affected": 3`) {
+	if err != nil || !strings.Contains(out, `"affected":3`) {
 		t.Fatalf("MCP update: %v %s", err, out)
 	}
-	if out, err = tools.mcpCallTool(ctx, "set_ttl_where", map[string]interface{}{"collection": "c", "filter_meta": map[string]interface{}{"kind": []interface{}{"page"}}, "ttl": float64(60)}); err != nil || !strings.Contains(out, `"affected": 3`) {
+	if out, err = tools.mcpCallTool(ctx, "set_ttl_where", map[string]interface{}{"collection": "c", "filter_meta": map[string]interface{}{"kind": []interface{}{"page"}}, "ttl": float64(60)}); err != nil || !strings.Contains(out, `"affected":3`) {
 		t.Fatalf("MCP ttl: %v %s", err, out)
 	}
 	if _, err = tools.mcpCallTool(ctx, "delete_where", map[string]interface{}{"collection": "c", "filter": "bad"}); err == nil {
@@ -206,7 +206,7 @@ func TestWhere_Surfaces(t *testing.T) {
 	if _, err = tools.mcpCallTool(ctx, "delete_where", map[string]interface{}{"collection": "c"}); err == nil {
 		t.Fatal("MCP no filter")
 	}
-	if out, err = tools.mcpCallTool(ctx, "delete_where", map[string]interface{}{"collection": "c", "filter_meta": map[string]interface{}{"kind": []interface{}{"log"}}, "dry_run": true}); err != nil || !strings.Contains(out, `"dry_run"`) && !strings.Contains(out, `"dryRun": true`) {
+	if out, err = tools.mcpCallTool(ctx, "delete_where", map[string]interface{}{"collection": "c", "filter_meta": map[string]interface{}{"kind": []interface{}{"log"}}, "dry_run": true}); err != nil || !strings.Contains(out, `"dry_run"`) && !strings.Contains(out, `"dryRun":true`) {
 		t.Fatalf("MCP dry run: %v %s", err, out)
 	}
 

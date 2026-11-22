@@ -85,11 +85,11 @@ func installOverMCP(t *testing.T, ts *MCPToolServer, url, sum string) {
 		t.Error("an install without a url was accepted")
 	}
 	out, err := ts.mcpCallTool(ctx, "corpus_install", map[string]interface{}{"url": url, "sha256": strings.ToUpper(sum)})
-	if err != nil || !strings.Contains(out, `"docCount": 3`) {
+	if err != nil || !strings.Contains(out, `"docCount":3`) {
 		t.Fatalf("corpus_install = %s, %v", out, err)
 	}
 	out, err = ts.mcpCallTool(ctx, "corpus_list", nil)
-	if err != nil || !strings.Contains(out, `"total": 1`) || !strings.Contains(out, `"collection": "docs"`) {
+	if err != nil || !strings.Contains(out, `"total":1`) || !strings.Contains(out, `"collection":"docs"`) {
 		t.Fatalf("corpus_list = %s, %v", out, err)
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"unicode/utf8"
 
 	json "mddb/internal/jsonx"
 	"strings"
@@ -32,6 +33,13 @@ const (
 
 	defaultPassageLines = 10
 	maxPassageLines     = 200
+	// defaultPassageTokens bounds a passage cut around a hit. Twenty-one
+	// lines of code stay under it; twenty-one lines of prose are paragraphs
+	// and ran to thousands of tokens for one hit.
+	defaultPassageTokens = 500
+	maxPassageTokens     = 8000
+	// cutMark ends a line cut to fit the bound.
+	cutMark = " […]"
 )
 
 // PassageOptions selects the passage format on a search request.
@@ -41,6 +49,12 @@ type PassageOptions struct {
 	// PassageLines is the context kept on each side of a hit in parent mode
 	// (default 10, max 200).
 	PassageLines int `json:"passageLines,omitempty"`
+	// PassageTokens is the most tokens one passage may hold (default 500,
+	// max 8000). A passage over it loses context lines, then the end of its
+	// hit line, and says so in truncated. Unset, it bounds passages cut
+	// around a hit; set, also chunks, which the collection's chunk size
+	// bounds otherwise.
+	PassageTokens int `json:"passageTokens,omitempty"`
 }
 
 // ValidatePassageOptions rejects an unknown format or a negative window.
@@ -53,6 +67,9 @@ func (o PassageOptions) ValidatePassageOptions() error {
 	if o.PassageLines < 0 {
 		return errors.New("passageLines must be 0 or more")
 	}
+	if o.PassageTokens < 0 {
+		return errors.New("passageTokens must be 0 or more")
+	}
 	return nil
 }
 
@@ -63,6 +80,14 @@ func (o PassageOptions) radius() int {
 		return defaultPassageLines
 	}
 	return min(o.PassageLines, maxPassageLines)
+}
+
+// tokenCap is the bound on one passage, in tokens.
+func (o PassageOptions) tokenCap() int {
+	if o.PassageTokens <= 0 {
+		return defaultPassageTokens
+	}
+	return min(o.PassageTokens, maxPassageTokens)
 }
 
 // PassagesResponse is what a search returns with format "passages".
@@ -110,7 +135,7 @@ func passageAtHit(collection string, doc *storage.Doc, terms []string, highlight
 	for _, h := range highlights {
 		terms = append(terms, h.MatchedTerms...)
 	}
-	return passageAround(collection, doc, hitLine(doc.ContentMD, terms), opts.radius(), score, source)
+	return passageAround(collection, doc, hitLine(doc.ContentMD, terms), opts.radius(), opts.PassageTokens, score, source)
 }
 
 // hitLine picks the line where the most distinct terms meet, counting each
@@ -170,15 +195,40 @@ func hitLine(content string, terms []string) int {
 	return 1
 }
 
-// passageAround is the window of radius lines on each side of hit, or the
-// definition holding hit when that is no longer than the window.
-func passageAround(collection string, doc *storage.Doc, hit, radius int, score float64, source string) Passage {
-	st := newSourceText(doc)
-	start, end := max(hit-radius, 1), min(hit+radius, len(st.lines))
+// window is the lines a passage around hit covers: radius lines on each
+// side, or the definition holding hit when that is no longer than the window.
+// A hit on a Markdown heading starts there and runs down instead: the text
+// under the heading is what was asked for, and the lines above it belong to
+// the section before.
+func (st *sourceText) window(hit, radius int) (start, end int) {
+	start, end = max(hit-radius, 1), min(hit+radius, len(st.lines))
 	if sp := st.enclosing(hit); sp != nil && sp.EndLine-sp.StartLine <= 2*radius {
-		start, end = sp.StartLine, sp.EndLine
+		return sp.StartLine, sp.EndLine
 	}
+	if st.spans == nil && hit >= 1 && hit <= len(st.lines) && strings.HasPrefix(st.lines[hit-1], "#") {
+		return hit, min(hit+2*radius, len(st.lines))
+	}
+	return start, end
+}
+
+// passageAround is the window around hit (see window), held to tokenCap
+// tokens when that is above zero: context lines go first, then the end of
+// the hit line itself, and the passage says it was cut.
+func passageAround(collection string, doc *storage.Doc, hit, radius, tokenCap int, score float64, source string) Passage {
+	st := newSourceText(doc)
+	start, end := st.window(hit, radius)
 	p := st.passage(collection, start, end, source, true)
+	for tokenCap > 0 && p.Tokens > tokenCap && end > start {
+		radius /= 2
+		if start, end = st.window(hit, radius); radius == 0 {
+			start, end = hit, hit
+		}
+		p = st.passage(collection, start, end, source, true)
+		p.Truncated = true
+	}
+	if tokenCap > 0 {
+		capPassage(&p, tokenCap)
+	}
 	// The hit's definition names the passage; a hit outside any keeps the
 	// name of the one the window starts in (as before CODE-012: a
 	// collection without facts must answer byte for byte as it did).
@@ -187,6 +237,20 @@ func passageAround(collection string, doc *storage.Doc, hit, radius int, score f
 	}
 	p.Score = score
 	return p
+}
+
+// capPassage cuts a passage's text to tokenCap tokens, on a rune boundary,
+// and marks the cut.
+func capPassage(p *Passage, tokenCap int) {
+	if p.Tokens <= tokenCap {
+		return
+	}
+	cut := tokenCap * 4
+	for cut > 0 && !utf8.RuneStart(p.Content[cut]) {
+		cut--
+	}
+	p.Content = p.Content[:cut] + cutMark
+	p.Tokens, p.Truncated = approxTokens(p.Content), true
 }
 
 // passageOfChunk wraps a chunk or window a search already cut.
@@ -231,12 +295,16 @@ type passageSource struct {
 	terms      []string
 }
 
-// buildPassages turns hits into passages, one per hit, in order.
+// buildPassages turns hits into passages, one per hit, in order, each within
+// the options' token bound (see PassageOptions.PassageTokens).
 func (s *Server) buildPassages(collection string, hits []passageSource, opts PassageOptions, source string) []Passage {
 	out := make([]Passage, 0, len(hits))
+	capChunks := opts.PassageTokens > 0
+	opts.PassageTokens = opts.tokenCap()
 	for i := range hits {
 		h := &hits[i]
 		doc := s.withSemanticFacts(collection, &h.doc) // names the definition by its qualified name (CODE-012)
+		from := len(out)
 		switch {
 		case h.chunkText != "":
 			out = append(out, passageOfChunk(collection, doc, h.chunkText, h.startLine, h.endLine, h.score, source))
@@ -248,6 +316,10 @@ func (s *Server) buildPassages(collection string, hits []passageSource, opts Pas
 			out = append(out, s.passageOfChunkIndex(collection, doc, h.bestChunk, h.score, source))
 		default:
 			out = append(out, passageAtHit(collection, doc, h.terms, h.highlights, opts, h.score, source))
+			continue
+		}
+		for k := from; capChunks && k < len(out); k++ {
+			capPassage(&out[k], opts.PassageTokens)
 		}
 	}
 	return out
@@ -261,13 +333,32 @@ func mcpDocumentToDoc(d MCPDocument) storage.Doc {
 
 // mcpGetPassageOptions reads format and passage_lines (AGT-002).
 func mcpGetPassageOptions(m map[string]interface{}) PassageOptions {
-	return PassageOptions{Format: mcpGetString(m, "format"), PassageLines: mcpGetInt(m, "passage_lines")}
+	return PassageOptions{Format: mcpGetString(m, "format"), PassageLines: mcpGetInt(m, "passage_lines"),
+		PassageTokens: mcpGetInt(m, "passage_tokens")}
 }
 
 // mcpPassagesJSON renders a passages response the way tools render results.
 func mcpPassagesJSON(p *PassagesResponse) string {
-	data, _ := json.MarshalIndent(p, "", "  ")
+	data, _ := json.Marshal(p)
 	return string(data)
+}
+
+// mcpPassagesFor renders a passages response for a tool call. `fields` on a
+// search asks for less than the whole hit; with passages that is the place
+// without its text, unless include_content says otherwise — as it drops the
+// body of a document in the results format. It used to be ignored here, and
+// an agent that asked for keys alone received every passage in full.
+func mcpPassagesFor(args map[string]interface{}, p *PassagesResponse) string {
+	if includeContent, fields := mcpProjectionArgs(args); len(fields) > 0 && !includeContent {
+		bare := *p
+		bare.Passages = make([]Passage, len(p.Passages))
+		for i, hit := range p.Passages {
+			hit.Content, hit.Tokens = "", 0
+			bare.Passages[i] = hit
+		}
+		p = &bare
+	}
+	return mcpPassagesJSON(p)
 }
 
 // hybridPassages builds passages from hybrid results, located by the terms

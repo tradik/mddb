@@ -55,7 +55,7 @@ func (s *MCPToolServer) toolWhere(ctx context.Context, op WhereOp, args map[stri
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(res, "", "  ")
+	data, _ := json.Marshal(res)
 	return string(data), nil
 }
 

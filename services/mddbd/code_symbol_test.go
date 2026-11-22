@@ -153,7 +153,7 @@ func TestLookupSymbol_Surfaces(t *testing.T) {
 	out, err := tools.toolCodeSymbol(context.Background(), map[string]interface{}{
 		"collection": "repo", "name": "SearchHybrid", "include": []interface{}{"callers"}, "limit": 5,
 	})
-	if err != nil || !strings.Contains(out, `"symbol": "run"`) {
+	if err != nil || !strings.Contains(out, `"symbol":"run"`) {
 		t.Fatalf("MCP: %v %s", err, out)
 	}
 	if _, err := tools.toolCodeSymbol(context.Background(), map[string]interface{}{"collection": "repo"}); err == nil {

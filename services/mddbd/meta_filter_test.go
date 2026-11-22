@@ -302,7 +302,7 @@ func TestMetaFilter_MCPTools(t *testing.T) {
 		"collection": "code",
 		"filter":     map[string]interface{}{"summary": map[string]interface{}{"exists": true}},
 	})
-	if err != nil || !strings.Contains(out, `"c"`) || strings.Contains(out, `"key": "a"`) {
+	if err != nil || !strings.Contains(out, `"c"`) || strings.Contains(out, `"key":"a"`) {
 		t.Fatalf("search_documents: %v %s", err, out)
 	}
 	out, err = tools.toolFTSSearch(ctx, map[string]interface{}{
@@ -316,7 +316,7 @@ func TestMetaFilter_MCPTools(t *testing.T) {
 		"collection": "code",
 		"filter":     map[string]interface{}{"path": map[string]interface{}{"prefix": "cmd/"}},
 	})
-	if err != nil || !strings.Contains(out, `"totalDocs": 1`) {
+	if err != nil || !strings.Contains(out, `"totalDocs":1`) {
 		t.Fatalf("aggregate: %v %s", err, out)
 	}
 	for name, fn := range map[string]func(context.Context, map[string]interface{}) (string, error){

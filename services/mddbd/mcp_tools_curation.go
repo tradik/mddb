@@ -18,32 +18,26 @@ func (s *MCPToolServer) toolListCurationRules(ctx context.Context, args map[stri
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]any{
+	data, _ := json.Marshal(map[string]any{
 		"rules":      rules,
 		"total":      len(rules),
 		"collection": collection,
-	}, "", "  ")
+	})
 	return string(data), nil
 }
 
 func (s *MCPToolServer) toolCreateCurationRule(ctx context.Context, args map[string]interface{}) (string, error) {
-	rule, err := parseCurationArgs(args)
-	if err != nil {
-		return "", err
-	}
+	rule := parseCurationArgs(args)
 	created, err := s.client.CreateCurationRule(ctx, rule)
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(created, "", "  ")
+	data, _ := json.Marshal(created)
 	return string(data), nil
 }
 
 func (s *MCPToolServer) toolUpdateCurationRule(ctx context.Context, args map[string]interface{}) (string, error) {
-	rule, err := parseCurationArgs(args)
-	if err != nil {
-		return "", err
-	}
+	rule := parseCurationArgs(args)
 	if rule.ID == "" {
 		return "", fmt.Errorf("id is required for update")
 	}
@@ -51,7 +45,7 @@ func (s *MCPToolServer) toolUpdateCurationRule(ctx context.Context, args map[str
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(updated, "", "  ")
+	data, _ := json.Marshal(updated)
 	return string(data), nil
 }
 
@@ -70,7 +64,7 @@ func (s *MCPToolServer) toolDeleteCurationRule(ctx context.Context, args map[str
 // passed either as a list of objects (`{key, lang, position}`) or as a flat
 // ordered list of keys — the latter is what small LLMs tend to emit, so we
 // normalize it. Hides must be a list of strings.
-func parseCurationArgs(args map[string]interface{}) (*CurationRule, error) {
+func parseCurationArgs(args map[string]interface{}) *CurationRule {
 	rule := &CurationRule{
 		ID:         mcpGetString(args, "id"),
 		Collection: mcpGetString(args, "collection"),
@@ -106,5 +100,5 @@ func parseCurationArgs(args map[string]interface{}) (*CurationRule, error) {
 			}
 		}
 	}
-	return rule, nil
+	return rule
 }

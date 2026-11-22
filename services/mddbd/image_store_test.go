@@ -175,7 +175,7 @@ func TestIngestImagesOnEveryPath(t *testing.T) {
 		"options": map[string]interface{}{"extract_images": true, "fetch_remote_images": false},
 		"documents": []interface{}{map[string]interface{}{"key": "manual.md", "lang": "en", "content_md": md,
 			"images": []interface{}{map[string]interface{}{"path": "img/seal.png", "content_base64": base64.StdEncoding.EncodeToString(png)}}}}})
-	if err != nil || !strings.Contains(out, `"added": 3`) {
+	if err != nil || !strings.Contains(out, `"added":3`) {
 		t.Fatalf("mcp ingest: %v %s", err, out)
 	}
 	if _, err := tools.mcpCallTool(ctx, "ingest_documents", map[string]interface{}{"collection": "m",

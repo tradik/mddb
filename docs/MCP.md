@@ -269,7 +269,7 @@ and shows its API key field as optional.
 | `MDDB_MCP_SERVER_DESCRIPTION` | — | Server description |
 | `MDDB_MCP_SERVER_VENDOR` | — | Vendor name |
 | `MDDB_MCP_SERVER_HOMEPAGE` | — | Homepage URL |
-| `MDDB_MCP_INSTRUCTIONS` | — | System prompt for LLM — guidance on how to use this server |
+| `MDDB_MCP_INSTRUCTIONS` | — | System prompt for LLM — guidance on how to use this server. (v2.19.13) Unset, a server that holds code sends a default of about 120 tokens that says which tool answers which question (`code_symbol` with `format: "lines"`, `code_search`), when the key is bound to no chat scenario and may use the `code` toolset. A server without code sends nothing, as before. `none` turns the default off. |
 | `MDDB_MCP_INSTRUCTIONS_FILE` | — | (v2.18.1) Path to a file holding the instructions, read at startup. For multi-paragraph text that cannot go into a compose `.env` file. `MDDB_MCP_INSTRUCTIONS` wins when both are set. |
 
 ### Tools
@@ -277,7 +277,7 @@ and shows its API key field as optional.
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 115 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 116 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 | `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs (v2.18.9). See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
 
@@ -779,7 +779,10 @@ and on plain `POST /tools/call`. A `get_checksum` call, for example:
 
 The other tools declare no schema and return `structuredContent` only for a
 [capped limit](#result-limits-v21810) or a refused call (a quota or rate limit,
-a read-only collection).
+a read-only collection). `code_search` declares none either (v2.19.13): a
+tool with an output schema must return `structuredContent`, and a client that
+receives it may give the model that JSON instead of the text, so the
+[line answers](#line-answers-for-agents-v21913) are on tools without one.
 
 Before 2.19.12 the nine tools answered with `content` only. The MCP
 specification requires `structuredContent` from a tool with an output schema,
@@ -792,7 +795,10 @@ text are unaffected by the change: a field is added and nothing is removed.
 `search_documents`, `full_text_search`, `semantic_search`, `hybrid_search` and
 `cross_search` take `format: "passages"` (and `passage_lines`). Each hit then
 comes back as a path, a line range, the definition holding it and those lines,
-instead of the document:
+instead of the document. (v2.19.13) A passage cut around a hit holds at most
+500 tokens; `passage_tokens` (1 to 8000) changes the bound, and a passage cut
+to it carries `truncated: true`. With `fields` set, passages come without
+their text unless `include_content: true` is passed:
 
 ```json
 {"name": "full_text_search", "arguments": {
@@ -803,6 +809,67 @@ instead of the document:
 For code this replaces "search, then read the file" with one call; see
 [Passages — What an Agent Gets](SEARCH.md#passages--what-an-agent-gets-v2188).
 
+## Line Answers for Agents (v2.19.13+)
+
+`code_search` and `code_symbol` with `format: "lines"` answer in lines, the
+way grep does: a path once for consecutive hits in one file (the next hit in
+the same file starts with `  :`), one hit per line, and a count at the end
+that says whether the list is complete. `N of N` means it is; `more with
+limit` means the limit cut it. JSON stays the default on `code_symbol`.
+
+`code_search` takes `collection`, `query`, `mode`, `path` (a directory
+prefix) and `limit`. `mode: "exact"` lists every line that holds the query as
+written, ignoring case, with the definition it sits in. It reads the documents
+under `path` (up to 5 000; past that the count says how many it read), and
+shows 50 lines by default:
+
+```text
+app/main.go:4: [run] c.Close()
+  :5: [run] f.Close()
+2 of 4 lines in 2 files, more with limit or a narrower path
+```
+
+`mode: "words"` (the default) is the full-text search and `mode: "meaning"`
+the hybrid one, five hits by default. Each hit is its line range and enclosing
+definition, then the matching line with two lines of context, numbered. On a
+server without embeddings `meaning` answers by words and says so on the first
+line.
+
+```text
+file/file.go:5-8  File.Close
+  5: func (f *File) Close() error {
+  6: flush()
+  7: return nil
+  8: }
+1 of 1 hits
+```
+
+`code_symbol` with `format: "lines"` writes `path:start-end  kind  Name` for
+definitions, callers, callees, implementations and siblings, `path:line  in
+Enclosing.Func: text` for references and tests, and a count line per relation
+asked for, also when it is empty:
+
+```text
+Closer: semantic (gopls/0.24.0)
+definitions: 1 of 1
+io/closer.go:3-5  interface  Closer
+implementations: 3 of 3
+buf/buf.go:3-3  struct  Buffer
+file/file.go:3-3  struct  File
+net/conn.go:3-3  struct  Conn
+```
+
+When the name has several definitions, each use names its target, and a
+relation cut by `limit` gives its total:
+
+```text
+references: 1 of 4, more with limit
+app/main.go:5  in run: f.Close()  -> file/file.go#File.Close
+```
+
+With `include_content: true` the text of a definition follows its line,
+indented by four spaces.
+
 ## Toolsets (v2.18.8+)
 
 Every tool's schema sits in the model's context on every turn, and a long menu
@@ -812,7 +879,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
 | Toolset | Tools |
 |---|---|
 | `search` | `search_documents`, `aggregate`, `semantic_search`, `full_text_search`, `hybrid_search`, `cross_search`, `autocomplete`, `fts_languages`, `search_advisor`, `get_indexing_status`, `run_eval`, `add_eval_query`, `get_gain`, `find_duplicates`, `classify_document`, `get_meta_keys` |
-| `code` | `code_graph`, `code_symbol`, `reference_search`, `reference_symbol`, `reference_examples`, `reference_dependencies` |
+| `code` | `code_graph`, `code_symbol`, `code_search`, `reference_search`, `reference_symbol`, `reference_examples`, `reference_dependencies` |
 | `documents` | `add_document`, `update_document`, `delete_document`, `get_document_meta`, `set_ttl`, `add_documents_batch`, `delete_documents_batch`, `export_documents`, `list_revisions`, `restore_revision`, `delete_where`, `update_where`, `set_ttl_where` |
 | `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*`, `sync_refresh` |
 | `memory` | `memory_*` |
@@ -879,7 +946,7 @@ stored when a write asks for them: `extract_images` on `upload_file` and
 
 ## Built-in Tool Catalog
 
-All 115 built-in tools, grouped by area. Tool inputs are self-describing via
+All 116 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -1063,7 +1130,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `reference_symbol` | (v2.18.8) Where reference code defines and uses a symbol. |
 | `reference_examples` | (v2.18.8) The definitions in reference code that call a symbol, with their text. |
 | `reference_dependencies` | (v2.18.8) What a file in a reference collection imports, or what imports it. |
-| `code_symbol` | (v2.18.8) Everything about one symbol as path + line passages: definitions with their span, references with the definition each sits in, callers, callees, tests that touch it and siblings in the same directory. Read-only. (v2.19.3) After `mddb-cli autoindex --semantic` it answers from a language server's facts: `precision: semantic` (`mixed` when only some files have facts), qualified names (`Conn.Close`), `path` to pick one definition, `ambiguous` + `candidates` for a name with several, references grouped per definition (`target`), and the `implementations` relation, which needs those facts. |
+| `code_symbol` | (v2.18.8) Everything about one symbol as path + line passages: definitions with their span, references with the definition each sits in, callers, callees, tests that touch it and siblings in the same directory. Read-only. (v2.19.3) After `mddb-cli autoindex --semantic` it answers from a language server's facts: `precision: semantic` (`mixed` when only some files have facts), qualified names (`Conn.Close`), `path` to pick one definition, `ambiguous` + `candidates` for a name with several, references grouped per definition (`target`), and the `implementations` relation, which needs those facts. (v2.19.13) `format: "lines"` answers in [lines](#line-answers-for-agents-v21913) instead of JSON; `exclude_tests: true` leaves out every passage in a test file before the limit; `path` may name a directory (`internal/session`) and keeps the definitions under it; `totals` gives, per relation the limit cut, how many passages it had. |
+| `code_search` | (v2.19.13) Search a code collection and answer in [lines](#line-answers-for-agents-v21913): `mode` `exact` (every line holding an identifier or literal, ignoring case, with its enclosing definition), `words` (default, full-text) or `meaning` (hybrid; by words on a server without embeddings), `path` prefix, `limit`. Ends with a count that says whether the list is complete. No output schema. Read-only. |
 | `code_graph` | Code connection graph: what a document depends on and what depends on it: which stylesheet declares a selector, which pages load a script, which file defines a function this one calls (C, C++, assembly, Go, Rust, Java, Python, Ruby, PHP), which manifest declares the ConfigMap a Deployment refers to (Kubernetes, OpenShift, Kustomize, Terraform, Ansible). Edge kinds: `uses-selector`, `calls`, `references`, `imports`. |
 | `delete_collection` | Delete an entire collection and all its documents, revisions, and metadata indices. |
 | `get_collection_config` | Get configuration attributes for a collection (type, description, icon, color, custom metadata). |

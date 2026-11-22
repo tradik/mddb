@@ -77,7 +77,7 @@ func (s *MCPToolServer) toolChatLogList(ctx context.Context, args map[string]int
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(page, "", "  ")
+	data, _ := json.Marshal(page)
 	return string(data), nil
 }
 
@@ -94,6 +94,6 @@ func (s *MCPToolServer) toolChatGaps(ctx context.Context, args map[string]interf
 	if len(res.Gaps) == 0 {
 		return fmt.Sprintf("No docs gaps (threshold %g).", res.Threshold), nil
 	}
-	data, _ := json.MarshalIndent(res, "", "  ")
+	data, _ := json.Marshal(res)
 	return string(data), nil
 }

@@ -26,7 +26,7 @@ func (s *MCPToolServer) toolGeoSearch(ctx context.Context, args map[string]inter
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -46,7 +46,7 @@ func (s *MCPToolServer) toolGeoWithin(ctx context.Context, args map[string]inter
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -110,7 +110,7 @@ func (s *MCPToolServer) toolGeoPolygon(_ context.Context, args map[string]interf
 		Shape:     shape,
 		Algorithm: "rtree",
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -165,7 +165,7 @@ func (s *MCPToolServer) toolGeoStats(ctx context.Context, args map[string]interf
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 

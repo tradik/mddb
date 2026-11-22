@@ -50,7 +50,7 @@ func (s *MCPToolServer) toolChatConversationList(ctx context.Context, args map[s
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(page, "", "  ")
+	data, _ := json.Marshal(page)
 	return string(data), nil
 }
 
@@ -63,6 +63,6 @@ func (s *MCPToolServer) toolChatConversationGet(ctx context.Context, args map[st
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(conv, "", "  ")
+	data, _ := json.Marshal(conv)
 	return string(data), nil
 }

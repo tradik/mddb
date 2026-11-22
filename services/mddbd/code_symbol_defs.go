@@ -56,7 +56,7 @@ func heuristicDefinitions(req SymbolRequest, defs []*sourceText, sem []semanticD
 	}
 	var out []*sourceText
 	for _, st := range defs {
-		if !answered[st.doc.ID] && (req.Path == "" || docPath(st.doc) == req.Path) {
+		if !answered[st.doc.ID] && req.inPath(docPath(st.doc)) {
 			out = append(out, st)
 		}
 	}

@@ -72,7 +72,7 @@ func (s *MCPToolServer) toolChatMcpSecretList(ctx context.Context, _ map[string]
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(list, "", "  ")
+	data, _ := json.Marshal(list)
 	return string(data), nil
 }
 

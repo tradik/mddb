@@ -53,6 +53,7 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	"set_ttl_where":           writeIdempotent(),
 	"add_eval_query":          writeIdempotent(),
 	"code_symbol":             readOnly(),
+	"code_search":             readOnly(),
 	"reference_search":        readOnly(),
 	"reference_symbol":        readOnly(),
 	"reference_examples":      readOnly(),

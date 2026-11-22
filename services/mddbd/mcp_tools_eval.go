@@ -76,7 +76,7 @@ func (s *MCPToolServer) toolAddEvalQuery(ctx context.Context, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(saved, "", "  ")
+	data, _ := json.Marshal(saved)
 	return string(data), nil
 }
 
@@ -93,7 +93,7 @@ func (s *MCPToolServer) toolRunEval(ctx context.Context, args map[string]interfa
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(res, "", "  ")
+	data, _ := json.Marshal(res)
 	return string(data), nil
 }
 
@@ -130,7 +130,7 @@ func (s *MCPToolServer) toolGetGain(ctx context.Context, args map[string]interfa
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(rep, "", "  ")
+	data, _ := json.Marshal(rep)
 	return string(data), nil
 }
 

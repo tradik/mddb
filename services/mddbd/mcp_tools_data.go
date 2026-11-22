@@ -24,7 +24,7 @@ func (s *MCPToolServer) toolAddDocument(ctx context.Context, args map[string]int
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(doc, "", "  ")
+	data, _ := json.Marshal(doc)
 	return fmt.Sprintf("Document added successfully:\n%s", string(data)), nil
 }
 
@@ -56,15 +56,15 @@ func (s *MCPToolServer) toolSearchDocuments(ctx context.Context, args map[string
 		return "", err
 	}
 	if resp.Passages != nil {
-		return mcpPassagesJSON(resp.Passages), nil
+		return mcpPassagesFor(args, resp.Passages), nil
 	}
 
 	if mcpProjectionActive(fields, includeContent) {
-		data, _ := json.MarshalIndent(projectSearchResult(resp, fields, includeContent), "", "  ")
+		data, _ := json.Marshal(projectSearchResult(resp, fields, includeContent))
 		return string(data), nil
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -104,7 +104,7 @@ func (s *MCPToolServer) toolGetStats(ctx context.Context, args map[string]interf
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(stats, "", "  ")
+	data, _ := json.Marshal(stats)
 	return string(data), nil
 }
 
@@ -137,7 +137,7 @@ func (s *MCPToolServer) toolAddBatch(ctx context.Context, args map[string]interf
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -168,7 +168,7 @@ func (s *MCPToolServer) toolDeleteBatch(ctx context.Context, args map[string]int
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -270,15 +270,15 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 		return "", err
 	}
 	if resp.Passages != nil {
-		return mcpPassagesJSON(resp.Passages), nil
+		return mcpPassagesFor(args, resp.Passages), nil
 	}
 
 	if mcpProjectionActive(fields, includeContent) {
-		data, _ := json.MarshalIndent(projectVectorResult(resp, fields, includeContent), "", "  ")
+		data, _ := json.Marshal(projectVectorResult(resp, fields, includeContent))
 		return string(data), nil
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -295,7 +295,7 @@ func (s *MCPToolServer) toolVectorReindex(ctx context.Context, args map[string]i
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return fmt.Sprintf("Reindex complete:\n%s", string(data)), nil
 }
 
@@ -305,7 +305,7 @@ func (s *MCPToolServer) toolVectorStats(ctx context.Context, args map[string]int
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -324,7 +324,7 @@ func (s *MCPToolServer) toolImportURL(ctx context.Context, args map[string]inter
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(doc, "", "  ")
+	data, _ := json.Marshal(doc)
 	return fmt.Sprintf("Document imported from URL:\n%s", string(data)), nil
 }
 
@@ -341,7 +341,7 @@ func (s *MCPToolServer) toolSetTTL(ctx context.Context, args map[string]interfac
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(doc, "", "  ")
+	data, _ := json.Marshal(doc)
 	return fmt.Sprintf("TTL updated:\n%s", string(data)), nil
 }
 
@@ -400,15 +400,15 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 		return "", err
 	}
 	if resp.Passages != nil {
-		return mcpPassagesJSON(resp.Passages), nil
+		return mcpPassagesFor(args, resp.Passages), nil
 	}
 
 	if mcpProjectionActive(fields, includeContent) {
-		data, _ := json.MarshalIndent(projectFTSResult(resp, fields, includeContent), "", "  ")
+		data, _ := json.Marshal(projectFTSResult(resp, fields, includeContent))
 		return string(data), nil
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -420,7 +420,7 @@ func (s *MCPToolServer) toolFTSReindex(ctx context.Context, args map[string]inte
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -429,7 +429,7 @@ func (s *MCPToolServer) toolFTSLanguages(ctx context.Context, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -491,10 +491,10 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		return "", err
 	}
 	if resp.Passages != nil {
-		return mcpPassagesJSON(resp.Passages), nil
+		return mcpPassagesFor(args, resp.Passages), nil
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -517,7 +517,7 @@ func (s *MCPToolServer) toolRegisterWebhook(ctx context.Context, args map[string
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(wh, "", "  ")
+	data, _ := json.Marshal(wh)
 	return fmt.Sprintf("Webhook registered:\n%s", string(data)), nil
 }
 
@@ -527,7 +527,7 @@ func (s *MCPToolServer) toolListWebhooks(ctx context.Context, args map[string]in
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(hooks, "", "  ")
+	data, _ := json.Marshal(hooks)
 	return string(data), nil
 }
 
@@ -564,7 +564,7 @@ func (s *MCPToolServer) toolGetSchema(ctx context.Context, args map[string]inter
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -584,7 +584,7 @@ func (s *MCPToolServer) toolListSchemas(ctx context.Context, args map[string]int
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -599,7 +599,7 @@ func (s *MCPToolServer) toolValidateDocument(ctx context.Context, args map[strin
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -633,7 +633,7 @@ func (s *MCPToolServer) toolUpdateDocument(ctx context.Context, args map[string]
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(doc, "", "  ")
+	data, _ := json.Marshal(doc)
 	return fmt.Sprintf("Document updated:\n%s", string(data)), nil
 }
 
@@ -649,7 +649,7 @@ func (s *MCPToolServer) toolGetDocumentMeta(ctx context.Context, args map[string
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -666,7 +666,7 @@ func (s *MCPToolServer) toolCodeGraph(ctx context.Context, args map[string]inter
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -699,7 +699,7 @@ func (s *MCPToolServer) toolClassifyDocument(ctx context.Context, args map[strin
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -710,7 +710,7 @@ func (s *MCPToolServer) toolSearchAdvisor(ctx context.Context, args map[string]i
 		return "", err
 	}
 
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -720,7 +720,7 @@ func (s *MCPToolServer) toolGetIndexingStatus(ctx context.Context, args map[stri
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }
 
@@ -732,6 +732,11 @@ func (s *MCPToolServer) toolCodeSymbol(ctx context.Context, args map[string]inte
 		Path:           mcpGetString(args, "path"),
 		Limit:          mcpGetInt(args, "limit"),
 		IncludeContent: mcpGetBool(args, "include_content"),
+		ExcludeTests:   mcpGetBool(args, "exclude_tests"),
+	}
+	format := mcpGetString(args, "format")
+	if format != "" && format != "json" && format != FormatLines {
+		return "", fmt.Errorf("unknown format %q (known: json, lines)", format)
 	}
 	if inc, ok := args["include"].([]interface{}); ok {
 		for _, v := range inc {
@@ -744,6 +749,9 @@ func (s *MCPToolServer) toolCodeSymbol(ctx context.Context, args map[string]inte
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(resp, "", "  ")
+	if format == FormatLines {
+		return symbolLines(req, resp), nil
+	}
+	data, _ := json.Marshal(resp)
 	return string(data), nil
 }

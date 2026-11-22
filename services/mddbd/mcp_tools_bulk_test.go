@@ -96,7 +96,7 @@ func assertBulkJobLifecycle(t *testing.T, call mcpToolCall) {
 	if _, err := call("bulk_ingest_submit", doc); !wantErrContaining(err, "queue is full") {
 		t.Fatalf("second submit: %v", err)
 	}
-	id := strings.Split(strings.Split(out, `"id": "`)[1], `"`)[0]
+	id := strings.Split(strings.Split(out, `"id":"`)[1], `"`)[0]
 	if out, err := call("bulk_ingest_status", map[string]any{"id": id}); err != nil || !strings.Contains(out, id) {
 		t.Fatalf("status: %v %s", err, out)
 	}

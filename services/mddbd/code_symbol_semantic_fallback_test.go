@@ -18,7 +18,7 @@ func TestPassageAround_KeepsTheSymbolOfItsStart(t *testing.T) {
 	defer cleanup()
 	content := "package x\n\nfunc Serve() {\n\tlisten()\n\tloop()\n}\n\nvar a = 1\nvar b = 2\n"
 	doc := addTestDoc(t, s, "notes", "serve.go", "en", content, nil)
-	p := passageAround("notes", &doc, 8, 3, 0, "fts") // lines 5-9: Serve's end, then top level
+	p := passageAround("notes", &doc, 8, 3, 0, 0, "fts") // lines 5-9: Serve's end, then top level
 	if p.Lines.Start != 5 || p.Symbol != "Serve" {
 		t.Fatalf("passage: %+v", p)
 	}

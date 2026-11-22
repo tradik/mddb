@@ -272,7 +272,7 @@ MDDB implements both MCP revisions in full — see [Protocol revisions](MCP-REVI
 
 | Feature | Description |
 |---------|-------------|
-| **Tool Annotations** | All 114 built-in tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
+| **Tool Annotations** | All 116 built-in tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
 | **Structured Output** | `outputSchema` on key tools (stats, search, classification, aggregation), and `structuredContent` conforming to it on every successful call of those tools (v2.19.12+; before, a client that checks the schema refused their answers, #461) |
 | **5 Built-in Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |
@@ -382,7 +382,7 @@ Use the `mddbd` binary directly. Like the Docker variant, this starts a separate
 }
 ```
 
-### Available MCP Tools (114)
+### Available MCP Tools (116)
 
 Once connected, your LLM agent has access to all built-in tools (with annotations for auto-approve). They come in eleven toolsets; `MDDB_MCP_TOOLSETS` or a per-key `toolsets` list exposes only some of them ([MCP.md](MCP.md#toolsets-v2188)):
 

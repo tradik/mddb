@@ -149,22 +149,22 @@ func TestReferenceTools(t *testing.T) {
 	seedReferences(t, s)
 
 	out, err := tools.toolReferenceSearch(ctx, map[string]interface{}{"query": "delete neighbours", "top_k": 3})
-	if err != nil || !strings.Contains(out, `"passages"`) || !strings.Contains(out, `"collection": "ref-`) || strings.Contains(out, `"mine"`) {
+	if err != nil || !strings.Contains(out, `"passages"`) || !strings.Contains(out, `"collection":"ref-`) || strings.Contains(out, `"mine"`) {
 		t.Fatalf("reference_search: %v %s", err, out)
 	}
 	if _, err := tools.toolReferenceSearch(ctx, map[string]interface{}{"query": "x", "filter": map[string]interface{}{"k": map[string]interface{}{"bad": 1}}}); err == nil {
 		t.Fatal("bad filter")
 	}
 	out, err = tools.toolReferenceSymbol(ctx, map[string]interface{}{"name": "Delete"})
-	if err != nil || strings.Count(out, `"kind": "function"`) != 2 || !strings.Contains(out, "TestDelete") {
+	if err != nil || strings.Count(out, `"kind":"function"`) != 2 || !strings.Contains(out, "TestDelete") {
 		t.Fatalf("reference_symbol: %v %s", err, out)
 	}
 	out, err = tools.toolReferenceExamples(ctx, map[string]interface{}{"name": "Delete", "collections": []interface{}{"ref-a"}})
-	if err != nil || !strings.Contains(out, `"symbol": "TestDelete"`) || !strings.Contains(out, "Delete(1)") || strings.Contains(out, "hnsw") {
+	if err != nil || !strings.Contains(out, `"symbol":"TestDelete"`) || !strings.Contains(out, "Delete(1)") || strings.Contains(out, "hnsw") {
 		t.Fatalf("reference_examples: %v %s", err, out)
 	}
 	out, err = tools.toolReferenceDependencies(ctx, map[string]interface{}{"collection": "ref-a", "key": "tree/node.go"})
-	if err != nil || !strings.Contains(out, `"kind": "imports"`) || strings.Contains(out, `"kind": "calls"`) {
+	if err != nil || !strings.Contains(out, `"kind":"imports"`) || strings.Contains(out, `"kind":"calls"`) {
 		t.Fatalf("reference_dependencies: %v %s", err, out)
 	}
 	if _, err := tools.toolReferenceDependencies(ctx, map[string]interface{}{"collection": "ref-a", "key": "nope.go"}); err == nil {
