@@ -310,6 +310,14 @@ const coverageFiles = [
   'src/components/IssuesSyncFields.jsx',
   'src/components/CollectionRepository.jsx',
   'src/components/ForgeTokensCard.jsx',
+  // 2.19.11 (FE-023): Backup & Restore and Collection Maintenance pages.
+  'src/lib/backup-history.js',
+  'src/lib/use-backup-history.js',
+  'src/components/BackupsPanel.jsx',
+  'src/components/BackupHistory.jsx',
+  'src/components/ScheduledBackups.jsx',
+  'src/components/CollectionMaintenancePanel.jsx',
+  'src/components/MaintenanceAction.jsx',
 ];
 
 export default mergeConfig(
