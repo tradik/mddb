@@ -7,6 +7,63 @@ import (
 	"testing"
 )
 
+// TestApplyMCPAuth_MCPKeyWithoutKeyAuth — #445: with main auth guarding the
+// listener, an mcp_ key (either header) gets a 401 that names
+// MDDB_MCP_API_KEY_ENABLED, never reaching the backend; other credentials,
+// public paths and a disabled manager are untouched.
+func TestApplyMCPAuth_MCPKeyWithoutKeyAuth(t *testing.T) {
+	t.Setenv("MDDB_AUTH_ENABLED", "true")
+	t.Setenv("MDDB_MCP_API_KEY_ENABLED", "")
+
+	am, cleanup := authMwSetup(t)
+	defer cleanup()
+	s := &Server{AuthManager: am}
+	var reached bool
+	handler := s.applyMCPAuth(mcpProbeHandler(&reached), ":9000")
+
+	send := func(path, header, value string) *httptest.ResponseRecorder {
+		reached = false
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
+		req.Header.Set(header, value)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	for _, h := range [][2]string{{"Authorization", "Bearer mcp_0123abcd"}, {"X-API-Key", "mcp_0123abcd"}} {
+		rec := send("/mcp", h[0], h[1])
+		if rec.Code != http.StatusUnauthorized || reached {
+			t.Errorf("%s: got %d reached=%v, want 401 false", h[0], rec.Code, reached)
+		}
+		if !strings.Contains(rec.Body.String(), "MDDB_MCP_API_KEY_ENABLED=true") || strings.Contains(rec.Body.String(), "invalid") {
+			t.Errorf("%s: body %q does not name the setting", h[0], rec.Body)
+		}
+		if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+			t.Errorf("%s: Content-Type %q", h[0], ct)
+		}
+	}
+
+	// Any other credential still meets the AuthManager's own refusal.
+	if rec := send("/mcp", "Authorization", "Bearer not-a-jwt"); rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "invalid token") {
+		t.Errorf("bad JWT: got %d %s", rec.Code, rec.Body)
+	}
+	// A public path needs no credential, whatever is sent.
+	if rec := send("/health", "X-API-Key", "mcp_0123abcd"); rec.Code != http.StatusOK || !reached {
+		t.Errorf("public path: got %d reached=%v", rec.Code, reached)
+	}
+
+	// A disabled manager guards nothing: the wrapper passes through too.
+	am.enabled = false
+	reached = false
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{}`))
+	req.Header.Set("X-API-Key", "mcp_0123abcd")
+	rec := httptest.NewRecorder()
+	refuseMCPKeyWithoutKeyAuth(am, mcpProbeHandler(&reached)).ServeHTTP(rec, req)
+	if !reached {
+		t.Errorf("disabled manager: got %d, want pass-through", rec.Code)
+	}
+}
+
 // TestDecideMCPAuth covers every flag combination of the SEC-002 decision.
 func TestDecideMCPAuth(t *testing.T) {
 	tests := []struct {

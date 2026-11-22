@@ -10,6 +10,7 @@ vi.mock('../lib/mddb-client', () => ({
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { default: ChatScenarioMcpKeys } = await import('./ChatScenarioMcpKeys');
+const { useStore } = await import('../lib/store');
 
 const bound = { name: 'widget', keyPrefix: 'mcp_', fingerprint: 'aa11', scenario: 'support' };
 const other = { name: 'elsewhere', keyPrefix: 'mcp_', fingerprint: 'bb22', scenario: 'sales' };
@@ -72,5 +73,32 @@ describe('ChatScenarioMcpKeys', () => {
     fireEvent.change(screen.getByLabelText('New key name'), { target: { value: 'y' } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: /Create key/ })));
     expect(screen.getByRole('alert').textContent).toBe('chat scenario not found');
+  });
+
+  // #445: the card does not hand out a key the server would never check.
+  test('MCP key auth off: the notice names the setting and no key is created', async () => {
+    useStore.setState({ config: { protocols: { mcp: { apiKeyEnabled: false } } } });
+    await renderFor('support');
+    expect(screen.getByRole('status').textContent).toContain('MDDB_MCP_API_KEY_ENABLED=true');
+    fireEvent.change(screen.getByLabelText('New key name'), { target: { value: 'site' } });
+    const create = screen.getByRole('button', { name: /Create key/ });
+    expect(create.disabled).toBe(true);
+    await act(async () => fireEvent.submit(create.closest('form')));
+    expect(mddbClient.createMCPAPIKey).not.toHaveBeenCalled();
+    useStore.setState({ config: null });
+  });
+
+  test('MCP key auth on: no notice; a warning returned with a key is shown with it', async () => {
+    useStore.setState({ config: { protocols: { mcp: { apiKeyEnabled: true } } } });
+    mddbClient.createMCPAPIKey.mockResolvedValueOnce({ key: 'mcp_warned', warning: 'not checked here' });
+    await renderFor('support');
+    expect(screen.queryByRole('status')).toBeNull();
+    fireEvent.change(screen.getByLabelText('New key name'), { target: { value: 'site' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Create key/ })));
+    expect(screen.getByText('mcp_warned')).toBeTruthy();
+    expect(screen.getByText('not checked here').closest('[role=status]')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('status')).toBeNull();
+    useStore.setState({ config: null });
   });
 });

@@ -229,6 +229,33 @@ describe('MCPAPIKeysPanel', () => {
     expect(screen.getByText('MCP API keys are disabled')).toBeTruthy();
   });
 
+  // #445: a server that does not check MCP keys gets no Create, and a
+  // warning the server returns with a new key is shown with it.
+  test('MCP key auth off: the notice names the setting and Create is disabled', async () => {
+    useStore.setState({ config: { protocols: { mcp: { apiKeyEnabled: false } } } });
+    render(<MCPAPIKeysPanel />);
+    await act(async () => {});
+    expect(screen.getByRole('status').textContent).toContain('MDDB_MCP_API_KEY_ENABLED=true');
+    const name = screen.getByPlaceholderText('Key name (e.g. claude-prod)');
+    fireEvent.change(name, { target: { value: 'bot' } });
+    expect(screen.getByRole('button', { name: /Create Key/ }).disabled).toBe(true);
+    await act(async () => fireEvent.keyDown(name, { key: 'Enter' }));
+    expect(mddbClient.createMCPAPIKey).not.toHaveBeenCalled();
+    useStore.setState({ config: null });
+  });
+
+  test('a warning returned with a new key is shown until the key is dismissed', async () => {
+    mddbClient.createMCPAPIKey.mockResolvedValueOnce({ key: 'mcp_warned', warning: 'MCP API key auth is not enabled on this server' });
+    render(<MCPAPIKeysPanel />);
+    await act(async () => {});
+    expect(screen.queryByRole('status')).toBeNull(); // config not loaded: as before
+    fireEvent.change(screen.getByPlaceholderText('Key name (e.g. claude-prod)'), { target: { value: 'bot' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Create Key/ })));
+    expect(screen.getByText('MCP API key auth is not enabled on this server').closest('[role=status]')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   test('an answer without keys lists none', async () => {
     mddbClient.listMCPAPIKeys.mockResolvedValueOnce({});
     render(<MCPAPIKeysPanel />);

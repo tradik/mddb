@@ -13,6 +13,27 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+// TestCovDKeyCreateWarnsWhenKeyAuthOff — #445: the key is still created, and
+// the response says no listener checks it until MDDB_MCP_API_KEY_ENABLED=true.
+func TestCovDKeyCreateWarnsWhenKeyAuthOff(t *testing.T) {
+	s, _ := covDKeyServer(t)
+	for _, tc := range []struct {
+		env      string
+		wantWarn bool
+	}{{"", true}, {"false", true}, {"true", false}} {
+		t.Setenv("MDDB_MCP_API_KEY_ENABLED", tc.env)
+		rec := covDKeyRequest(s, s.handleMCPAPIKeyCreate, http.MethodPost, `{"name":"w"}`, context.Background())
+		var body map[string]any
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &body) != nil || body["key"] == "" {
+			t.Fatalf("env=%q: create = %d %s", tc.env, rec.Code, rec.Body)
+		}
+		warning, has := body["warning"].(string)
+		if has != tc.wantWarn || (has && !strings.Contains(warning, "MDDB_MCP_API_KEY_ENABLED=true")) {
+			t.Errorf("env=%q: warning = %q (present %v), want present %v", tc.env, warning, has, tc.wantWarn)
+		}
+	}
+}
+
 // covDDropKeyBucket removes the key bucket, the state a store is in after a
 // restore onto a database that never held MCP keys.
 func covDDropKeyBucket(t *testing.T, db *bolt.DB) {

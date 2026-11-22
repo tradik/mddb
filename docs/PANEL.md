@@ -353,7 +353,12 @@ up a saved scenario without a restart.
   composed prompt as the MCP instructions; while the scenario is disabled, or
   chat is off, the key's calls are refused
   ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)).
-  Listing and creating keys need admin; a refusal is shown.
+  Listing and creating keys need admin; a refusal is shown. On a server that
+  does not check MCP keys (`protocols.mcp.apiKeyEnabled: false` in
+  `/v1/config`) the card says so, names `MDDB_MCP_API_KEY_ENABLED=true` and
+  disables *Create key*, since the MCP endpoint would refuse the key; a
+  `warning` the server returns with a new key is shown under it (2.19.10,
+  #445). A server that does not report the setting gets the card as before.
 - **Try it**: a placeholder. Talking to a scenario from the panel needs the
   chat service connected to it, which a later release adds.
 - **Permissions**: saving and deleting need admin on `"*"`; the server's 403
@@ -558,6 +563,12 @@ key is kept in the page's memory only — not in local storage, the store or
 the URL — and is gone when you leave the page; *Show key* reveals it. Against
 a server before 2.19.9, which does not report `apiKeyEnabled`, the field is
 shown as optional. *Copy* copies exactly the variant shown.
+
+The *API Keys* tab lists, creates, disables and deletes MCP API keys. With
+MCP API keys off (`apiKeyEnabled: false`) it shows the same notice as a
+scenario's *MCP keys* card — the server does not check MCP keys, set
+`MDDB_MCP_API_KEY_ENABLED=true` — and *Create Key* is disabled; a `warning`
+returned with a new key is shown with it (2.19.10, #445).
 
 ### Module switches: the Features page (2.19.0)
 

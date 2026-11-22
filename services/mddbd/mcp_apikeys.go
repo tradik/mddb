@@ -306,8 +306,7 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 		s.mcpAuth.InvalidateCache()
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	resp := map[string]interface{}{
 		"key":         fullKey, // Full key shown only once
 		"name":        apiKey.Name,
 		"createdAt":   apiKey.CreatedAt,
@@ -316,7 +315,15 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 		"collections": apiKey.Collections,
 		"readOnly":    apiKey.ReadOnly,
 		"scenario":    apiKey.Scenario,
-	})
+	}
+	// The key is created either way, so a client that sets the variable
+	// afterwards keeps it — but the caller learns now that no listener on
+	// this server checks it yet (#445).
+	if !mcpKeyAuthEnabled() {
+		resp["warning"] = mcpKeyAuthOffMessage
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // createMCPAPIKey stores a key after checking the scenario it is bound to
