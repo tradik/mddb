@@ -1,7 +1,7 @@
 ---
 title: "Corpus Packs"
 slug: "docs/corpus-packs"
-description: "Build a collection once — documents, full-text index, vectors — and install it read-only on any MDDB server with one command: mddb-cli corpus build, install, list and remove."
+description: "Build one collection or several once — documents, full-text index, vectors — and install them read-only on any MDDB server with one command: mddb-cli corpus build, install, list and remove, or the panel's Corpus packs page."
 status: publish
 ---
 
@@ -25,6 +25,9 @@ mddb-cli corpus list
 mddb-cli corpus remove k8s-docs
 ```
 
+The panel does the same on its **Corpus packs** page, beside the collections
+([PANEL.md](PANEL.md#corpus-packs)).
+
 ## What a pack is
 
 A `.mddbpack` file is a zstd-compressed tar with two members, in this order:
@@ -33,6 +36,9 @@ A `.mddbpack` file is a zstd-compressed tar with two members, in this order:
 |---|---|
 | `manifest.json` | what the pack is, where it came from, under which licence |
 | `collection.db` | the collection's bbolt file: documents, metadata index, revisions, key lookups, full-text postings and statistics, vectors and their provenance, geo points |
+
+A pack of several collections has another layout; see
+[Several collections in one pack](#several-collections-in-one-pack).
 
 `collection.db` is exactly the file the [per-collection layout](STORAGE-LAYOUT.md)
 keeps for a collection: every collection bucket, and only this collection's
@@ -89,6 +95,8 @@ sha256, which is what `install --sha256` checks.
 | `--license` | Licence of the pack as a whole. **Required.** |
 | `--source LICENSE=REPO[@COMMIT]` | A source of the documents; repeatable. Each needs its licence. |
 | `--version`, `--description` | Recorded in the manifest. |
+| `-c NAME[=LICENSE]` | A collection of the pack, instead of the argument; repeatable. See [Several collections in one pack](#several-collections-in-one-pack). |
+| `--name` | The pack's name, required with several `-c`. |
 | `-o` | The file to write. |
 
 A collection is refused when it cannot travel: an **encrypted** collection
@@ -139,6 +147,55 @@ The pack's vectors are loaded into the in-memory indexes and its geo points
 into the geo indexes; full-text search answers from the pack's own postings
 and statistics. A collection of the same name that already holds data is not
 overwritten: the install answers 409.
+
+## Several collections in one pack
+
+Documents added at different times often land in different collections. One
+pack can hold several of them (v2.19.11):
+
+```bash
+mddb-cli corpus build --name handbook -c policies -c faq=CC-BY-4.0 --license MIT
+```
+
+```json
+{"name": "handbook", "license": "MIT",
+ "collections": ["policies", {"name": "faq", "license": "CC-BY-4.0",
+                              "sources": [{"repo": "https://example.org/faq", "license": "CC-BY-4.0"}]}]}
+```
+
+`collections` takes a name or an object with the collection's own `license`
+and `sources`; a collection without a licence is under the pack's. Naming
+both `collection` and `collections` is refused, and a pack of several
+collections needs a `name` of its own.
+
+**Layout (format 2).** Each collection keeps its own file, exactly as a
+format-1 pack keeps its one: `manifest.json`, then `collection-1.db` …
+`collection-N.db`, in the order of the manifest's `collections`, each holding
+only its own collection's keys. The manifest's top-level `name`, `license`
+and `sources` describe the pack; each entry of `collections` records its
+`name`, `license`, `sources`, `schemaVersion`, `embedding`, `docCount`,
+`sha256` and `bytes`. The top-level `docCount` and `bytes` are the totals.
+File names inside the pack are never taken from the manifest: the reader
+expects the i-th file to be called `collection-i.db`.
+
+**Installing.** Each collection is installed as the collection it was built
+from, read-only, under its own name — so a key used in two collections stays
+two documents, one in each. Every file is checked first (checksum, integrity,
+only its own collection's keys, its document count), then every name: the
+install answers 409 when a pack of that name is installed or any of its
+collections already holds data, and nothing is installed. If attaching one
+collection fails, the ones already attached are removed. Each collection's
+config records the pack's `name`, `version`, its own `license` and
+`sources`, and — for a pack of several — `packLicense` and `collections`.
+`MDDB_CORPUS_MAX_BYTES` caps all the files of a pack together.
+
+**Removing.** `mddb-cli corpus remove handbook` removes every collection the
+pack installed.
+
+**Compatibility.** A build of one collection without a licence or sources of
+its own still writes format 1, which every server since 2.18.10 reads. A
+server before 2.19.11 refuses a format-2 pack ("unsupported pack format 2");
+this one reads both.
 
 ## Read-only collections
 
@@ -227,8 +284,9 @@ name the terms. An install refuses a pack without them.
 | Method | Path | |
 |---|---|---|
 | `GET` | `/v1/corpus` | installed packs |
-| `POST` | `/v1/corpus/build` | `{"collection","license","version","description","sources"}` → `application/zstd` |
-| `POST` | `/v1/corpus/install` | multipart, field `pack` → `{"name","docCount","vectorsDisabled","warnings"}` |
+| `POST` | `/v1/corpus/build` | `{"collection","license","version","description","sources"}`, or `"name"` and `"collections"` instead of `"collection"` → `application/zstd` |
+| `POST` | `/v1/corpus/install` | multipart, field `pack` → `{"name","docCount","vectorsDisabled","warnings","collections"}` |
+| `POST` | `/v1/corpus/inspect` | multipart, field `pack` (the pack or its first megabytes; at most 16 MiB is read) → `{"manifest","conflicts"}`; admin; nothing is installed |
 | `POST` | `/v1/corpus/remove` | `{"name"}` |
 
 See the [REST API reference](/docs/api/reference/), generated from `openapi.yaml`, for the full schemas.
@@ -252,7 +310,7 @@ the model's context. Build with the CLI, REST or gRPC.
 | `ListCorpusPacks` | read, filtered to the tenant | `ListCorpusPacksResponse{packs, total}` |
 | `InstallCorpusPack` | admin | client stream: the first message holds `url` (+ `sha256`), or the pack as `data` chunks with an optional `sha256` |
 | `RemoveCorpusPack` | admin | `{name}` → `{status, name, deleted}` |
-| `BuildCorpusPack` | admin | server stream of `CorpusPackChunk`; the first carries `filename` and `doc_count` |
+| `BuildCorpusPack` | admin | server stream of `CorpusPackChunk`; the first carries `filename` and `doc_count`. `collections` and `name` (v2.19.11) build a pack of several collections, as REST |
 
 Errors: `INVALID_ARGUMENT` for a pack or request refused as it is,
 `NOT_FOUND`, `ALREADY_EXISTS` for a name already holding data,
