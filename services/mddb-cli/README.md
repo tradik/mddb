@@ -173,6 +173,36 @@ image documents under the file's key, with alt text and captions searchable
 ([docs/SEARCH.md](../../docs/SEARCH.md#images--alt-text-captions-and-pictures-v2189)).
 See [docs/BULK-IMPORT.md](../../docs/BULK-IMPORT.md).
 
+#### plan - A project's backlog in a collection (v2.19.11+)
+
+```bash
+mddb-cli plan [-c collection] [--lang en] add "<prompt>" [--size S|M|L] [--issue N]...
+                                              [--release X] [--model M] [--order N] [--slug s]
+mddb-cli plan next [--peek]
+mddb-cli plan done <slug> [--commit sha] [--note "..."]
+mddb-cli plan list [--status todo,doing,done]
+mddb-cli plan import BACKLOG.md
+mddb-cli plan export [--status todo,doing] > BACKLOG.md
+```
+
+One document per row in `<repo>-work` (the collection `autoindex` would pick
+for the working directory, with `-work` added): key `backlog/<slug>`, the
+prompt as content, and meta `kind: backlog`, `status` (`todo`, `doing`,
+`done`), `size`, `order`, `issues`, `release`, `model`. `plan next` takes the
+first `todo` row by `order` and marks it `doing` with a conditional write
+(`expectedRevision`): two sessions asking at the same moment get different
+rows. `plan done --note` also writes `progress/<date>-<slug>`.
+
+`plan import` reads the first Markdown table of a file (`| Prompt | Size |
+Model |`, a `|---|` separator, one line per row) and adds its rows after the
+existing ones; a prompt already in the backlog is not added twice. Columns
+other than Prompt, Size and Model are kept as meta, so `plan export` writes the
+same table back. A table written as `plan export` writes it (`| a | b |`
+lines, `|---|---|` separator) comes back byte for byte; the text around the
+table is not stored. The commands find rows with meta filters and the next row
+with a facet over `order`, so none of them reads the whole collection. See
+[docs/WORK-TRACKING.md](../../docs/WORK-TRACKING.md#3-keep-the-plan-in-a-collection).
+
 #### add - Add or update a document
 
 ```bash
