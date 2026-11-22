@@ -1,7 +1,7 @@
 ---
 title: "Issues, Plans and Sessions in MDDB"
 slug: "blog/issues-plans-sessions-in-mddb"
-status: draft
+status: publish
 type: post
 date: 2026-11-22
 tags: [agents, mcp, retrieval]
@@ -9,10 +9,6 @@ categories: [Guides]
 excerpt: "Mirror your repository's issues into MDDB, keep the plan and the session notes next to them, and let the agent ask one index instead of three tools. We measured where that saves tokens and where it does not."
 description: "A read-only issue mirror, a plan collection and scoped session memory for coding agents in MDDB 2.19.11: what it costs, what it saves, and when to skip it."
 ---
-
-<!-- DRAFT. Publish with 2.19.11. Every figure marked TBD is measured on a
-     running server before publication (blog/README.md); the forge-side
-     figures below are measured already. -->
 
 A coding agent spends tokens on three things before it writes code: finding
 the code, finding out what is asked for, and finding out where the last
@@ -50,7 +46,7 @@ Three questions are expensive, or cannot be asked at all:
   hand, if it makes it at all.
 - **"Where was I?"** Each session starts by reading the plan and the notes
   in full, whatever the task. In our own workflow the notes index alone is
-  about 2,500 tokens per session, and it grows with every release.
+  about 1,700 tokens per session, and it grows with every release.
 
 All three are retrieval problems, and retrieval is what MDDB does.
 
@@ -87,23 +83,43 @@ by recalling the three notes closest to its task.
 The commands, fields and the skill text are in
 [Work Tracking for Agents](/docs/work-tracking/).
 
-## What it should save
+## What it saves, measured
 
-Estimates until the release is measured; the forge column is measured.
+The same repository, mirrored into a local 2.19.11 server: 108 issues
+arrived in 8.1 s without a token. Answers are counted as the forge column
+was, four characters per token.
 
 | Question | Forge CLI | MDDB |
 |---|---|---|
-| open bugs, titles only | ~930 for 30 | TBD (projection: keys and titles) |
-| one issue, known number | 546 – 2,400 | the same text |
-| "did we fix this before?" | up to 72,792, or not found | TBD (5 passages; expected 1,000–2,500) |
-| issues that mention a file | not possible directly | TBD (metadata filter) |
-| start of session: next task and notes | ~2,500 and growing | TBD (expected under 1,000) |
+| closed bugs, titles only | 928 for a list of 30 | 1,241 for the 21 that match (keys and titles) |
+| one issue, known number | 546 – 2,400 | 2,921 for the same issue with its metadata |
+| how many issues per label | a list, then counting | 78 (one aggregate) |
+| "did we fix this before?" | up to 72,792, or not found | 1,879 for five passages; the first was the right issue |
+| issues that mention a file | not possible directly | 76 (a metadata filter on `paths`) |
+| next task from an 18-row backlog | 1,175 to read the file | 58 (`mddb-cli plan next`) |
 
-For ordinary work we expect a saving of 3,000 to 15,000 tokens per session.
-That is small next to what a code index saves, which is why this feature is
-small too: a mirror and some conventions, with no second tracker. The
-larger gain is in answers the agent could not get before, and no token
-count shows that.
+The first two rows are the honest ones to look at. Listing titles and
+opening one issue cost about the same either way, and slightly more through
+MDDB, whose answers carry metadata. The saving is in the other four rows:
+questions the forge answers by reading everything, or does not answer.
+
+For a session that looks up history once or twice and takes its next task
+from the plan, that is a few thousand tokens saved, and tens of thousands
+when the alternative was reading the tracker. It is small next to what a
+code index saves, which is why this feature is small too: a mirror and some
+conventions, with no second tracker. The larger gain is in answers the
+agent could not get before, and no token count shows that.
+
+Two things the measurement taught us. Without a token a forge allows few
+requests per hour: our second full import inside the hour ended with "the
+forge's rate limit is reached: it resets at 14:56:00Z", and deleted nothing.
+Give the rule a token. And the first search we wrote, `"filter": {"state":
+"closed"}`, was refused, because a filter wanted `{"in": ["closed"]}`. A
+bare value now means "equals", and `fields: ["meta.title"]` now returns the
+title, as the agent instructions had always claimed.
+
+Session memory is not in the table: recall depends on what was stored, and
+we have not measured it on real notes yet.
 
 ## When to use it
 
@@ -124,5 +140,7 @@ Not worth it:
 
 ## Measure your own
 
-TBD: the task file and the command for `tools/bench/agent` that run the
-same ten questions through the forge's CLI and through MDDB.
+`mddb-cli gain --window 7d` reports the searches an agent made and the
+tokens passages saved against whole documents. For the comparison above,
+ask your own tracker three questions you asked last week, once through the
+forge's CLI and once through the mirror, and count what comes back.

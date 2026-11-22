@@ -187,6 +187,14 @@ func TestMcpProjectionArgs(t *testing.T) {
 
 // --- projectMeta ---------------------------------------------------------
 
+func TestProjectMeta_MetaPrefix(t *testing.T) {
+	meta := map[string][]string{"title": {"T"}, "meta.odd": {"O"}, "odd": {"plain"}}
+	got := projectMeta(meta, []string{"meta.title", "meta.odd", "meta.missing"})
+	if len(got) != 2 || got["title"][0] != "T" || got["meta.odd"][0] != "O" {
+		t.Fatalf("prefix projection: %v", got)
+	}
+}
+
 func TestProjectMeta(t *testing.T) {
 	meta := map[string][]string{"a": {"1"}, "b": {"2"}, "c": {"3"}}
 	got := projectMeta(meta, []string{"a", "c", "missing"})

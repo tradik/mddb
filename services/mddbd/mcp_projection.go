@@ -1,5 +1,7 @@
 package main
 
+import "strings"
+
 // Response projection for the MCP read path.
 //
 // Narrow, high-frequency lookups (e.g. a "versions" service that only needs
@@ -58,11 +60,22 @@ func projectMCPDocument(doc MCPDocument, fields []string, includeContent bool) m
 // projectMeta returns a copy of meta containing only the requested keys.
 // Requested keys that are absent from the document are simply skipped, so the
 // result never carries empty placeholder entries.
+//
+// A key may be written with a "meta." prefix: the agent instructions have
+// said `fields: ["key", "meta.title"]` since they were written, and that
+// returned no title (2.19.11). A metadata key that really is named
+// "meta.x" still wins over the prefix reading.
 func projectMeta(meta map[string][]string, fields []string) map[string][]string {
 	out := make(map[string][]string, len(fields))
 	for _, f := range fields {
 		if v, ok := meta[f]; ok {
 			out[f] = v
+			continue
+		}
+		if name, prefixed := strings.CutPrefix(f, "meta."); prefixed {
+			if v, ok := meta[name]; ok {
+				out[name] = v
+			}
 		}
 	}
 	return out
