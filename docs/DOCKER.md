@@ -588,8 +588,8 @@ services:
 - [API Documentation](API.md) - API reference
 - [Architecture](ARCHITECTURE.md) - System architecture
 - [Docker Hub Image](DOCKER_HUB.md) - What ships in the published image
-- [Docker Hub Setup](DOCKER_SETUP.md) - Wiring up automated image builds and pushes
-- [Docker Hub Description Update](DOCKER_HUB_UPDATE.md) - Refreshing the Docker Hub listing text
+- [Docker Hub Setup](https://github.com/tradik/mddb/blob/main/docs/DOCKER_SETUP.md) - Wiring up automated image builds and pushes
+- [Docker Hub Description Update](https://github.com/tradik/mddb/blob/main/docs/DOCKER_HUB_UPDATE.md) - Refreshing the Docker Hub listing text
 
 ## License
 

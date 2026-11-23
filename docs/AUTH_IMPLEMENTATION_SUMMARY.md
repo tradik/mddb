@@ -2,7 +2,7 @@
 title: "JWT Auth and RBAC: Implementation Summary"
 slug: "docs/auth-implementation-summary"
 description: "Implementation notes for MDDB's JWT authentication and RBAC system: where the code lives, how a request is authenticated and authorized, and how the SEC-019 gate and SEC-020 admin scope changed it."
-status: publish
+status: draft
 ---
 
 # JWT Authentication + Authorization Implementation Summary

@@ -2,7 +2,7 @@
 title: "Docker Hub Setup Guide"
 slug: "docs/docker-setup"
 description: "Set up automated Docker image builds for MDDB: Docker Hub credentials, GitHub Actions secrets, the release tagging flow and multi-arch builds."
-status: publish
+status: draft
 ---
 
 # Docker Hub Setup Guide
