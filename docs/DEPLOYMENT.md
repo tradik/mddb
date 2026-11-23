@@ -451,7 +451,7 @@ fsync, a small commit went from 0.15 ms to 0.66 ms with about 16,000 free
 pages. On a disk, where every commit already waits for fsync, the relative
 cost is smaller. Use it for any database over a few gigabytes.
 
-Since 2.18.1, every startup phase is logged with its duration (`startup phase
+Every startup phase is logged with its duration (`startup phase
 finished phase=... elapsed=...`). `/health` answers from the first moment with
 `{"status":"warming_up","phase":"opening database",...}`, so a slow start can
 be told apart from a hang. When opening takes longer than 30 seconds without
@@ -460,7 +460,7 @@ health check allows 60 seconds before it counts failures. Raise
 `start_period` further for a large database that has not been switched to
 freelist sync yet.
 
-**Since 2.18.2 a planned restart no longer walks the file.** A clean shutdown
+**A planned restart no longer walks the file.** A clean shutdown
 (SIGTERM, SIGINT) stores the freelist with one commit, whatever
 `MDDB_FREELIST_SYNC` says, and the next start reads it. Commits after that
 start clear the stored list again, so after a crash the open still walks —
@@ -472,7 +472,7 @@ page cache dropped before each start:
 
 | start | opening the database |
 |---|---|
-| walk, cold (2.18.1) | 56–60 s |
+| walk, cold | 56–60 s |
 | after a clean shutdown | 0.014 s |
 | after a crash, with prewarm | 1.5 s read + 0.4 s walk |
 

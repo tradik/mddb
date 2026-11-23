@@ -636,7 +636,7 @@ passages = resp["passages"]
   the collection's evaluation set says it helps. See
   [SEARCH.md](SEARCH.md#model-reranking-v2198).
 
-## Summaries for General Questions (v2.18.9+)
+## Summaries for General Questions
 
 Chunks answer specific questions. Questions like "what is this document
 about" or "what are the main risks" match a summary better than any single
@@ -677,7 +677,7 @@ when the text changes, and it counts against the collection's embedding
 budget. `summaryMode: "off"` (the default) returns exactly what a search
 returned before. Run `POST /v1/eval` with configurations that differ only in
 `summaryMode` to see whether summaries raise recall on your own questions.
-For the full reference, see [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189).
+For the full reference, see [SEARCH.md](SEARCH.md#summaries--a-second-representation).
 
 ## Production Tips
 

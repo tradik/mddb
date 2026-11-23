@@ -185,7 +185,7 @@ Add or update a markdown document in a collection.
 
 **Optional fields**:
 - `ttl`: seconds until the document expires (0 = never)
-- `expectedRevision` (v2.18.8): write only if the document is still at this revision; otherwise `409 Conflict` — see [conditional writes](#patch-v1update)
+- `expectedRevision`: write only if the document is still at this revision; otherwise `409 Conflict` — see [conditional writes](#patch-v1update)
 - `ifAbsent` (v2.19.6): create only. When the document already exists the answer is `409 Conflict` with its `currentRevision` and an empty `expectedRevision`, and nothing is written. A document past its TTL counts as absent. Cannot be combined with `expectedRevision` (`400`)
 
 **Features**:
@@ -249,8 +249,8 @@ Add multiple documents to a collection in a single request. Uses the optimized b
   - `key` (required): Document key
   - `lang` (required): Language code
   - `contentMd` (required unless `contentBase64` is given): Markdown content
-  - `format` (optional, v2.18.9+): convert the document from this format (`html`, `pdf`, `docx`, `odt`, `rtf`, `xlsx`, `ods`, `csv`, `tsv`, `pptx`, `odp`, `epub`, `eml`, `mbox`, `tex`, `yaml`, `log`, ... — see the format table under `/v1/upload`). Empty means the key's extension. Without `contentBase64`, `contentMd` is the file's text (HTML sent as a string)
-  - `contentBase64` (optional, v2.18.9+): the file to convert, base64-encoded. It goes through the same converters as `/v1/upload`; the stored document is the Markdown, with `meta.sourceFormat` set. With `skipDuplicates` the converted Markdown is compared, so an unchanged file is skipped. A format with no converter fails that document (`unsupported format: bin`), not the batch
+  - `format` (optional): convert the document from this format (`html`, `pdf`, `docx`, `odt`, `rtf`, `xlsx`, `ods`, `csv`, `tsv`, `pptx`, `odp`, `epub`, `eml`, `mbox`, `tex`, `yaml`, `log`, ... — see the format table under `/v1/upload`). Empty means the key's extension. Without `contentBase64`, `contentMd` is the file's text (HTML sent as a string)
+  - `contentBase64` (optional): the file to convert, base64-encoded. It goes through the same converters as `/v1/upload`; the stored document is the Markdown, with `meta.sourceFormat` set. With `skipDuplicates` the converted Markdown is compared, so an unchanged file is skipped. A format with no converter fails that document (`unsupported format: bin`), not the batch
   - `meta` (optional): Metadata key-value pairs
   - `saveRevision` (optional): Whether to save a revision for this document
 
@@ -264,7 +264,7 @@ Add multiple documents to a collection in a single request. Uses the optimized b
 }
 ```
 
-`embeddingDropped` (v2.15.0+) appears **only when non-zero**: that many
+`embeddingDropped` appears **only when non-zero**: that many
 documents were stored without a vector because the embedding queue was full
 and the write gave up waiting. `failed` stays `0` — the documents are in the
 database; they are simply unreachable by vector and hybrid search until
@@ -362,8 +362,8 @@ Bulk ingest endpoint with advanced features for scraping pipelines and data impo
   - `skipWebhooks` (optional): Skip webhook firing for this batch
   - `autoConfigureCollection` (optional): Auto-configure collection as "scraping" type if it doesn't exist
   - `saveRevision` (optional): Save revision history for all documents in this batch
-  - `profile` (optional, v2.12.0+): `default` or `fast` — see below
-  - `textOnly` (optional, v2.12.0+): Extract plain text from html/docx/odt instead of rebuilding Markdown structure. Implied by `profile: fast`. Applies to documents sent with `format`/`contentBase64`.
+  - `profile` (optional): `default` or `fast` — see below
+  - `textOnly` (optional): Extract plain text from html/docx/odt instead of rebuilding Markdown structure. Implied by `profile: fast`. Applies to documents sent with `format`/`contentBase64`.
 
 **Response**:
 ```json
@@ -379,13 +379,13 @@ Bulk ingest endpoint with advanced features for scraping pipelines and data impo
 }
 ```
 
-Since v2.18.9 the response also lists `conversions`: every document converted
+The response also lists `conversions`: every document converted
 from a file sent with `contentBase64`, with its `key`, the `format` it came
 from, `conversionConfidence` and `conversionWarnings` (see *Conversion
 confidence* below). An email's attachments and a mailbox's messages are
 stored as documents of their own and listed there too.
 
-#### The `fast` ingest profile (v2.12.0+)
+#### The `fast` ingest profile
 
 MDDB could always ingest faster by skipping steps — the flags existed — but only
 as separate switches a caller had to discover one at a time, and the wiki
@@ -473,10 +473,10 @@ Upload files via multipart/form-data. Files are auto-converted to Markdown and s
 - `profile` / `textOnly` (optional): as for `/v1/ingest`
 
 Upload, `/v1/ingest` with `contentBase64`, and the MCP tools `upload_file`
-and `ingest_documents` share one conversion path (v2.18.9+), so a format
+and `ingest_documents` share one conversion path, so a format
 converts the same way whichever door it comes through.
 
-### Images (v2.18.9+)
+### Images
 
 - `extractImages=true` (form field; `options.extractImages` on
   `/v1/ingest`): the images of Markdown files and PDFs become image
@@ -498,7 +498,7 @@ converts the same way whichever door it comes through.
 
 What is extracted, what is skipped, and how images come back with search
 results (`includeImages`, `imageHits`, `queryImage`):
-[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189).
+[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures).
 
 ### Document keys are case-insensitive
 
@@ -517,7 +517,7 @@ plainly, because none of them announce themselves:
   `README` and `readme`, `Dockerfile` and `dockerfile` are distinct files on a
   case-sensitive filesystem and one document here.
 
-Since v2.18.9 the **key index** follows the same rule as the identifier: the
+The **key index** follows the same rule as the identifier: the
 key and language are stored with ASCII letters in lower case. A document
 written as `README.md` is found as `readme.md`, `ReadMe.MD` or any other
 spelling, and it has one index entry however many spellings were written.
@@ -539,14 +539,14 @@ migrated when v2.18.9 first opens it (see
 | DOCX | `.docx` | Text extracted with headings and list structure preserved |
 | ODT | `.odt` | OpenDocument text extracted with headings preserved |
 | RTF | `.rtf` | Rich Text Format — text extracted, formatting stripped |
-| XLSX (v2.18.9+) | `.xlsx` | Every sheet a `## Sheet` section holding a table; dates (by the cell's number format) as ISO 8601, not serial numbers; shared and inline strings, booleans; formulas give their cached value |
-| ODS (v2.18.9+) | `.ods` | As XLSX: every table a section; date and time cells as ISO 8601; repeated rows and columns expanded up to 1000 |
-| CSV, TSV (v2.18.9+) | `.csv`, `.tsv` | One table; the CSV separator (`,` `;` tab `\|`) detected from the first lines, a UTF-8 BOM dropped |
-| PPTX (v2.18.9+) | `.pptx` | One `## Slide N: Title` section per slide in presentation order, body paragraphs, then `**Notes:**` with the speaker notes; slide numbers, dates and footers left out |
-| ODP (v2.18.9+) | `.odp` | As PPTX: one section per page, title frame as the title, `presentation:notes` as notes |
-| EPUB (v2.18.9+) | `.epub` | Chapters in spine order (the book's reading order), each through the HTML converter; the book title as the heading |
-| EML (v2.18.9+) | `.eml` | Headers to meta (`from`, `to`, `date` as RFC 3339, `subject`, `messageId`, `attachments`); the plain-text body, or the HTML body through the HTML converter (nothing executed); every attachment the server can convert stored as its own document `KEY/attachments/NAME` with `meta.parent` = KEY |
-| MBOX (v2.18.9+) | `.mbox` | The mailbox document lists its messages; each message is stored as `KEY/message-N` (as EML, with its own attachments below it) |
+| XLSX | `.xlsx` | Every sheet a `## Sheet` section holding a table; dates (by the cell's number format) as ISO 8601, not serial numbers; shared and inline strings, booleans; formulas give their cached value |
+| ODS | `.ods` | As XLSX: every table a section; date and time cells as ISO 8601; repeated rows and columns expanded up to 1000 |
+| CSV, TSV | `.csv`, `.tsv` | One table; the CSV separator (`,` `;` tab `\|`) detected from the first lines, a UTF-8 BOM dropped |
+| PPTX | `.pptx` | One `## Slide N: Title` section per slide in presentation order, body paragraphs, then `**Notes:**` with the speaker notes; slide numbers, dates and footers left out |
+| ODP | `.odp` | As PPTX: one section per page, title frame as the title, `presentation:notes` as notes |
+| EPUB | `.epub` | Chapters in spine order (the book's reading order), each through the HTML converter; the book title as the heading |
+| EML | `.eml` | Headers to meta (`from`, `to`, `date` as RFC 3339, `subject`, `messageId`, `attachments`); the plain-text body, or the HTML body through the HTML converter (nothing executed); every attachment the server can convert stored as its own document `KEY/attachments/NAME` with `meta.parent` = KEY |
+| MBOX | `.mbox` | The mailbox document lists its messages; each message is stored as `KEY/message-N` (as EML, with its own attachments below it) |
 | LaTeX | `.tex`, `.latex` | Converted to Markdown (sections, formatting, environments, math preserved) |
 | YAML | `.yaml`, `.yml` | Wrapped in code block for structured data |
 | Log | `.log` | Wrapped in code block |
@@ -559,7 +559,7 @@ or an OpenDocument/EPUB `mimetype` — and by extension otherwise, so a PDF name
 refused (`binary content that is no format the server converts`) rather than
 stored as text. Every converter is pure Go; none adds a dependency.
 
-**Conversion confidence** (v2.18.9+, GO-046): every converted document carries
+**Conversion confidence**: every converted document carries
 `meta.conversionConfidence`, a number from `0.00` to `1.00`, and
 `meta.conversionWarnings` saying what lowered it. It is a heuristic, computed
 from the converted text and the file — no model, no OCR:
@@ -582,8 +582,8 @@ not converted and carry no score.
 - `upload_format`: Original file format (e.g. `pdf`, `html`, `docx`)
 - `upload_filename`: Original filename
 - `upload_converted`: `"true"` if file was converted from non-markdown format
-- `conversionConfidence`, `conversionWarnings` (v2.18.9+): see *Conversion confidence* above
-- `from`, `to`, `date`, `subject`, `messageId`, `attachments` (v2.18.9+, email); `parent` and `filename` on an attachment's document
+- `conversionConfidence`, `conversionWarnings`: see *Conversion confidence* above
+- `from`, `to`, `date`, `subject`, `messageId`, `attachments` (email); `parent` and `filename` on an attachment's document
 
 A converted file's response also carries `conversionConfidence` and
 `conversionWarnings`, and `parts`: the further documents it held (a mailbox's
@@ -658,7 +658,7 @@ curl -X POST http://localhost:11023/v1/upload \
   -F "maxSize=52428800"
 ```
 
-**MCP Tool**: `upload_file` — accepts base64-encoded file content with filename for format detection, and `text_only` (v2.18.9+). `ingest_documents` takes `format` and `content_base64` per document and `text_only` in its options.
+**MCP Tool**: `upload_file` — accepts base64-encoded file content with filename for format detection, and `text_only`. `ingest_documents` takes `format` and `content_base64` per document and `text_only` in its options.
 
 ---
 
@@ -759,7 +759,7 @@ Search for documents in a collection with optional metadata filtering and sortin
 - `filterMeta` (optional): Metadata filters (AND between keys, OR between values)
 - `sort` (optional): Sort field - `addedAt`, `updatedAt`, or `key`
 - `asc` (optional): Sort order - `true` for ascending, `false` for descending
-- `limit` (optional): Maximum number of results (default: 50), never more than `MDDB_SEARCH_MAX_LIMIT` (default 1000, v2.18.10+). A larger `limit` is lowered to the cap and the response carries the headers `X-Limit-Capped: true` and `X-Limit: <the limit used>` — the body is a bare array, with no object to hold the fields every other search returns
+- `limit` (optional): Maximum number of results (default: 50), never more than `MDDB_SEARCH_MAX_LIMIT` (default 1000). A larger `limit` is lowered to the cap and the response carries the headers `X-Limit-Capped: true` and `X-Limit: <the limit used>` — the body is a bare array, with no object to hold the fields every other search returns
 - `offset` (optional): Number of results to skip (default: 0)
 
 **Response**:
@@ -847,16 +847,16 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `threshold` (optional): Minimum similarity score 0.0-1.0 (default: 0.0)
 - `filterMeta` (optional): Metadata pre-filter (same logic as `/v1/search`)
 - `includeContent` (optional): Include `contentMd` in results (default: false)
-- `algorithm` (optional): `flat` (default), `auto`, `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`. With `auto` (v2.18.9+) the query planner chooses per query; the collection profile's `retrieval.vectorAlgorithm` applies when the request names none ([SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189))
-- `explain` (optional, v2.18.9+): Add `plan` to the response — the index that answered, `prefilter`, `strategy` (v2.19.8: `prefilter`, `graph+filter`, `ivf` or `scan+filter` for a filtered search), `candidates`, `iterativeScan` and the reasons
-- `includeImages` (optional, v2.18.9+): Attach each hit's image documents as `images` (alt text, caption, page, `url`); with a provider that embeds images also return `imageHits`, the images whose picture matches the query. Also on `/v1/fts`, `/v1/hybrid-search` and `/v1/cross-search` ([SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189))
-- `queryImage` (optional*, v2.18.9+): Search by an image instead of text — base64, a data URI or an http(s) URL (SSRF-guarded). Needs a provider that embeds images, else 400; the results are image documents, `algorithm: "image"`
-- `latencyTargetMs` (optional, v2.18.9+): Latency goal for `auto`, 0–60000; 10 or less favours a quantized index on 10,000+ vectors
-- `positive`, `negative` (optional, v2.18.9+): Relevance feedback — results that were right or wrong, each a document key or ID (string) or a vector (array of numbers); at most 50 per side ([SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189))
-- `feedbackMode` (optional, v2.18.9+): `query` (default: Rocchio on the query vector) or `rescore` (re-rank the candidates by similarity to the examples)
-- `feedbackWeight` (optional, v2.18.9+): Rescore weight, 0–10 (default 0.5)
-- `rocchio` (optional, v2.18.9+): `{alpha, beta, gamma}` for `query` mode (default 1, 0.75, 0.25)
-- `queryDecomposition` (optional, v2.18.10+): `off` (default) or `auto` — a query of several clauses ("set up a replica and take a backup") is also searched clause by clause, at most 4, and each document keeps its best score; with `explain`, `plan.decomposition` gives the parts ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810))
+- `algorithm` (optional): `flat` (default), `auto`, `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`. With `auto` the query planner chooses per query; the collection profile's `retrieval.vectorAlgorithm` applies when the request names none ([SEARCH.md](SEARCH.md#auto-the-server-chooses))
+- `explain` (optional): Add `plan` to the response — the index that answered, `prefilter`, `strategy` (v2.19.8: `prefilter`, `graph+filter`, `ivf` or `scan+filter` for a filtered search), `candidates`, `iterativeScan` and the reasons
+- `includeImages` (optional): Attach each hit's image documents as `images` (alt text, caption, page, `url`); with a provider that embeds images also return `imageHits`, the images whose picture matches the query. Also on `/v1/fts`, `/v1/hybrid-search` and `/v1/cross-search` ([SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures))
+- `queryImage` (optional*): Search by an image instead of text — base64, a data URI or an http(s) URL (SSRF-guarded). Needs a provider that embeds images, else 400; the results are image documents, `algorithm: "image"`
+- `latencyTargetMs` (optional): Latency goal for `auto`, 0–60000; 10 or less favours a quantized index on 10,000+ vectors
+- `positive`, `negative` (optional): Relevance feedback — results that were right or wrong, each a document key or ID (string) or a vector (array of numbers); at most 50 per side ([SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples))
+- `feedbackMode` (optional): `query` (default: Rocchio on the query vector) or `rescore` (re-rank the candidates by similarity to the examples)
+- `feedbackWeight` (optional): Rescore weight, 0–10 (default 0.5)
+- `rocchio` (optional): `{alpha, beta, gamma}` for `query` mode (default 1, 0.75, 0.25)
+- `queryDecomposition` (optional): `off` (default) or `auto` — a query of several clauses ("set up a replica and take a backup") is also searched clause by clause, at most 4, and each document keeps its best score; with `explain`, `plan.decomposition` gives the parts ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs))
 
 \* Either `query` or `queryVector` is required.
 
@@ -906,7 +906,7 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `model`: Embedding model used
 - `dimensions`: Vector dimensionality
 - `algorithm`: The index that answered
-- `plan` (with `explain`, v2.18.9+): `{algorithm, prefilter, strategy, candidates, iterativeScan, reasons}`
+- `plan` (with `explain`): `{algorithm, prefilter, strategy, candidates, iterativeScan, reasons}`
 
 **How It Works**:
 1. When a document is added via `/v1/add`, its content is automatically embedded in the background
@@ -960,9 +960,9 @@ worse ranking rather than as an error. Reindexing is your call.
 **Parameters**:
 - `collection` (required): Collection name
 - `force` (optional): If `true`, re-embed all documents regardless of content changes. If `false`, skip documents whose content hasn't changed (default: false)
-- `async` (optional, v2.18.4+): If `true`, start the reindex as a background job and answer at once (see below)
+- `async` (optional): If `true`, start the reindex as a background job and answer at once (see below)
 
-**Long reindexes (v2.18.4+).** Re-embedding tens of thousands of documents
+**Long reindexes.** Re-embedding tens of thousands of documents
 takes as long as the provider needs, often over an hour on a CPU. The
 synchronous call keeps working: its write deadline is lifted, as for
 `add-batch` and backups, so the result is delivered however long it takes, as
@@ -1032,7 +1032,7 @@ Get embedding/vector search statistics.
 }
 ```
 
-`queue` (v2.15.0+) says why `embedded_documents` might be below
+`queue` says why `embedded_documents` might be below
 `total_documents`, which the two counts alone cannot:
 
 | Field | Meaning |
@@ -1042,7 +1042,7 @@ Get embedding/vector search statistics.
 | `dropped` | Documents stored **without** a vector since startup, because the queue was full and the write gave up waiting. Repair with `POST /v1/vector-reindex` |
 | `wait` | How long a write waits for room before dropping (`MDDB_EMBEDDING_QUEUE_WAIT`) |
 
-While the index loads at startup (v2.18.4+), `indexProgress` says how far
+While the index loads at startup, `indexProgress` says how far
 it is: `collectionsDone`/`collectionsTotal`, `vectorsDone`/`vectorsTotal`,
 `percent`, `etaSeconds` (-1 until it can be estimated), the collection being
 loaded (`current`) and `readyCollections`, the ones that already answer.
@@ -1050,7 +1050,7 @@ loaded (`current`) and `readyCollections`, the ones that already answer.
 on a collection that is not loaded yet answers `503` with `Retry-After`,
 the collection and the progress; other collections are searched normally.
 
-Since v2.18.10 a collection answers on flat, HNSW and BQ before IVF, PQ,
+A collection answers on flat, HNSW and BQ before IVF, PQ,
 OPQ, SQ and SQ4 have trained on it; they train in the background
 afterwards (GO-047). While they do, `indexTraining` lists `current`, the
 collection being trained, `pending`, every collection not trained yet in
@@ -1167,7 +1167,7 @@ without vectors answers `{"points": [], ...}`; a missing `collection` is a 400.
 | OpenAI | `openai` | `text-embedding-3-small` | 1536 | Yes |
 | Voyage AI (Anthropic) | `voyage` | `voyage-3` | 1024 | Yes |
 | Ollama (local) | `ollama` | `nomic-embed-text` | 768 | No |
-| Lexical (no model; matches spelling, not meaning — [details](EMBEDDING_PROVIDERS.md#5-lexical-no-model-no-network--v2189)) | `lexical` | `lexical-ngram-v1` | 512 (256–2048) | No |
+| Lexical (no model; matches spelling, not meaning — [details](EMBEDDING_PROVIDERS.md#5-lexical-no-model-no-network)) | `lexical` | `lexical-ngram-v1` | 512 (256–2048) | No |
 | Disabled | `none` or empty | - | - | - |
 
 #### Provider-Specific Configuration
@@ -1218,7 +1218,7 @@ Metadata pre-filtering significantly reduces search time (e.g., filtering to 10%
 
 Perform full-text search across document content. Supports multiple search modes: simple, boolean, phrase, wildcard, proximity, and range filtering. Uses TF-IDF, BM25, BM25F, or PMISparse scoring with optional stemming, synonyms, and typo tolerance.
 
-**Result limit (v2.18.10+).** `limit` (default 50) is never above `MDDB_SEARCH_MAX_LIMIT` (default 1000) or the collection's `retrieval.maxTopK`. A request above the cap gets the cap, and the response adds `"limit": <the limit used>, "limitCapped": true`; under the cap neither field appears. `facetMaxValues` is bounded by the same cap (`0` means the cap), `maxHighlights` by 20 and `fragmentSize` by 1000. The same holds for vector, hybrid, cross-collection, autocomplete, code symbol and geo search — see [SEARCH.md](SEARCH.md#result-limits-v21810).
+**Result limit.** `limit` (default 50) is never above `MDDB_SEARCH_MAX_LIMIT` (default 1000) or the collection's `retrieval.maxTopK`. A request above the cap gets the cap, and the response adds `"limit": <the limit used>, "limitCapped": true`; under the cap neither field appears. `facetMaxValues` is bounded by the same cap (`0` means the cap), `maxHighlights` by 20 and `fragmentSize` by 1000. The same holds for vector, hybrid, cross-collection, autocomplete, code symbol and geo search — see [SEARCH.md](SEARCH.md#result-limits).
 
 **Request Body**:
 ```json
@@ -1247,23 +1247,23 @@ Perform full-text search across document content. Supports multiple search modes
 - `query` (required): Search query text
 - `limit` (optional): Maximum results (default: 50)
 - `algorithm` (optional): `"tfidf"` (default), `"bm25"`, `"bm25f"`, or `"pmisparse"` — used for simple mode
-- `mode` (optional): Search mode — `"auto"` (default), `"simple"`, `"boolean"`, `"phrase"`, `"wildcard"`, `"proximity"`, `"expression"` (v2.9.13+ — full query DSL with nested parens and precedence)
+- `mode` (optional): Search mode — `"auto"` (default), `"simple"`, `"boolean"`, `"phrase"`, `"wildcard"`, `"proximity"`, `"expression"` (full query DSL with nested parens and precedence)
 - `distance` (optional): Proximity distance in words (default: 5) — only used with mode=proximity
 - `fuzzy` (optional): Typo tolerance — `0` (off, default), `1` (1 edit), `2` (2 edits) — used for simple mode
 - `lang` (optional): Language code for query tokenization (e.g., `"pl"`, `"de"`, `"fr"`). Uses language-specific stemmer and stop words. Falls back to server default if omitted (default: `"en"`, configurable via `MDDB_FTS_DEFAULT_LANG`)
 - `disableStem` (optional): Disable stemming for this query (default: false)
 - `disableSynonyms` (optional): Disable synonym expansion for this query (default: false)
 - `fieldWeights` (optional, BM25F only): Map of field name to weight. Defaults: content=1.0, meta.title=3.0, meta.tags=2.0, meta.category=2.0, meta.description=1.5
-- `bm25K1`, `bm25B` (optional, v2.18.8, bm25 and bm25f only): BM25 parameters for this query, k1 0–3 and b 0–1. Default: the collection profile's `retrieval.bm25K1`/`bm25B`, then 1.2 / 0.75. See [SEARCH.md](SEARCH.md#tuning-k1-and-b-v2188).
+- `bm25K1`, `bm25B` (optional, bm25 and bm25f only): BM25 parameters for this query, k1 0–3 and b 0–1. Default: the collection profile's `retrieval.bm25K1`/`bm25B`, then 1.2 / 0.75. See [SEARCH.md](SEARCH.md#tuning-k1-and-b).
 - `filterMeta` (optional): Metadata pre-filter — `{"key": ["value1", "value2"]}`
 - `rangeMeta` (optional): Array of range filters on metadata or timestamps
 - `boost` (optional): Per-query score multipliers keyed by `"metaKey:metaValue"`. Positive values boost (`5.0` → 5×), negative values demote (`-2.0` → ½×). Multiple matching entries combine multiplicatively; floor is `0.001`. No reindex required.
-- `highlight` (optional, v2.9.13+): When `true`, each result gains a `highlights[]` array with snippet fragments around matched terms. Works uniformly across every mode.
-- `highlightTag` (optional, v2.9.13+): Wrap tag for matched terms — defaults to `"<mark>"` which produces `<mark>term</mark>`. Common alternatives: `"<strong>"`, `"**"` (for markdown), `"[h]"`. The close tag is derived automatically from the open tag.
-- `maxHighlights` (optional, v2.9.13+): Max fragments returned per result (default `3`).
-- `fragmentSize` (optional, v2.9.13+): Approximate chars per fragment (default `150`). Fragments snap to word boundaries so the value is a target, not a hard cap.
-- `facetBy` (optional, v2.9.14+): Array of metadata keys. When non-empty the response gains a `facets` map keyed by the same names with per-value counts (ordered by count desc, value asc) aggregated over the matched documents. Counts reflect the post-filter, post-boost, post-curation result set.
-- `facetMaxValues` (optional, v2.9.14+): Cap per-key bucket count. `0` / omitted = unlimited.
+- `highlight` (optional): When `true`, each result gains a `highlights[]` array with snippet fragments around matched terms. Works uniformly across every mode.
+- `highlightTag` (optional): Wrap tag for matched terms — defaults to `"<mark>"` which produces `<mark>term</mark>`. Common alternatives: `"<strong>"`, `"**"` (for markdown), `"[h]"`. The close tag is derived automatically from the open tag.
+- `maxHighlights` (optional): Max fragments returned per result (default `3`).
+- `fragmentSize` (optional): Approximate chars per fragment (default `150`). Fragments snap to word boundaries so the value is a target, not a hard cap.
+- `facetBy` (optional): Array of metadata keys. When non-empty the response gains a `facets` map keyed by the same names with per-value counts (ordered by count desc, value asc) aggregated over the matched documents. Counts reflect the post-filter, post-boost, post-curation result set.
+- `facetMaxValues` (optional): Cap per-key bucket count. `0` / omitted = unlimited.
 
 **Search Modes**:
 - **simple**: Standard full-text search with TF-IDF/BM25/BM25F/PMISparse scoring
@@ -1400,7 +1400,7 @@ lowered `limit`, the response says so with `limit` and `limitCapped`; when
 
 ### POST /v1/fts-reindex
 
-Reindex all documents in a collection using their stored `lang` field for language-aware FTS processing. A collection with `fts: {enabled: false}` has its postings removed instead (v2.18.2+). Every document is rebuilt from scratch, while a write re-indexes only what it changed (v2.18.10+, see [incremental indexing](SEARCH.md#incremental-indexing-v21810)): run it after changing stop words, stemming or `fts.excludeMetaKeys`.
+Reindex all documents in a collection using their stored `lang` field for language-aware FTS processing. A collection with `fts: {enabled: false}` has its postings removed instead. Every document is rebuilt from scratch, while a write re-indexes only what it changed (see [incremental indexing](SEARCH.md#incremental-indexing)): run it after changing stop words, stemming or `fts.excludeMetaKeys`.
 
 **Request Body**:
 ```json
@@ -1424,7 +1424,7 @@ curl -X POST http://localhost:11023/v1/fts-reindex \
 
 `status` is `ok`, `partial` when some documents failed to index (they count
 in `skipped`), or `removed` for a collection with full-text indexing off.
-A reindex of a large collection takes minutes; since v2.18.6 the call lifts
+A reindex of a large collection takes minutes; the call lifts
 the HTTP write deadline for its own response, as `add-batch` does, so the
 answer arrives however long it takes, as long as the client waits.
 
@@ -1462,7 +1462,7 @@ Return up to `topN` terms starting with the given prefix, ranked by document fre
 - `collection` (required): Collection name
 - `q` (required): Prefix query — lowercased and stripped of non-alphanumerics
 - `field` (optional): Limit to one indexed field (e.g. `title`, `content`, `meta.tags`); empty means global
-- `topN` (optional, default 10): Maximum suggestions, never above `MDDB_SEARCH_MAX_LIMIT` or the collection's `retrieval.maxTopK` (v2.18.10+); a capped request's response adds `"limit"` and `"limitCapped": true`
+- `topN` (optional, default 10): Maximum suggestions, never above `MDDB_SEARCH_MAX_LIMIT` or the collection's `retrieval.maxTopK`; a capped request's response adds `"limit"` and `"limitCapped": true`
 
 **cURL Examples**:
 ```bash
@@ -1675,8 +1675,7 @@ curl "http://localhost:11023/v1/backup?to=backup-$(date +%s).db"
 
 **Notes**:
 - Copies the database through a read transaction, so the copy is one
-  consistent state even while writes continue (v2.15.4; before that a copy
-  taken during writes could not be restored — #266)
+  consistent state even while writes continue
 - The copy passes bbolt's full integrity check before it is kept. A failure
   returns `500` and means the **live** database is damaged — see
   [BACKUP.md](BACKUP.md). `MDDB_BACKUP_VERIFY=false` skips the check
@@ -1715,9 +1714,9 @@ curl -X POST http://localhost:11023/v1/restore \
 - The server briefly closes and reopens the database connection
 - All current data will be replaced with the backup
 
-**Safety** (v2.12.0, hardened in v2.15.4): the backup must pass bbolt's full
+**Safety**: the backup must pass bbolt's full
 integrity check, run in a separate process, before the live file is touched —
-a read-only open alone let a damaged backup through (#266) — the current database is kept as a snapshot
+the current database is kept as a snapshot
 until the swap succeeds, and any failure rolls back — the server never ends up
 with a closed or destroyed database. A failed restore returns `500` with the
 previous data still being served. The gRPC `Restore` RPC follows the same
@@ -1836,7 +1835,7 @@ curl -X POST http://localhost:11023/v1/truncate \
 
 ### GET /v1/storage
 
-(v2.18.2+) Where the bytes of the database file are: bytes per top-level
+Where the bytes of the database file are: bytes per top-level
 bucket, key and value bytes per collection split by bucket and category
 (`content`, `metadata`, `fullText`, `vectors`, `other`), and the free space a
 [compaction](BACKUP.md#compacting-a-database) would give back.
@@ -1863,8 +1862,8 @@ In the per-collection layout ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md)) each
 collection also reports `fileBytes`, the size of its own file, and the totals
 cover every file.
 
-The full breakdown reads every key; on a large file that is minutes. Since
-v2.18.5 it reads in short transactions, so writes are not held up behind it,
+The full breakdown reads every key; on a large file that is minutes. It
+reads in short transactions, so writes are not held up behind it,
 and a bucket's `inUseBytes` is the bytes of its keys and values. `allocBytes`,
 the pages bbolt allocated to a bucket, is no longer reported: measuring it
 took one read transaction over the whole bucket. `buckets` is present only in
@@ -1875,7 +1874,7 @@ then `POST /v1/fts-reindex` to remove its postings.
 
 ### GET /v1/indexing-status
 
-Is what was just written searchable yet? (v2.18.8, GO-042.) Queued embedding
+Is what was just written searchable yet? Queued embedding
 and metadata work for one collection, or for the whole server without
 `collection`. A write returns once its full text and metadata are indexed; the
 embedding follows from a background worker, so a semantic search sees the
@@ -1885,11 +1884,11 @@ document once `pendingEmbeddings` reaches 0.
 curl "http://localhost:11023/v1/indexing-status?collection=notes"
 ```
 
-Since v2.18.9 a collection holding image documents also reports `images`:
+A collection holding image documents also reports `images`:
 `documents`, `embedded` (with an image vector), the multimodal `model`, or a
 `note` saying why images are not embedded (RAG-010).
 
-Since v2.18.10 `trainingCollections` lists the collections whose IVF, PQ,
+`trainingCollections` lists the collections whose IVF, PQ,
 OPQ, SQ and SQ4 indexes are still training after a start or a restore
 (GO-047). Flat and HNSW already answer for them. The field is absent when no
 collection is training.
@@ -1918,7 +1917,7 @@ event `collection.indexed` fires when a collection's queue drains, and
 
 ### Collection aliases: /v1/aliases
 
-An alias is a stable name for a collection (v2.18.8, GO-044). Clients use
+An alias is a stable name for a collection. Clients use
 the alias, and moving it to another collection is one atomic step. That is
 how a collection rebuilt with a new embedding model replaces the old one
 without any client changing a name.
@@ -2371,10 +2370,10 @@ curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{"enabled":true
 ### GET /v1/gain
 
 What retrieval saved its callers over a window of days, for the whole
-server (v2.18.8, AGT-004). It reports searches by type, algorithm and hybrid
+server. It reports searches by type, algorithm and hybrid
 fusion, and tokens returned. It also reports tokens avoided, meaning whole
 documents minus the passages or chunks returned instead. Read-only. The
-definitions are in [TELEMETRY.md](TELEMETRY.md#retrieval-gain-v2188).
+definitions are in [TELEMETRY.md](TELEMETRY.md#retrieval-gain).
 
 ```bash
 curl "http://localhost:11023/v1/gain?window=30d"
@@ -2401,7 +2400,7 @@ curl "http://localhost:11023/v1/gain?window=30d"
 
 ### POST /v1/eval
 
-Measure retrieval on the collection's own questions (v2.18.8, SRCH-019). An
+Measure retrieval on the collection's own questions. An
 evaluation set is a list of queries, each with the keys of the documents that
 should answer it and optional grades (0–3) for nDCG. The endpoint runs the set
 under up to 8 search configurations and returns, per configuration, recall@k,
@@ -2503,10 +2502,10 @@ Get server and database statistics.
 - `totalDocuments`: Total documents across all collections
 - `totalRevisions`: Total revisions across all collections
 - `totalMetaIndices`: Total metadata indices across all collections
-- `statsComputedAt`, `statsAgeSeconds` (v2.18.5+): when the counts were computed
-- `statsPending` (v2.18.5+): `true` when the first count after a start is still running
+- `statsComputedAt`, `statsAgeSeconds`: when the counts were computed
+- `statsPending`: `true` when the first count after a start is still running
 
-**How fresh the counts are (v2.18.5+).** Counting walks every document,
+**How fresh the counts are.** Counting walks every document,
 revision and metadata-index key, which on a database of millions of documents
 takes minutes; the call used to do that every time and never returned. The
 counts now come from a snapshot shared with gRPC, MCP and `/metrics`:
@@ -2976,9 +2975,9 @@ Partially update a document's metadata and/or content independently without re-s
 | `meta` | object | No | New metadata (replaces all). Use `{}` to clear |
 | `contentMd` | string | No | New content (replaces existing) |
 | `ttl` | int | No | New TTL in seconds (0 = remove) |
-| `expectedRevision` | string | No | (v2.18.8) Update only if the document is still at this revision; otherwise `409 Conflict` |
+| `expectedRevision` | string | No | Update only if the document is still at this revision; otherwise `409 Conflict` |
 
-**Conditional writes (v2.18.8, INT-021).** `GET /v1/get`, `POST /v1/add` and
+**Conditional writes.** `GET /v1/get`, `POST /v1/add` and
 this endpoint return the document's `revision`. Send it back as
 `expectedRevision` and the write succeeds only if nobody wrote in between;
 otherwise the response is `409 Conflict` with `currentRevision`, and nothing
@@ -3014,11 +3013,11 @@ curl -X PATCH http://localhost:11023/v1/update -d '{"collection":"notes","key":"
 # 409 {"error":"revision conflict","expectedRevision":"53f8149d734342a9","currentRevision":"9a0c..."}
 ```
 
-Since v2.18.8 an update also re-extracts code symbols from new content, and
+An update also re-extracts code symbols from new content, and
 REST, gRPC, MCP and GraphQL updates share one implementation — the MCP one
 used to skip the metadata index, revision history and full-text reindex.
 
-**After every write (v2.18.10, GO-048).** Every write path ends in the same
+**After every write.** Every write path ends in the same
 after-write step: `POST /v1/add`, this endpoint, `POST /v1/add-batch`, ingest,
 the scheduled sync, gRPC `Add`, `UpdateDocument`, `AddBatch` and
 `UpdateBatch`, MCP and GraphQL. It queues the embedding, updates TTL, geo
@@ -3136,7 +3135,7 @@ in a later minor release. Read `notFound`. The MCP tools `delete_batch` and
 
 ### POST /v1/documents:deleteWhere, /v1/documents:updateWhere, /v1/documents:setTTLWhere
 
-Act on every document a metadata filter matches (v2.18.8, GO-045). The
+Act on every document a metadata filter matches. The
 alternative is listing keys and sending them back in batches, with a race
 between the list and the write. All three take `POST` and the same body.
 
@@ -3231,12 +3230,12 @@ Hybrid search combining full-text (sparse) and vector (dense) results using alph
 | `query` | string | | **Required.** Search query |
 | `topK` | integer | `10` | Max results |
 | `algorithm` | string | `"bm25"` | FTS algorithm: `bm25`, `bm25f` |
-| `vectorAlgorithm` | string | `"flat"` | Vector algorithm: `flat`, `auto` (v2.18.9+, the query planner chooses), `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`; the profile's `retrieval.vectorAlgorithm` applies when unset |
-| `explain` | boolean | `false` | (v2.18.9+) Add `plan` — the vector half's index and why — to the response |
-| `latencyTargetMs` | integer | `0` | (v2.18.9+) Latency goal for `auto`, 0–60000 |
-| `positive`, `negative` | array | | (v2.18.9+) Relevance feedback for the vector half only: document keys/IDs or vectors ([SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189)) |
-| `feedbackMode`, `feedbackWeight`, `rocchio` | | `query`, 0.5, 1/0.75/0.25 | (v2.18.9+) How the examples are applied |
-| `queryDecomposition` | string | `"off"` | (v2.18.10+) `auto` splits a multi-clause query for the vector half only ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810)) |
+| `vectorAlgorithm` | string | `"flat"` | Vector algorithm: `flat`, `auto` (the query planner chooses), `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`; the profile's `retrieval.vectorAlgorithm` applies when unset |
+| `explain` | boolean | `false` | Add `plan` — the vector half's index and why — to the response |
+| `latencyTargetMs` | integer | `0` | Latency goal for `auto`, 0–60000 |
+| `positive`, `negative` | array | | Relevance feedback for the vector half only: document keys/IDs or vectors ([SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples)) |
+| `feedbackMode`, `feedbackWeight`, `rocchio` | | `query`, 0.5, 1/0.75/0.25 | How the examples are applied |
+| `queryDecomposition` | string | `"off"` | `auto` splits a multi-clause query for the vector half only ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs)) |
 | `alpha` | number | `0.5` | Weight blending (0=FTS only, 1=vector only) |
 | `strategy` | string | `"alpha"` | Fusion strategy: `alpha` or `rrf` |
 | `rrfK` | integer | `60` | RRF parameter k |
@@ -3244,17 +3243,17 @@ Hybrid search combining full-text (sparse) and vector (dense) results using alph
 | `threshold` | number | `0.0` | Min vector similarity 0–1 |
 | `distanceMetric` | string | `"cosine"` | `cosine`, `dot_product`, `euclidean` |
 | `filterMeta` | object | | Metadata key-value filter |
-| `filter` | object | | Operator filter: `prefix`, `contains`, `gt`/`gte`/`lt`/`lte`, `not`, `exists` per key (v2.18.8+, [SEARCH.md](SEARCH.md#filter-operators-v2188)) |
-| `groupBy` | object | | `{key, perGroup}` — at most `perGroup` results per metadata value or document (v2.18.8+, [SEARCH.md](SEARCH.md#grouping-results-v2188)) |
+| `filter` | object | | Operator filter: `prefix`, `contains`, `gt`/`gte`/`lt`/`lte`, `not`, `exists` per key ([SEARCH.md](SEARCH.md#filter-operators)) |
+| `groupBy` | object | | `{key, perGroup}` — at most `perGroup` results per metadata value or document ([SEARCH.md](SEARCH.md#grouping-results)) |
 | `includeContent` | boolean | `false` | Include full content |
 | `disableStem` | boolean | `false` | Disable stemming |
 | `disableSynonyms` | boolean | `false` | Disable synonym expansion |
 | `boost` | object | | Per-query score multiplier keyed by `"metaKey:metaValue"` |
-| `bm25K1`, `bm25B` | number | profile, then 1.2 / 0.75 | BM25 parameters of the full-text half (v2.18.8+, [SEARCH.md](SEARCH.md#tuning-k1-and-b-v2188)) |
+| `bm25K1`, `bm25B` | number | profile, then 1.2 / 0.75 | BM25 parameters of the full-text half ([SEARCH.md](SEARCH.md#tuning-k1-and-b)) |
 | `geo` | object | | Spatial pre-filter: `{lat, lng, radiusMeters}` |
 | `sort` | string | `"combined"` | Result ordering: `combined` (default, by fused score) or `distance` (by `distanceMeters` ascending — requires `geo`) |
-| `facetBy` | array | | (v2.9.14+) Metadata keys to aggregate into `facets` map on the response |
-| `facetMaxValues` | integer | `0` | (v2.9.14+) Cap per-key bucket count; `0` = unlimited |
+| `facetBy` | array | | Metadata keys to aggregate into `facets` map on the response |
+| `facetMaxValues` | integer | `0` | Cap per-key bucket count; `0` = unlimited |
 
 **Response**:
 ```json
@@ -3428,15 +3427,15 @@ Alternative source modes (use one):
 | `targetCollections` | string[] | all | Collections to search |
 | `topK` | integer | `10` | Max results |
 | `threshold` | number | `0.0` | Min similarity |
-| `algorithm` | string | `"flat"` | Vector algorithm; `auto` (v2.18.9+) plans each target collection and reports `"algorithm": "auto"` |
-| `explain` | boolean | `false` | (v2.18.9+) Add `plan` to the response; with `auto`, one plan per target under `plan.collections` |
-| `latencyTargetMs` | integer | `0` | (v2.18.9+) Latency goal for `auto`, 0–60000 |
-| `positive`, `negative` | array | | (v2.18.9+) Relevance feedback: keys resolve in `sourceCollection`, then each target; or vectors |
-| `feedbackMode`, `feedbackWeight`, `rocchio` | | `query`, 0.5, 1/0.75/0.25 | (v2.18.9+) How the examples are applied |
+| `algorithm` | string | `"flat"` | Vector algorithm; `auto` plans each target collection and reports `"algorithm": "auto"` |
+| `explain` | boolean | `false` | Add `plan` to the response; with `auto`, one plan per target under `plan.collections` |
+| `latencyTargetMs` | integer | `0` | Latency goal for `auto`, 0–60000 |
+| `positive`, `negative` | array | | Relevance feedback: keys resolve in `sourceCollection`, then each target; or vectors |
+| `feedbackMode`, `feedbackWeight`, `rocchio` | | `query`, 0.5, 1/0.75/0.25 | How the examples are applied |
 | `distanceMetric` | string | `"cosine"` | Distance metric |
 | `filterMeta` | object | | Metadata filter |
-| `filter` | object | | Operator filter applied in every target collection (v2.18.8+) |
-| `groupBy` | object | | `{key, perGroup}`; `key: "collection"` keeps the best per collection (v2.18.8+) |
+| `filter` | object | | Operator filter applied in every target collection |
+| `groupBy` | object | | `{key, perGroup}`; `key: "collection"` keeps the best per collection |
 | `includeContent` | boolean | `false` | Include content |
 
 **Response**:
@@ -3723,9 +3722,9 @@ stored one; `"repository": {}` removes it. `400` for a URL a sync could not
 read or a secret that does not exist. See
 [AUTOMATIONS.md](AUTOMATIONS.md#the-repository-of-a-collection).
 
-##### Quota usage (v2.18.10)
+##### Quota usage
 
-A collection with a [quota](#quotas-v2189) also gets `usage`: what it uses of each
+A collection with a [quota](#quotas) also gets `usage`: what it uses of each
 limit, next to `config.quota`.
 
 ```json
@@ -3753,7 +3752,7 @@ gets no `usage`: it is not scanned on a config read. gRPC returns the same
 numbers in `GetCollectionConfigResponse.usage`; `/metrics` keeps the
 `mddb_collection_fullness` and `mddb_embedding_budget_used` gauges.
 
-##### Credentials are masked on read (v2.12.0+)
+##### Credentials are masked on read
 
 A collection config can hold two credentials: `storageConfig.secretKey` and
 `wordpress.apiKey`. Reads — REST, gRPC and MCP alike — return them empty and
@@ -3776,7 +3775,7 @@ loop a UI performs does not erase it. Send a new value to replace it; remove the
 whole `storageConfig` or `wordpress` block to clear it. `secretKeySet` and
 `apiKeySet` are output-only and ignored on write.
 
-##### gRPC carries the same fields as REST (v2.12.0+)
+##### gRPC carries the same fields as REST
 
 `CollectionConfigProto` used to carry 8 of the 18 fields `CollectionConfig`
 holds, so a gRPC client saw a partially configured collection and could not tell
@@ -3793,12 +3792,11 @@ switch encryption off on a collection whose owner only wanted a new icon —
 after which the next document is written as plaintext. Presence keeps that from
 happening. **Omitted means "leave it alone"** for those fields and for
 `storage_backend`, `storage_config`, `quantization`, `spell_lang`,
-`wordpress` and `code` (v2.18.0). The original fields — `type`,
+`wordpress` and `code`. The original fields — `type`,
 `description`, `icon`, `color`, `custom_meta`, `max_revisions` and
 `response_prompt` — are set as sent, as REST `PUT` does, because proto3
 cannot tell an omitted string or `0` from an empty one: send their current
-values when changing something else. (Before v2.18.0 this paragraph said
-every field was merged; the code never did that for these seven.)
+values when changing something else.
 
 #### PUT /v1/collection-config
 
@@ -3808,30 +3806,30 @@ Set or update collection configuration including storage backend.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `collection` | string | Yes | Collection name |
-| `type` | string | No | Collection type (`default`, `website`, `images`, `audio`, `documents`). Since v2.18.9 `images` means something: writes extract images by default and an image file is an image document ([SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189)); the others are labels |
+| `type` | string | No | Collection type (`default`, `website`, `images`, `audio`, `documents`). `images` means something: writes extract images by default and an image file is an image document ([SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures)); the others are labels |
 | `description` | string | No | Collection description |
 | `icon` | string | No | Emoji icon |
 | `color` | string | No | Hex color code |
 | `customMeta` | object | No | Custom key-value metadata |
 | `storageBackend` | string | No | Where this collection's document bodies are stored: `boltdb` (default), `memory`, `s3` — see below |
 | `storageConfig` | object | No | Backend-specific settings (required for `s3`) |
-| `maxRevisions` | integer | No | (v2.9.14+) Revision retention cap. `0` (default) = unlimited; `N > 0` keeps only the newest N revisions per document. Older entries are trimmed inside the same transaction as every write. |
-| `retrieval` | object | No | (v2.12.0+) Per-collection retrieval defaults — see below |
-| `responsePrompt` | string | No | (v2.12.0+) How to format answers from this collection — see below (max 4 KiB) |
+| `maxRevisions` | integer | No | Revision retention cap. `0` (default) = unlimited; `N > 0` keeps only the newest N revisions per document. Older entries are trimmed inside the same transaction as every write. |
+| `retrieval` | object | No | Per-collection retrieval defaults — see below |
+| `responsePrompt` | string | No | How to format answers from this collection — see below (max 4 KiB) |
 | `trackAccess` | boolean | No | Record per-read access events for temporal analytics |
 | `trackHot` | boolean | No | Maintain a hot-documents leaderboard |
 | `spellCorrect` | boolean | No | Auto-correct FTS queries using the spell checker |
 | `spellLang` | string | No | Override language for spell correction |
-| `quota` | object | No | (v2.18.9+) `{maxDocuments, maxBytes, maxVectors, embeddingCallsPerDay, embeddingTokensPerDay}`; `0` = no limit. Omitted keeps the stored quota, `{}` removes it. Changing it needs a global admin when auth is on (`403` otherwise) — see below |
+| `quota` | object | No | `{maxDocuments, maxBytes, maxVectors, embeddingCallsPerDay, embeddingTokensPerDay}`; `0` = no limit. Omitted keeps the stored quota, `{}` removes it. Changing it needs a global admin when auth is on (`403` otherwise) — see below |
 
-##### Quotas (v2.18.9+)
+##### Quotas
 
 Writes that would take a collection past `maxDocuments`, `maxBytes` or
 `maxVectors` — on any endpoint: `add`, `update`, `add-batch`, `ingest`,
 `upload` (one file; a multi-file upload lists the refusal per file), `import-url` — answer **`507 Insufficient Storage`**, and nothing
 is written (a batch is refused whole). The same `507` comes from the
 server-wide `MDDB_DISK_RESERVE_BYTES` and `MDDB_VECTOR_RAM_LIMIT_BYTES`
-([config.md](config.md#quotas-and-reserves-v2189)):
+([config.md](config.md#quotas-and-reserves)):
 
 ```json
 {
@@ -3852,9 +3850,9 @@ never refuses a document — its embedding waits, pending — but
 `Retry-After` (seconds to midnight UTC) and `retryAfterSeconds` in the body.
 gRPC answers `RESOURCE_EXHAUSTED` for both; MCP returns the object as the
 tool error's `structuredContent`; GraphQL puts it in the error's
-`extensions`. See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189).
+`extensions`. See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas).
 
-##### Storage backends (v2.12.0+)
+##### Storage backends
 
 A collection can keep its **document bodies** somewhere other than the server's
 own database file:
@@ -3887,7 +3885,7 @@ would trade a correctness guarantee for a storage location.
 
 The key index — which document a key and language name — is among what stays,
 so on every backend a key is found by any spelling of its ASCII letter case
-(`README.md` as `readme.md`), as on `boltdb` since 2.18.9; the S3 bucket holds
+(`README.md` as `readme.md`), as on `boltdb`; the S3 bucket holds
 no key index to migrate ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version)).
 
 So an `s3` collection still needs its local database, and that database still
@@ -3907,12 +3905,7 @@ causes writes to that collection to error rather than falling back to local
 disk. Silently writing elsewhere is how an operator loses data they believed was
 in object storage.
 
-> Before v2.12.0 this setting was accepted, validated and **ignored** — every
-> document went to the local database regardless. If you set `memory` or `s3` on
-> an earlier version, your documents are in the local file, and the collection
-> will keep reading them from there until they are rewritten.
-
-##### Retrieval defaults (v2.12.0+)
+##### Retrieval defaults
 
 Retrieval settings used to be constants scattered across MDDB's internals — FTS
 returned 50 results, vector 5, hybrid 10, memory recall 10 — so a caller had to
@@ -3942,12 +3935,12 @@ curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d 
 | `retrievalMode` | string | `parent` (whole document) \| `chunk` (matching passage) \| `window` (passage with neighbours) |
 | `hybridStrategy` | string | `alpha` \| `rrf` |
 | `hybridAlpha` | number | 0 = keyword only, 1 = semantic only. Requires `hybridAlphaSet: true`, because 0.0 is a real weight and cannot double as "unset". |
-| `oversample` | number | 1.0–10.0. Candidates fetched per requested result before deduplication or merging — see [SEARCH.md](SEARCH.md#oversampling-v2120) for measured effect |
+| `oversample` | number | 1.0–10.0. Candidates fetched per requested result before deduplication or merging — see [SEARCH.md](SEARCH.md#oversampling) for measured effect |
 | `contextTokenBudget` | integer | Cap on total returned context, in tokens |
-| `maxTopK` | integer | Most results one search of this collection returns, whatever the request asks (v2.18.10+). Lowers `MDDB_SEARCH_MAX_LIMIT` for this collection, never raises it; `topK` must not exceed it. 0 = unset. A capped response carries `"limitCapped": true` and the `limit` used — see [SEARCH.md](SEARCH.md#result-limits-v21810) |
-| `groupBy` | object | Default result grouping, e.g. `{"key": "path", "perGroup": 1}` for one passage per file (v2.18.8+); a request's own `groupBy` wins |
-| `summaryMode` | string | `off` (default) \| `blend` \| `expand`: what the documents' client-written summaries (metadata key `summary`) do on vector and hybrid search (v2.18.9+) — see [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189) |
-| `summaryWeight` | number | 0–10. BM25F weight of `meta.summary` while `summaryMode` is not `off`; unset = 2.0 (v2.18.9+) |
+| `maxTopK` | integer | Most results one search of this collection returns, whatever the request asks. Lowers `MDDB_SEARCH_MAX_LIMIT` for this collection, never raises it; `topK` must not exceed it. 0 = unset. A capped response carries `"limitCapped": true` and the `limit` used — see [SEARCH.md](SEARCH.md#result-limits) |
+| `groupBy` | object | Default result grouping, e.g. `{"key": "path", "perGroup": 1}` for one passage per file; a request's own `groupBy` wins |
+| `summaryMode` | string | `off` (default) \| `blend` \| `expand`: what the documents' client-written summaries (metadata key `summary`) do on vector and hybrid search — see [SEARCH.md](SEARCH.md#summaries--a-second-representation) |
+| `summaryWeight` | number | 0–10. BM25F weight of `meta.summary` while `summaryMode` is not `off`; unset = 2.0 |
 
 **The context budget drops results, it does not truncate them.** Half a document
 still costs tokens and no longer says anything reliable, so the budget trims the
@@ -3962,7 +3955,7 @@ Applies to `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search`, `/v1/search` and
 deliberately excluded: it has no single collection whose profile could own
 `topK`, and picking one of N arbitrarily would be worse than a fixed default.
 
-##### Answer formatting (v2.12.0+)
+##### Answer formatting
 
 A collection of runbooks wants numbered steps; a collection of API docs wants
 code blocks and key references. That instruction used to live in the client — a
@@ -4080,7 +4073,7 @@ curl http://localhost:11023/v1/collection-configs
 
 A corpus pack is one collection, or several (v2.19.11) — documents, full-text
 index, vectors, geo points — shipped as a `.mddbpack` file and installed
-read-only on any server (v2.18.10). Building, installing and removing need the admin permission. The
+read-only on any server. Building, installing and removing need the admin permission. The
 full guide: [CORPUS-PACKS.md](CORPUS-PACKS.md).
 
 | Method | Path | Body | Answer |
@@ -4667,7 +4660,6 @@ Events are returned newest-first. `dropped` reports the running total of events 
 
 ### GET /v1/admin/diagnose
 
-> Added in 2.18.10 (OPS-025).
 
 A tar.gz describing the instance without its data, to attach to an issue.
 `mddb-cli diagnose` saves it; `mddb-cli diagnose --inspect` prints its manifest
@@ -4691,7 +4683,7 @@ The first file is `MANIFEST.json`:
 ```json
 {
   "format": 1,
-  "version": "2.18.10",
+  "version": "2.19.13",
   "createdAt": "2026-10-30T15:31:04Z",
   "options": { "profiles": false, "integrity": false, "keepNames": false },
   "files": [
@@ -4716,7 +4708,6 @@ tar -xOzf bundle.tar.gz MANIFEST.json
 
 ### GET /v1/audit/exporters
 
-> Added in 2.9.16.
 
 Per-sink delivery counters for the audit log export subsystem. Returns a snapshot of every configured exporter (webhook + syslog) with delivered / failed / dropped counts and the last error.
 
@@ -4758,7 +4749,6 @@ Exporters are configured via `MDDB_AUDIT_EXPORT_WEBHOOK_URL`, `MDDB_AUDIT_EXPORT
 
 ### GET /v1/encryption/status
 
-> Added in 2.9.16.
 
 At-rest encryption posture: primary keyID, configured previous keyIDs, and per-collection counts of how each document is sealed.
 
@@ -4791,7 +4781,6 @@ At-rest encryption posture: primary keyID, configured previous keyIDs, and per-c
 
 ### POST /v1/encryption/rotate
 
-> Added in 2.9.16.
 
 Start a re-encryption job that walks every encrypted entry under non-primary keys and re-seals it with the current `MDDB_ENCRYPTION_KEY`. Plaintext entries and entries already sealed under the primary are skipped.
 
@@ -4826,7 +4815,6 @@ Calling rotate while a job is already running returns the running job's ID inste
 
 ### GET /v1/encryption/jobs[/:id]
 
-> Added in 2.9.16.
 
 Without an ID — list every rotation job ever queued in this process (newest first):
 
@@ -4856,7 +4844,7 @@ With an ID (`GET /v1/encryption/jobs/:id`) — single job snapshot:
 
 ### GET /v1/compliance-status
 
-Report the live state of the production-hardening guard, for operator-facing liveness / readiness probes and for external monitoring that must detect a drifted configuration before production traffic hits a non-compliant server. With auth on, it needs an authenticated caller (any valid token or API key; since v2.18.10, SEC-019), so give the probe a read-only API key.
+Report the live state of the production-hardening guard, for operator-facing liveness / readiness probes and for external monitoring that must detect a drifted configuration before production traffic hits a non-compliant server. With auth on, it needs an authenticated caller (any valid token or API key), so give the probe a read-only API key.
 
 **Query parameters**: none.
 
@@ -4946,7 +4934,7 @@ List document revision history.
 
 `timestamp` identifies the revision; `restore` takes it. It is the write's
 unix second. When a document already has a revision in that second, the new
-one takes the next free second (since 2.18.8, #358). Several writes within a
+one takes the next free second. Several writes within a
 second therefore keep every version, dated a second or so apart in order.
 `updatedAt` keeps the actual write time.
 
@@ -5144,14 +5132,14 @@ Import a markdown document from a URL. Automatically extracts YAML frontmatter.
 | `ttl` | integer | Time-to-live in seconds |
 
 **Response**: Saved document object. The call lifts the HTTP write deadline
-for its own response (v2.18.6+): a slow remote server no longer costs the
+for its own response: a slow remote server no longer costs the
 client the answer.
 
 ---
 
 ### POST /v1/import-wiki
 
-Import Wikipedia (MediaWiki) XML dumps. Supports `.xml` and `.xml.bz2` compressed files. Streams the XML — does not load the entire file into memory. The call lifts the HTTP write deadline for its own response (v2.18.6+); an import that outlasted `MDDB_HTTP_WRITE_TIMEOUT` used to finish with the client seeing `EOF`.
+Import Wikipedia (MediaWiki) XML dumps. Supports `.xml` and `.xml.bz2` compressed files. Streams the XML — does not load the entire file into memory. The call lifts the HTTP write deadline for its own response; an import that outlasted `MDDB_HTTP_WRITE_TIMEOUT` used to finish with the client seeing `EOF`.
 
 **Multipart Form Upload:**
 ```bash
@@ -5304,7 +5292,7 @@ curl http://localhost:11023/v1/system/info
   "arch": "amd64",
   "numCPU": 4,
   "goVersion": "go1.27.4",
-  "version": "2.18.6",
+  "version": "2.19.13",
   "uptimeSeconds": 3600,
   "memoryTotal": 134217728,
   "memoryUsed": 67108864,
@@ -5320,7 +5308,7 @@ curl http://localhost:11023/v1/system/info
 Returns server configuration overview.
 
 Values pass through the configuration allowlist the diagnose bundle uses
-(2.18.10, OPS-025): a URL is shown without credentials, query or fragment
+: a URL is shown without credentials, query or fragment
 (`https://user:key@host/v1` → `https://host/v1`); secrets are never part of
 this answer.
 
@@ -5332,7 +5320,7 @@ curl http://localhost:11023/v1/config
 **Response**:
 ```json
 {
-  "version": "2.18.6",
+  "version": "2.19.13",
   "databasePath": "mddb.db",
   "mode": "wr",
   "protocols": {
@@ -5357,7 +5345,7 @@ curl http://localhost:11023/v1/config
 }
 ```
 
-**Search surface, tracing and proxies (2.18.10):**
+**Search surface, tracing and proxies:**
 
 | Field | Source | Meaning |
 |-------|--------|---------|
@@ -5370,8 +5358,7 @@ curl http://localhost:11023/v1/config
 | `clientAddressing.proxyProtocol` | `MDDB_PROXY_PROTOCOL` | Whether the TCP listeners accept a PROXY protocol header |
 
 The diagnose bundle renders the same fields with its stricter rules: the
-collector endpoint becomes `<set: https>`. A server before 2.18.10 omits these
-fields.
+collector endpoint becomes `<set: https>`.
 
 ---
 
@@ -5454,7 +5441,7 @@ admin on `*`, "authenticated" for any valid token or API key. See
 | GET | `/v1/events` | authenticated; each event is filtered by `read` on its collection | [SSE.md](SSE.md#endpoints) |
 | POST | `/v1/geo-search` | `read` | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-search) |
 | POST | `/v1/geo-within` | `read` | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-within) |
-| POST | `/v1/geo-polygon` | `read` | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-polygon-v2913) |
+| POST | `/v1/geo-polygon` | `read` | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-polygon) |
 | POST | `/v1/geo-reindex` | global admin | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-reindex) |
 | GET | `/v1/geo-stats` | `read` on `*` (reports every collection) | [GEOSEARCH.md](GEOSEARCH.md#get-v1geo-stats) |
 | POST | `/v1/geo-encode` | authenticated (no collection) | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-encode--post-v1geo-decode) |
@@ -5508,7 +5495,7 @@ Health check endpoint. Also available at `/v1/health`.
 
 Returns `503` with `"status": "unhealthy"` if the database is not accessible.
 
-The database check waits at most 2 s (v2.18.5+). While the database is busy —
+The database check waits at most 2 s. While the database is busy —
 a write growing the file waits for long reads to end, and no read can begin
 meanwhile — the answer is `200` with `"status": "busy"` and
 `databaseWaitSeconds`; after `MDDB_HEALTH_STALL_LIMIT` seconds (300) it is
@@ -5914,22 +5901,22 @@ keys above and edges in the [connection graph](#the-connection-graph).
 
 | Language | Extensions | Code search | Symbols | Graph edges |
 |---|---|---|---|---|
-| C | `.c` `.h` | ✅ | ✅ (v2.18.0) | `calls`, `imports` |
-| C++ | `.cc` `.cpp` `.cxx` `.hpp` `.hh` `.hxx` | ✅ | ✅ (v2.18.0) | `calls`, `imports` |
-| Assembly | `.s` `.S` `.asm` | ✅ | ✅ (v2.18.0) | `calls`, `imports` |
-| Go | `.go` | ✅ | ✅ (v2.18.6) | `calls` |
-| Rust | `.rs` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
-| Java | `.java` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
-| Python | `.py` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
-| Ruby | `.rb` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
-| PHP | `.php` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
+| C | `.c` `.h` | ✅ | ✅ | `calls`, `imports` |
+| C++ | `.cc` `.cpp` `.cxx` `.hpp` `.hh` `.hxx` | ✅ | ✅ | `calls`, `imports` |
+| Assembly | `.s` `.S` `.asm` | ✅ | ✅ | `calls`, `imports` |
+| Go | `.go` | ✅ | ✅ | `calls` |
+| Rust | `.rs` | ✅ | ✅ | `calls`, `imports` |
+| Java | `.java` | ✅ | ✅ | `calls`, `imports` |
+| Python | `.py` | ✅ | ✅ | `calls`, `imports` |
+| Ruby | `.rb` | ✅ | ✅ | `calls`, `imports` |
+| PHP | `.php` | ✅ | ✅ | `calls`, `imports` |
 | JavaScript | `.js` `.mjs` `.cjs` `.jsx` | ✅ | ✅ | `imports` |
 | TypeScript | `.ts` `.tsx` | ✅ | ✅ | `imports` |
 | HTML | `.html` `.htm` | ✅ | ✅ | `uses-selector`, `imports` |
 | CSS / SCSS / Sass / Less | `.css` `.scss` `.sass` `.less` | ✅ | ✅ | `uses-selector`, `imports` |
-| Terraform | `.tf` `.tfvars` | ✅ (v2.18.6) | ✅ (v2.18.6) | `references` |
-| Kubernetes / OpenShift manifests, Kustomize | `.yaml` `.yml` | ✅ | ✅ (v2.18.6) | `references`, `imports` |
-| Ansible playbooks, task and handler files | `.yaml` `.yml` | ✅ | ✅ (v2.18.6) | `references`, `imports` |
+| Terraform | `.tf` `.tfvars` | ✅ | ✅ | `references` |
+| Kubernetes / OpenShift manifests, Kustomize | `.yaml` `.yml` | ✅ | ✅ | `references`, `imports` |
+| Ansible playbooks, task and handler files | `.yaml` `.yml` | ✅ | ✅ | `references`, `imports` |
 | Shell | `.sh` `.bash` | ✅ | — | — |
 | SQL | `.sql` | ✅ | — | — |
 | M4 | `.m4` | ✅ | — | — |
@@ -5951,17 +5938,17 @@ What each language contributes:
 | CSS / SCSS / LESS | Selectors, their component classes and ids, `--custom-properties` | `url(...)` targets | `@import` targets |
 | JavaScript / TypeScript | Function, class, and arrow-const names | — | `import` and `require` specifiers |
 | HTML | `id` attributes | `class` names, `on*` handler names | Local `src` / `href` targets |
-| C / C++ (`.c .h .cc .cpp .hpp …`, v2.18.0) | Function definitions, `static` prototypes, `struct`/`union`/`enum` tags, `typedef` names, `#define` macros, file-scope variables | Functions and macros called in function bodies that the file does not define | `#include` targets |
-| Assembly (`.S .s .asm`, v2.18.0) | `ENTRY(x)` and similar macros, `.globl` symbols | `call` / `bl` / `jal` targets | `#include` targets |
-| Go (v2.18.6) | Functions, methods, `type` names | Functions called that the file does not define | Import paths (`fmt`, `net/http`) |
-| Rust (v2.18.6) | `fn`, `struct`, `enum`, `trait`, `type`, `union`, `macro_rules!` | Functions and macros called that the file does not define | `use` paths as written, `extern crate`, `mod x;` as the file beside it |
-| Java (v2.18.6) | Classes, interfaces, enums, records, methods | Methods called and classes created with `new` | `import a.b.C` as `a/b/C` |
-| Python (v2.18.6) | `def` and `class` | Functions and classes called that the file does not define | `import a.b` as `a/b`; `from .x import y` as `./x` |
-| Ruby (v2.18.6) | `def`, `class`, `module` | Methods called and `Name.new` | `require` as written, `require_relative` from the file |
-| PHP (v2.18.6) | Functions, classes, interfaces, traits, enums | Functions called, classes created with `new`, `Class::method()` | `require`/`include` from the file (`__DIR__ . '/x.php'` too), `use` namespaces as written |
-| Terraform (v2.18.6) | `aws_instance.web`, `data.aws_ami.ubuntu`, `module.vpc`, `var.region`, `output.ip`, `local.tags` — the way code refers to them | `var.`, `local.`, `module.`, `data.` and resource references the file does not declare, inside `"${...}"` too | Module `source` (`./modules/vpc` from the file, registry addresses as written) |
-| Kubernetes / OpenShift (v2.18.6) | `Kind/name` of each object (`Deployment/web`) | `ConfigMap/…`, `Secret/…`, `PersistentVolumeClaim/…`, `ServiceAccount/…` and Ingress `Service/…` it refers to, and any `{kind, name}` pair: a Route's `to`, `roleRef`, `subjects`, `scaleTargetRef` | A Kustomization's `resources`, `bases`, `components` and patches |
-| Ansible (v2.18.6) | Task and handler names, `listen` topics | `notify` | `include_tasks`, `import_tasks`, `import_playbook`, `include_vars`, `vars_files` from the file; roles as `roles/NAME` |
+| C / C++ (`.c .h .cc .cpp .hpp …`) | Function definitions, `static` prototypes, `struct`/`union`/`enum` tags, `typedef` names, `#define` macros, file-scope variables | Functions and macros called in function bodies that the file does not define | `#include` targets |
+| Assembly (`.S .s .asm`) | `ENTRY(x)` and similar macros, `.globl` symbols | `call` / `bl` / `jal` targets | `#include` targets |
+| Go | Functions, methods, `type` names | Functions called that the file does not define | Import paths (`fmt`, `net/http`) |
+| Rust | `fn`, `struct`, `enum`, `trait`, `type`, `union`, `macro_rules!` | Functions and macros called that the file does not define | `use` paths as written, `extern crate`, `mod x;` as the file beside it |
+| Java | Classes, interfaces, enums, records, methods | Methods called and classes created with `new` | `import a.b.C` as `a/b/C` |
+| Python | `def` and `class` | Functions and classes called that the file does not define | `import a.b` as `a/b`; `from .x import y` as `./x` |
+| Ruby | `def`, `class`, `module` | Methods called and `Name.new` | `require` as written, `require_relative` from the file |
+| PHP | Functions, classes, interfaces, traits, enums | Functions called, classes created with `new`, `Class::method()` | `require`/`include` from the file (`__DIR__ . '/x.php'` too), `use` namespaces as written |
+| Terraform | `aws_instance.web`, `data.aws_ami.ubuntu`, `module.vpc`, `var.region`, `output.ip`, `local.tags` — the way code refers to them | `var.`, `local.`, `module.`, `data.` and resource references the file does not declare, inside `"${...}"` too | Module `source` (`./modules/vpc` from the file, registry addresses as written) |
+| Kubernetes / OpenShift | `Kind/name` of each object (`Deployment/web`) | `ConfigMap/…`, `Secret/…`, `PersistentVolumeClaim/…`, `ServiceAccount/…` and Ingress `Service/…` it refers to, and any `{kind, name}` pair: a Route's `to`, `roleRef`, `subjects`, `scaleTargetRef` | A Kustomization's `resources`, `bases`, `components` and patches |
+| Ansible | Task and handler names, `listen` topics | `notify` | `include_tasks`, `import_tasks`, `import_playbook`, `include_vars`, `vars_files` from the file; roles as `roles/NAME` |
 
 **Calls through a value are left out** in every language — `obj.f()`,
 `$this->f()`, `pkg.F()`, `Type::f()` — because the text alone cannot say
@@ -5992,7 +5979,7 @@ collection-relative (`net/conn.h`), which suits a tree keyed from its include
 root. Set them before loading: documents written earlier keep their imports
 until they are written again.
 
-**Chunk size per collection (v2.18.1+).** `MDDB_EMBEDDING_CHUNK_SIZE` is one
+**Chunk size per collection.** `MDDB_EMBEDDING_CHUNK_SIZE` is one
 number for the whole server, and 1500 characters suits prose but cuts a long
 C function in two. A collection can set its own size and mode:
 
@@ -6009,7 +5996,7 @@ vectors already stored keep their chunks until `POST /v1/vector-reindex` with
 `chunkSize`. The same object is `embedding` in MCP `set_collection_config`
 (`chunk_size`, `chunk_mode`) and in gRPC `SetCollectionConfig`.
 
-**Full-text indexing per collection (v2.18.2+).** Postings are usually most
+**Full-text indexing per collection.** Postings are usually most
 of the file. A collection searched only by metadata or vectors can turn them
 off; `POST /v1/fts-reindex` then removes the ones it has (`"status":
 "removed"`), and full-text and hybrid search find nothing in it:
@@ -6019,7 +6006,7 @@ curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' \
   -d '{"collection":"vectors-only","fts":{"enabled":false}}'
 ```
 
-**Meta keys kept out of full-text search (v2.18.10+, #367).** Every meta key
+**Meta keys kept out of full-text search.** Every meta key
 is a BM25F field `meta.<key>` with its own postings. Keys that are only ever
 filters can stay out: `fts.excludeMetaKeys` lists them, and changing them
 then costs no full-text work at all. `filterMeta`, `filter` and facets still
@@ -6156,8 +6143,8 @@ Four kinds of edge:
 | Kind | Meaning | Derived from |
 |---|---|---|
 | `uses-selector` | A template applies a class or id a stylesheet declares | `uses` ↔ `defines` |
-| `calls` | A file calls a function or macro another file defines: C, C++ and assembly (v2.18.0); Go, Rust, Java, Python, Ruby and PHP (v2.18.6) | `uses` ↔ `defines` |
-| `references` | A configuration file names what another declares: a Deployment its ConfigMap, a Terraform output its resource, an Ansible `notify` its handler (v2.18.6) | `uses` ↔ `defines` |
+| `calls` | A file calls a function or macro another file defines: C, C++ and assembly; Go, Rust, Java, Python, Ruby and PHP | `uses` ↔ `defines` |
+| `references` | A configuration file names what another declares: a Deployment its ConfigMap, a Terraform output its resource, an Ansible `notify` its handler | `uses` ↔ `defines` |
 | `imports` | A document pulls another in by path or `#include` | `imports` ↔ document key |
 
 The `uses` ↔ `defines` kind is named by the language of the document doing the
@@ -6193,7 +6180,7 @@ The same traversal is available through all three surfaces — `GET`/`POST
 `codeGraph` GraphQL query — and a test pins that they agree, so they cannot
 drift apart in what the graph says.
 
-### One symbol, everywhere it matters (v2.18.8+)
+### One symbol, everywhere it matters
 
 `GET /v1/symbol?collection=<c>&name=<symbol>` (or `POST` with the same fields
 as JSON) answers what an agent asks before changing a function, a type or a
@@ -6326,13 +6313,13 @@ classes): telling an implementation from a namesake needs type information a
 scanner does not have. A collection indexed with `mddb-cli autoindex --semantic`
 has it — see "Precise answers from semantic facts" above.
 
-### GET /v1/code-languages (v2.18.8+)
+### GET /v1/code-languages
 
 The extension → language table the server classifies source by:
 `{"extensions": {".go": "go", ".tsx": "typescript", ...}, "languages": [...]}`.
 `mddb-cli autoindex` reads it so a client marks files the way the server would.
 
-### Passages instead of documents (v2.18.8+)
+### Passages instead of documents
 
 `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search` and `/v1/cross-search`
 take `"format": "passages"` and `"passageLines"`. The response is then
@@ -6344,7 +6331,7 @@ loses context lines first, then the end of its hit line (marked ` […]`), and
 carries `"truncated": true`; its `lines` are the lines returned. Chunks and
 vector hits are cut only when `passageTokens` is set. A hit on a Markdown
 heading returns the heading and the text under it.
-See [SEARCH.md — Passages](SEARCH.md#passages--what-an-agent-gets-v2188).
+See [SEARCH.md — Passages](SEARCH.md#passages--what-an-agent-gets).
 
 ### Why the tokeniser differs
 
@@ -6388,7 +6375,7 @@ and `h2` and `utf8` are real names.
 | `200` | Success |
 | `400` | Bad Request - Invalid JSON or missing required fields |
 | `403` | Forbidden - Write operation in read-only mode |
-| `404` | Not Found - the document or revision does not exist (every path since v2.18.8; some answered 400 before) |
+| `404` | Not Found - the document or revision does not exist (every path; some answered 400 before) |
 | `500` | Internal Server Error |
 
 ### Common Errors
@@ -6674,7 +6661,7 @@ any order). The MCP tool `memory_session_history` answers in the same order.
 
 ---
 
-## Curation Rules (v2.9.14+)
+## Curation Rules
 
 Editorial overrides for search ranking: pin documents to fixed positions and/or hide others for specific queries. Applied in FTS + Hybrid pipelines after scoring, before pagination.
 

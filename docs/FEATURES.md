@@ -39,7 +39,7 @@ Complete list of MDDB features organized by category.
 - **Full Content Snapshots** - Each revision stores complete document content
 - **Revision Queries** - Access any historical version through API
 - **Truncation** - Remove old revisions to save space
-- **Per-Collection Retention Cap** (v2.9.14+) - `maxRevisions` on `CollectionConfig` enforces a synchronous cap on every write: older revisions are trimmed in the same BoltDB transaction so high-churn collections can't grow history unbounded. `0` (default) = unlimited. Configurable via REST `/v1/collection-config`, gRPC `SetCollectionConfig`, MCP `set_collection_config`, and the Admin Panel.
+- **Per-Collection Retention Cap** - `maxRevisions` on `CollectionConfig` enforces a synchronous cap on every write: older revisions are trimmed in the same BoltDB transaction so high-churn collections can't grow history unbounded. `0` (default) = unlimited. Configurable via REST `/v1/collection-config`, gRPC `SetCollectionConfig`, MCP `set_collection_config`, and the Admin Panel.
 
 ### Search & Discovery
 
@@ -60,7 +60,7 @@ Complete list of MDDB features organized by category.
 - **Configurable Models** - Switch providers/models without code changes
 - **Background Indexing** - Non-blocking embedding generation
 - **Automatic Fallback** - Falls back to flat if ANN index not ready
-- **Embedding Chunking** - Auto-split long documents into paragraph-based chunks before embedding with sentence and hard-split fallbacks. Multi-key chunk storage with deduplication in search results. Configurable via `MDDB_EMBEDDING_CHUNK_SIZE` and `MDDB_EMBEDDING_CHUNK_ENABLED`; since v2.18.1 a collection can override size and mode with `embedding: {chunkSize, chunkMode}` in its collection config.
+- **Embedding Chunking** - Auto-split long documents into paragraph-based chunks before embedding with sentence and hard-split fallbacks. Multi-key chunk storage with deduplication in search results. Configurable via `MDDB_EMBEDDING_CHUNK_SIZE` and `MDDB_EMBEDDING_CHUNK_ENABLED`; a collection can override size and mode with `embedding: {chunkSize, chunkMode}` in its collection config.
 - **Embedding Cache** - Repeated queries are served from memory instead of the provider, and a reindex reuses the vectors of chunks whose text did not change — editing one paragraph of a fifty-chunk document no longer re-embeds all fifty. Hit/miss counters in `/metrics`; `MDDB_EMBEDDING_CACHE_SIZE=0` disables it.
 
 #### Full-Text Search
@@ -78,12 +78,12 @@ Complete list of MDDB features organized by category.
 - **Multi-field Search** - Search in content and metadata
 - **Language-aware** - Per-language stop words
 - **Metadata Pre-filtering** - `filterMeta` parameter to scope FTS results by metadata before BM25 scoring (AND across keys, OR within key)
-- **Per-Query Boost/Demote** (v2.9.12+) - `boost` map keyed by `"metaKey:metaValue"` multiplies scores at query time without reindexing. Positive values boost (`5.0` → 5×), negative values demote (`-2.0` → ½×); combined multiplicatively with a `0.001` floor. Works in FTS and Hybrid search.
-- **Prefix Autocomplete** (v2.9.12+) - `GET /v1/autocomplete?collection=X&q=mar` returns top-N terms starting with the given prefix, ranked by document frequency. Scans the existing FTS inverted index — no additional storage. Field-scoped via `field` parameter; scan is bounded at 10k entries. Also exposed as MCP `autocomplete` tool.
-- **Expression Query DSL** (v2.9.13+) - `mode: "expression"` on `/v1/fts` runs through a proper recursive-descent parser with parenthesized grouping, operator precedence (NOT > AND > OR), implicit AND between adjacent atoms, and mixed atom types (terms, fuzzy `~N`, phrases, proximity, wildcards) in one query. Example: `(rust OR golang) AND "async runtime"~3 NOT legacy`.
-- **Search-Result Highlighting** (v2.9.13+) - `highlight: true` on `/v1/fts` returns context snippets around matched terms with each match wrapped in a configurable tag (default `<mark>…</mark>`). Clusters nearby hits, snaps to word boundaries, supports custom `highlightTag` / `maxHighlights` / `fragmentSize`. Works uniformly across every FTS mode.
-- **Inline Facets** (v2.9.14+) - `facetBy: ["category","lang"]` on `/v1/fts` and `/v1/hybrid-search` returns a `facets` map of per-value counts aggregated over the matched documents — no separate `/v1/aggregate` round-trip. `facetMaxValues` caps per-key cardinality; counts reflect post-filter, post-boost, post-curation state so UIs stay in sync.
-- **Curation Rules** (v2.9.14+) - `POST/GET/PUT/DELETE /v1/curation` pins specific documents to fixed positions and/or hides others for a given query. Rule shape: `{collection, query, matchMode: exact|contains, pins: [{key, lang, position}], hides: [...], enabled}`. Pinned results carry `pinned: true` on the wire. Applied in FTS and Hybrid pipelines after scoring, before pagination. See [SEARCH.md](SEARCH.md).
+- **Per-Query Boost/Demote** - `boost` map keyed by `"metaKey:metaValue"` multiplies scores at query time without reindexing. Positive values boost (`5.0` → 5×), negative values demote (`-2.0` → ½×); combined multiplicatively with a `0.001` floor. Works in FTS and Hybrid search.
+- **Prefix Autocomplete** - `GET /v1/autocomplete?collection=X&q=mar` returns top-N terms starting with the given prefix, ranked by document frequency. Scans the existing FTS inverted index — no additional storage. Field-scoped via `field` parameter; scan is bounded at 10k entries. Also exposed as MCP `autocomplete` tool.
+- **Expression Query DSL** - `mode: "expression"` on `/v1/fts` runs through a proper recursive-descent parser with parenthesized grouping, operator precedence (NOT > AND > OR), implicit AND between adjacent atoms, and mixed atom types (terms, fuzzy `~N`, phrases, proximity, wildcards) in one query. Example: `(rust OR golang) AND "async runtime"~3 NOT legacy`.
+- **Search-Result Highlighting** - `highlight: true` on `/v1/fts` returns context snippets around matched terms with each match wrapped in a configurable tag (default `<mark>…</mark>`). Clusters nearby hits, snaps to word boundaries, supports custom `highlightTag` / `maxHighlights` / `fragmentSize`. Works uniformly across every FTS mode.
+- **Inline Facets** - `facetBy: ["category","lang"]` on `/v1/fts` and `/v1/hybrid-search` returns a `facets` map of per-value counts aggregated over the matched documents — no separate `/v1/aggregate` round-trip. `facetMaxValues` caps per-key cardinality; counts reflect post-filter, post-boost, post-curation state so UIs stay in sync.
+- **Curation Rules** - `POST/GET/PUT/DELETE /v1/curation` pins specific documents to fixed positions and/or hides others for a given query. Rule shape: `{collection, query, matchMode: exact|contains, pins: [{key, lang, position}], hides: [...], enabled}`. Pinned results carry `pinned: true` on the wire. Applied in FTS and Hybrid pipelines after scoring, before pagination. See [SEARCH.md](SEARCH.md).
 
 #### Hybrid Search
 - **Combined Retrieval** - Merge BM25/BM25F/PMISparse keyword scores with vector semantic scores in a single query
@@ -91,12 +91,12 @@ Complete list of MDDB features organized by category.
 - **RRF (Reciprocal Rank Fusion)** - Rank-based fusion robust to different score distributions
 - **Configurable Parameters** - `strategy`, `alpha`, `rrfK`, `algorithm`, `vectorAlgorithm`
 - **API Endpoint** - `POST /v1/hybrid-search` with gRPC `HybridSearch` RPC and `hybrid_search` MCP tool
-- **Distance Sort** (v2.9.13+) - With a `geo` filter attached, `sort: "distance"` re-orders post-merge results by proximity ascending instead of fused score
+- **Distance Sort** - With a `geo` filter attached, `sort: "distance"` re-orders post-merge results by proximity ascending instead of fused score
 
 #### Code Search & Code Graph
 - **Code is indexed as code** - Identifiers are kept whole and split into parts (`parse_request`, `request`), nothing is stemmed, keywords stay searchable. A document is code by its extension or `meta.language`
-- **Chunking on brackets** - `embedding.chunkMode: code` (v2.18.1+) splits code for embedding where brackets balance, so a chunk is a whole function
-- **Symbols** - `defines`, `uses` and `imports` extracted on save for CSS, JavaScript/TypeScript, HTML (v2.12+), C, C++, assembly (v2.18.0+), Go, Rust, Java, Python, Ruby, PHP, Terraform, Kubernetes/OpenShift manifests, Kustomize and Ansible (v2.18.6+); filter on them with `meta.defines=` / `meta.uses=`
+- **Chunking on brackets** - `embedding.chunkMode: code` splits code for embedding where brackets balance, so a chunk is a whole function
+- **Symbols** - `defines`, `uses` and `imports` extracted on save for CSS, JavaScript/TypeScript, HTML, C, C++, assembly, Go, Rust, Java, Python, Ruby, PHP, Terraform, Kubernetes/OpenShift manifests, Kustomize and Ansible; filter on them with `meta.defines=` / `meta.uses=`
 - **Connection graph** - `GET /v1/code-graph` and the `code_graph` MCP tool return what a file depends on and what depends on it, with `uses-selector`, `calls`, `references` and `imports` edges and the symbol behind each. See [API.md](API.md#the-connection-graph)
 - **Semantic facts (v2.19.3+)** - `mddb-cli autoindex --semantic` runs gopls, basedpyright, phpactor, clangd (C and C++, v2.19.4, with the build's `compile_commands.json`) or rust-analyzer (Rust, v2.19.4) over the checkout; `code_symbol` then answers with qualified names, the exact references per definition, `implementations` and a `precision` field. See [CODE-INTELLIGENCE.md](CODE-INTELLIGENCE.md)
 - **Line answers (v2.19.13+)** - The `code_search` MCP tool lists every line holding an identifier or literal (`mode: "exact"`), or ranked hits by words or meaning, as `path:line` lines with a count; `code_symbol` takes `format: "lines"`, `exclude_tests` and a directory `path`. See [CODE-INTELLIGENCE.md](CODE-INTELLIGENCE.md#answers-in-lines-21913)
@@ -104,7 +104,7 @@ Complete list of MDDB features organized by category.
 #### Geospatial Search
 - **R-tree Index** - Radius and bounding-box queries over lat/lng points
 - **Geohash Index** - Alternative geohash-prefix index with same API
-- **GeoJSON Polygon Containment** (v2.9.13+) - `POST /v1/geo-polygon` accepts GeoJSON Polygon (outer ring + holes) or MultiPolygon (union); bounding-box prefilter + ray-cast. MCP tool `geo_polygon`
+- **GeoJSON Polygon Containment** - `POST /v1/geo-polygon` accepts GeoJSON Polygon (outer ring + holes) or MultiPolygon (union); bounding-box prefilter + ray-cast. MCP tool `geo_polygon`
 - **Postcode Lookup** - Optional per-country CSV lookups for postcode → lat/lng resolution
 - **Composable with FTS and vector** - Spatial filter combines freely with other search modes
 
@@ -255,19 +255,19 @@ backups are always on. The operator can lock modules off with
 - **Cumulative Permissions** - Users get permissions from all their groups
 
 ### Compliance & Hardening (ISO 27001 / SOC 2)
-- **Audit Log** (v2.9.15+) - Structured JSON events (auth attempts, writes, deletes) persisted to a dedicated BoltDB bucket; admin-only `GET /v1/audit` with actor/action/result/time filters; retention configurable via `MDDB_AUDIT_RETENTION_DAYS` (default 90). ISO A.8.15 / SOC 2 CC7.2. See [config.md#audit-log-iso-27001--soc-2](config.md#audit-log-iso-27001--soc-2) and [SECURITY.md](SECURITY.md).
-- **Production Hardening Switch** (v2.9.15+) - `MDDB_PRODUCTION=true` refuses startup unless every guardrail is satisfied (auth on, JWT secret ≥32 B, TLS on, CORS explicit, audit + rate limit enabled). `GET /v1/compliance-status` publishes live state for operator probes (any authenticated caller). ISO A.8.9 / SOC 2 CC6.1. See [config.md#production-hardening-iso-27001--soc-2](config.md#production-hardening-iso-27001--soc-2) and [SECURITY.md](SECURITY.md).
-- **HTTP + gRPC Rate Limiting** (v2.9.15+) - Single sliding-window limiter shared across both transports; per-IP or per-user keying; `X-RateLimit-*` headers, `429 Retry-After`, gRPC `ResourceExhausted`. `/health`, `/v1/health`, `/metrics` exempt. Independent from MCP limiter. ISO A.5.30 / SOC 2 CC6.6. See [config.md#rate-limiting-http--grpc](config.md#rate-limiting-http--grpc) and [SECURITY.md](SECURITY.md).
-- **At-Rest Encryption** (v2.9.15+) - Opt-in per-collection AES-256-GCM on `docs` and `rev` buckets. Enable globally with `MDDB_ENCRYPTION_KEY` (32 B base64) and flip `CollectionConfig.encrypted=true` per collection. Transparent read path, legacy plaintext stays readable, key loss is terminal. ISO A.8.24 / SOC 2 CC6.7. See [config.md#at-rest-encryption-iso-27001--soc-2](config.md#at-rest-encryption-iso-27001--soc-2) and [SECURITY.md](SECURITY.md).
-- **Incident Webhook Events** (v2.9.15+) - Five named events on existing `/v1/webhooks`: `security.auth_failure_burst`, `security.rate_limit_exceeded`, `ops.replication_lag_high`, `ops.panic_recovered`, `ops.disk_usage_high`. Panic-recovery middleware turns handler crashes into 500 + event. Structured `detail` payload. ISO A.8.16 / SOC 2 CC7.3–7.4. See [config.md#incident-webhook-events](config.md) and [SECURITY.md](SECURITY.md).
+- **Audit Log** - Structured JSON events (auth attempts, writes, deletes) persisted to a dedicated BoltDB bucket; admin-only `GET /v1/audit` with actor/action/result/time filters; retention configurable via `MDDB_AUDIT_RETENTION_DAYS` (default 90). ISO A.8.15 / SOC 2 CC7.2. See [config.md#audit-log-iso-27001--soc-2](config.md#audit-log-iso-27001--soc-2) and [SECURITY.md](SECURITY.md).
+- **Production Hardening Switch** - `MDDB_PRODUCTION=true` refuses startup unless every guardrail is satisfied (auth on, JWT secret ≥32 B, TLS on, CORS explicit, audit + rate limit enabled). `GET /v1/compliance-status` publishes live state for operator probes (any authenticated caller). ISO A.8.9 / SOC 2 CC6.1. See [config.md#production-hardening-iso-27001--soc-2](config.md#production-hardening-iso-27001--soc-2) and [SECURITY.md](SECURITY.md).
+- **HTTP + gRPC Rate Limiting** - Single sliding-window limiter shared across both transports; per-IP or per-user keying; `X-RateLimit-*` headers, `429 Retry-After`, gRPC `ResourceExhausted`. `/health`, `/v1/health`, `/metrics` exempt. Independent from MCP limiter. ISO A.5.30 / SOC 2 CC6.6. See [config.md#rate-limiting-http--grpc](config.md#rate-limiting-http--grpc) and [SECURITY.md](SECURITY.md).
+- **At-Rest Encryption** - Opt-in per-collection AES-256-GCM on `docs` and `rev` buckets. Enable globally with `MDDB_ENCRYPTION_KEY` (32 B base64) and flip `CollectionConfig.encrypted=true` per collection. Transparent read path, legacy plaintext stays readable, key loss is terminal. ISO A.8.24 / SOC 2 CC6.7. See [config.md#at-rest-encryption-iso-27001--soc-2](config.md#at-rest-encryption-iso-27001--soc-2) and [SECURITY.md](SECURITY.md).
+- **Incident Webhook Events** - Five named events on existing `/v1/webhooks`: `security.auth_failure_burst`, `security.rate_limit_exceeded`, `ops.replication_lag_high`, `ops.panic_recovered`, `ops.disk_usage_high`. Panic-recovery middleware turns handler crashes into 500 + event. Structured `detail` payload. ISO A.8.16 / SOC 2 CC7.3–7.4. See [config.md#incident-webhook-events](config.md) and [SECURITY.md](SECURITY.md).
 
 ## Integration & Automation
 
 ### Automation System
 - **Triggers** - Fire webhooks when new/updated/deleted documents match search criteria (FTS/vector/hybrid) above configurable threshold
 - **Crons** - Schedule periodic trigger execution using cron expressions (5 fields, or 6 with seconds first)
-- **Scheduled Backups** (v2.18.9+) - A cron's `backup` action: verified backups with sha256 checksum files to a local directory or an S3-compatible bucket, `keep: N` retention applied only after a successful run, `backup.failed` webhook event, `mddb_backup_last_success_timestamp` metric, `mddb-cli backup schedule add|list|remove`. See [BACKUP.md](BACKUP.md#scheduled-backups)
-- **Synced Sources** (v2.18.10+) - A cron's `sync` action: a sitemap, a URL list or an S3 prefix kept in step with a collection; unchanged sources are not written (ETag / Last-Modified / sha256), `prune` deletes documents whose source is gone, every request through the SSRF guard, robots.txt honoured, `source.synced` webhook event. See [AUTOMATIONS.md](AUTOMATIONS.md#synced-sources)
+- **Scheduled Backups** - A cron's `backup` action: verified backups with sha256 checksum files to a local directory or an S3-compatible bucket, `keep: N` retention applied only after a successful run, `backup.failed` webhook event, `mddb_backup_last_success_timestamp` metric, `mddb-cli backup schedule add|list|remove`. See [BACKUP.md](BACKUP.md#scheduled-backups)
+- **Synced Sources** - A cron's `sync` action: a sitemap, a URL list or an S3 prefix kept in step with a collection; unchanged sources are not written (ETag / Last-Modified / sha256), `prune` deletes documents whose source is gone, every request through the SSRF guard, robots.txt honoured, `source.synced` webhook event. See [AUTOMATIONS.md](AUTOMATIONS.md#synced-sources)
 - **Webhook Targets** - Named HTTP endpoints with custom method (POST/GET/PUT), custom headers, and template variable substitution (`{{doc.id}}`, `{{collection}}`, etc.)
 - **Sentiment Analysis** - Optional keyword-based sentiment condition (-1.0 to +1.0) on triggers with AND/OR logic for combining with search
 - **Execution Logs** - `GET /v1/automation-logs` with cursor-based pagination, status filtering, TTL-based cleanup
@@ -304,7 +304,7 @@ backups are always on. The operator can lock modules off with
 - **Progress Tracking** - Show import progress
 - **Dry Run** - Preview what would be imported
 - **Error Handling** - Continue on errors, report failures
-- **Async Bulk Ingest Jobs** (v2.9.12+) - `/v1/bulk-ingest-job*` endpoints for long-running imports. Queue jobs that return HTTP 202 immediately, poll status, cancel pending, list all jobs newest-first. Single FIFO worker processes 500-doc chunks; orphan jobs from crashed runs are marked `failed` on startup. Optional `callbackUrl` fires a webhook on completion. 4 MCP tools (`bulk_ingest_submit/status/list/cancel`) mirror the HTTP API.
+- **Async Bulk Ingest Jobs** - `/v1/bulk-ingest-job*` endpoints for long-running imports. Queue jobs that return HTTP 202 immediately, poll status, cancel pending, list all jobs newest-first. Single FIFO worker processes 500-doc chunks; orphan jobs from crashed runs are marked `failed` on startup. Optional `callbackUrl` fires a webhook on completion. 4 MCP tools (`bulk_ingest_submit/status/list/cancel`) mirror the HTTP API.
 
 ## Developer Tools
 

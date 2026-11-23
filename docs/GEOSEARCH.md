@@ -7,7 +7,7 @@ status: publish
 
 # Geosearch
 
-MDDB 2.9.11 ships a full geospatial search subsystem: radius and
+MDDB has a full geospatial search subsystem: radius and
 bounding-box queries, two pluggable index algorithms, composition with
 full-text and vector search, and a Leaflet-backed panel UI. This
 document describes the data model, the HTTP/MCP/gRPC surfaces, and the
@@ -154,7 +154,7 @@ Axis-aligned bbox search. No ordering is applied.
 }
 ```
 
-### POST `/v1/geo-polygon` (v2.9.13+)
+### POST `/v1/geo-polygon`
 
 GeoJSON Polygon or MultiPolygon containment. Returns every indexed point
 whose coordinates fall inside the shape. Exactly one of `polygon` or
@@ -274,11 +274,8 @@ response.
 
 ## GraphQL
 
-GraphQL is **not** a supported protocol for geosearch in 2.9.10. The
-GraphQL subsystem in the project is currently a pre-existing stub —
-every query resolver panics with `not implemented` — and wiring it
-up is tracked separately. Until that follow-up PR lands, use REST,
-gRPC, or MCP for geo queries.
+GraphQL is **not** a supported protocol for geosearch: the GraphQL
+schema has no geo queries. Use REST, gRPC, or MCP for geo queries.
 
 ## MCP tools
 

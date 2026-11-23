@@ -312,7 +312,7 @@ What this baseline shows, before the 2.19.8 index and replication work:
 - **kill -9 lost nothing**: every acknowledged write was there after the
   restart.
 
-## Retrieval quality on the MDDB docs (v2.18.8)
+## Retrieval quality on the MDDB docs
 
 The latency tables above say how fast each algorithm is. This section says how
 often it finds the right page. The set is
@@ -362,7 +362,7 @@ when recall@10 drops under 0.7 or nDCG@10 under 0.65. The test server there
 scores 0.750 and 0.683, because it does not use a default server's
 configuration.
 
-## BM25 parameters on the MDDB docs (v2.18.8)
+## BM25 parameters on the MDDB docs
 
 Same corpus and the same 20 questions as above, keyword search only. Only
 the BM25 parameters change. Measured 2026-10-29 with:
@@ -392,7 +392,7 @@ mddb-cli eval docs --queries tools/bench/evalsets/docs.json \
   recommends a variant only when that variant scores better. There are no
   thresholds on document length behind it.
 
-## Finding code: grep and read vs MDDB passages (v2.18.8)
+## Finding code: grep and read vs MDDB passages
 
 An agent asked to change something first has to find it. This compares the
 two ways it can, on the MDDB repository itself. The comparison counts tokens
@@ -446,7 +446,7 @@ go run ./agent -url http://localhost:11023 -collection mddb -root ../.. \
 - **Hybrid sits between the two here.** On this set it is pulled down by the
   full-text half. Run `mddb-cli eval` on your own questions before picking
   one, as shown in
-  [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing-v2188).
+  [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing).
 - **Two tasks defeat grep.** For "include paths" and "cross-collection text
   search", the first term an agent would try is not in the answer file.
 
@@ -596,7 +596,7 @@ differs is the passage's `symbol` label, which names the definition by its
 qualified name (`FakeClient.SearchAdvisor` for `SearchAdvisor`) in 27–41 of
 the 50 answers.
 
-## Relevance feedback (v2.18.9)
+## Relevance feedback
 
 How much one round of `positive` and `negative` examples recovers on a vector
 search (SRCH-015). The corpus is synthetic and built for the case feedback is
@@ -635,7 +635,7 @@ cd tools/bench && go run ./feedback -url http://localhost:11023 -queries 200 -se
   representative of a real embedding model. Read them as what the mechanism
   can recover, not as what every collection will gain.
 
-## Late interaction over chunks: the SRCH-004 spike (v2.18.9)
+## Late interaction over chunks: the SRCH-004 spike
 
 MDDB stores a document as one vector per chunk (keys `docID#N`) and scores
 it by its best chunk against one vector of the whole query. Late interaction
@@ -773,11 +773,11 @@ The SQ and SQ4 overheads come from the per-vector calibration listed in
 [QUANTIZATION.md](QUANTIZATION.md). The BQ figure assumes no per-vector
 overhead, which has not been measured.
 
-## Query decomposition (v2.18.10)
+## Query decomposition
 
 SRCH-020 turns the spike's best-part control into a server option:
 `queryDecomposition: "auto"` on vector and hybrid search
-([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810)).
+([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs)).
 The same tool, [`tools/bench/maxsim`](https://github.com/tradik/mddb/tree/main/tools/bench/maxsim),
 now also measures four server rows through `POST /v1/eval`: vector and hybrid
 search, each without and with `queryDecomposition: "auto"`. A row with
@@ -848,7 +848,7 @@ The two ranges overlap, so a gate cannot tell the cases apart.
   rises from 17 to 36 ms with Ollama on this machine. A query with nothing
   to split costs nothing more.
 
-## Vector query planner (v2.18.9)
+## Vector query planner
 
 Before and after `algorithm: "auto"` (SRCH-013). Before, a search used flat
 unless the caller named an index. After, the planner picks one per query.
@@ -1030,9 +1030,9 @@ the bench stores it, and shuffled. 100 queries, built with `-tags noasm`:
 | `coder/hnsw` | 16 | 100 / 100 | shuffled | 1.000 | 12.9 s | 734 µs |
 | `coder/hnsw` | 16 | 200 / 200 | by topic | 0.972 | 22.2 s | 1,410 µs |
 | `coder/hnsw` | 32 | 100 / 100 | by topic | 0.998 | 19.4 s | 1,197 µs |
-| MDDB, v2.18.9 | 16 | 200 / 100 | by topic | 1.000 | 2.0 s | 98 µs |
-| MDDB, v2.18.9 | 16 | 200 / 50 | by topic | 1.000 | 2.1 s | 44 µs |
-| MDDB, v2.18.9 | 16 | 200 / 100 | shuffled | 1.000 | 2.4 s | 79 µs |
+| MDDB | 16 | 200 / 100 | by topic | 1.000 | 2.0 s | 98 µs |
+| MDDB | 16 | 200 / 50 | by topic | 1.000 | 2.1 s | 44 µs |
+| MDDB | 16 | 200 / 100 | shuffled | 1.000 | 2.4 s | 79 µs |
 
 At 200k the MDDB graph measured 1.000 at efSearch 100, 0.997–0.998 at 50 and
 1.000 at efConstruction 100 / efSearch 64, in either order. The library gave

@@ -117,7 +117,7 @@ Enable with `MDDB_EXTREME=true` to activate:
 
 ### Production Images
 - `latest` - Latest stable release
-- `2.18.6`, `2.18`, `2` - Specific version tags
+- `2.19.13`, `2.19`, `2` - Specific version tags
 
 ### Platform Support
 All images support:

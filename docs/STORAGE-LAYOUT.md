@@ -7,7 +7,7 @@ status: publish
 
 # Storage Layout: One File or One File per Collection
 
-Since 2.18.2 mddb can keep each collection in a bbolt file of its own
+Mddb can keep each collection in a bbolt file of its own
 (#336). The default is unchanged: everything in one file.
 
 | | `single` (default) | `per-collection` |
@@ -120,7 +120,7 @@ compacted on its own.
 
 ## Schema version
 
-Since 2.18.9 every file — the main file and, in this layout, each collection
+Every file — the main file and, in this layout, each collection
 file — records the version of the on-disk format it holds: bucket
 `schema_version`, key `version`, eight big-endian bytes. A file without it
 is version 0, written by an earlier release.
@@ -176,13 +176,13 @@ their lower-case spelling.
 backend; the key index of every collection stays in bbolt and is migrated
 like any other. The backends' own key-index interface (the S3 objects
 `bykey/<collection>/<key>/<lang>`, the memory backend's map) uses the same
-rule since 2.18.9: the key and language with ASCII letters in lower case, the
+rule: the key and language with ASCII letters in lower case, the
 collection as written (#360). No release has written key-index objects to a
 bucket, so a bucket has nothing to migrate and is never rewritten.
 
 ## Corpus packs
 
-A corpus pack ([CORPUS-PACKS.md](CORPUS-PACKS.md), since 2.18.10) carries one
+A corpus pack ([CORPUS-PACKS.md](CORPUS-PACKS.md)) carries one
 collection as the file this layout keeps for it: every collection bucket,
 only that collection's keys, stamped with its schema version. Both layouts
 build and install packs, with the server running:

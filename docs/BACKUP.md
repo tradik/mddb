@@ -8,8 +8,7 @@ status: publish
 # Backup, restore and repair
 
 How MDDB copies its database, how it decides a copy is safe to restore, and
-what to do when the database file itself is damaged. Everything here applies
-from **v2.15.4**.
+what to do when the database file itself is damaged.
 
 ## Taking a backup
 
@@ -22,10 +21,6 @@ The MCP `backup` tool does the same. All three:
 
 1. copy the database **through a read transaction**. The copy holds exactly
    one committed state, however many writes land while it is being written.
-   Before 2.15.4 the HTTP and MCP backups copied the file itself. A copy taken
-   during writes held pages from different commits, and bbolt refused it at
-   restore with `freepages: ... needs to be < than key of the next element`
-   ([#266](https://github.com/tradik/mddb/issues/266)).
 2. **check the copy** with bbolt's full integrity check, the same check a
    restore runs, before keeping it.
 3. move it into place under the requested name only when both steps
@@ -38,9 +33,7 @@ until it is next opened, so do not restart it: see
 [Repairing a damaged database](#repairing-a-damaged-database).
 
 A large database takes a while to copy and check, so the HTTP backup lifts
-the server's 30-second write timeout for its own response. Before 2.15.4 the
-client got no response at all (`curl: (52) Empty reply`), even though the
-file was still being written.
+the server's 30-second write timeout for its own response.
 
 | Variable | Default | Effect |
 |---|---|---|
@@ -49,7 +42,7 @@ file was still being written.
 
 ## Scheduled backups
 
-Since 2.18.9 the server takes backups on a schedule itself: a cron
+The server takes backups on a schedule itself: a cron
 automation ([AUTOMATIONS.md](AUTOMATIONS.md#scheduled-backups)) with a
 `backup` action instead of a webhook. It needs `MDDB_CRONS=true`.
 
@@ -69,7 +62,7 @@ curl -X POST http://localhost:11023/v1/automation -H 'Content-Type: application/
 ```
 
 Over gRPC, `CreateAutomation` takes the same block as
-`AutomationRuleProto.backup` ([GRPC.md](GRPC.md#new-in-v2189)).
+`AutomationRuleProto.backup` ([GRPC.md](GRPC.md#query-planner-relevance-feedback-summaries-images-and-backups)).
 
 Each run:
 
@@ -220,11 +213,6 @@ and checkpointed again afterwards
 ([SEARCH.md](SEARCH.md#index-checkpoints-v2198)). A file-level copy of a
 stopped server may leave them out too.
 
-Before 2.15.4 the check was only a read-only open. That open skips the
-freelist walk, which is where a damaged file fails, so a damaged backup passed
-it. The failure came later, after the live database had been moved aside, and
-the server was left with no open database.
-
 ## Checking a file by hand
 
 ```bash
@@ -284,10 +272,10 @@ over 40 minutes on a busy spinning disk
 
 | Variable | Default | Effect |
 |---|---|---|
-| `MDDB_FREELIST_SYNC` | on from 4 GiB | `true` writes the freelist on every commit, so an open reads one page instead of walking the file. Writes are slightly slower. The first open with it set still walks once, to write the freelist. Unset, it is on for files of 4 GiB or more (`MDDB_FREELIST_SYNC_THRESHOLD`, v2.18.2+). |
-| `MDDB_PREWARM` | `auto` | (v2.18.2+) Before a walk, read the file sequentially into the page cache if it fits in half the available memory. |
+| `MDDB_FREELIST_SYNC` | on from 4 GiB | `true` writes the freelist on every commit, so an open reads one page instead of walking the file. Writes are slightly slower. The first open with it set still walks once, to write the freelist. Unset, it is on for files of 4 GiB or more (`MDDB_FREELIST_SYNC_THRESHOLD`). |
+| `MDDB_PREWARM` | `auto` | Before a walk, read the file sequentially into the page cache if it fits in half the available memory. |
 
-Since v2.18.2 a clean shutdown stores the freelist whatever the setting, so a
+A clean shutdown stores the freelist whatever the setting, so a
 planned restart reads one page. `MDDB_FREELIST_SYNC=true` is what covers the
 start after a crash. See [STORAGE-TUNING.md](STORAGE-TUNING.md).
 
@@ -299,7 +287,7 @@ See [STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#backup-and-restore).
 
 ## A corpus pack is not a backup
 
-A corpus pack (`mddb-cli corpus build`, since 2.18.10) is taken with the same
+A corpus pack (`mddb-cli corpus build`) is taken with the same
 consistent copy, but of **one collection**, without any of the server's own
 data, and it is installed **beside** the other collections, read-only, on any
 server — a backup replaces the database it is restored into. Use a backup to
@@ -328,5 +316,4 @@ measure before using it.
 ## When the database is damaged at startup
 
 The server stops and logs `startup step failed step=bolt.Open` with a
-`remedy` field that points here. Before 2.15.4 it stopped with a raw panic
-trace.
+`remedy` field that points here.

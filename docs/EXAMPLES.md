@@ -137,10 +137,10 @@ curl -X POST http://localhost:11023/v1/search \
   }'
 ```
 
-### Full-Text Search (v2.9.12+ and v2.9.13+ features)
+### Full-Text Search: boost, autocomplete, expressions, highlighting
 
 ```bash
-# Per-query boost / demote (v2.9.12+) — rerank without reindexing
+# Per-query boost / demote — rerank without reindexing
 curl -X POST http://localhost:11023/v1/fts \
   -H 'Content-Type: application/json' \
   -d '{
@@ -150,10 +150,10 @@ curl -X POST http://localhost:11023/v1/fts \
     "boost": {"tag:featured": 5.0, "status:archived": -2.0}
   }'
 
-# Prefix autocomplete for type-ahead UI (v2.9.12+)
+# Prefix autocomplete for type-ahead UI
 curl "http://localhost:11023/v1/autocomplete?collection=blog&q=mar&topN=5"
 
-# Expression mode — parens, precedence, mixed atoms (v2.9.13+)
+# Expression mode — parens, precedence, mixed atoms
 curl -X POST http://localhost:11023/v1/fts \
   -H 'Content-Type: application/json' \
   -d '{
@@ -162,7 +162,7 @@ curl -X POST http://localhost:11023/v1/fts \
     "mode": "expression"
   }'
 
-# Highlighting with fragments (v2.9.13+) — returns snippets per result
+# Highlighting with fragments — returns snippets per result
 curl -X POST http://localhost:11023/v1/fts \
   -H 'Content-Type: application/json' \
   -d '{
@@ -175,7 +175,7 @@ curl -X POST http://localhost:11023/v1/fts \
   }'
 ```
 
-### Hybrid Search with Geo Distance Sort (v2.9.13+)
+### Hybrid Search with Geo Distance Sort
 
 ```bash
 # Nearest matching venue — sort by proximity instead of fused score
@@ -190,7 +190,7 @@ curl -X POST http://localhost:11023/v1/hybrid-search \
   }'
 ```
 
-### GeoJSON Polygon / Multi-Polygon Containment (v2.9.13+)
+### GeoJSON Polygon / Multi-Polygon Containment
 
 ```bash
 # Find points inside a custom polygon (Berlin Mitte bounding box)
@@ -233,7 +233,7 @@ curl -X POST http://localhost:11023/v1/geo-polygon \
   }'
 ```
 
-### Async Bulk Ingest with Job Tracking (v2.9.12+)
+### Async Bulk Ingest with Job Tracking
 
 ```bash
 # Submit a long-running import — returns 202 with a job id
@@ -835,7 +835,7 @@ curl -X POST http://localhost:11023/v1/add \
   }'
 ```
 
-## Security & Compliance (v2.9.15+)
+## Security & Compliance
 
 Worked examples for the ISO 27001 / SOC 2 hardening features. See [SECURITY.md](SECURITY.md) for the full compliance map and [config.md](config.md) for every environment variable.
 
@@ -954,7 +954,7 @@ curl -s -X POST http://localhost:11023/v1/get \
 # 5) Verify the on-disk value is ciphertext by inspecting the BoltDB file.
 #    New values are written as:  "MDDB_ENC_V2\x00" (12 B magic) + 1 B key ID
 #    + 12 B nonce + AES-GCM ct + tag (MDDB_ENC_V1, without the key ID, is the
-#    pre-2.9.16 format, still read). The magic prefix is grep-able:
+#    older format, still read). The magic prefix is grep-able:
 strings mddb.db | grep -a MDDB_ENC_V | head -3
 # Output (one line per stored encrypted value, binary after the magic):
 # MDDB_ENC_V2

@@ -14,7 +14,7 @@ MDDB provides a fully-functional GraphQL API alongside its REST and gRPC interfa
 **Endpoint:** `POST /graphql`
 **Playground:** `GET /playground` (development tool, served alongside the endpoint)
 
-> **Status (MDDB 2.9.11+)**: GraphQL is now **enabled by default**. Prior to 2.9.11, the resolvers were scaffolding stubs that panicked with `not implemented` for every query and mutation except `login`. As of 2.9.11 every query and mutation in `schema.graphql` has a real implementation that delegates through the same adapter as REST and gRPC. To opt out, set `MDDB_GRAPHQL_ENABLED=false`.
+> **Status**: GraphQL is **enabled by default**. Every query and mutation in `schema.graphql` has a real implementation that delegates through the same adapter as REST and gRPC. To opt out, set `MDDB_GRAPHQL_ENABLED=false`.
 
 ## Quick Start
 
@@ -184,11 +184,11 @@ query {
 
 ### Indexing Status
 
-`indexingStatus(collection: String)` (v2.18.8) reports queued embeddings and
+`indexingStatus(collection: String)` reports queued embeddings and
 metadata updates — whether what was just written is searchable yet. Omit
 `collection` for the whole server. Fields match
 [`GET /v1/indexing-status`](API.md#get-v1indexing-status); `oldestPendingAt`
-is a unix timestamp. Since v2.18.10, `trainingCollections` lists the
+is a unix timestamp. `trainingCollections` lists the
 collections an ivf, pq, opq, sq or sq4 index has not trained yet (GO-047):
 flat and hnsw already answer for them, and `algorithm: "auto"` skips the
 index still training.
@@ -199,10 +199,10 @@ query { indexingStatus(collection: "notes") { pendingEmbeddings progress indexed
 
 ### Code Symbol
 
-`codeSymbol(input: CodeSymbolInput!)` (v2.18.8) returns where a symbol is
+`codeSymbol(input: CodeSymbolInput!)` returns where a symbol is
 defined and used, each relation a list of `Passage` (path, `lines { start end }`,
 the enclosing `symbol`, optional `content`). See
-[API.md — One symbol, everywhere it matters](API.md#one-symbol-everywhere-it-matters-v2188).
+[API.md — One symbol, everywhere it matters](API.md#one-symbol-everywhere-it-matters).
 
 ```graphql
 query {
@@ -233,8 +233,8 @@ query {
 
 ### Passages
 
-`fts` and `vectorSearch` take `format: "passages"` and `passageLines`
-(v2.18.8); the response then fills `passages` (path, `lines`, `symbol`,
+`fts` and `vectorSearch` take `format: "passages"` and `passageLines`;
+the response then fills `passages` (path, `lines`, `symbol`,
 `content`) and leaves `results` empty. `passageTokens` (v2.19.13) is the most
 tokens one passage may hold (default 500, max 8000); a passage cut to it
 carries `truncated: true`.
@@ -279,8 +279,8 @@ query {
 Each node carries `revision` (v2.19.6), the value `document` returns, ready
 to pass back as `expectedRevision`.
 
-`filter` (v2.18.8+) takes the operator filter from
-[Filter Operators](SEARCH.md#filter-operators-v2188) as a JSON object, on
+`filter` takes the operator filter from
+[Filter Operators](SEARCH.md#filter-operators) as a JSON object, on
 `search` and `vectorSearch`, ANDed with `filterMeta`:
 
 ```graphql
@@ -293,7 +293,7 @@ query {
 ```
 
 `vectorSearch` also takes `groupBy: { key: "path", perGroup: 1 }`
-(v2.18.8+, [Grouping Results](SEARCH.md#grouping-results-v2188)); each result
+([Grouping Results](SEARCH.md#grouping-results)); each result
 then reports `group` and `groupRank`.
 
 ### Vector Search (Semantic Search)
@@ -339,13 +339,13 @@ query {
 }
 ```
 
-**Query planner and relevance feedback (v2.18.9+):** `vectorSearch` takes
+**Query planner and relevance feedback:** `vectorSearch` takes
 the same fields as `POST /v1/vector-search`, and runs the same code.
 `algorithm: "auto"` lets the planner pick the index
-([auto](SEARCH.md#auto-the-server-chooses-v2189)); `explain: true` returns
+([auto](SEARCH.md#auto-the-server-chooses)); `explain: true` returns
 `plan`, which is `null` otherwise. `positive` and `negative` take examples
 from earlier results, each `{key}` (a document key or ID) or `{vector}`, not
-both ([Relevance Feedback](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189)):
+both ([Relevance Feedback](SEARCH.md#relevance-feedback--positive-and-negative-examples)):
 
 ```graphql
 query {
@@ -370,9 +370,9 @@ query {
 }
 ```
 
-`queryDecomposition: "auto"` (v2.18.10+) also searches a query of several
+`queryDecomposition: "auto"` also searches a query of several
 clauses clause by clause, and `plan { decomposition { parts texts } }` shows
-the split ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810)).
+the split ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs)).
 
 A refused input (an unknown `feedbackMode` or `queryDecomposition`, an example with both or neither
 of `key` and `vector`, a key with no embedding, `latencyTargetMs` out of
@@ -406,11 +406,11 @@ query {
 
 `fts`, `vectorSearch`, `search` and `codeSymbol` return at most
 `MDDB_SEARCH_MAX_LIMIT` results (default 1000), or the collection's
-`retrieval.maxTopK` when lower (v2.18.10+). When the requested `limit` / `topK`
+`retrieval.maxTopK` when lower. When the requested `limit` / `topK`
 was above it, `limitCapped` is `true` and `limit` is the count used; under the
-cap both are `null`. See [Result Limits](SEARCH.md#result-limits-v21810).
+cap both are `null`. See [Result Limits](SEARCH.md#result-limits).
 
-### Images (v2.18.9+)
+### Images
 
 `vectorSearch` and `fts` take `includeImages: true`: each result (and each
 passage) carries `images { key altText caption page url }`. With a provider
@@ -419,7 +419,7 @@ match the query by what they show) and takes `queryImage` (base64, a data URI
 or an http(s) URL) to search by a picture. `indexingStatus` reports
 `images { documents embedded model note }`, and `ingestDocuments` options take
 `extractImages` and `fetchRemoteImages`. See
-[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189).
+[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures).
 
 ```graphql
 query {
@@ -1205,5 +1205,4 @@ GraphQL resolver implementations are in progress. Contributions welcome:
 
 ---
 
-**Version:** 2.7.1
 **Last Updated:** March 2026

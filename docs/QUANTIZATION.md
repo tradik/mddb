@@ -9,8 +9,6 @@ status: publish
 
 MDDB supports **per-collection vector quantization** to reduce storage size and memory usage for embedding vectors. Quantization compresses float32 vectors into lower-precision formats while preserving search quality.
 
-Available since **v2.9.0**.
-
 ## Overview
 
 | Format | Bits/Dimension | Compression | Recall Drop | Use Case |
@@ -170,10 +168,10 @@ Two independent mechanisms share the "quantization" vocabulary:
   SQ/BQ are themselves compression-based indexes; HNSW and IVF are
   graph/cluster-based approximate indexes. See
   [SEARCH.md](SEARCH.md#vector-search) for per-algorithm characteristics.
-  `algorithm: "auto"` (v2.18.9+) chooses among them per query. On a quantized
+  `algorithm: "auto"` chooses among them per query. On a quantized
   or disk-only collection it searches the `quantized` index. When float32
   vectors would exceed 256 MB or 1 GB, it picks `sq` or `sq4` if trained. See
-  [`auto`: the server chooses](SEARCH.md#auto-the-server-chooses-v2189).
+  [`auto`: the server chooses](SEARCH.md#auto-the-server-chooses).
 
 Index tuning parameters are currently fixed at sensible defaults (HNSW
 `M=16`, `efConstruction=200`, `efSearch=64`; IVF `nProbe=10`; PQ
@@ -181,7 +179,7 @@ Index tuning parameters are currently fixed at sensible defaults (HNSW
 `MDDB_VECTOR_BQ_RERANK_FACTOR` for the binary-quantized index — see
 [config.md](config.md).
 
-## Disk-Only Vectors — Low-Memory Mode (v2.11.4+)
+## Disk-Only Vectors — Low-Memory Mode
 
 By default, quantized collections still keep full-precision vectors in the
 float32 index alongside the quantized copies. `diskOnlyVectors` removes that
@@ -226,7 +224,7 @@ Notes:
 
 ## Backward Compatibility
 
-- **Existing vectors** stored before v2.9.0 use float32 format (v1 binary encoding). They continue to work without changes.
+- **Unquantized vectors** use float32 format (v1 binary encoding). They continue to work without changes.
 - The storage layer auto-detects the format (v1 float32 vs v2 quantized) on read.
 - Changing quantization only affects newly written vectors. Use `vector-reindex --force` to convert all existing vectors.
 - Collections without a `quantization` setting default to `float32`.
@@ -272,7 +270,7 @@ The quantized vector block:
 
 Both return values in the same range as float32 cosine similarity, so thresholds work identically.
 
-### Hardware Acceleration (v2.9.9+)
+### Hardware Acceleration
 
 Float32 vector math (cosine similarity, dot product, Euclidean distance) is hardware-accelerated on ARM64 platforms using a 3-tier dispatch:
 

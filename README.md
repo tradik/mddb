@@ -26,10 +26,10 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **File Upload** - Upload PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT files, auto-converted to Markdown and indexed, each with a conversion confidence score
 - **Wikipedia Import** - Stream and import MediaWiki XML dumps (`.xml.bz2`). Wikitext is auto-converted to Markdown, with namespace filtering, and multi-GB files are handled
 - **Built-in MCP Server** - 116 tools for Claude Desktop, Cursor, Windsurf, or any MCP client
-- **Vector Search** - Auto-embed documents, semantic similarity with 8 index algorithms (Flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ, or `auto` to let the server choose) + per-collection quantization (int8/int4) + [disk-only low-memory mode](docs/QUANTIZATION.md#disk-only-vectors--low-memory-mode-v2114) + ARM NEON/SME hardware acceleration + goroutine parallel search
+- **Vector Search** - Auto-embed documents, semantic similarity with 8 index algorithms (Flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ, or `auto` to let the server choose) + per-collection quantization (int8/int4) + [disk-only low-memory mode](docs/QUANTIZATION.md#disk-only-vectors--low-memory-mode) + ARM NEON/SME hardware acceleration + goroutine parallel search
 - **Embedding Providers** - Pluggable: OpenAI, Ollama, Voyage, Cohere, plus an offline lexical provider (spelling, not meaning), configured per server or per collection ([guide](docs/EMBEDDING_PROVIDERS.md))
 - **[Geo Search](docs/GEOSEARCH.md)** - R-tree and geohash indexes for radius/bounding-box queries, composable with FTS/vector via `hybrid-search`, optional postcode lookup
-- **RAG-Ready** - Hybrid search (BM25 keyword + vector, fused with RRF or alpha blending), [parent/chunk/window retrieval modes](docs/SEARCH.md#retrieval-modes--parent-chunk-window-v2114) for precise LLM context, [MMR result diversification](docs/SEARCH.md#mmr-result-diversification-v2114), and per-query metadata boosting (freshness/recency ranking)
+- **RAG-Ready** - Hybrid search (BM25 keyword + vector, fused with RRF or alpha blending), [parent/chunk/window retrieval modes](docs/SEARCH.md#retrieval-modes--parent-chunk-window) for precise LLM context, [MMR result diversification](docs/SEARCH.md#mmr-result-diversification), and per-query metadata boosting (freshness/recency ranking)
 - **Native Multi-Tenancy** - [Namespace isolation per tenant](docs/MULTI_TENANCY.md) across HTTP/gRPC/GraphQL/MCP, ready for SaaS backends
 - **Zero-Maintenance Storage** - Single-file embedded database with automatic space management: no vacuum, compaction jobs, or index maintenance windows
 - **Memory RAG** - Conversational memory system: store, recall, and summarize chat sessions with semantic search
@@ -37,17 +37,17 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **Zero-Shot Classification** - Classify documents against candidate labels using embeddings, no training data
 - **Custom AI Tools** - Define YAML-based MCP tools for domain-specific workflows
 - **Code Documents** - Store HTML/CSS/JS alongside prose; a `kind: ["code"]` convention on the existing flat meta switches to a source-aware tokeniser that keeps `.hero-banner` and `checkoutHandler` findable whole and in parts ([API.md](docs/API.md#code-documents))
-- **Code Symbols** - Each code document records what it `defines`, `uses` and `imports` in its meta, so `meta.defines=.hero-banner` returns the stylesheet that declares the selector instead of the twelve templates that apply it. CSS, JavaScript/TypeScript, HTML; from 2.18, C, C++ and assembly, with `#include` resolved against per-collection include paths; from 2.18.6, Go, Rust, Java, Python, Ruby and PHP, plus Terraform, Kubernetes/OpenShift manifests, Kustomize and Ansible ([language table in API.md](docs/API.md#symbols-which-file-declares-this), [blog](blog/2026-10-24-mddb-reads-c-code.md))
+- **Code Symbols** - Each code document records what it `defines`, `uses` and `imports` in its meta, so `meta.defines=.hero-banner` returns the stylesheet that declares the selector instead of the twelve templates that apply it. CSS, JavaScript/TypeScript, HTML, C, C++ and assembly (with `#include` resolved against per-collection include paths), Go, Rust, Java, Python, Ruby and PHP, plus Terraform, Kubernetes/OpenShift manifests, Kustomize and Ansible ([language table in API.md](docs/API.md#symbols-which-file-declares-this), [blog](blog/2026-10-24-mddb-reads-c-code.md))
 - **Code Connection Graph** - What breaks if this selector changes, which pages load this script, what calls this C function, what does nothing reference any more. Edges are derived from the symbol meta, never stored, so a reindex reproduces the graph exactly ([API.md](docs/API.md#the-connection-graph))
-- **Per-Collection Retrieval Profiles** - Search type, topK, granularity, hybrid strategy and a context token budget stored with the collection instead of repeated by every client; an explicit request parameter always wins ([API.md](docs/API.md#retrieval-defaults-v2120))
+- **Per-Collection Retrieval Profiles** - Search type, topK, granularity, hybrid strategy and a context token budget stored with the collection instead of repeated by every client; an explicit request parameter always wins ([API.md](docs/API.md#retrieval-defaults))
 - **Embedding Cache** - Repeated queries never reach the provider twice, and a reindex reuses the vectors of chunks whose text is unchanged. Editing one paragraph of a 50-chunk document embeds one chunk, not fifty ([config.md](docs/config.md))
-- **Answer Formatting per Collection** - A `responsePrompt` stored with the collection tells every consumer how its answers should be shaped; MCP agents receive it with their search results, in the same round trip ([API.md](docs/API.md#answer-formatting-v2120))
-- **`fast` Ingest Profile** - One named trade-off instead of a combination of flags to reverse-engineer: text-only parsing, no revisions, no webhooks, and 43x faster on HTML. Embeddings and full-text stay on, because *fast* should not mean *unsearchable* ([API.md](docs/API.md#the-fast-ingest-profile-v2120))
-- **`oversample` Knob** - Recall/latency dial per query or per collection, where the `topK * 3` constant used to be. At 1x a chunked collection returns half the documents you asked for; at 10x it returns all of them, for about 1% more time on a flat index ([SEARCH.md](docs/SEARCH.md#oversampling-v2120))
-- **Passages, not files (v2.18.8)** - `format: "passages"` on every search returns a path, the lines, the enclosing function or type and the text. On 15 find-the-code tasks over this repository, vector passages reached the same answers as grep-and-read with 0.6x the tokens of grep's best case ([BENCHMARK.md](docs/BENCHMARK.md#finding-code-grep-and-read-vs-mddb-passages-v2188))
+- **Answer Formatting per Collection** - A `responsePrompt` stored with the collection tells every consumer how its answers should be shaped; MCP agents receive it with their search results, in the same round trip ([API.md](docs/API.md#answer-formatting))
+- **`fast` Ingest Profile** - One named trade-off instead of a combination of flags to reverse-engineer: text-only parsing, no revisions, no webhooks, and 43x faster on HTML. Embeddings and full-text stay on, because *fast* should not mean *unsearchable* ([API.md](docs/API.md#the-fast-ingest-profile))
+- **`oversample` Knob** - Recall/latency dial per query or per collection, where the `topK * 3` constant used to be. At 1x a chunked collection returns half the documents you asked for; at 10x it returns all of them, for about 1% more time on a flat index ([SEARCH.md](docs/SEARCH.md#oversampling))
+- **Passages, not files** - `format: "passages"` on every search returns a path, the lines, the enclosing function or type and the text. On 15 find-the-code tasks over this repository, vector passages reached the same answers as grep-and-read with 0.6x the tokens of grep's best case ([BENCHMARK.md](docs/BENCHMARK.md#finding-code-grep-and-read-vs-mddb-passages))
 - **Line answers for agents (v2.19.13)** - The `code_search` MCP tool (`exact`, `words`, `meaning`) and `code_symbol` with `format: "lines"` answer like grep: `path:line` lines and a count that says whether the list is complete ([MCP.md](docs/MCP.md#line-answers-for-agents-v21913))
-- **Measured, not guessed (v2.18.8)** - Evaluation sets score search configurations on your own questions (recall@k, nDCG@k, MRR, latency, tokens), `mddb-cli eval --fail-below` gates CI, and the advisor recommends from the measurement, BM25 `k1`/`b` included. `mddb-cli gain` reports the tokens retrieval returned and saved ([SEARCH.md](docs/SEARCH.md#measuring-instead-of-guessing-v2188))
-- **Safe for many agents (v2.18.8)** - Conditional writes with `expectedRevision`, collection aliases for blue/green rebuilds (`mddb-cli reindex-swap`), and delete/update/TTL by metadata filter with a dry run ([API.md](docs/API.md#collection-aliases-v1aliases))
+- **Measured, not guessed** - Evaluation sets score search configurations on your own questions (recall@k, nDCG@k, MRR, latency, tokens), `mddb-cli eval --fail-below` gates CI, and the advisor recommends from the measurement, BM25 `k1`/`b` included. `mddb-cli gain` reports the tokens retrieval returned and saved ([SEARCH.md](docs/SEARCH.md#measuring-instead-of-guessing))
+- **Safe for many agents** - Conditional writes with `expectedRevision`, collection aliases for blue/green rebuilds (`mddb-cli reindex-swap`), and delete/update/TTL by metadata filter with a dry run ([API.md](docs/API.md#collection-aliases-v1aliases))
 - **Agent Instructions** - Ready-made guidance for Claude Code, Cursor and Windsurf on which tool fits a question and how to ask for chunks instead of whole documents ([integrations/agent-instructions/](integrations/agent-instructions/)), measured at 60x fewer tokens for the same search
 - **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse, 8 search modes (simple, boolean, phrase, wildcard, proximity, **expression**, range, fuzzy), typo tolerance, multi-language stemming (17 languages), synonyms, per-query metadata boost/demote, prefix autocomplete, **search-result highlighting with fragments**, incremental re-indexing (an update writes only the fields it changed) and per-collection `excludeMetaKeys`
 - **Geosearch** - R-tree + geohash radius/bbox queries, **GeoJSON polygon and multi-polygon containment**, postcode lookup, **distance-sorted hybrid search** combining proximity with keyword/vector relevance
@@ -124,7 +124,7 @@ stores a retrieval profile. Running it again only rewrites what changed;
 `--prune` removes what was deleted, `--dry-run` shows the plan first. While you
 work, `mddb-cli autoindex . --watch` follows every save, and `mddb-cli autoindex
 hook install` re-indexes after each commit in the background. See
-[Bulk Import](docs/BULK-IMPORT.md#autoindex-one-command-v2188).
+[Bulk Import](docs/BULK-IMPORT.md#autoindex-one-command).
 
 Add `--semantic` to take definitions, references and implementations from a
 language server — gopls, basedpyright, phpactor, clangd (C/C++) or rust-analyzer — instead of heuristics; see
@@ -234,7 +234,7 @@ mddb-cli fts blog --query="getting started" --algorithm=bm25
 | linux/amd64, linux/arm64 | ✅ | ✅ every push |
 | darwin/amd64, darwin/arm64 | ✅ | compiled and vetted, not run |
 | freebsd/amd64, freebsd/arm64 | ✅ | compiled and vetted, not run |
-| **windows/amd64** | ❌ build from source | ✅ every push, since 2.13 |
+| **windows/amd64** | ❌ build from source | ✅ every push |
 | windows/arm64 | ❌ | ❌ not a target |
 
 Two things this table is precise about on purpose.
@@ -245,8 +245,8 @@ that fails to compile. The FreeBSD build broke once on a `Statfs_t` field width
 and that is exactly what it catches. It does not catch a syscall that compiles
 and returns the wrong thing.
 
-**Windows runs the suite but ships nothing.** As of 2.13 the full test suite runs
-on `windows-latest` on every push (in three parallel shards since 2.18.9), and native `windows/amd64` binaries build from
+**Windows runs the suite but ships nothing.** The full test suite runs
+on `windows-latest` on every push (in three parallel shards), and native `windows/amd64` binaries build from
 source with `make build-windows`. There are no Windows release artifacts, and
 Unix domain sockets are refused there by design, because the listener's security model
 is owner-only mode bits, which Windows cannot express. WSL2 remains the route
@@ -378,25 +378,25 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **MCP Server** - 116 built-in tools via Model Context Protocol 2026-07-28 and 2025-11-25, served side by side (stdio + Streamable HTTP + SSE) with `server/discover`, tool annotations, prompts, completion, and structured output
 - ✅ **Chat Scenarios** (2.19.0) - An assistant's prompt, guardrails, allowed collections, style, LLM parameters and limits stored in MDDB (`/v1/chat/scenarios`, gRPC and MCP alike), edited in the panel, with a composed-prompt preview and one version counter a chat service polls to pick up changes without a restart ([API.md](docs/API.md#chat-scenarios-v1chatscenarios))
 - ✅ **Chat Skills** (2.19.0) - Reusable `SKILL.md` instruction blocks attached to scenarios in a chosen order and composed after the guardrails; paste or import from an https URL (full text shown before saving, GitHub URLs pinned to a commit), versioned with a diff on update, a "used by" list and size limits; admin only ([API.md](docs/API.md#chat-skills-v1chatskills))
-- ✅ **WordPress Publishing** - `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts & pages on sites running the [mddb-sync plugin](integrations/wordpress-plugin/README.md), including tags, categories, meta fields and Polylang/WPML translations included ([docs](docs/MCP.md#wordpress-publishing-tools-v2110))
+- ✅ **WordPress Publishing** - `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts & pages on sites running the [mddb-sync plugin](integrations/wordpress-plugin/README.md), including tags, categories, meta fields and Polylang/WPML translations included ([docs](docs/MCP.md#wordpress-publishing-tools))
 - ✅ **File Upload** - Upload PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT, auto-converted to Markdown (single, batch, ingest and `mddb-cli autoindex`; `meta.conversionConfidence` flags scans and broken files)
 - ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext to Markdown conversion, namespace filtering, batch processing
 - ✅ **Vector Search** - Semantic similarity with auto-embeddings (OpenAI, Ollama, Cohere, Voyage), ARM NEON/SME SIMD acceleration
-- ✅ **Query Planner & Relevance Feedback** - `algorithm: "auto"` picks the vector index per query (`explain: true` shows why); `positive`/`negative` examples correct a search with Rocchio or rescoring; client-written document summaries as a second representation (`summaryMode: blend|expand`); images from Markdown and PDF attached to hits (`includeImages`) and searchable by picture with Voyage or Cohere; `queryDecomposition: "auto"` searches a question with several needs clause by clause (v2.18.10); after a restart a collection answers with flat and HNSW as soon as its vectors are loaded, while IVF/PQ/OPQ/SQ train in the background and `auto` skips them until they are ready (v2.18.10) ([guide](docs/SEARCH.md))
+- ✅ **Query Planner & Relevance Feedback** - `algorithm: "auto"` picks the vector index per query (`explain: true` shows why); `positive`/`negative` examples correct a search with Rocchio or rescoring; client-written document summaries as a second representation (`summaryMode: blend|expand`); images from Markdown and PDF attached to hits (`includeImages`) and searchable by picture with Voyage or Cohere; `queryDecomposition: "auto"` searches a question with several needs clause by clause; after a restart a collection answers with flat and HNSW as soon as its vectors are loaded, while IVF/PQ/OPQ/SQ train in the background and `auto` skips them until they are ready ([guide](docs/SEARCH.md))
 - ✅ **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse scoring, 8 search modes (simple, boolean, phrase, wildcard, proximity, expression, range, fuzzy), typo tolerance, metadata pre-filtering, multi-language stemming and stop words (17 languages)
 - ✅ **Hybrid Search** - Sparse (BM25) + dense (vector) fusion with alpha blending or RRF
 - ✅ **Aggregations** - Metadata facets (value counts) and date histograms with optional pre-filtering
-- ✅ **Inline Facets on Search** (v2.9.14+) - Pass `facetBy` to `/v1/fts` or `/v1/hybrid-search` and get per-key value counts alongside results, with no separate aggregate call
-- ✅ **Curation Rules** (v2.9.14+) - Pin or hide documents for specific queries via `/v1/curation` (CRUD); applied in FTS + Hybrid pipelines
+- ✅ **Inline Facets on Search** - Pass `facetBy` to `/v1/fts` or `/v1/hybrid-search` and get per-key value counts alongside results, with no separate aggregate call
+- ✅ **Curation Rules** - Pin or hide documents for specific queries via `/v1/curation` (CRUD); applied in FTS + Hybrid pipelines
 - ✅ **Zero-Shot Classification** - Classify documents against candidate labels using embedding similarity
 - ✅ **Custom MCP Tools** - Define YAML-based AI tools for domain-specific workflows
 - ✅ **RAG Pipeline** - Built-in support for retrieval-augmented generation workflows
 - ✅ **Integrations** - Docling, Langflow, OpenSearch, SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension ([guide](docs/INTEGRATIONS.md))
-- ✅ **Elasticsearch-compatible subset** - the `esCompat` module (System → Features, or `MDDB_ES_COMPAT=true`) mounts `_search`, `_count`, `_doc`, `_bulk` under `/es`, translated onto MDDB's full-text, vector (`auto`), hybrid (`rrf`) and metadata paths with the same auth, permissions and limits as `/v1`; tested in CI with the unmodified `elasticsearch-py` (v2.18.10+) — **[Details](docs/ELASTICSEARCH-COMPAT.md)**
+- ✅ **Elasticsearch-compatible subset** - the `esCompat` module (System → Features, or `MDDB_ES_COMPAT=true`) mounts `_search`, `_count`, `_doc`, `_bulk` under `/es`, translated onto MDDB's full-text, vector (`auto`), hybrid (`rrf`) and metadata paths with the same auth, permissions and limits as `/v1`; tested in CI with the unmodified `elasticsearch-py` — **[Details](docs/ELASTICSEARCH-COMPAT.md)**
 
 ### Core Functionality
 - ✅ **Document Management** - Full CRUD with metadata and collections
-- ✅ **Revision History** - Complete version control with snapshots, per-collection retention cap (`maxRevisions`, v2.9.14+) trimmed synchronously on every write
+- ✅ **Revision History** - Complete version control with snapshots, per-collection retention cap (`maxRevisions`) trimmed synchronously on every write
 - ✅ **Metadata Search** - Fast indexed queries with multi-value tags
 - ✅ **Collection Checksum** - Lightweight CRC32 checksum per collection for cache invalidation
 - ✅ **Partial Document Update** - Update metadata and/or content independently
@@ -408,7 +408,7 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **Schema Validation** - JSON Schema validation per collection
 - ✅ **Per-Collection Storage Backends** - Choose BoltDB (default), in-memory (ephemeral), or S3/MinIO per collection
 - ✅ **Persistent Chat Conversations** (2.19.0) - Per-user conversations for `mddb-chat` stored in mddbd: a host API over REST and gRPC (create, resume with the last N messages, end, export and delete everything of a user for GDPR), every call bound to the user id (`sub`) of the host's signed join token, per-scenario retention, tenant-scoped, read-only MCP tools ([API](docs/API.md#chat-conversations-v1chatconversations))
-- ✅ **Corpus Packs** - Build a collection once (documents, full-text index, vectors) and install it read-only on any server with `mddb-cli corpus install`, no re-embedding or reindexing; licences mandatory (v2.18.10)
+- ✅ **Corpus Packs** - Build a collection once (documents, full-text index, vectors) and install it read-only on any server with `mddb-cli corpus install`, no re-embedding or reindexing; licences mandatory
 
 ### APIs & Protocols
 - ✅ **HTTP/JSON REST** - Easy debugging, extensive docs
@@ -418,7 +418,7 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **Web Panel** - React UI with REST/GraphQL toggle
 
 ### Security & Access
-- ✅ **Authentication** - JWT tokens and API keys; OAuth 2.1 on the MCP listener for claude.ai connectors ([MCP.md](docs/MCP.md#oauth-21-for-claudeai-connectors-v2181))
+- ✅ **Authentication** - JWT tokens and API keys; OAuth 2.1 on the MCP listener for claude.ai connectors ([MCP.md](docs/MCP.md#oauth-21-for-claudeai-connectors))
 - ✅ **Authorization** - Collection-level RBAC (Read/Write/Admin)
 - ✅ **Per-Protocol Access Modes** - `MDDB_MCP_MODE=read` (MCP read-only), `MDDB_API_MODE`, `MDDB_GRPC_MODE`, `MDDB_HTTP3_MODE`
 - ✅ **MCP Tool Control** - `MDDB_MCP_BUILTIN_TOOLS=false` to expose only custom YAML tools; `MDDB_MCP_TOOLSETS=search,code` (or per API key) to expose only some groups
@@ -434,10 +434,10 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 - ✅ **Audit log (ISO 27001 / SOC 2)** - `MDDB_AUDIT_ENABLED=true` persists structured JSON events (auth attempts, writes, deletes) to a dedicated BoltDB bucket. Admin-only `GET /v1/audit` query with actor / action / result / time-window filters. Retention configurable via `MDDB_AUDIT_RETENTION_DAYS` (default 90)
 - ✅ **Incident webhook events** - subscribe on `/v1/webhooks` to `security.auth_failure_burst`, `security.rate_limit_exceeded`, `ops.replication_lag_high`, `ops.panic_recovered`, `ops.disk_usage_high`. Panic-recovery middleware turns handler crashes into structured 500 + event instead of process kill
 - ✅ **At-rest encryption (opt-in per collection)** - AES-256-GCM on document values. Enable globally with `MDDB_ENCRYPTION_KEY` (32 B base64) and flip `CollectionConfig.encrypted=true` per collection. Legacy plaintext stays readable after flip. FTS / vector indexes remain plaintext (queryable). Losing the key is terminal, so store it in an HSM with escrow
-- ✅ **Encryption key rotation (2.9.16)** - V2 ciphertext format prefixes the keyID byte so the encryptor can hold a primary plus any number of read-only previous keys. Rotate by setting a fresh `MDDB_ENCRYPTION_KEY` + `MDDB_ENCRYPTION_KEY_ID` and listing every superseded key in `MDDB_ENCRYPTION_KEYS_PREVIOUS` (JSON `[{"id":1,"key":"..."}]`). Old documents stay readable; the admin endpoint `POST /v1/encryption/rotate` (or panel "Encryption", then "Start rotation") rewrites every encrypted entry under the new primary in the background. V1 (2.9.15) ciphertexts continue to decrypt, so the change is non-breaking
-- ✅ **Audit log export to SIEM / syslog (2.9.16)** - `MDDB_AUDIT_EXPORT_WEBHOOK_URL` mirrors every audit event as JSON to a SIEM (Splunk HEC, Datadog Logs, ELK) with custom auth headers from `MDDB_AUDIT_EXPORT_WEBHOOK_HEADER`. `MDDB_AUDIT_EXPORT_SYSLOG_ADDR=host:port` (or `tcp://host:port`) sends RFC 5424 framed messages to a syslog collector. Both can run together. Per-sink delivered/failed/dropped counters at `GET /v1/audit/exporters` and in the Security panel
+- ✅ **Encryption key rotation** - V2 ciphertext format prefixes the keyID byte so the encryptor can hold a primary plus any number of read-only previous keys. Rotate by setting a fresh `MDDB_ENCRYPTION_KEY` + `MDDB_ENCRYPTION_KEY_ID` and listing every superseded key in `MDDB_ENCRYPTION_KEYS_PREVIOUS` (JSON `[{"id":1,"key":"..."}]`). Old documents stay readable; the admin endpoint `POST /v1/encryption/rotate` (or panel "Encryption", then "Start rotation") rewrites every encrypted entry under the new primary in the background. V1 ciphertexts continue to decrypt, so the change is non-breaking
+- ✅ **Audit log export to SIEM / syslog** - `MDDB_AUDIT_EXPORT_WEBHOOK_URL` mirrors every audit event as JSON to a SIEM (Splunk HEC, Datadog Logs, ELK) with custom auth headers from `MDDB_AUDIT_EXPORT_WEBHOOK_HEADER`. `MDDB_AUDIT_EXPORT_SYSLOG_ADDR=host:port` (or `tcp://host:port`) sends RFC 5424 framed messages to a syslog collector. Both can run together. Per-sink delivered/failed/dropped counters at `GET /v1/audit/exporters` and in the Security panel
 - ✅ **HTTP + gRPC rate limiting** - `MDDB_RATE_LIMIT_ENABLED=true` enforces a single sliding-window budget across both transports (per-IP by default, `MDDB_RATE_LIMIT_BY=user` keys on authenticated username). Emits `X-RateLimit-*` headers + `429 Retry-After` on HTTP; `ResourceExhausted` on gRPC. Health / metrics endpoints are always exempt. The client IP header (`MDDB_CLIENT_IP_HEADER`: `X-Forwarded-For` by default, `Forwarded`, `CF-Connecting-IP`, `X-Real-IP`, ...) and PROXY protocol v1/v2 (`MDDB_PROXY_PROTOCOL=on`) count only from proxies listed in `MDDB_TRUSTED_PROXIES` (IPs/CIDRs, empty = trust nobody); setup for nginx, Traefik, Caddy, HAProxy, F5, NetScaler, vTM, Cloudflare/cloudflared and AWS ALB/NLB in [config.md](docs/config.md#proxies-and-load-balancers) — **[Details](docs/config.md#client-ip-and-trusted-proxies)**
-- ✅ **Server-side result cap** - every search returns at most `MDDB_SEARCH_MAX_LIMIT` results (default 1000) on REST, gRPC, MCP and GraphQL, lowered further per collection by `retrieval.maxTopK`; a capped response says `"limitCapped": true` with the `limit` used (v2.18.10+) — **[Details](docs/SEARCH.md#result-limits-v21810)**
+- ✅ **Server-side result cap** - every search returns at most `MDDB_SEARCH_MAX_LIMIT` results (default 1000) on REST, gRPC, MCP and GraphQL, lowered further per collection by `retrieval.maxTopK`; a capped response says `"limitCapped": true` with the `limit` used — **[Details](docs/SEARCH.md#result-limits)**
 - ✅ **Production hardening switch** - `MDDB_PRODUCTION=true` fails startup unless every compliance guardrail is satisfied (auth on, JWT secret of 32 bytes or more, TLS on, CORS explicit, audit + rate limit enabled). Unset = silent warning; no breaking change for existing deployments. **[Details](docs/config.md#production-hardening-iso-27001--soc-2)**
 
 **[Full compliance map, threat model, operational checklist](docs/SECURITY.md)**
@@ -683,7 +683,7 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 - **[Zero-Shot Classification](docs/ZERO-SHOT-CLASSIFICATION.md)** - Classify documents against labels using embeddings
 - **[PMISparse](docs/PMISPARSE.md)** - Two-phase BM25 + PPMI query expansion (invented by Tradik Limited)
 - **[Webhooks](docs/API.md#getpost-v1webhooks)** - Event-driven integration (API reference)
-- **[Automations](docs/AUTOMATIONS.md)** - Triggers, crons, webhooks, sentiment, template variables; scheduled backups and synced sources (sitemap, URL list or S3 prefix kept in step with a collection, v2.18.10; run now and each source's last result, v2.19.0; a git repository at a branch, tag or its latest release, v2.19.5)
+- **[Automations](docs/AUTOMATIONS.md)** - Triggers, crons, webhooks, sentiment, template variables; scheduled backups and synced sources (sitemap, URL list or S3 prefix kept in step with a collection; run now and each source's last result, v2.19.0; a git repository at a branch, tag or its latest release, v2.19.5)
 - **[Temporal Tracking](docs/TEMPORAL-TRACK.md)** - Document event history, hot-docs leaderboard, activity histograms
 - **[Spell Correction](docs/SYMSPELL.md)** - SymSpell FTS spell suggestions, text cleanup, custom dictionaries
 - **[Authentication](docs/AUTHENTICATION.md)** - JWT & API keys, RBAC, MCP OAuth 2.1
@@ -693,7 +693,7 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 - **[Reference Coding](docs/REFERENCE-CODING.md)** - Other projects' code as searchable references, with their licences
 - **[Code Intelligence](docs/CODE-INTELLIGENCE.md)** - Definitions, references, callers and implementations: heuristic for 13 programming languages, precise from a language server with `autoindex --semantic`
 - **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch (and when MDDB alone is enough), SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension, LangChain / LangGraph
-- **[Elasticsearch-compatible subset](docs/ELASTICSEARCH-COMPAT.md)** - the `esCompat` module (or `MDDB_ES_COMPAT=true`): unmodified Elasticsearch clients index, search (`match`, `bool`, `term`, `range`, `knn`, `highlight`, `terms` aggs) and delete under `/es`; unsupported clauses are a 400 naming them (v2.18.10+)
+- **[Elasticsearch-compatible subset](docs/ELASTICSEARCH-COMPAT.md)** - the `esCompat` module (or `MDDB_ES_COMPAT=true`): unmodified Elasticsearch clients index, search (`match`, `bool`, `term`, `range`, `knn`, `highlight`, `terms` aggs) and delete under `/es`; unsupported clauses are a 400 naming them
 - **[Bulk Import](docs/BULK-IMPORT.md)** - `mddb-cli autoindex` for a directory or repository, and the converters it uses
 - **[Blog](blog/)** - Release announcements and engineering notes
 

@@ -27,7 +27,7 @@ mddb stores everything in one bbolt file:
   random read at a time. On a 101 GB file on a virtual disk that took 101
   minutes, at about 17 MB/s.
 
-Since 2.18.2 a clean shutdown stores the freelist, so planned restarts open in
+A clean shutdown stores the freelist, so planned restarts open in
 milliseconds. After a crash the server starts at once and serves reads while
 the freelist is rebuilt in the background; writes wait for it (503 with
 `Retry-After`). The rebuild reads the file sequentially into the cache first
@@ -36,7 +36,7 @@ an ETA.
 
 | start, 2.5 GB file, WSL2 ext4, cache dropped (*measured*) | open |
 |---|---|
-| walk (2.18.1 behaviour) | 56–60 s |
+| walk every page (no stored freelist) | 56–60 s |
 | after a clean shutdown | 0.014 s |
 | after a crash, sequential prewarm first | 1.5 s + 0.4 s |
 
@@ -48,11 +48,11 @@ walk does not hold up writes to a small one ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.
 
 1. **Let the server shut down.** SIGTERM, then wait: the shutdown has a 15 s
    budget (`MDDB_SHUTDOWN_TIMEOUT_SEC`) and stores the freelist at the end.
-   Since 2.18.5 the process exits when the budget runs out even if a read is
+   The process exits when the budget runs out even if a read is
    still open, and a second SIGTERM exits at once.
    Docker kills after 10 s by default, so set `stop_grace_period: 20s` (the
    bundled compose files do); Kubernetes waits 30 s by default.
-2. **Keep `MDDB_FREELIST_SYNC` on for large files.** Since 2.18.2 it is on by
+2. **Keep `MDDB_FREELIST_SYNC` on for large files.** It is on by
    default for a file of 4 GiB or more (`MDDB_FREELIST_SYNC_THRESHOLD`); set it
    to `true` for smaller ones where crashes happen. It protects the start
    after a crash, which the clean-shutdown store cannot. It costs a little per commit (0.15 → 0.66 ms on tmpfs,
@@ -70,11 +70,9 @@ walk does not hold up writes to a small one ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.
 
 bbolt maps the file into memory. A write that makes the file outgrow the map
 has to remap it, which waits for every open read transaction, and no new read
-can begin while it waits. Until 2.18.5 the whole-database walks
+can begin while it waits. The whole-database walks
 (`/v1/storage`, `/v1/vector-stats`, the stats count, an fts or vector reindex)
-each ran in one read transaction, so during a bulk ingest into a large file
-every request, `/health` included, stopped until the walk ended (#350). They
-now read in slices of at most 10 000 keys or 50 ms, each its own transaction.
+read in slices of at most 10 000 keys or 50 ms, each its own transaction.
 A file over 1 GiB is also mapped a quarter beyond its size at start (64-bit,
 not Windows), so a bulk ingest remaps rarely; the map is address space, not
 memory or disk.

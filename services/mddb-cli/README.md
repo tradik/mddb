@@ -96,7 +96,7 @@ with BM25 parameters: `fts/bm25:k1=2:b=0.75`). It prints
 recall@k, nDCG@k, MRR, latency and tokens for each. With `--fail-below` it
 exits non-zero when any configuration scores under a threshold, which makes
 it a CI gate. See
-[docs/SEARCH.md](../../docs/SEARCH.md#measuring-instead-of-guessing-v2188).
+[docs/SEARCH.md](../../docs/SEARCH.md#measuring-instead-of-guessing).
 
 #### gain - What retrieval saved
 
@@ -107,7 +107,7 @@ mddb-cli gain [--window 30d]
 Prints, for the whole server, the searches by type and algorithm, the
 tokens returned, and the tokens saved by passages and chunks compared with
 whole documents. Token counts are estimates. The definitions are in
-[docs/TELEMETRY.md](../../docs/TELEMETRY.md#retrieval-gain-v2188).
+[docs/TELEMETRY.md](../../docs/TELEMETRY.md#retrieval-gain).
 
 #### alias, reindex-swap - Stable names for collections
 
@@ -188,7 +188,7 @@ With `--images` (v2.18.9+) each Markdown file is sent with the JPEG, PNG, GIF
 and WebP files its relative image links name (inside the indexed tree, at
 most 2 MB each), and the server stores them, and the pictures of PDFs, as
 image documents under the file's key, with alt text and captions searchable
-([docs/SEARCH.md](../../docs/SEARCH.md#images--alt-text-captions-and-pictures-v2189)).
+([docs/SEARCH.md](../../docs/SEARCH.md#images--alt-text-captions-and-pictures)).
 See [docs/BULK-IMPORT.md](../../docs/BULK-IMPORT.md).
 
 #### plan - A project's backlog in a collection (v2.19.11+)

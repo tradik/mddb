@@ -39,7 +39,7 @@ takes MCP API keys: static ones in `MDDB_MCP_API_KEYS`, or keys created with
 `POST /v1/mcp/keys`. With `MDDB_AUTH_ENABLED=true` and no MCP keys, it takes
 the same credentials as the HTTP API. claude.ai custom connectors sign in with
 OAuth 2.1 (`MDDB_MCP_OAUTH_ENABLED=true`); each token stands for an MCP API
-key ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)).
+key ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors)).
 
 Each built-in tool belongs to one of eleven toolsets: `search` (16 tools),
 `code` (7), `documents` (13), `ingest` (8), `memory` (6), `schema` (5),
@@ -60,8 +60,8 @@ or `MDDB_MCP_API_KEYS=key:docs-reader::docs:ro`. Tools such a key can never
 call are left out of `tools/list` ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)).
 
 With `search,code` the 22 tool schemas take about 43 KB per turn, against
-94 KB for all 93 tools of 2.18.10 (114 since 2.19.0). A tool outside the caller's toolsets is not listed,
-and calling it returns JSON-RPC `-32601` ([MCP.md](MCP.md#toolsets-v2188)).
+94 KB measured for a full list of 93 tools. A tool outside the caller's toolsets is not listed,
+and calling it returns JSON-RPC `-32601` ([MCP.md](MCP.md#toolsets)).
 
 Operators can add their own tools and prompts in YAML
 ([CUSTOM-TOOLS.md](CUSTOM-TOOLS.md)), and replace the server's instructions
@@ -102,7 +102,7 @@ tool that no longer exists.
 ## 3. Index a repository or a folder
 
 `mddb-cli autoindex` loads a directory in one command
-([BULK-IMPORT.md](BULK-IMPORT.md#autoindex-one-command-v2188)):
+([BULK-IMPORT.md](BULK-IMPORT.md#autoindex-one-command)):
 
 ```bash
 mddb-cli autoindex .                  # collection named after the repository
@@ -152,7 +152,7 @@ servers from a tool call is a separate security decision.
 `format: "passages"` on `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search`,
 `/v1/cross-search` and the matching MCP tools returns, per hit, the path, a
 line range, the innermost enclosing definition, the text and its token
-estimate — never the whole document ([SEARCH.md](SEARCH.md#passages--what-an-agent-gets-v2188)):
+estimate — never the whole document ([SEARCH.md](SEARCH.md#passages--what-an-agent-gets)):
 
 ```json
 {"passages": [{
@@ -172,7 +172,7 @@ curl -X PUT http://localhost:11023/v1/collection-config \
 
 `contextTokenBudget` drops results from the tail of the ranked list, never
 cuts one in half, and says so with `contextTruncated: true`; the first result
-is always kept ([API.md](API.md#retrieval-defaults-v2120)). Separately, the
+is always kept ([API.md](API.md#retrieval-defaults)). Separately, the
 server returns at most `MDDB_SEARCH_MAX_LIMIT` results (default 1000), and a
 capped response carries `limitCapped: true`. One passage cut around a hit
 holds at most 500 tokens (2.19.13); `passageTokens` (`passage_tokens` on MCP)
@@ -189,7 +189,7 @@ Other ways to narrow a search on the MCP tools:
 ## 5. Code: symbols and the graph
 
 For a code collection, two calls replace most search-then-read loops
-([API.md](API.md#one-symbol-everywhere-it-matters-v2188)):
+([API.md](API.md#one-symbol-everywhere-it-matters)):
 
 - **`code_symbol`** (`GET /v1/symbol?collection=…&name=…`) returns a
   symbol's definitions with their line span, every reference with the
@@ -267,11 +267,11 @@ hybrid search on it uses full text.
 
 | Option | What it does | Page |
 |---|---|---|
-| `algorithm: "auto"` (`vector_algorithm` on `hybrid_search`) | The server picks the vector index per query from collection size, memory, built indexes and how much the filter admits; `explain: true` shows why | [SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189) |
-| `query_decomposition: "auto"` | Splits a question with several needs ("set up a replica and take a backup") into up to 4 parts, searches each and keeps every document's best score. +0.065 nDCG@10 on two-topic questions, unchanged on ordinary ones | [SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810) |
-| `positive` / `negative` | Relevance feedback: keys of hits that answered and that did not; the next search moves towards the first | [SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189) |
-| Summaries | The client writes a short summary in meta `summary`; with `retrieval.summaryMode` `blend` or `expand` it is embedded and searched as a second representation. MDDB never generates a summary | [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189) |
-| `wait_for_index`, `wait_for_keys` | Full text finds a document as soon as its write returns; its embedding comes later. These make a vector search wait for named keys instead of polling `get_indexing_status` | [MCP.md](MCP.md#searching-what-you-just-wrote-v2188) |
+| `algorithm: "auto"` (`vector_algorithm` on `hybrid_search`) | The server picks the vector index per query from collection size, memory, built indexes and how much the filter admits; `explain: true` shows why | [SEARCH.md](SEARCH.md#auto-the-server-chooses) |
+| `query_decomposition: "auto"` | Splits a question with several needs ("set up a replica and take a backup") into up to 4 parts, searches each and keeps every document's best score. +0.065 nDCG@10 on two-topic questions, unchanged on ordinary ones | [SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs) |
+| `positive` / `negative` | Relevance feedback: keys of hits that answered and that did not; the next search moves towards the first | [SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples) |
+| Summaries | The client writes a short summary in meta `summary`; with `retrieval.summaryMode` `blend` or `expand` it is embedded and searched as a second representation. MDDB never generates a summary | [SEARCH.md](SEARCH.md#summaries--a-second-representation) |
+| `wait_for_index`, `wait_for_keys` | Full text finds a document as soon as its write returns; its embedding comes later. These make a vector search wait for named keys instead of polling `get_indexing_status` | [MCP.md](MCP.md#searching-what-you-just-wrote) |
 | `expected_revision` | Conditional write: fails with a conflict when another agent wrote the document in between. `delete_document` takes it too; `search_documents` results carry each `revision` | [API.md](API.md#patch-v1update) |
 | `if_absent` | `add_document` creates only: fails with a conflict when the document already exists, so two agents cannot both create it | [API.md](API.md#post-v1add) |
 | `run_eval`, `add_eval_query` | Measure recall@k and nDCG@k of several configurations on your own questions before choosing one | [API.md](API.md#post-v1eval) |
@@ -293,7 +293,7 @@ behind the client, through MCP elicitation, before `delete_collection`,
 `corpus_remove` also ask for the collection or pack name to be typed. Nothing happens unless the answer is yes. Under `elicit`, a
 client without elicitation support runs the tool as before; under `require`
 it is refused with `-32021`. The default, `off`, changes nothing
-([MCP.md](MCP.md#confirming-destructive-tools-v2189)).
+([MCP.md](MCP.md#confirming-destructive-tools)).
 
 For bulk changes, the `*_where` tools take `dry_run: true`: check `matched`
 and `sample` before the real call.
@@ -303,12 +303,12 @@ and `sample` before the real call.
 - **Retrieval gain.** `get_gain` (`GET /v1/gain`, `mddb-cli gain --window 7d`)
   reports how many searches ran and how many tokens passages and chunks saved
   against returning whole documents. Counts only, no queries
-  ([TELEMETRY.md](TELEMETRY.md#retrieval-gain-v2188)).
+  ([TELEMETRY.md](TELEMETRY.md#retrieval-gain)).
 - **Query-shape counters.** Every surface counts search modes, the algorithm
   that ran and what `auto` chose, filter operators, capped and empty results,
   decomposed queries and, for the code graph, depth, clamps and chains of
   graph calls, as `mddb_query_shape_*` in `/metrics`
-  ([TELEMETRY.md](TELEMETRY.md#query-shape-v21810)).
+  ([TELEMETRY.md](TELEMETRY.md#query-shape)).
 - **Tool calls.** With `MDDB_MCP_LOGGING_ENABLED=true` each `tools/call` is
   logged with the tool, the query and whether it found anything; the
   `mddb_operations_total{operation="mcp_tool_call"|"mcp_tool_miss"|"mcp_tool_error"}`

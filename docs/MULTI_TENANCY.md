@@ -66,18 +66,18 @@ Listing endpoints return only the caller's namespace:
 - `POST /v1/stats` — collection stats and totals are filtered to the tenant.
 - `GET /v1/vector-stats` (HTTP and gRPC) and `GET /v1/storage` — only tenant
   collections; `?collection=` naming another tenant's collection answers
-  `403` (v2.18.6+; until then they listed every collection).
+  `403`.
 - `POST /v1/collection-config/list` — only tenant collections.
 - Curation rule listing, schema listing (gRPC) — filtered likewise.
 
 Every other request that names no collection is about all of them, and a
-tenant user is refused it with `403` (v2.18.10+, SEC-019): server-wide
+tenant user is refused it with `403`: server-wide
 `/v1/geo-stats`, `/v1/schema/list`, `/v1/gain`, `/v1/bulk-ingest-jobs` and
 `/v1/indexing-status` without `?collection=`, the webhook list, and the
 same operations over gRPC, MCP and GraphQL. Name the collection instead. The
 memory store (`/v1/memory/*`) is shared by every tenant and is closed to
 tenant users. See
-[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced-21810-sec-019)
+[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced)
 for how every entry point is classified.
 
 ## Permissions within a tenant
@@ -98,7 +98,7 @@ For a tenant user, `"collection": "*"` means "every collection of my tenant" —
 the namespace gate is applied before the permission match, so the wildcard can
 never leak across tenants.
 
-## Quotas (v2.18.9+)
+## Quotas
 
 Isolation keeps tenants out of each other's data; quotas keep one collection —
 a tenant's, or one an agent writes to in a loop — from filling the disk,
@@ -166,11 +166,11 @@ again. Query embeddings for searches are not counted.
 
 **Seeing it coming.** `/metrics` reports `mddb_collection_fullness{collection,resource}`
 and `mddb_embedding_budget_used{collection}` (0–1, see
-[TELEMETRY.md](TELEMETRY.md#quotas-v2189)), and every refusal fires the
+[TELEMETRY.md](TELEMETRY.md#quotas)), and every refusal fires the
 `quota.exceeded` webhook — at most once a minute per collection and resource.
 
 Server-wide, `MDDB_DISK_RESERVE_BYTES` and `MDDB_VECTOR_RAM_LIMIT_BYTES`
-protect the node itself ([config.md](config.md#quotas-and-reserves-v2189)).
+protect the node itself ([config.md](config.md#quotas-and-reserves)).
 
 ## Tenant limits and isolation (v2.19.8+)
 

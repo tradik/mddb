@@ -363,7 +363,7 @@ curl -X PUT http://localhost:11023/v1/collection-config \
 
 Documents that link images can return them with the passages:
 `"includeImages": true` attaches each hit's images with their alt text and
-captions ([Images](SEARCH.md#images--alt-text-captions-and-pictures-v2189)).
+captions ([Images](SEARCH.md#images--alt-text-captions-and-pictures)).
 
 **Shipping the knowledge base.** Embedding a large handbook takes time and
 provider calls. Build it once and install it on other servers as a read-only
@@ -764,7 +764,7 @@ What the `acme` user gets:
 Admin on one collection manages that collection only; only admin on `"*"` is a
 global admin. Every REST route, gRPC method, MCP tool and GraphQL field checks
 these permissions before it runs.
-[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced-21810-sec-019)
+[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced)
 has the rule for each, and [MULTI_TENANCY.md](MULTI_TENANCY.md) the tenant
 namespaces and quota details.
 

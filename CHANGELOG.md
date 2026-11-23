@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Documentation no longer says in which release an option appeared, for releases before 2.19.0.** Markers such as `(v2.18.9+)` and `Since v2.18.8`, and sentences that described how older releases behaved, are removed from `docs/` and `README.md`. Headings that carried a version lost it, so their anchors changed (`SEARCH.md#grouping-results-v2188` is now `#grouping-results`); links inside the repository follow. The on-disk format notes for upgrades from 2.18 stay. This changelog keeps the history.
+- **Documentation site: a Model Training group** in the sidebar and in the Documentation section of the home page, with the guide and the reference.
+
+### Removed
+
+- **`docs/INDEX_AUDIT.md`** (`/docs/index-audit/`): a 2025 audit of the home page, out of date.
+
 ## [2.19.13] - 2026-11-22
 
 An agent that answers a code question through the MCP tools used more tokens than one using grep, on every question measured (15 pairs, +9% to +13% in total). The cost was in the answers and the schemas: 21-line passages, JSON envelopes with repeated fields, indentation, prose passages of thousands of tokens. This release adds answers shaped like grep's and bounds the JSON ones.

@@ -11,7 +11,7 @@ An agent often needs knowledge that is not in its repository: a library's
 documentation, an RFC, a specification, reference code. Building that
 collection — ingest, embeddings, full-text index — gives the same result on
 every machine. A **corpus pack** lets it be built once and installed
-anywhere, without re-embedding or reindexing (since 2.18.10).
+anywhere, without re-embedding or reindexing.
 
 ```bash
 # on the machine that has the collection
@@ -53,7 +53,7 @@ webhooks, other collections — is ever in a pack.
   "name": "k8s-docs",
   "version": "1.31",
   "description": "Kubernetes documentation, release 1.31",
-  "mddbVersion": "2.18.10",
+  "mddbVersion": "2.19.13",
   "schemaVersion": 1,
   "createdAt": "2026-10-30T12:00:00Z",
   "license": "CC-BY-4.0",
@@ -193,7 +193,7 @@ config records the pack's `name`, `version`, its own `license` and
 pack installed.
 
 **Compatibility.** A build of one collection without a licence or sources of
-its own still writes format 1, which every server since 2.18.10 reads. A
+its own still writes format 1, which every server reads. A
 server before 2.19.11 refuses a format-2 pack ("unsupported pack format 2");
 this one reads both.
 
@@ -315,4 +315,4 @@ the model's context. Build with the CLI, REST or gRPC.
 Errors: `INVALID_ARGUMENT` for a pack or request refused as it is,
 `NOT_FOUND`, `ALREADY_EXISTS` for a name already holding data,
 `PERMISSION_DENIED` for a non-admin or a read-only server. See
-[GRPC.md](GRPC.md#corpus-packs-v21811).
+[GRPC.md](GRPC.md#corpus-packs-v2190).

@@ -82,7 +82,7 @@ figure measured with tiny documents and no meaningful index work. It has been
 removed rather than adjusted.
 
 **Binary and image:** the release binary is ~36 MB (33,570,976 bytes for
-linux/amd64 at 2.18.10, `CGO_ENABLED=0 go build -ldflags="-s -w"`; a plain
+linux/amd64, `CGO_ENABLED=0 go build -ldflags="-s -w"`; a plain
 `go build` is larger, because it keeps the symbol table and DWARF), and the
 release archive a visitor downloads is ~12 MB. The Docker image is ~47 MB
 compressed.
@@ -198,7 +198,7 @@ performs best on short technical queries here.
 cluster, log aggregation, or analysis features — custom analyzers, complex
 aggregations, percolation — beyond what a document store should be doing.
 
-### Elasticsearch clients against MDDB (v2.18.10+)
+### Elasticsearch clients against MDDB
 
 Code written for Elasticsearch does not have to be rewritten to try MDDB.
 With `MDDB_ES_COMPAT=true`, `/es` accepts a subset of the Elasticsearch REST
@@ -290,7 +290,7 @@ tasks over the MDDB repository, vector passages reached the same 13 answers
 as grep followed by reading files. They used 0.6× the tokens of grep's best
 case and about 3% of its typical case, in one call per task. The method and
 every number are in
-[BENCHMARK.md](BENCHMARK.md#finding-code-grep-and-read-vs-mddb-passages-v2188).
+[BENCHMARK.md](BENCHMARK.md#finding-code-grep-and-read-vs-mddb-passages).
 Asked where 50 random Go symbols are used, `code_symbol` built on gopls facts
 (`autoindex --semantic`) returned 100% correct reference lines (98.0% under
 the pre-release fact limit of 2048) and 93.5% of the true ones, against 38.5% and 88.8% from name matching, at about two and a

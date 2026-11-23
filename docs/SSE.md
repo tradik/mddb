@@ -9,8 +9,6 @@ status: publish
 
 MDDB provides a real-time event stream for document changes via Server-Sent Events (SSE).
 
-Available since **v2.9.4**. Auth enforcement and per-IP rate limiting since **v2.9.4**.
-
 ## Quick Start
 
 ```bash
@@ -50,7 +48,7 @@ of polling its status endpoint:
 | `job.failed` | Every document failed |
 | `job.cancelled` | The job was cancelled before or during processing |
 
-…and one for indexing (v2.18.8, GO-042):
+…and one for indexing:
 
 | Event | Trigger |
 |-------|---------|

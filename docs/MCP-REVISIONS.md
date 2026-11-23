@@ -76,7 +76,7 @@ notifications at all, which is what replaced `logging/setLevel`.
     "resultType": "complete",
     "content": [{"type": "text", "text": "…"}],
     "_meta": {
-      "io.modelcontextprotocol/serverInfo": {"name": "mddbd", "version": "2.13.0"}
+      "io.modelcontextprotocol/serverInfo": {"name": "mddbd", "version": "2.19.13"}
     }
   }
 }
@@ -92,7 +92,7 @@ case, described next.
 ### Asking the client: multi round-trip requests
 
 With `MDDB_MCP_CONFIRM_DESTRUCTIVE=elicit` or `require`
-([details](MCP.md#confirming-destructive-tools-v2189)), a `tools/call` of a
+([details](MCP.md#confirming-destructive-tools)), a `tools/call` of a
 destructive tool from a client whose `clientCapabilities` declare
 `elicitation` is answered with an `InputRequiredResult` instead of running:
 
@@ -160,7 +160,7 @@ curl -X POST http://localhost:9000/mcp \
   "instructions": "…",
   "ttlMs": 3600000,
   "cacheScope": "public",
-  "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "mddbd", "version": "2.13.0"}}
+  "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "mddbd", "version": "2.19.13"}}
 }
 ```
 
@@ -256,7 +256,7 @@ A handshake client that declared `elicitation` in `initialize` is asked to
 confirm a destructive tool the 2025-11-25 way, when the operator enabled it:
 the server sends `elicitation/create` mid-call — on stdout for stdio, as an SSE
 stream answering the `tools/call` POST over Streamable HTTP — and waits for the
-client's response ([details](MCP.md#confirming-destructive-tools-v2189)).
+client's response ([details](MCP.md#confirming-destructive-tools)).
 
 `initialize` only ever answers with a revision that *has* a handshake. A client
 that sends `initialize` asking for 2026-07-28 is answered with 2025-11-25

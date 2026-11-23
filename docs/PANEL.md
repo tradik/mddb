@@ -152,7 +152,7 @@ existed but nothing showed them):
 - Optional query overlay: project a natural-language query into the map to
   see why results match ("Vector Space" in the sidebar)
 
-### Server features of 2.18.9 and 2.18.10
+### Search, automations, diagnostics and quotas
 
 - **Corpus packs**: since 2.19.11 on their own page beside the collections
   ([Corpus packs](#corpus-packs)). A read-only collection shows a notice in
@@ -216,14 +216,13 @@ existed but nothing showed them):
   itself is configured on the server (`MDDB_RERANK_*`, or
   `/v1/embedding-configs` with `kind: "rerank"`), not in the panel.
 
-- **Search surface, tracing and proxies** (Config and System pages, 2.18.10):
+- **Search surface, tracing and proxies** (Config and System pages):
   from `GET /v1/config` — the Elasticsearch-compatible subset on or off with
   its `/es` prefix, the server's result cap (`MDDB_SEARCH_MAX_LIMIT`),
   OpenTelemetry export on or off with the collector's scheme and host, how
   many trusted proxies are configured (never their addresses), the client IP
-  header and PROXY protocol. A server before 2.18.10 shows *Not reported by
-  this server*.
-- **Quota usage** (collection settings, 2.18.10): for a collection with a
+  header and PROXY protocol.
+- **Quota usage** (collection settings): for a collection with a
   quota, one bar per limit — *1,234 / 5,000 documents*, stored bytes,
   vectors, and today's embedding calls and tokens — from the `usage` that
   `GET /v1/collection-config` returns. Each bar is a `progressbar` whose
@@ -232,7 +231,7 @@ existed but nothing showed them):
 
   ![Collection settings with a quota: one bar per limit, documents at 86% in amber with Close to the limit, stored bytes and vectors in blue](panel-collection-quota.png)
 
-- **Accessibility fixes** (2.18.10): a document row and its delete button are
+- **Accessibility fixes**: a document row and its delete button are
   sibling buttons (a button nested in a button was invalid HTML and hid the
   delete from screen readers); the create-user, create-group, edit-group and
   add-permission fields are tied to their labels; Cancel on the vector,
@@ -240,7 +239,7 @@ existed but nothing showed them):
   another one (the replaced search used to empty the abort slot as it
   settled).
 
-### Server features of 2.18.2–2.19.0 the panel gained in 2.19.0
+### Server features the panel gained in 2.19.0
 
 - **Collection Aliases** page: aliases and their collections, create or move
   an alias (one atomic step), delete one (its collection stays). An alias

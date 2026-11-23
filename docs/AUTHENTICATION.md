@@ -9,7 +9,7 @@ status: publish
 
 Complete guide to JWT authentication and RBAC (Role-Based Access Control) in MDDB.
 
-> **What's new in 2.9.15.** Authentication is now compliance-aware:
+> Authentication is compliance-aware:
 > - **Timing-safe error unification** — "user disabled or not found" now returns the same `invalid token` response as a bad JWT, so an attacker can no longer probe user existence via differential error messages ([services/mddbd/auth_middleware.go](https://github.com/tradik/mddb/blob/main/services/mddbd/auth_middleware.go)).
 > - **Audit trail of every auth event** — every login, JWT verification, API-key check, and missing/invalid/disabled attempt is recorded to a dedicated audit bucket with actor, IP, user agent, and outcome. Enable with `MDDB_AUDIT_ENABLED=true` and query via admin-only `GET /v1/audit`.
 > - **`security.auth_failure_burst` incident event** — the new `AuthFailureTracker` integrates with the auth middleware. When the configured number of failures lands from the same `actor@ip` inside the sliding window (`MDDB_INCIDENT_AUTH_*`), MDDB fires a webhook to every subscriber on `/v1/webhooks` with detail `{actor, ip, count, windowSec}` so your SIEM / PagerDuty / Slack receives an alert without polling.
@@ -127,8 +127,8 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 **Best for:** Services, CI/CD pipelines, MCP servers
 
 > The MCP listener has its own keys (`MDDB_MCP_API_KEYS`, `/v1/mcp/keys`)
-> and, since v2.18.1, OAuth 2.1 for clients that cannot send a key, such as
-> claude.ai connectors. See [MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181).
+>, OAuth 2.1 for clients that cannot send a key, such as
+> claude.ai connectors. See [MCP.md](MCP.md#oauth-21-for-claudeai-connectors).
 > Since v2.19.9 an MCP key can be scoped to collections, to reads, or to a chat
 > scenario ([MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)).
 
@@ -164,7 +164,7 @@ curl -H "X-API-Key: mddb_live_..." \
 ```
 
 `Authorization: Bearer mddb_live_...` works too. On the Elasticsearch-compatible
-subset under `/es` (v2.18.10+, `MDDB_ES_COMPAT=true`) the key is also accepted
+subset under `/es` (`MDDB_ES_COMPAT=true`) the key is also accepted
 as `Authorization: ApiKey mddb_live_...`, the header Elasticsearch clients send
 for `api_key=...`; `/v1` does not read that scheme. See
 [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md#authentication-and-permissions). On the Qdrant-compatible point query under `/qdrant` (v2.19.10+,
@@ -265,8 +265,7 @@ Use `"*"` to grant database-wide permissions:
 `"admin": true` on one collection lets the user manage that collection only.
 Only `"admin": true` on `"*"` makes a **global admin**: the `admin` flag in
 login and API-key tokens, which passes every permission check, manages
-users and permissions, and reaches admin-only endpoints. Before v2.18.10 admin
-on any single collection set that flag too (SEC-020).
+users and permissions, and reaches admin-only endpoints.
 
 ### Permission Lookup Order
 
@@ -281,14 +280,11 @@ lets each user read a chat scenario's collections, an admin on `"*"` calls
 `GET /v1/chat/scenarios/{name}/access` (2.19.10); the panel shows it in the
 scenario's *Access* card. See [API.md](API.md#chat-scenarios-v1chatscenarios).
 
-### Where permissions are enforced (2.18.10+, SEC-019)
+### Where permissions are enforced
 
 Every entry point of every surface — each REST route, gRPC method, MCP tool
 and resource, and GraphQL root field — has one rule in a table, and a gate
-applies that rule **before** the entry point runs. Until 2.18.10 each handler
-checked permissions on its own, and some never did: a key confined to one
-collection could read (and through `add-batch`, `ingest` or `schema/set`,
-write) another, and a tenant could reach another tenant's collections.
+applies that rule **before** the entry point runs.
 
 The tables live next to the gates:
 
@@ -586,11 +582,6 @@ registering the same name works.
 }
 ```
 
-> **Changed in 2.13.0.** This used to disable the account and keep it. The name
-> stayed taken — registering it again answered `409 user already exists` — while
-> the response said `deleted`. If you have a client that reads the disabled
-> record back after deleting, it will no longer find one.
->
 > Group membership and permissions are removed rather than carried over
 > deliberately. Had the record been reused on re-registration instead, a name
 > that looked free would have handed whoever claimed it the privileges of
@@ -1000,4 +991,3 @@ For issues or questions:
 ---
 
 **Last Updated:** March 2, 2026
-**MDDB Version:** 2.3.3+

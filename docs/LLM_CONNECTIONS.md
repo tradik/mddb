@@ -179,7 +179,7 @@ In read-only mode, MCP tools with `readOnlyHint=false` (write, delete, destructi
 
 ### Disabling Built-in Tools
 
-Set `MDDB_MCP_BUILTIN_TOOLS=false` to hide all built-in tools, exposing only custom YAML tools (to keep some groups, use `MDDB_MCP_TOOLSETS=search,code` — see [MCP.md](MCP.md#toolsets-v2188)):
+Set `MDDB_MCP_BUILTIN_TOOLS=false` to hide all built-in tools, exposing only custom YAML tools (to keep some groups, use `MDDB_MCP_TOOLSETS=search,code` — see [MCP.md](MCP.md#toolsets)):
 
 ```bash
 docker run -d \
@@ -258,7 +258,7 @@ Log output (to stderr):
 {"timestamp":"2026-03-26T10:30:00Z","method":"POST","path":"/mcp","status":200,"duration_ms":45,"client_ip":"1.2.3.4","key_name":"claude-prod","session_id":"abc123","user_agent":"claude-code/1.0"}
 ```
 
-Since 2.16.0 the same switch also writes one record per `tools/call`, with the
+The same switch also writes one record per `tools/call`, with the
 tool name, the `query` argument and whether the result carried any document
 (`hits`, `found`). This is the line to read when asking what clients query
 and which lookups come back empty — see [MCP.md](MCP.md#request-logging).
@@ -327,7 +327,7 @@ Do not commit a real key: reference an environment variable as above (Claude Cod
 
 ### Custom connector (claude.ai, Claude Desktop)
 
-A custom connector needs OAuth on the server (`MDDB_MCP_API_KEY_ENABLED=true`, `MDDB_MCP_OAUTH_ENABLED=true`, `MDDB_MCP_OAUTH_ISSUER`, `MDDB_MCP_OAUTH_SECRET`; see [MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)). Claude connects to the URL from Anthropic's servers, so it must be an `https` address reachable from the internet. Then:
+A custom connector needs OAuth on the server (`MDDB_MCP_API_KEY_ENABLED=true`, `MDDB_MCP_OAUTH_ENABLED=true`, `MDDB_MCP_OAUTH_ISSUER`, `MDDB_MCP_OAUTH_SECRET`; see [MCP.md](MCP.md#oauth-21-for-claudeai-connectors)). Claude connects to the URL from Anthropic's servers, so it must be an `https` address reachable from the internet. Then:
 
 1. Open **Customize → Connectors**, select **Add**, then **Add custom connector**.
 2. Enter a name (for example `mddb`) and the MCP URL, then click **Continue**.
@@ -384,7 +384,7 @@ Use the `mddbd` binary directly. Like the Docker variant, this starts a separate
 
 ### Available MCP Tools (116)
 
-Once connected, your LLM agent has access to all built-in tools (with annotations for auto-approve). They come in eleven toolsets; `MDDB_MCP_TOOLSETS` or a per-key `toolsets` list exposes only some of them ([MCP.md](MCP.md#toolsets-v2188)):
+Once connected, your LLM agent has access to all built-in tools (with annotations for auto-approve). They come in eleven toolsets; `MDDB_MCP_TOOLSETS` or a per-key `toolsets` list exposes only some of them ([MCP.md](MCP.md#toolsets)):
 
 **search**
 `search_documents` `aggregate` `semantic_search` `full_text_search` `hybrid_search` `cross_search` `autocomplete` `fts_languages` `search_advisor` `get_indexing_status` `run_eval` `add_eval_query` `get_gain` `find_duplicates` `classify_document` `get_meta_keys`
@@ -462,7 +462,7 @@ Create a Custom GPT that connects to MDDB via its REST API.
 ```json
 {
   "openapi": "3.1.0",
-  "info": { "title": "MDDB API", "version": "2.9.12" },
+  "info": { "title": "MDDB API", "version": "2.19.13" },
   "servers": [{ "url": "https://your-domain:11023" }],
   "paths": {
     "/v1/search": {

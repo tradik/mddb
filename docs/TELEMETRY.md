@@ -123,7 +123,7 @@ Miss ratio per tool: `sum by (label) (rate(mddb_operations_total{operation="mcp_
 The names behind the misses are in the log, not the metric — see
 [MCP.md](MCP.md#request-logging).
 
-### Scheduled backups (v2.18.9+)
+### Scheduled backups
 
 Set by the scheduled backups of [BACKUP.md](BACKUP.md#scheduled-backups);
 absent until a backup rule has stored a backup.
@@ -147,7 +147,7 @@ Alert when a nightly backup is late: `time() - mddb_backup_last_success_timestam
 
 Database metrics are cached for 15 seconds to avoid excessive BoltDB scans.
 
-### Quotas (v2.18.9+)
+### Quotas
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
@@ -162,7 +162,7 @@ cache above. Alert before a tenant hits the wall:
 max by (collection, resource) (mddb_collection_fullness) > 0.9
 ```
 
-See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189).
+See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas).
 
 ### Tenants (v2.19.8+)
 
@@ -190,7 +190,7 @@ rate(mddb_tenant_queue_wait_seconds_total[5m]) / rate(mddb_tenant_queue_jobs_tot
 
 See [MULTI_TENANCY.md](MULTI_TENANCY.md#tenant-limits-and-isolation-v2198).
 
-### Retrieval gain (v2.18.8+)
+### Retrieval gain
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
@@ -220,7 +220,7 @@ The counters hold counts only: no query text, no keys, no collection names.
 They are written once a minute and at shutdown. Cached full-text responses
 and evaluation runs (`POST /v1/eval`) are not counted.
 
-### Query shape (v2.18.10+)
+### Query shape
 
 What searches and graph requests looked like, counted on every surface: REST,
 gRPC, MCP, GraphQL and the Elasticsearch subset under `/es`. The counters hold
@@ -279,9 +279,9 @@ sum by (mode) (rate(mddb_query_shape_empty_results_total[5m])) / sum by (mode) (
 | `mddb_vector_index_ready` | gauge | -- | 1 if index is loaded, 0 if loading |
 | `mddb_embedding_provider_configured` | gauge | -- | 1 if embedding provider is set |
 | `mddb_embedding_queue_size` | gauge | -- | Pending embedding jobs in queue |
-| `mddb_embedding_cache_hits_total` | counter | -- | (v2.12.0+) Embedding requests served from cache |
-| `mddb_embedding_cache_misses_total` | counter | -- | (v2.12.0+) Embedding requests that reached the provider |
-| `mddb_embedding_cache_size` | gauge | -- | (v2.12.0+) Embeddings currently held in cache |
+| `mddb_embedding_cache_hits_total` | counter | -- | Embedding requests served from cache |
+| `mddb_embedding_cache_misses_total` | counter | -- | Embedding requests that reached the provider |
+| `mddb_embedding_cache_size` | gauge | -- | Embeddings currently held in cache |
 
 ### Webhooks & Schema
 
@@ -562,7 +562,7 @@ metadata:
     prometheus.io/path: "/metrics"
 ```
 
-## OpenTelemetry Tracing (v2.18.9+)
+## OpenTelemetry Tracing
 
 Metrics say how many searches ran and how long they took overall. They cannot
 say why one query took 900 ms: 20 ms of full-text search, 700 ms embedding the
@@ -582,7 +582,7 @@ MDDB_OTEL_ENDPOINT=http://otel-collector:4318 mddbd
 
 That is the only required setting. `/v1/traces` is appended to the endpoint
 unless its path already ends in it. The other settings are listed in
-[config.md](config.md#opentelemetry-tracing-v2189):
+[config.md](config.md#opentelemetry-tracing):
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -671,7 +671,7 @@ and OTLP/HTTP JSON. Measured on the stripped release build
 
 | Build | Bytes | Change |
 |---|---|---|
-| v2.18.9 before tracing | 30,974,112 | — |
+| Before tracing | 30,974,112 | — |
 | With the OpenTelemetry Go SDK v1.47.0 + `otlptracehttp` (exporter set up only, no instrumentation) | 32,522,400 | +1,548,288 (+5.0%) |
 | With the in-house exporter and all instrumentation | 31,019,168 | +45,056 (+0.15%) |
 
@@ -723,7 +723,7 @@ redaction applied; the CLI checks each file against it.
 | `env.json` | names of the `MDDB_*` variables | values through the allowlist; an unclassified variable shows `<unclassified>` | always |
 | `stats.json`, `storage.json`, `vector-stats.json`, `indexing.json` | the handlers of `/v1/stats`, `/v1/storage`, `/v1/vector-stats`, `/v1/indexing-status`, called in process | collections hashed; strings other than enumerations and timestamps replaced by `<redacted>` | always |
 | `metrics.prom` | `/metrics` | collection labels hashed; HTTP paths cut to their endpoint (`/v1/aliases/*`); other label values kept only as lowercase identifiers | always |
-| `query-shape.json` | the [query-shape counters](#query-shape-v21810), with the CODE-006/007 gates computed | counters only; collections hashed | always |
+| `query-shape.json` | the [query-shape counters](#query-shape), with the CODE-006/007 gates computed | counters only; collections hashed | always |
 | `audit-summary.json` | `/v1/audit`, last 7 days | action × result counts; no actors, IPs, keys or details | audit log on |
 | `errors.json` | the last 200 errors answered | error class (`not_found`, `json`, `quota`, a Go type) and `file:line`; never the message | always |
 | `runtime.json` | `runtime` | goroutine count, heap and GC counters; numbers only. Stacks and heap profiles come from `/debug/pprof` (`MDDB_PPROF_ENABLED`, admin) | `--profiles` |

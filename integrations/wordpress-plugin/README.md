@@ -88,7 +88,7 @@ The **Test connection** button under the form calls `POST /v1/search` against yo
 
 Off by default. When **Remote publishing** is enabled and a **Publish key** is set, the plugin registers two REST routes under `mddb-sync/v1`. Every request must present the key as `Authorization: Bearer <key>` (or `X-MDDB-Publish-Key` for proxies that strip Authorization); keys are compared with `hash_equals`.
 
-The natural caller is MDDB's built-in MCP server: pin the target once with `set_collection_config` (`wordpress: {url, api_key}`), then use the `wordpress_publish` / `wordpress_set_status` tools — see [docs/MCP.md](../../docs/MCP.md#wordpress-publishing-tools-v2110).
+The natural caller is MDDB's built-in MCP server: pin the target once with `set_collection_config` (`wordpress: {url, api_key}`), then use the `wordpress_publish` / `wordpress_set_status` tools — see [docs/MCP.md](../../docs/MCP.md#wordpress-publishing-tools).
 
 ### `POST /wp-json/mddb-sync/v1/publish`
 

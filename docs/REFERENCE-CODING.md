@@ -86,7 +86,7 @@ curl -X POST http://localhost:11023/v1/cross-search -H "Content-Type: applicatio
   comparable, ranks are. Over one collection, `hybrid` returns what
   `hybrid_search` returns.
 - `format: "passages"` returns path, lines, enclosing definition and text
-  ([Passages](SEARCH.md#passages--what-an-agent-gets-v2188)).
+  ([Passages](SEARCH.md#passages--what-an-agent-gets)).
 
 ## MCP tools
 

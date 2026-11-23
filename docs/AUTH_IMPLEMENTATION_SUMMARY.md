@@ -11,10 +11,10 @@ Authentication and role-based access control were added to MDDB in March 2026
 (v2.x). Two later changes moved where permissions are checked and what
 "admin" means:
 
-- **SEC-019 (v2.18.10):** one access gate checks every REST route, gRPC
+- **SEC-019:** one access gate checks every REST route, gRPC
   method, MCP tool and resource, and GraphQL field before the handler runs.
   Handlers no longer decide on their own.
-- **SEC-020 (v2.18.10):** only admin on `"*"` is a global admin. Admin on one
+- **SEC-020:** only admin on `"*"` is a global admin. Admin on one
   collection manages that collection only.
 
 This page is a map of the implementation. The rules themselves are in
@@ -97,7 +97,7 @@ entry point's rule in its table and calls `Server.authorize`:
 
 The rule classes (public, authenticated, admin, collection, handler) and the
 list of what falls in each are in
-[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced-21810-sec-019).
+[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced).
 
 ### Permission check
 
