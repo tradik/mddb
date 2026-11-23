@@ -8,26 +8,10 @@ status: publish
 # License Audit Report
 
 **Project:** MDDB (Markdown Database)  
-**Date:** 2026-03-10  
-**Tool:** [Trivy](https://trivy.dev/) — filesystem license scanner  
-**Scan command:** `trivy fs --scanners license .`  
-**Amended:** 2026-08-24 — `github.com/google/renameio` removed from
-`services/mddbd` (WIN-003), through a fork of `github.com/coder/hnsw`. This is
-a targeted correction, not a re-scan: every other row is still as of the scan date.
-**Amended:** 2026-10-29 — `github.com/coder/hnsw` (CC0-1.0) and the fork it
-was replaced with are removed from `services/mddbd`, and with them
-`github.com/chewxy/math32`, `github.com/viterin/partial`, `github.com/viterin/vek`
-and `golang.org/x/exp`, which only it required. The HNSW graph is now written in
-the module (SRCH-013, `internal/vector/vector_hnsw_graph.go`).
-**Amended:** 2026-10-29 — the XLSX, ODS, CSV, PPTX, ODP, EPUB, EML and MBOX
-converters (GO-046, v2.18.9) add **no dependency**. They are written on the
-standard library (`archive/zip`, `encoding/xml`, `encoding/csv`, `net/mail`,
-`mime/multipart`) plus `golang.org/x/text` (BSD-3-Clause, already listed under
-`services/mddbd`, now a direct rather than an indirect requirement) for mail
-charsets. `github.com/xuri/excelize/v2` (BSD-3-Clause) was considered for XLSX
-and not taken: reading cell values needs a few hundred lines, while excelize
-brings six further modules (mscfb, msoleps, go-deepcopy, efp, nfp, x/image) for
-writing, styling and encrypted workbooks the server never uses.
+**Date:** 2026-11-23  
+**Tool:** [Trivy](https://trivy.dev/) 0.76.2 — filesystem license scanner  
+**Scan command:** `trivy fs --scanners license --skip-dirs dist --skip-dirs audit --skip-dirs '**/node_modules' .`  
+**Replaces:** the scan of 2026-03-10 and its three amendments. This is a full re-scan of the tree at MDDB 2.19.13.
 
 ---
 
@@ -44,20 +28,39 @@ obligation that stops at their own files.
 
 ## Executive Summary
 
-Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependencies**.
+Trivy read **16 lockfiles and module files** and reported licences for **8** of them: **332 packages**, 342 licence entries (a package under two licences counts twice).
 
 | Metric | Value |
 |--------|-------|
-| Total dependencies scanned | 275 |
+| Packages with a licence reported | 332 |
+| Licence entries | 342 |
 | CRITICAL issues | 0 |
 | HIGH issues | 0 |
 | MEDIUM issues | 2 |
-| LOW issues | 274 |
-| Permissive (notice) | 272 (98.6%) |
-| Reciprocal | 2 (0.7%) |
-| Public domain (unencumbered) | 2 (0.7%) |
+| LOW issues | 339 |
+| Not classified by the scanner | 1 |
+| Permissive (notice) | 337 (98.5%) |
+| Reciprocal | 2 (0.6%) |
+| Public domain (unencumbered) | 2 (0.6%) |
 
-**Overall risk: LOW** — No HIGH or CRITICAL license issues detected.
+**Overall risk: LOW** — no HIGH or CRITICAL licence issue, and no GPL or AGPL licence, in what the scan covers.
+
+### What the scan does not cover
+
+Trivy found these files and reported no licence for any package in them. Their dependencies are **not audited** by this report:
+
+| File | Ecosystem |
+|------|-----------|
+| clients/go/mddb/go.mod | Go |
+| clients/python/uv.lock | Python |
+| integrations/langchain-mddb/uv.lock | Python |
+| services/mddb-chat/Cargo.lock | Rust |
+| test/es-compat/uv.lock | Python |
+| test/qdrant-compat/uv.lock | Python |
+| tools/bench/go.mod | Go |
+| tools/bench/soak/go.mod | Go |
+
+The scan ran on a checkout without installed Python and Rust packages, and Trivy reported nothing for `uv.lock` and `Cargo.lock` in that state. The three Go modules in the list returned no licence entries either.
 
 ---
 
@@ -65,13 +68,15 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 
 | License | Count | Category | Commercial Use |
 |---------|-------|----------|----------------|
-| MIT | 225 | notice | Yes |
-| BSD-3-Clause | 23 | notice | Yes |
-| Apache-2.0 | 14 | notice | Yes |
-| ISC | 6 | notice | Yes |
-| BSD-2-Clause | 4 | notice | Yes |
-| CC0-1.0 | 2 | unencumbered | Yes |
+| MIT | 251 | notice | Yes |
+| BSD-3-Clause | 42 | notice | Yes |
+| Apache-2.0 | 27 | notice | Yes |
+| ISC | 12 | notice | Yes |
+| BSD-2-Clause | 5 | notice | Yes |
 | MPL-2.0 | 2 | reciprocal | Yes (with conditions) |
+| 0BSD | 1 | unencumbered | Yes |
+| BlueOak-1.0.0 | 1 | unknown | Not classified by the scanner |
+| CC0-1.0 | 1 | unencumbered | Yes |
 
 ---
 
@@ -79,7 +84,7 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 
 ### services/mddb-cli/go.mod
 
-**3 dependencies**
+**3 packages**
 
 | Package | License | Severity | Category |
 |---------|---------|----------|----------|
@@ -87,9 +92,173 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | github.com/spf13/cobra | Apache-2.0 | LOW | notice |
 | github.com/spf13/pflag | BSD-3-Clause | LOW | notice |
 
+### services/mddbd/go.mod
+
+**45 packages**
+
+| Package | License | Severity | Category |
+|---------|---------|----------|----------|
+| github.com/99designs/gqlgen | MIT | LOW | notice |
+| github.com/agnivade/levenshtein | MIT | LOW | notice |
+| github.com/bits-and-blooms/bitset | BSD-3-Clause | LOW | notice |
+| github.com/bits-and-blooms/bloom/v3 | BSD-2-Clause | LOW | notice |
+| github.com/blevesearch/snowballstem | BSD-3-Clause | LOW | notice |
+| github.com/cespare/xxhash/v2 | MIT | LOW | notice |
+| github.com/coder/websocket | ISC | LOW | notice |
+| github.com/dustin/go-humanize | MIT | LOW | notice |
+| github.com/go-viper/mapstructure/v2 | MIT | LOW | notice |
+| github.com/goccy/go-json | MIT | LOW | notice |
+| github.com/golang-jwt/jwt/v5 | MIT | LOW | notice |
+| github.com/golang/snappy | BSD-3-Clause | LOW | notice |
+| github.com/google/uuid | BSD-3-Clause | LOW | notice |
+| github.com/hashicorp/golang-lru/v2 | MPL-2.0 | MEDIUM | reciprocal |
+| github.com/klauspost/compress | Apache-2.0 / BSD-3-Clause / MIT | LOW | notice |
+| github.com/klauspost/cpuid/v2 | MIT | LOW | notice |
+| github.com/klauspost/crc32 | BSD-3-Clause | LOW | notice |
+| github.com/kr/pretty | MIT | LOW | notice |
+| github.com/minio/crc64nvme | Apache-2.0 | LOW | notice |
+| github.com/minio/md5-simd | Apache-2.0 | LOW | notice |
+| github.com/minio/minio-go/v7 | Apache-2.0 | LOW | notice |
+| github.com/philhofer/fwd | MIT | LOW | notice |
+| github.com/pires/go-proxyproto | Apache-2.0 | LOW | notice |
+| github.com/quic-go/qpack | MIT | LOW | notice |
+| github.com/quic-go/quic-go | MIT | LOW | notice |
+| github.com/robfig/cron/v3 | MIT | LOW | notice |
+| github.com/rs/xid | MIT | LOW | notice |
+| github.com/sosodev/duration | MIT | LOW | notice |
+| github.com/tidwall/geoindex | MIT | LOW | notice |
+| github.com/tidwall/rtree | MIT | LOW | notice |
+| github.com/tinylib/msgp | MIT | LOW | notice |
+| github.com/vektah/gqlparser/v2 | MIT | LOW | notice |
+| github.com/zeebo/xxh3 | BSD-2-Clause | LOW | notice |
+| go.yaml.in/yaml/v3 | Apache-2.0 / MIT | LOW | notice |
+| golang.org/x/crypto | BSD-3-Clause | LOW | notice |
+| golang.org/x/net | BSD-3-Clause | LOW | notice |
+| golang.org/x/sync | BSD-3-Clause | LOW | notice |
+| golang.org/x/sys | BSD-3-Clause | LOW | notice |
+| golang.org/x/text | BSD-3-Clause | LOW | notice |
+| google.golang.org/genproto/googleapis/rpc | Apache-2.0 | LOW | notice |
+| google.golang.org/grpc | Apache-2.0 | LOW | notice |
+| google.golang.org/protobuf | BSD-3-Clause | LOW | notice |
+| gopkg.in/check.v1 | BSD-2-Clause | LOW | notice |
+| gopkg.in/ini.v1 | Apache-2.0 | LOW | notice |
+| gopkg.in/yaml.v3 | Apache-2.0 / MIT | LOW | notice |
+
+### services/mddbd/third_party/bbolt/go.mod
+
+**14 packages**
+
+| Package | License | Severity | Category |
+|---------|---------|----------|----------|
+| github.com/aclements/go-moremath | BSD-3-Clause | LOW | notice |
+| github.com/davecgh/go-spew | ISC | LOW | notice |
+| github.com/inconshreveable/mousetrap | Apache-2.0 | LOW | notice |
+| github.com/pmezard/go-difflib | BSD-3-Clause | LOW | notice |
+| github.com/spf13/cobra | Apache-2.0 | LOW | notice |
+| github.com/spf13/pflag | BSD-3-Clause | LOW | notice |
+| github.com/stretchr/testify | MIT | LOW | notice |
+| go.etcd.io/gofail | Apache-2.0 | LOW | notice |
+| golang.org/x/mod | BSD-3-Clause | LOW | notice |
+| golang.org/x/perf | BSD-3-Clause | LOW | notice |
+| golang.org/x/sync | BSD-3-Clause | LOW | notice |
+| golang.org/x/sys | BSD-3-Clause | LOW | notice |
+| golang.org/x/tools | BSD-3-Clause | LOW | notice |
+| gopkg.in/yaml.v3 | Apache-2.0 / MIT | LOW | notice |
+
+### test/go.mod
+
+**19 packages**
+
+| Package | License | Severity | Category |
+|---------|---------|----------|----------|
+| filippo.io/edwards25519 | BSD-3-Clause | LOW | notice |
+| github.com/go-sql-driver/mysql | MPL-2.0 | MEDIUM | reciprocal |
+| github.com/golang/snappy | BSD-3-Clause | LOW | notice |
+| github.com/klauspost/compress | Apache-2.0 / BSD-3-Clause / MIT | LOW | notice |
+| github.com/lib/pq | MIT | LOW | notice |
+| github.com/montanaflynn/stats | MIT | LOW | notice |
+| github.com/xdg-go/pbkdf2 | Apache-2.0 | LOW | notice |
+| github.com/xdg-go/scram | Apache-2.0 | LOW | notice |
+| github.com/xdg-go/stringprep | Apache-2.0 | LOW | notice |
+| github.com/youmark/pkcs8 | MIT | LOW | notice |
+| go.mongodb.org/mongo-driver | Apache-2.0 | LOW | notice |
+| golang.org/x/crypto | BSD-3-Clause | LOW | notice |
+| golang.org/x/net | BSD-3-Clause | LOW | notice |
+| golang.org/x/sync | BSD-3-Clause | LOW | notice |
+| golang.org/x/sys | BSD-3-Clause | LOW | notice |
+| golang.org/x/text | BSD-3-Clause | LOW | notice |
+| google.golang.org/genproto/googleapis/rpc | Apache-2.0 | LOW | notice |
+| google.golang.org/grpc | Apache-2.0 | LOW | notice |
+| google.golang.org/protobuf | BSD-3-Clause | LOW | notice |
+
+### clients/nodejs/package-lock.json
+
+**33 packages**
+
+| Package | License | Severity | Category |
+|---------|---------|----------|----------|
+| @grpc/grpc-js | Apache-2.0 | LOW | notice |
+| @grpc/proto-loader | Apache-2.0 / Apache-2.0 | LOW | notice |
+| @js-sdsl/ordered-map | MIT | LOW | notice |
+| @protobufjs/aspromise | BSD-3-Clause | LOW | notice |
+| @protobufjs/base64 | BSD-3-Clause | LOW | notice |
+| @protobufjs/codegen | BSD-3-Clause | LOW | notice |
+| @protobufjs/eventemitter | BSD-3-Clause | LOW | notice |
+| @protobufjs/fetch | BSD-3-Clause | LOW | notice |
+| @protobufjs/float | BSD-3-Clause | LOW | notice |
+| @protobufjs/path | BSD-3-Clause | LOW | notice |
+| @protobufjs/pool | BSD-3-Clause | LOW | notice |
+| @protobufjs/utf8 | BSD-3-Clause | LOW | notice |
+| @types/node | MIT | LOW | notice |
+| ansi-regex | MIT | LOW | notice |
+| ansi-styles | MIT | LOW | notice |
+| cliui | ISC | LOW | notice |
+| color-convert | MIT | LOW | notice |
+| color-name | MIT | LOW | notice |
+| emoji-regex | MIT | LOW | notice |
+| escalade | MIT | LOW | notice |
+| get-caller-file | ISC | LOW | notice |
+| is-fullwidth-code-point | MIT | LOW | notice |
+| lodash.camelcase | MIT | LOW | notice |
+| long | Apache-2.0 | LOW | notice |
+| protobufjs | BSD-3-Clause | LOW | notice |
+| require-directory | MIT | LOW | notice |
+| string-width | MIT | LOW | notice |
+| strip-ansi | MIT | LOW | notice |
+| undici-types | MIT | LOW | notice |
+| wrap-ansi | MIT | LOW | notice |
+| y18n | ISC | LOW | notice |
+| yargs | MIT | LOW | notice |
+| yargs-parser | ISC | LOW | notice |
+
+### integrations/github-action/package-lock.json
+
+**10 packages**
+
+| Package | License | Severity | Category |
+|---------|---------|----------|----------|
+| @actions/core | MIT | LOW | notice |
+| @actions/exec | MIT | LOW | notice |
+| @actions/glob | MIT | LOW | notice |
+| @actions/http-client | MIT | LOW | notice |
+| @actions/io | MIT | LOW | notice |
+| balanced-match | MIT | LOW | notice |
+| brace-expansion | MIT | LOW | notice |
+| minimatch | BlueOak-1.0.0 | UNKNOWN | unknown |
+| tunnel | MIT | LOW | notice |
+| undici | MIT / MIT | LOW | notice |
+
+### integrations/grafana-datasource/package-lock.json
+
+**1 packages**
+
+| Package | License | Severity | Category |
+|---------|---------|----------|----------|
+| tslib | 0BSD | LOW | unencumbered |
+
 ### services/mddb-panel/package-lock.json
 
-**216 dependencies**
+**207 packages**
 
 | Package | License | Severity | Category |
 |---------|---------|----------|----------|
@@ -99,14 +268,11 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | @types/estree | MIT | LOW | notice |
 | @types/estree-jsx | MIT | LOW | notice |
 | @types/hast | MIT | LOW | notice |
-| @types/http-proxy | MIT | LOW | notice |
 | @types/mdast | MIT | LOW | notice |
 | @types/ms | MIT | LOW | notice |
-| @types/node | MIT | LOW | notice |
 | @types/prismjs | MIT | LOW | notice |
 | @types/react | MIT | LOW | notice |
-| @types/unist | MIT | LOW | notice |
-| @types/unist | MIT | LOW | notice |
+| @types/unist | MIT / MIT | LOW | notice |
 | @ungap/structured-clone | ISC | LOW | notice |
 | @urql/core | MIT | LOW | notice |
 | accepts | MIT | LOW | notice |
@@ -144,20 +310,17 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | escape-string-regexp | MIT | LOW | notice |
 | estree-util-is-identifier-name | MIT | LOW | notice |
 | etag | MIT | LOW | notice |
-| eventemitter3 | MIT | LOW | notice |
 | express | MIT | LOW | notice |
 | extend | MIT | LOW | notice |
 | fault | MIT | LOW | notice |
 | fill-range | MIT | LOW | notice |
 | finalhandler | MIT | LOW | notice |
-| follow-redirects | MIT | LOW | notice |
 | forwarded | MIT | LOW | notice |
 | fresh | MIT | LOW | notice |
 | function-bind | MIT | LOW | notice |
 | get-intrinsic | MIT | LOW | notice |
 | get-proto | MIT | LOW | notice |
 | gopd | MIT | LOW | notice |
-| graphql | MIT | LOW | notice |
 | has-symbols | MIT | LOW | notice |
 | hasown | MIT | LOW | notice |
 | hast-util-from-parse5 | MIT | LOW | notice |
@@ -173,8 +336,8 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | html-url-attributes | MIT | LOW | notice |
 | html-void-elements | MIT | LOW | notice |
 | http-errors | MIT | LOW | notice |
-| http-proxy | MIT | LOW | notice |
 | http-proxy-middleware | MIT | LOW | notice |
+| httpxy | MIT | LOW | notice |
 | iconv-lite | MIT | LOW | notice |
 | inherits | ISC | LOW | notice |
 | inline-style-parser | MIT | LOW | notice |
@@ -187,8 +350,8 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | is-hexadecimal | MIT | LOW | notice |
 | is-number | MIT | LOW | notice |
 | is-plain-obj | MIT | LOW | notice |
-| is-plain-object | MIT | LOW | notice |
 | is-promise | MIT | LOW | notice |
+| leaflet | BSD-2-Clause | LOW | notice |
 | longest-streak | MIT | LOW | notice |
 | lowlight | MIT | LOW | notice |
 | lucide-react | ISC | LOW | notice |
@@ -254,7 +417,6 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | picomatch | MIT | LOW | notice |
 | prismjs | MIT | LOW | notice |
 | property-information | MIT | LOW | notice |
-| property-information | MIT | LOW | notice |
 | proxy-addr | MIT | LOW | notice |
 | qs | BSD-3-Clause | LOW | notice |
 | range-parser | MIT | LOW | notice |
@@ -270,7 +432,6 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | remark-parse | MIT | LOW | notice |
 | remark-rehype | MIT | LOW | notice |
 | remark-stringify | MIT | LOW | notice |
-| requires-port | MIT | LOW | notice |
 | router | MIT | LOW | notice |
 | safer-buffer | MIT | LOW | notice |
 | scheduler | MIT | LOW | notice |
@@ -291,7 +452,6 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | trim-lines | MIT | LOW | notice |
 | trough | MIT | LOW | notice |
 | type-is | MIT | LOW | notice |
-| undici-types | MIT | LOW | notice |
 | unified | MIT | LOW | notice |
 | unist-util-is | MIT | LOW | notice |
 | unist-util-position | MIT | LOW | notice |
@@ -310,96 +470,30 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependen
 | zustand | MIT | LOW | notice |
 | zwitch | MIT | LOW | notice |
 
-### services/mddbd/go.mod
-
-**30 dependencies**
-
-| Package | License | Severity | Category |
-|---------|---------|----------|----------|
-| github.com/99designs/gqlgen | MIT | LOW | notice |
-| github.com/agnivade/levenshtein | MIT | LOW | notice |
-| github.com/bits-and-blooms/bitset | BSD-3-Clause | LOW | notice |
-| github.com/bits-and-blooms/bloom/v3 | BSD-2-Clause | LOW | notice |
-| github.com/go-viper/mapstructure/v2 | MIT | LOW | notice |
-| github.com/goccy/go-json | MIT | LOW | notice |
-| github.com/golang-jwt/jwt/v5 | MIT | LOW | notice |
-| github.com/golang/snappy | BSD-3-Clause | LOW | notice |
-| github.com/google/uuid | BSD-3-Clause | LOW | notice |
-| github.com/gorilla/websocket | BSD-2-Clause | LOW | notice |
-| github.com/hashicorp/golang-lru/v2 | MPL-2.0 | MEDIUM | reciprocal |
-| github.com/klauspost/compress | Apache-2.0 | LOW | notice |
-| github.com/klauspost/compress | BSD-3-Clause | LOW | notice |
-| github.com/klauspost/compress | MIT | LOW | notice |
-| github.com/quic-go/qpack | MIT | LOW | notice |
-| github.com/quic-go/quic-go | MIT | LOW | notice |
-| github.com/robfig/cron/v3 | MIT | LOW | notice |
-| github.com/sosodev/duration | MIT | LOW | notice |
-| github.com/vektah/gqlparser/v2 | MIT | LOW | notice |
-| go.etcd.io/bbolt | MIT | LOW | notice |
-| golang.org/x/crypto | BSD-3-Clause | LOW | notice |
-| golang.org/x/net | BSD-3-Clause | LOW | notice |
-| golang.org/x/sync | BSD-3-Clause | LOW | notice |
-| golang.org/x/sys | BSD-3-Clause | LOW | notice |
-| golang.org/x/text | BSD-3-Clause | LOW | notice |
-| google.golang.org/genproto/googleapis/rpc | Apache-2.0 | LOW | notice |
-| google.golang.org/grpc | Apache-2.0 | LOW | notice |
-| google.golang.org/protobuf | BSD-3-Clause | LOW | notice |
-| gopkg.in/yaml.v3 | Apache-2.0 | LOW | notice |
-| gopkg.in/yaml.v3 | MIT | LOW | notice |
-
-### test/go.mod
-
-**21 dependencies**
-
-| Package | License | Severity | Category |
-|---------|---------|----------|----------|
-| filippo.io/edwards25519 | BSD-3-Clause | LOW | notice |
-| github.com/go-sql-driver/mysql | MPL-2.0 | MEDIUM | reciprocal |
-| github.com/golang/snappy | BSD-3-Clause | LOW | notice |
-| github.com/klauspost/compress | Apache-2.0 | LOW | notice |
-| github.com/klauspost/compress | BSD-3-Clause | LOW | notice |
-| github.com/klauspost/compress | MIT | LOW | notice |
-| github.com/lib/pq | MIT | LOW | notice |
-| github.com/montanaflynn/stats | MIT | LOW | notice |
-| github.com/xdg-go/pbkdf2 | Apache-2.0 | LOW | notice |
-| github.com/xdg-go/scram | Apache-2.0 | LOW | notice |
-| github.com/xdg-go/stringprep | Apache-2.0 | LOW | notice |
-| github.com/youmark/pkcs8 | MIT | LOW | notice |
-| go.mongodb.org/mongo-driver | Apache-2.0 | LOW | notice |
-| golang.org/x/crypto | BSD-3-Clause | LOW | notice |
-| golang.org/x/net | BSD-3-Clause | LOW | notice |
-| golang.org/x/sync | BSD-3-Clause | LOW | notice |
-| golang.org/x/sys | BSD-3-Clause | LOW | notice |
-| golang.org/x/text | BSD-3-Clause | LOW | notice |
-| google.golang.org/genproto/googleapis/rpc | Apache-2.0 | LOW | notice |
-| google.golang.org/grpc | Apache-2.0 | LOW | notice |
-| google.golang.org/protobuf | BSD-3-Clause | LOW | notice |
-
 ---
 
 ## Items Requiring Attention
 
 ### Reciprocal Licenses (MPL-2.0)
 
-The following packages use **MPL-2.0** (Mozilla Public License 2.0), which is a "file-level" copyleft license:
+These packages are under **MPL-2.0** (Mozilla Public License 2.0), a file-level copyleft licence. Trivy rates them MEDIUM:
 
 | Package | Target |
 |---------|--------|
 | github.com/hashicorp/golang-lru/v2 | services/mddbd/go.mod |
 | github.com/go-sql-driver/mysql | test/go.mod |
 
-**Impact:** MPL-2.0 requires that modifications to MPL-licensed *source files* must be released under MPL-2.0. However, it does **not** require the rest of the project to be open-sourced (unlike GPL). Using these libraries unmodified in a larger project is fully permitted for commercial use.
+**Impact:** MPL-2.0 requires that modifications to MPL-licensed *source files* are released under MPL-2.0. It does **not** extend to the rest of the project. `test/go.mod` is the integration-test module and is not part of any released binary.
 
-**Action required:** None, as long as the MPL-licensed files themselves are not modified. If modifications are needed, the changed files must be made available under MPL-2.0.
+**Action required:** none while the MPL-licensed files are used unmodified. A changed file must be made available under MPL-2.0.
 
-### Medium Severity
+### Licences the scanner does not classify
 
 | Package | License | Target |
 |---------|---------|--------|
-| github.com/hashicorp/golang-lru/v2 | MPL-2.0 | services/mddbd/go.mod |
-| github.com/go-sql-driver/mysql | MPL-2.0 | test/go.mod |
+| minimatch | BlueOak-1.0.0 | integrations/github-action/package-lock.json |
 
-**Note:** MEDIUM severity in Trivy license scanning typically indicates licenses that may have additional requirements (e.g., attribution in binary distributions). Review these for compliance with your distribution method.
+Trivy has no category for the Blue Oak Model License 1.0.0 and reports it as UNKNOWN. Its text grants use, modification and distribution and asks for a copy of the licence or a link to it; it has no copyleft clause.
 
 ---
 
@@ -416,11 +510,12 @@ The following packages use **MPL-2.0** (Mozilla Public License 2.0), which is a 
 
 ## Recommendations
 
-1. **No immediate action required** — all licenses are compatible with commercial use
-2. **Maintain a LICENSE/NOTICE file** listing all third-party dependencies and their licenses (standard practice for Apache-2.0 and BSD-licensed dependencies)
-3. **Re-run this audit** before each major release to catch any newly introduced dependencies with restrictive licenses
-4. **Monitor MPL-2.0 dependencies** — if you fork or modify their source files, ensure compliance
+1. **No action required** for the packages covered: every licence allows commercial use.
+2. **Audit the files listed under "What the scan does not cover"** with a tool that reads those ecosystems before relying on this report for the Rust and Python parts.
+3. **Keep the third-party notices** that Apache-2.0 and BSD licences ask for with each distribution.
+4. **Re-run the scan** when a dependency is added: the command at the top of this page reproduces it.
+5. **Do not modify the MPL-2.0 files** without publishing the changed files under MPL-2.0.
 
 ---
 
-*Report generated on 2026-03-10 using Trivy filesystem license scanner.*
+*Report generated on 2026-11-23 with Trivy 0.76.2.*
