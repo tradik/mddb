@@ -90,13 +90,11 @@ The follower:
   replaces the follower's database ([BACKUP.md](BACKUP.md))
 - Tails the binlog for real-time updates
 
-#### How the stream guarantees every entry (v2.15.4)
+#### How the stream guarantees every entry
 
 The leader sends every LSN after the follower's position, once and in order:
 
-- **History is streamed as it is read.** Before 2.15.4 the leader read its
-  whole binlog into memory before sending the first entry. A follower starting
-  at LSN 0 against a 20 GB binlog got about 1 KB and then nothing for hours.
+- **History is streamed as it is read.**
 - **No entry falls between history and live tail.** The stream subscribes
   before it reads the file. An entry written between the two used to reach
   neither.
@@ -104,7 +102,7 @@ The leader sends every LSN after the follower's position, once and in order:
   subscription is a bounded buffer (4096 entries) and drops what does not fit,
   for example during a bulk import. The stream detects the gap in LSNs, even
   one at the very end of a burst, and reads the missing entries back from the
-  binlog. Before 2.15.4 they were silently lost.
+  binlog.
 - **Reconnecting under the same ID is safe.** The old stream's cleanup used
   to close the new stream's subscription and remove its record, so
   `mddb_replication_followers_connected` showed 0 while data was flowing.

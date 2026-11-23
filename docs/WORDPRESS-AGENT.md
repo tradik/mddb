@@ -750,7 +750,7 @@ wpexportjson export --url https://your-site.com -f markdown --resume --output ./
 
 ### What about MCP?
 MCP (Model Context Protocol) works with Claude Desktop and Windsurf/Cursor.
-Open WebUI supports MCP since v0.6.31 (Streamable HTTP transport), but the
+Open WebUI supports MCP (Streamable HTTP transport), but the
 Python Tool approach described above is simpler -- zero extra components.
 
 If you want MCP with Open WebUI, point it at the MCP listener `mddbd` runs
@@ -781,7 +781,7 @@ claude mcp add mddb --transport http https://mddb.your-site.com/mcp \
 
 Claude gets the 116 built-in tools, or the toolsets the key allows, plus your
 custom tools. claude.ai custom connectors sign in with OAuth 2.1 instead of a
-header ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)).
+header ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors)).
 
 ### ChatGPT (Custom GPTs / Actions)
 
@@ -817,7 +817,7 @@ MCP listener `mddbd` already runs: `https://mddb.your-site.com/mcp` when your
 proxy forwards it to port 9000 (`MDDB_MCP_ADDR`, default `:9000`). Protect it
 with `MDDB_MCP_API_KEY_ENABLED=true` before exposing it.
 
-### YAML Custom Tools per Website (v2.3.3+)
+### YAML Custom Tools per Website
 
 When exposing MDDB externally, generic tools like `semantic_search(collection, query)`
 work -- but the LLM has to guess collection names and parameters. The **custom tools**

@@ -75,7 +75,7 @@ graph LR
 
 [Docling](https://github.com/DS4SD/docling) is IBM's document parser that converts PDF, DOCX, PPTX, and HTML into structured Markdown. Since MDDB stores Markdown natively, this is a natural fit.
 
-MDDB converts PDF, DOCX, ODT, RTF, XLSX, ODS, PPTX, ODP, EPUB, CSV, EML and MBOX itself on upload (v2.18.9+, see [BULK-IMPORT.md](BULK-IMPORT.md)), and marks each result with `meta.conversionConfidence`. It has no OCR and no layout model: a scanned PDF is stored with confidence 0. Reach for Docling when documents are scans, or when their tables and reading order need a layout model; `filter: {"conversionConfidence": {"lt": 0.5}}` finds the documents worth sending through it.
+MDDB converts PDF, DOCX, ODT, RTF, XLSX, ODS, PPTX, ODP, EPUB, CSV, EML and MBOX itself on upload (see [BULK-IMPORT.md](BULK-IMPORT.md)), and marks each result with `meta.conversionConfidence`. It has no OCR and no layout model: a scanned PDF is stored with confidence 0. Reach for Docling when documents are scans, or when their tables and reading order need a layout model; `filter: {"conversionConfidence": {"lt": 0.5}}` finds the documents worth sending through it.
 
 ### Install Docling
 
@@ -415,11 +415,11 @@ tool, how to move between them, and how to run both.
 
 ### What each side does
 
-| | MDDB (v2.18.10) | OpenSearch |
+| | MDDB | OpenSearch |
 |---|---|---|
 | Deployment | One node; leader-follower replication copies the whole database to each follower. From 2.19.8, node groups each hold whole collections, never part of one ([CLUSTER.md](CLUSTER.md#placing-collections-across-groups)) | A cluster; shards and replicas spread one index over many nodes |
 | Vector search | 8 index types (flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ) and `algorithm: "auto"`, which picks one per query from the collection size, memory and filter ([SEARCH.md](SEARCH.md)). int8/int4 quantization and disk-only vectors cut memory ([QUANTIZATION.md](QUANTIZATION.md)). Every vector of a collection lives on one machine | k-NN plugin (Lucene, Faiss); vectors are split across shards and nodes |
-| Measured vector scale | Synthetic 32-dimension corpus, recall@10 against the exact top 10 ([BENCHMARK.md](BENCHMARK.md#vector-query-planner-v2189)): 200k vectors, HNSW 0.46 ms p50 at recall 1.000; 2M vectors, trained IVF 14 ms p50 at recall 1.000. 2M took about 2 hours to load and 10 minutes to train IVF on one machine | Scales by adding nodes |
+| Measured vector scale | Synthetic 32-dimension corpus, recall@10 against the exact top 10 ([BENCHMARK.md](BENCHMARK.md#vector-query-planner)): 200k vectors, HNSW 0.46 ms p50 at recall 1.000; 2M vectors, trained IVF 14 ms p50 at recall 1.000. 2M took about 2 hours to load and 10 minutes to train IVF on one machine | Scales by adding nodes |
 | Full text | TF-IDF, BM25, BM25F, PMISparse; 8 query modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy, expression); stemming for 17 languages; synonyms, stop words, typo tolerance, per-query BM25 `k1`/`b`. One index per document, covering the body and metadata values; no custom analyzers | Analyzer chains per field (tokenizers, token filters, ICU, language analyzers), per-field mappings |
 | Aggregations | Facet counts (`facetBy`, `facetScope: "all"`) and date histograms (`/v1/aggregate`) | The full aggregation framework: metrics, buckets, pipelines, nested |
 | Hybrid search | Built in: `/v1/hybrid-search` with alpha blending or RRF | Hybrid query with a search pipeline that normalises and combines scores |
@@ -452,7 +452,7 @@ tool, how to move between them, and how to run both.
 ### Moving between them: the `/es` subset
 
 `MDDB_ES_COMPAT=true` mounts a subset of the Elasticsearch REST API under
-`/es` (v2.18.10+, [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md)): index,
+`/es` ([ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md)): index,
 get, delete, `_bulk`, `_search`, `_count`, `_refresh`, with `match`,
 `match_phrase`, `multi_match`, `bool`, `term`, `terms`, `range`, top-level
 `knn` and `terms` aggregations. Code written against an Elasticsearch-style
@@ -462,7 +462,7 @@ ignored. Mappings, analyzers, scroll and aggregations beyond `terms` are out
 of scope.
 
 CI runs the official `elasticsearch-py` against it. `opensearch-py` is not
-tested in CI. It was checked by hand against a v2.18.10 build with the
+tested in CI. It was checked by hand against a build with the
 lexical embedding provider: `opensearch-py` 3.2.0 ran `info`, `ping`,
 `index`, `helpers.bulk`, `indices.refresh`, `indices.exists`, `get`, `search`
 with `match`, with `bool` + `term` and with Elasticsearch's top-level `knn`,
@@ -1126,7 +1126,7 @@ curl -s https://mddb.tradik.com/v1/search \
 
 [integrations/wordpress-plugin/](https://github.com/tradik/mddb/tree/main/integrations/wordpress-plugin) — first-party WordPress plugin that mirrors **posts** and **pages** (or any public post type) into MDDB. Unlike `wpexporter` (one-shot bulk migration), this plugin keeps the two stores in lock-step: every save / publish / trash / delete in WordPress is reflected in MDDB in real time.
 
-Since plugin 0.2.0 + MDDB 2.11.0 the bridge is **two-way**: the plugin's opt-in `mddb-sync/v1` REST routes let the `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts and pages from any MCP client — tags, categories, custom taxonomies, meta fields and Polylang/WPML translations included. See [MCP.md → WordPress Publishing Tools](MCP.md#wordpress-publishing-tools-v2110).
+Since plugin 0.2.0 the bridge is **two-way**: the plugin's opt-in `mddb-sync/v1` REST routes let the `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts and pages from any MCP client — tags, categories, custom taxonomies, meta fields and Polylang/WPML translations included. See [MCP.md → WordPress Publishing Tools](MCP.md#wordpress-publishing-tools).
 
 | Property | Value |
 |---|---|
@@ -1276,7 +1276,6 @@ Markdown and plain-text (`.md`, `.markdown`, `.mdx`, `.txt`, `.rst`, `.adoc`) ar
 | Plugin ID | `tradik-mddb-datasource` |
 | Type | Datasource (frontend-only, no backend Go binary) |
 | Grafana | `>=10.0.0` (tested against Grafana 13.0.1) |
-| MDDB | 2.9.16+ |
 
 Source: [integrations/grafana-datasource/](https://github.com/tradik/mddb/tree/main/integrations/grafana-datasource)
 
@@ -1478,7 +1477,7 @@ collection should be searched ([SRCH-010](../docs/SEARCH.md)) — choosing
 Filters translate equality and membership. Operator forms (`{"$gt": ...}`)
 raise rather than being dropped: a dropped condition silently widens the search.
 
-### Deep Agents filesystem backend (v2.18.8)
+### Deep Agents filesystem backend
 
 `MddbBackend` gives a [Deep Agents](https://github.com/langchain-ai/deepagents)
 agent its virtual filesystem in an MDDB collection: `ls`, `read`, `write`,
@@ -1503,7 +1502,7 @@ retries. Files are documents keyed by path, with `path`, `dir` and
 are searchable with `full_text_search` and `semantic_search`. Install with
 `pip install "langchain-mddb[client,deepagents]"` (Python 3.11+).
 
-### LangGraph Store: long-term agent memory (v2.18.9)
+### LangGraph Store: long-term agent memory
 
 `MddbStore` implements LangGraph's `BaseStore` — the interface behind a
 graph's long-term memory, Deep Agents' `StoreBackend` and LangMem — on one

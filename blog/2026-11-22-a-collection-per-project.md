@@ -168,7 +168,7 @@ there: one search per task instead of up to 33 greps and reads when a common
 word matches 160 files. Two of the tasks defeated grep outright, because the
 first word an agent would try does not appear in the file that holds the
 answer. The method and the script are in
-[Benchmarks](/docs/benchmark/#finding-code-grep-and-read-vs-mddb-passages-v2188).
+[Benchmarks](/docs/benchmark/#finding-code-grep-and-read-vs-mddb-passages).
 
 Where you will notice it:
 

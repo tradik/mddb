@@ -272,9 +272,9 @@ Two options, and they are not equivalent yet.
 **WSL2 is the supported route.** It runs the same Linux binary that every
 release is built and tested against, so it inherits the full test suite.
 
-**A native Windows build is tested but not released.** Since 2.13 the full
-test suite runs on `windows-latest` on every push (in three parallel shards
-since 2.18.9), and the server and CLI build for `windows/amd64` from source.
+**A native Windows build is tested but not released.** The full
+test suite runs on `windows-latest` on every push (in three parallel shards),
+and the server and CLI build for `windows/amd64` from source.
 There are no Windows release artifacts: publishing them (an installer, scoop or
 winget) has not been taken on yet, so you build the binaries yourself. For the
 same reason `mddb-cli self-update` (and `--check`) stops on Windows with a
@@ -552,7 +552,7 @@ ready, and its answer is cached in `GET /health`:
 
 ```json
 { "status": "healthy",
-  "update": { "current": "2.18.5", "latest": "v2.18.6", "available": true } }
+  "update": { "current": "2.19.12", "latest": "v2.19.13", "available": true } }
 ```
 
 An **absent** `update` field means the check is disabled or has not finished,

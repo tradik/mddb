@@ -57,8 +57,8 @@ This guide explains how to set up automated Docker image builds and pushes to Do
 
 1. Push a tag to trigger the workflow:
    ```bash
-   git tag -a v2.18.6 -m "Release v2.18.6"
-   git push origin v2.18.6
+   git tag -a v2.19.13 -m "Release v2.19.13"
+   git push origin v2.19.13
    ```
 
 2. Check GitHub Actions: https://github.com/tradik/mddb/actions
@@ -71,13 +71,13 @@ After successful build, the following images will be available:
 
 ### Production Images
 - `tradik/mddb:latest` - Latest stable release
-- `tradik/mddb:2.18.6` - Specific version
+- `tradik/mddb:2.19.13` - Specific version
 - `tradik/mddb:2.18` - Minor version
 - `tradik/mddb:2` - Major version
 
 ### Development Images
 - `tradik/mddb:dev` - Latest development build
-- `tradik/mddb:2.18.6-dev` - Specific version dev build
+- `tradik/mddb:2.19.13-dev` - Specific version dev build
 
 ### Platforms
 All images support:
@@ -126,7 +126,7 @@ docker rm mddb-test
 
 The Docker workflow runs on:
 
-1. **Tag push**: `v*.*.*` (e.g., v2.18.6)
+1. **Tag push**: `v*.*.*` (e.g., v2.19.13)
    - Builds and pushes versioned images
    - Updates `latest` tag
    - Does **not** update the Docker Hub description — see [DOCKER_HUB_UPDATE.md](DOCKER_HUB_UPDATE.md)

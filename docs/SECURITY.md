@@ -9,7 +9,7 @@ status: publish
 
 ## Overview
 
-MDDB is a source-available embedded document database (licences in [LICENSING.md](https://github.com/tradik/mddb/blob/main/LICENSING.md)). Starting with v2.9.15 it ships a coordinated set of controls designed to satisfy the administrative and technical requirements of **ISO/IEC 27001:2022 Annex A** and the **SOC 2 Trust Services Criteria** (Security, Confidentiality, Availability). This document is the compliance map, the threat model, and the operator checklist — everything an auditor or security reviewer needs to trace a control from requirement to source file. For vulnerability disclosure and the public security policy, see [`/SECURITY.md`](https://github.com/tradik/mddb/blob/main/SECURITY.md) at the repo root.
+MDDB is a source-available embedded document database (licences in [LICENSING.md](https://github.com/tradik/mddb/blob/main/LICENSING.md)). It ships a coordinated set of controls designed to satisfy the administrative and technical requirements of **ISO/IEC 27001:2022 Annex A** and the **SOC 2 Trust Services Criteria** (Security, Confidentiality, Availability). This document is the compliance map, the threat model, and the operator checklist — everything an auditor or security reviewer needs to trace a control from requirement to source file. For vulnerability disclosure and the public security policy, see [`/SECURITY.md`](https://github.com/tradik/mddb/blob/main/SECURITY.md) at the repo root.
 
 This page does not duplicate the configuration reference. Every environment variable mentioned here is fully specified in [docs/config.md](config.md); every endpoint is fully specified in [docs/API.md](API.md).
 
@@ -68,7 +68,7 @@ This page does not duplicate the configuration reference. Every environment vari
 
 **Client IP.** Per-IP buckets, the SSE connection cap and the audit log's IP all use one rule: the client IP header (`MDDB_CLIENT_IP_HEADER`, `X-Forwarded-For` by default, or `Forwarded`, `X-Real-IP`, `CF-Connecting-IP`, ...) and PROXY protocol headers (`MDDB_PROXY_PROTOCOL=on`) count only when the connecting peer is listed in `MDDB_TRUSTED_PROXIES` (comma-separated IPs/CIDRs, empty by default). Chains are read right to left so the client's own entries cannot win, and every value must be an IP address. With PROXY protocol on, a trusted peer without a header and an untrusted peer with one are both refused. Behind a reverse proxy, set it to the proxy's address; `0.0.0.0/0` or `::/0` trusts every client again, logs a warning and fails `MDDB_PRODUCTION=true`. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies).
 
-**Response size.** A rate limit counts requests, not bytes: one public `POST /v1/fts` with `"limit": 100000` returned 21 MB before v2.18.10. Every search now returns at most `MDDB_SEARCH_MAX_LIMIT` results (default 1000) on REST, gRPC, MCP and GraphQL, and says `"limitCapped": true` when it lowered a request. For a deployment that serves search to the public (a static site calling `/v1/fts` or `/v1/autocomplete` from the browser), set it to what the site actually asks for — e.g. `MDDB_SEARCH_MAX_LIMIT=50` — and, per collection, `retrieval.maxTopK`. A collection's `maxTopK` only ever lowers the server value: the server value is the operator's limit, and anyone with config write access on one collection must not be able to lift it. See [SEARCH.md](SEARCH.md#result-limits-v21810).
+**Response size.** A rate limit counts requests, not bytes: one public `POST /v1/fts` with `"limit": 100000` returned 21 MB without a cap. Every search returns at most `MDDB_SEARCH_MAX_LIMIT` results (default 1000) on REST, gRPC, MCP and GraphQL, and says `"limitCapped": true` when it lowered a request. For a deployment that serves search to the public (a static site calling `/v1/fts` or `/v1/autocomplete` from the browser), set it to what the site actually asks for — e.g. `MDDB_SEARCH_MAX_LIMIT=50` — and, per collection, `retrieval.maxTopK`. A collection's `maxTopK` only ever lowers the server value: the server value is the operator's limit, and anyone with config write access on one collection must not be able to lift it. See [SEARCH.md](SEARCH.md#result-limits).
 
 **Known limitations.** Buckets are per-process and in-memory. A multi-node replica set enforces the limit per-node, not per-cluster. For a global rate limit, front the fleet with a dedicated reverse proxy or API gateway that implements shared token buckets.
 
@@ -80,9 +80,9 @@ This page does not duplicate the configuration reference. Every environment vari
 
 **Known limitations.** Scope is the `docs` and `rev` buckets only. FTS inverted indexes and vector embeddings remain plaintext **by design** — encrypting a queryable structure breaks the query. If your threat model treats those indexes as sensitive, disable FTS and vector search on the affected collections. **Key loss is terminal**: there is no recovery if `MDDB_ENCRYPTION_KEY` is lost. Escrow the key out-of-band.
 
-**Key rotation (2.9.16+).** The V2 wire format (`MDDB_ENC_V2\x00 | keyID | nonce | ciphertext+tag`) carries a 1-byte key identifier so the encryptor can hold a primary plus any number of read-only previous keys. Operators rotate by introducing a new `MDDB_ENCRYPTION_KEY` + `MDDB_ENCRYPTION_KEY_ID`, listing the superseded key in `MDDB_ENCRYPTION_KEYS_PREVIOUS`, and triggering `POST /v1/encryption/rotate` to re-seal historical entries under the new primary. V1 ciphertexts continue to decrypt under the current primary so the upgrade is non-breaking. See [config.md#key-rotation-2916](config.md#key-rotation-2916).
+**Key rotation.** The V2 wire format (`MDDB_ENC_V2\x00 | keyID | nonce | ciphertext+tag`) carries a 1-byte key identifier so the encryptor can hold a primary plus any number of read-only previous keys. Operators rotate by introducing a new `MDDB_ENCRYPTION_KEY` + `MDDB_ENCRYPTION_KEY_ID`, listing the superseded key in `MDDB_ENCRYPTION_KEYS_PREVIOUS`, and triggering `POST /v1/encryption/rotate` to re-seal historical entries under the new primary. V1 ciphertexts continue to decrypt under the current primary so the upgrade is non-breaking. See [config.md#key-rotation](config.md#key-rotation).
 
-### 5. Audit log export to SIEM / syslog (2.9.16+)
+### 5. Audit log export to SIEM / syslog
 
 **What it protects.** Tamper-evidence of the audit trail itself. Local BoltDB is the source of truth, but if the database is compromised so is its evidence. Off-host export to a SIEM webhook (Splunk HEC, Datadog Logs, ELK) or a syslog collector keeps an attacker from rewriting history in place.
 
@@ -128,7 +128,7 @@ Request Forgery:
 - `MDDB_OUTBOUND_ALLOWLIST=host1,host2` restricts outbound requests to an
   explicit set of hostnames; anything else is refused regardless of IP class.
 
-### Embedding provider endpoints (v2.12.0+)
+### Embedding provider endpoints
 
 An embedding provider's `apiUrl` is the one field that deliberately sits
 outside the dialer above, because the headline use — a local Ollama on
@@ -161,7 +161,7 @@ bound wiki-dump imports against decompression bombs.
 ### In scope
 
 - **Unauthenticated RCE via HTTP/gRPC/GraphQL/MCP endpoints** — every mutating request runs through auth middleware when `MDDB_AUTH_ENABLED=true`, through RBAC permission checks, and (when configured) through the rate limiter. The production guard prevents a server from coming up without these in place.
-- **Privilege escalation between collections and tenants** — one access gate per surface applies each entry point's rule before it runs (2.18.10+, SEC-019): permission on every collection the request names, admin for administration, and tenant confinement. Every REST route, gRPC method, MCP tool and GraphQL field is classified in a table, and the completeness tests fail on one that is not; see [AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced-21810-sec-019).
+- **Privilege escalation between collections and tenants** — one access gate per surface applies each entry point's rule before it runs: permission on every collection the request names, admin for administration, and tenant confinement. Every REST route, gRPC method, MCP tool and GraphQL field is classified in a table, and the completeness tests fail on one that is not; see [AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced).
 - **Data exfiltration via stolen backup or filesystem snapshot** — at-rest encryption protects `docs` and `rev` on a per-collection opt-in.
 - **Credential stuffing / brute force** — `security.auth_failure_burst` fires a webhook above threshold; rate limiter caps request volume regardless of auth state; timing-safe "invalid token" response prevents user-existence enumeration.
 - **Replay / MITM** — TLS 1.2+ on HTTP and gRPC; optional mTLS with operator-supplied client CA bundle.
@@ -187,9 +187,7 @@ bound wiki-dump imports against decompression bombs.
 5. **`ops.disk_usage_high` uses `syscall.Statfs`.** Linux and macOS work correctly. Windows is unspecified — consider an external disk-monitor on that platform.
 6. **GraphQL field-level auth** is a field middleware that applies `graphqlAccessRules` to every `Query` and `Mutation` field (SEC-019); the `@auth` / `@hasRole` directives are intentional pass-throughs.
 7. **In-process MCP direct client** bypasses HTTP middleware (auth, rate limit). Tool calls that carry the main auth's claims are gated per tool (SEC-019); calls over stdio are scoped by toolsets only, and calls authenticated by an MCP API key by its toolsets and its scope (collections, read-only, a chat scenario since v2.19.9; read-only collections and a memory namespace since v2.19.11, [MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)). Do not expose the in-process embedding to untrusted callers.
-8. **Before 2.18.10 permissions were checked per handler, and some handlers did not check** (SEC-019): with auth on, a credential limited to one collection or tenant could reach others through routes such as `/v1/fts`, `/v1/add-batch`, `/v1/ingest`, `/v1/schema/*`, `/v1/geo-*`, `/v1/webhooks`, `/v1/memory/*`, the matching gRPC methods (synonyms, stopwords, geo stats) and MCP tools, and GraphQL `schema`, `schemas`, `stats` and `vectorStats`. Upgrade; there is no configuration workaround short of giving such credentials no access at all.
-
-9. **Model training starts the operator's commands.** The `modelTraining` module (off by default) starts only commands named in the server's `MDDB_TRAINERS_CONFIG`, with an argument list (no shell), parameter values checked against the profile, an environment allowlist that never includes an `MDDB_*` setting, and every file reached through an `os.Root` on the job's directory. It is admin only, refused to scoped MCP keys, absent from MCP, gRPC and GraphQL, and audited (`training.*`). MDDB does not sandbox the command: it runs with the server's user and rights, and with auth off anyone who reaches the API can start one. See [MODEL-TRAINING.md](MODEL-TRAINING.md#security-model).
+8. **Model training starts the operator's commands.** The `modelTraining` module (off by default) starts only commands named in the server's `MDDB_TRAINERS_CONFIG`, with an argument list (no shell), parameter values checked against the profile, an environment allowlist that never includes an `MDDB_*` setting, and every file reached through an `os.Root` on the job's directory. It is admin only, refused to scoped MCP keys, absent from MCP, gRPC and GraphQL, and audited (`training.*`). MDDB does not sandbox the command: it runs with the server's user and rights, and with auth off anyone who reaches the API can start one. See [MODEL-TRAINING.md](MODEL-TRAINING.md#security-model).
 
 ---
 

@@ -270,7 +270,7 @@ and shows its API key field as optional.
 | `MDDB_MCP_SERVER_VENDOR` | — | Vendor name |
 | `MDDB_MCP_SERVER_HOMEPAGE` | — | Homepage URL |
 | `MDDB_MCP_INSTRUCTIONS` | — | System prompt for LLM — guidance on how to use this server. (v2.19.13) Unset, a server that holds code sends a default of about 120 tokens that says which tool answers which question (`code_symbol` with `format: "lines"`, `code_search`), when the key is bound to no chat scenario and may use the `code` toolset. A server without code sends nothing, as before. `none` turns the default off. |
-| `MDDB_MCP_INSTRUCTIONS_FILE` | — | (v2.18.1) Path to a file holding the instructions, read at startup. For multi-paragraph text that cannot go into a compose `.env` file. `MDDB_MCP_INSTRUCTIONS` wins when both are set. |
+| `MDDB_MCP_INSTRUCTIONS_FILE` | — | Path to a file holding the instructions, read at startup. For multi-paragraph text that cannot go into a compose `.env` file. `MDDB_MCP_INSTRUCTIONS` wins when both are set. |
 
 ### Tools
 
@@ -278,8 +278,8 @@ and shows its API key field as optional.
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
 | `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 116 built-in tools (only custom tools exposed) |
-| `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
-| `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs (v2.18.9). See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
+| `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code`. See [Toolsets](#toolsets) |
+| `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs. See [Confirming Destructive Tools](#confirming-destructive-tools) |
 
 ### API Key Authentication
 
@@ -479,7 +479,7 @@ targets); `:ro` at the end makes the key read-only — `key:name:search::ro` is
 read-only on every collection. `key`, `key:name` and `key:name:toolsets` read
 as they always did. Static keys cannot be bound to a scenario.
 
-### OAuth 2.1 for claude.ai connectors (v2.18.1)
+### OAuth 2.1 for claude.ai connectors
 
 Claude Code and the Claude API's MCP connector send an API key. claude.ai's
 "Add custom connector" cannot: it supports OAuth or no authentication at all.
@@ -550,7 +550,7 @@ Two records exist, both behind the same switch.
 {"timestamp":"2026-03-26T10:30:00Z","method":"POST","path":"/mcp","status":200,"duration_ms":45,"client_ip":"1.2.3.4","key_name":"claude-prod","session_id":"abc123","user_agent":"claude-code/1.0"}
 ```
 
-**Tool-call record** (2.16.0) — one line per `tools/call`, on every transport
+**Tool-call record** — one line per `tools/call`, on every transport
 (Streamable HTTP, SSE, `/tools/call`, stdio). Every tool call is a
 `POST /mcp` with status 200, so the request record cannot tell a lookup that
 found something from one that did not. This record can:
@@ -600,7 +600,7 @@ longer exists.
 
 ## Locating a Match
 
-`full_text_search` accepts `highlight: true` (v2.12.0+), which returns each
+`full_text_search` accepts `highlight: true`, which returns each
 matching fragment with the lines it occupies:
 
 ```json
@@ -624,7 +624,7 @@ leave a caller with neither the text nor its location.
 Lower `fragment_size` for source. The default of 150 is a byte budget tuned for
 prose; code lines are short, so it covers about fifteen lines of CSS.
 
-## Narrowing a Search (v2.18.8+)
+## Narrowing a Search
 
 `search_documents`, `semantic_search`, `full_text_search`, `hybrid_search`,
 `cross_search` and `aggregate` take `filter` next to `filter_meta`. One
@@ -640,7 +640,7 @@ condition per metadata key, with the operators `in`, `prefix`, `contains`,
 
 The filter is evaluated on the metadata index before scoring, so narrowing to
 one directory costs nothing extra. An unknown operator is an error naming it.
-Full semantics: [Filter Operators](SEARCH.md#filter-operators-v2188).
+Full semantics: [Filter Operators](SEARCH.md#filter-operators).
 
 `semantic_search`, `full_text_search`, `hybrid_search` and `cross_search` also
 take `group_by`, which keeps at most `per_group` results for each value of a
@@ -654,9 +654,9 @@ key — one passage per file instead of five from the same one:
 ```
 
 Each result reports its `group` and `groupRank`. See
-[Grouping Results](SEARCH.md#grouping-results-v2188).
+[Grouping Results](SEARCH.md#grouping-results).
 
-## Letting the Server Choose the Index (v2.18.9+)
+## Letting the Server Choose the Index
 
 `semantic_search` and `cross_search` take `algorithm: "auto"`, and
 `hybrid_search` takes `vector_algorithm: "auto"`. With it, the query planner
@@ -675,9 +675,9 @@ less favours a quantized index on a large collection.
 
 Send `auto` rather than guessing an index. Without `algorithm`, the search is
 flat, as before. The table behind the choice is in
-[`auto`: the server chooses](SEARCH.md#auto-the-server-chooses-v2189).
+[`auto`: the server chooses](SEARCH.md#auto-the-server-chooses).
 
-## Telling the Search Which Results Were Right (v2.18.9+)
+## Telling the Search Which Results Were Right
 
 `semantic_search`, `hybrid_search` and `cross_search` take `positive` and
 `negative`. These are the keys of results from an earlier call (vectors work
@@ -696,9 +696,9 @@ vector (Rocchio; weights in `rocchio: {alpha, beta, gamma}`). `rescore`
 re-ranks the candidates by similarity to the examples, with `feedback_weight`
 (default 0.5). On `hybrid_search` only the vector half changes. With
 `explain: true`, `plan.feedback` shows the correction. See
-[Relevance Feedback](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189).
+[Relevance Feedback](SEARCH.md#relevance-feedback--positive-and-negative-examples).
 
-### Query decomposition (v2.18.10+)
+### Query decomposition
 
 `semantic_search` and `hybrid_search` take `query_decomposition`: `off`
 (default) or `auto`. With `auto`, a question with several needs is also
@@ -715,7 +715,7 @@ best score:
 Ask one combined question instead of two searches. Each clause costs one
 embedding call. On `hybrid_search` only the vector half is split. With
 `explain: true`, `plan.decomposition` gives the parts. See
-[Query Decomposition](SEARCH.md#query-decomposition--questions-with-several-needs-v21810).
+[Query Decomposition](SEARCH.md#query-decomposition--questions-with-several-needs).
 
 ### Model reranking (v2.19.8)
 
@@ -739,7 +739,7 @@ with `rerankSkipped` naming why — the tool never fails because of the model.
 Off unless asked for here or in the collection's retrieval profile. See
 [Model reranking](SEARCH.md#model-reranking-v2198).
 
-## Result Limits (v2.18.10+)
+## Result Limits
 
 Every tool that takes a result count — `limit`, `top_k` or `top_n` on
 `full_text_search`, `search_documents`, `autocomplete`, `semantic_search`,
@@ -760,7 +760,7 @@ that declares an output schema (`full_text_search`, `search_documents`,
 `semantic_search`, `hybrid_search`) returns its whole JSON answer as
 `structuredContent` on every call, so `limit` and `limitCapped` are fields of
 that object (see [Structured Output](#structured-output-v21912)).
-See [Result Limits](SEARCH.md#result-limits-v21810).
+See [Result Limits](SEARCH.md#result-limits).
 
 ## Structured Output (v2.19.12+)
 
@@ -778,7 +778,7 @@ and on plain `POST /tools/call`. A `get_checksum` call, for example:
 ```
 
 The other tools declare no schema and return `structuredContent` only for a
-[capped limit](#result-limits-v21810) or a refused call (a quota or rate limit,
+[capped limit](#result-limits) or a refused call (a quota or rate limit,
 a read-only collection). `code_search` declares none either (v2.19.13): a
 tool with an output schema must return `structuredContent`, and a client that
 receives it may give the model that JSON instead of the text, so the
@@ -790,7 +790,7 @@ and a client that checks refused every such answer with "Tool X has an output
 schema but did not return structured content" (#461). Clients that read the
 text are unaffected by the change: a field is added and nothing is removed.
 
-## Passages for Code (v2.18.8+)
+## Passages for Code
 
 `search_documents`, `full_text_search`, `semantic_search`, `hybrid_search` and
 `cross_search` take `format: "passages"` (and `passage_lines`). Each hit then
@@ -807,7 +807,7 @@ their text unless `include_content: true` is passed:
 ```
 
 For code this replaces "search, then read the file" with one call; see
-[Passages — What an Agent Gets](SEARCH.md#passages--what-an-agent-gets-v2188).
+[Passages — What an Agent Gets](SEARCH.md#passages--what-an-agent-gets).
 
 ## Line Answers for Agents (v2.19.13+)
 
@@ -870,7 +870,7 @@ app/main.go:5  in run: f.Close()  -> file/file.go#File.Close
 With `include_content: true` the text of a definition follows its line,
 indented by four spaces.
 
-## Toolsets (v2.18.8+)
+## Toolsets
 
 Every tool's schema sits in the model's context on every turn, and a long menu
 makes the choice worse as well as more expensive. Each built-in tool belongs
@@ -902,7 +902,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
   a key limited to collections or a scenario — and a custom tool by the action
   it wraps. Calling one anyway is answered `tool "<name>": forbidden`.
 
-Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (115 since 2.19.0) take about
+Measured on a full list of 93 tools, the `tools/list` schemas take about
 94 KB (≈23 600 tokens) per turn. The 22 tools of `search,code` take about 43 KB
 (≈10 800 tokens), less than half.
 
@@ -914,7 +914,7 @@ Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (1
 | Imports content | `ingest,documents,search` |
 | Operates the server | `admin` (with a key of its own) |
 
-## Searching What You Just Wrote (v2.18.8+)
+## Searching What You Just Wrote
 
 A write returns once the document's full text and metadata are indexed, so
 `full_text_search` finds it at once. Its embedding is computed afterwards by a
@@ -932,7 +932,7 @@ handle the gap, cheapest first:
 
 `add_document` reports `indexing.embeddingQueued` when it queued an embedding.
 
-## Images of the Documents You Find (v2.18.9+)
+## Images of the Documents You Find
 
 Pass `include_images: true` to `full_text_search`, `semantic_search`,
 `hybrid_search` or `cross_search` and each hit carries `images`: its image
@@ -942,7 +942,7 @@ With a provider that embeds images, `semantic_search` and `hybrid_search`
 also return `imageHits` (pictures matching the query by what they show), and
 `semantic_search` takes `query_image` to search by a picture. Images are
 stored when a write asks for them: `extract_images` on `upload_file` and
-`ingest_documents`. See [SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189).
+`ingest_documents`. See [SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures).
 
 ## Built-in Tool Catalog
 
@@ -963,29 +963,29 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `validate_document` | Validate document metadata against collection schema without adding the document. |
 | `add_documents_batch` | Add multiple documents to a collection in a single batch operation. |
 | `delete_documents_batch` | Delete multiple documents from a collection in a single batch operation. |
-| `delete_where` | (v2.18.8) Delete every document a metadata `filter`/`filter_meta` matches, through the normal delete. Destructive: run with `dry_run` first. `limit` (default 1000) and `cursor` page through large sets. |
-| `update_where` | (v2.18.8) Merge `meta` into every document a filter matches; content is untouched. |
-| `set_ttl_where` | (v2.18.8) Set the time to live (`ttl` seconds, 0 removes it) of every document a filter matches. |
+| `delete_where` | Delete every document a metadata `filter`/`filter_meta` matches, through the normal delete. Destructive: run with `dry_run` first. `limit` (default 1000) and `cursor` page through large sets. |
+| `update_where` | Merge `meta` into every document a filter matches; content is untouched. |
+| `set_ttl_where` | Set the time to live (`ttl` seconds, 0 removes it) of every document a filter matches. |
 | `get_meta_keys` | List all unique metadata keys and their values for a collection. |
 | `get_checksum` | Get a collection's checksum (16 hex digits): equal on two nodes that hold the same documents, changed by any document added, removed or modified. |
-| `ingest_documents` | Bulk ingest documents with URL-based key derivation, YAML frontmatter extraction, content deduplication, and automatic metadata injection. Since v2.18.9 a document may carry a file (`format`, `content_base64`) that the server converts, and options take `text_only`; options `extract_images` / `fetch_remote_images` and a document's `images` (`[{path, content_base64}]`) store its images as image documents ([images](SEARCH.md#images--alt-text-captions-and-pictures-v2189)). |
-| `upload_file` | Upload a file and convert it to markdown. Since v2.18.9: `text_only`; xlsx, ods, csv, tsv, pptx, odp, epub, eml and mbox; the result carries `conversionConfidence`, `conversionWarnings` and `parts` (the keys of an email's attachments or a mailbox's messages, stored with `meta.parent`); `extract_images`, `fetch_remote_images` and `images` store a Markdown file's or PDF's images as image documents, listed in `parts`. |
+| `ingest_documents` | Bulk ingest documents with URL-based key derivation, YAML frontmatter extraction, content deduplication, and automatic metadata injection. A document may carry a file (`format`, `content_base64`) that the server converts, and options take `text_only`; options `extract_images` / `fetch_remote_images` and a document's `images` (`[{path, content_base64}]`) store its images as image documents ([images](SEARCH.md#images--alt-text-captions-and-pictures)). |
+| `upload_file` | Upload a file and convert it to markdown. Also takes `text_only`; formats include xlsx, ods, csv, tsv, pptx, odp, epub, eml and mbox; the result carries `conversionConfidence`, `conversionWarnings` and `parts` (the keys of an email's attachments or a mailbox's messages, stored with `meta.parent`); `extract_images`, `fetch_remote_images` and `images` store a Markdown file's or PDF's images as image documents, listed in `parts`. |
 
 ### Search
 
 | Tool | Description |
 |------|-------------|
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
-| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. Since v2.18.9: `algorithm: "auto"`, `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), `include_images` (each hit's images, and `imageHits` with an image-capable provider) and `query_image` (search by an image; `query` may then be omitted). Since v2.18.10: `query_decomposition` (`off`/`auto`). Since v2.19.8: `rerank` (model reranking, see [above](#model-reranking-v2198)). |
-| `get_indexing_status` | (v2.18.8) Is what was just written searchable yet? Queued and failed embeddings, progress and the oldest queued job, for a collection or the server. Read-only. |
-| `run_eval` | (v2.18.8) Measure search configurations on the collection's evaluation set: recall@k, nDCG@k, MRR, p50/p99 latency and tokens per configuration. Read-only. See [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing-v2188). Since v2.18.9 a configuration takes `summaryMode` (`off`, `blend`, `expand`) to measure [summaries](SEARCH.md#summaries--a-second-representation-v2189). |
-| `get_gain` | (v2.18.8) What retrieval saved over a window of days: searches by type and algorithm, tokens returned and tokens avoided by passages and chunks. Counts only. Read-only. |
-| `add_eval_query` | (v2.18.8) Add a query and the keys of the documents that should answer it, optionally graded 0–3, to the collection's evaluation set. |
-| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). Since v2.18.9 `include_images` attaches each hit's images. Since v2.19.8: `rerank`. |
+| `semantic_search` | Search documents by meaning using semantic similarity. Takes `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued; `algorithm: "auto"`, `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), `include_images` (each hit's images, and `imageHits` with an image-capable provider), `query_image` (search by an image; `query` may then be omitted) and `query_decomposition` (`off`/`auto`). Since v2.19.8: `rerank` (model reranking, see [above](#model-reranking-v2198)). |
+| `get_indexing_status` | Is what was just written searchable yet? Queued and failed embeddings, progress and the oldest queued job, for a collection or the server. Read-only. |
+| `run_eval` | Measure search configurations on the collection's evaluation set: recall@k, nDCG@k, MRR, p50/p99 latency and tokens per configuration. Read-only. See [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing). A configuration takes `summaryMode` (`off`, `blend`, `expand`) to measure [summaries](SEARCH.md#summaries--a-second-representation). |
+| `get_gain` | What retrieval saved over a window of days: searches by type and algorithm, tokens returned and tokens avoided by passages and chunks. Counts only. Read-only. |
+| `add_eval_query` | Add a query and the keys of the documents that should answer it, optionally graded 0–3, to the collection's evaluation set. |
+| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. It runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). It also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search)). `include_images` attaches each hit's images. Since v2.19.8: `rerank`. |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
-| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Since v2.18.9: `vector_algorithm: "auto"`, `explain`, `latency_target_ms`, and relevance feedback on the vector half (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images`. Since v2.18.10: `query_decomposition` (`off`/`auto`, vector half only). Since v2.19.8: `rerank`. Since v2.19.12 `facet_by` and `facet_max_values` are read (they were in the schema before and ignored): `facets` counts the results per value of each key, as on `POST /v1/hybrid-search`. |
-| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. Since v2.18.9: `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images` (each hit's images from its own collection). Since v2.19.8: `rerank` (needs `query`). |
+| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Takes `vector_algorithm: "auto"`, `explain`, `latency_target_ms`, relevance feedback on the vector half (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), `include_images` and `query_decomposition` (`off`/`auto`, vector half only). Since v2.19.8: `rerank`. Since v2.19.12 `facet_by` and `facet_max_values` are read (they were in the schema before and ignored): `facets` counts the results per value of each key, as on `POST /v1/hybrid-search`. |
+| `cross_search` | Search across multiple collections using a source document's embedding or a text query. `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images` (each hit's images from its own collection). Since v2.19.8: `rerank` (needs `query`). |
 | `find_duplicates` | Find duplicate and similar documents within a collection. |
 
 ### Geo
@@ -1031,10 +1031,10 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 
 | Tool | Description |
 |------|-------------|
-| `list_curation_rules` | (v2.9.14+) List curation rules that pin or hide documents for specific search queries. |
-| `create_curation_rule` | (v2.9.14+) Create a rule that pins specific documents to fixed positions or hides others when a query matches. |
-| `update_curation_rule` | (v2.9.14+) Replace an existing curation rule by id. |
-| `delete_curation_rule` | (v2.9.14+) Remove a curation rule by id. |
+| `list_curation_rules` | List curation rules that pin or hide documents for specific search queries. |
+| `create_curation_rule` | Create a rule that pins specific documents to fixed positions or hides others when a query matches. |
+| `update_curation_rule` | Replace an existing curation rule by id. |
+| `delete_curation_rule` | Remove a curation rule by id. |
 
 ### Automation
 
@@ -1083,8 +1083,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 
 | Tool | Description |
 |------|-------------|
-| `wordpress_publish` | (v2.11.0+) Create or update a WordPress post/page via the mddb-sync plugin, including tags, categories, custom taxonomies, meta fields and Polylang/WPML language assignment. |
-| `wordpress_set_status` | (v2.11.0+) Change the publishing status of a WordPress post/page (publish, draft, pending, private, future, trash) via the mddb-sync plugin. |
+| `wordpress_publish` | Create or update a WordPress post/page via the mddb-sync plugin, including tags, categories, custom taxonomies, meta fields and Polylang/WPML language assignment. |
+| `wordpress_set_status` | Change the publishing status of a WordPress post/page (publish, draft, pending, private, future, trash) via the mddb-sync plugin. |
 
 ### Bulk ingest
 
@@ -1124,18 +1124,18 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `chat_conversation_get` | (v2.19.0, #405) One conversation of a user (`id`, `sub`, optional `limit` for the last N messages) with its messages: role, content, tool calls, model, tokens. A conversation of another `sub` is not found. Read-only: the host writes conversations over REST or gRPC, and no tool creates, appends to or deletes one. |
 | `chat_log_list` | (v2.19.0, #406) The logged chat turns across users (scenarios with `logging.enabled`), newest first: question, answer, outcome (`answered`, `noResults`, `refused`, `error`), rating and comment, tools with queries, result keys and scores, model, latency, tokens. Filters: `scenario`, `from`, `to` (unix seconds, RFC 3339 or `YYYY-MM-DD`), `rating` (`up`, `down`, `none`, `any`), `outcome`, `limit`, `cursor`. Global admin; read-only. See [API.md](API.md#chat-conversation-log-v1chatlog). |
 | `chat_gaps` | (v2.19.0, #406) Docs gaps: the questions whose searches found nothing or scored below `threshold` (default `MDDB_CHAT_GAP_SCORE` or 0.3), grouped by normalised text with counts and the last asked time, most frequent first. Filters: `scenario`, `from`, `to`, `minCount`, `limit`. Global admin; read-only. |
-| `update_document` | Partially update a document. Since v2.18.8 `expected_revision` makes it conditional: pass the `revision` from a previous read or write, and a concurrent change is reported instead of overwritten. Since v2.18.10 (GO-048) every MCP write, batch updates included, runs the same after-write step as REST and gRPC: embeddings, geo, full text, webhooks, SSE and triggers. An empty `content_md` empties the document: its content postings and vectors are removed, its meta fields stay searchable. A batch update reads an empty `content_md` as "leave it". |
+| `update_document` | Partially update a document. `expected_revision` makes it conditional: pass the `revision` from a previous read or write, and a concurrent change is reported instead of overwritten. Every MCP write, batch updates included, runs the same after-write step as REST and gRPC: embeddings, geo, full text, webhooks, SSE and triggers. An empty `content_md` empties the document: its content postings and vectors are removed, its meta fields stay searchable. A batch update reads an empty `content_md` as "leave it". |
 | `get_document_meta` | Get document metadata without content. |
-| `reference_search` | (v2.18.8) Search reference code — other projects indexed with `mddb-cli reference add` — hybrid, as passages. See [REFERENCE-CODING.md](REFERENCE-CODING.md). |
-| `reference_symbol` | (v2.18.8) Where reference code defines and uses a symbol. |
-| `reference_examples` | (v2.18.8) The definitions in reference code that call a symbol, with their text. |
-| `reference_dependencies` | (v2.18.8) What a file in a reference collection imports, or what imports it. |
-| `code_symbol` | (v2.18.8) Everything about one symbol as path + line passages: definitions with their span, references with the definition each sits in, callers, callees, tests that touch it and siblings in the same directory. Read-only. (v2.19.3) After `mddb-cli autoindex --semantic` it answers from a language server's facts: `precision: semantic` (`mixed` when only some files have facts), qualified names (`Conn.Close`), `path` to pick one definition, `ambiguous` + `candidates` for a name with several, references grouped per definition (`target`), and the `implementations` relation, which needs those facts. (v2.19.13) `format: "lines"` answers in [lines](#line-answers-for-agents-v21913) instead of JSON; `exclude_tests: true` leaves out every passage in a test file before the limit; `path` may name a directory (`internal/session`) and keeps the definitions under it; `totals` gives, per relation the limit cut, how many passages it had. |
+| `reference_search` | Search reference code — other projects indexed with `mddb-cli reference add` — hybrid, as passages. See [REFERENCE-CODING.md](REFERENCE-CODING.md). |
+| `reference_symbol` | Where reference code defines and uses a symbol. |
+| `reference_examples` | The definitions in reference code that call a symbol, with their text. |
+| `reference_dependencies` | What a file in a reference collection imports, or what imports it. |
+| `code_symbol` | Everything about one symbol as path + line passages: definitions with their span, references with the definition each sits in, callers, callees, tests that touch it and siblings in the same directory. Read-only. (v2.19.3) After `mddb-cli autoindex --semantic` it answers from a language server's facts: `precision: semantic` (`mixed` when only some files have facts), qualified names (`Conn.Close`), `path` to pick one definition, `ambiguous` + `candidates` for a name with several, references grouped per definition (`target`), and the `implementations` relation, which needs those facts. (v2.19.13) `format: "lines"` answers in [lines](#line-answers-for-agents-v21913) instead of JSON; `exclude_tests: true` leaves out every passage in a test file before the limit; `path` may name a directory (`internal/session`) and keeps the definitions under it; `totals` gives, per relation the limit cut, how many passages it had. |
 | `code_search` | (v2.19.13) Search a code collection and answer in [lines](#line-answers-for-agents-v21913): `mode` `exact` (every line holding an identifier or literal, ignoring case, with its enclosing definition), `words` (default, full-text) or `meaning` (hybrid; by words on a server without embeddings), `path` prefix, `limit`. Ends with a count that says whether the list is complete. No output schema. Read-only. |
 | `code_graph` | Code connection graph: what a document depends on and what depends on it: which stylesheet declares a selector, which pages load a script, which file defines a function this one calls (C, C++, assembly, Go, Rust, Java, Python, Ruby, PHP), which manifest declares the ConfigMap a Deployment refers to (Kubernetes, OpenShift, Kustomize, Terraform, Ansible). Edge kinds: `uses-selector`, `calls`, `references`, `imports`. |
 | `delete_collection` | Delete an entire collection and all its documents, revisions, and metadata indices. |
 | `get_collection_config` | Get configuration attributes for a collection (type, description, icon, color, custom metadata). |
-| `set_collection_config` | Set or update configuration attributes for a collection. Only the arguments sent change (v2.18.0; before, an update erased the icon, colour, custom meta and revision cap it did not mention). `code.include_paths` sets where C `#include <...>` resolves (#319). `embedding.chunk_size` / `embedding.chunk_mode` set the collection's chunking for embeddings (v2.18.1, #325). `fts.enabled: false` stops full-text postings for the collection; `fts_reindex` then removes existing ones (v2.18.2, #335). `fts.exclude_meta_keys` keeps meta keys used only as filters out of full-text search, so changing them costs no FTS work; run `fts_reindex` after changing the list (v2.18.10, #367). `quota` (`max_documents`, `max_bytes`, `max_vectors`, `embedding_calls_per_day`, `embedding_tokens_per_day`; `{}` removes it) caps the collection — global admin only when auth is on (v2.18.9, GO-043, see [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189)). A write refused by a quota is a tool error whose `structuredContent` carries `{code: "QUOTA_EXCEEDED", status, resource, limit, used}`. |
+| `set_collection_config` | Set or update configuration attributes for a collection. Only the arguments sent change. `code.include_paths` sets where C `#include <...>` resolves (#319). `embedding.chunk_size` / `embedding.chunk_mode` set the collection's chunking for embeddings. `fts.enabled: false` stops full-text postings for the collection; `fts_reindex` then removes existing ones. `fts.exclude_meta_keys` keeps meta keys used only as filters out of full-text search, so changing them costs no FTS work; run `fts_reindex` after changing the list. `quota` (`max_documents`, `max_bytes`, `max_vectors`, `embedding_calls_per_day`, `embedding_tokens_per_day`; `{}` removes it) caps the collection — global admin only when auth is on (GO-043, see [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas)). A write refused by a quota is a tool error whose `structuredContent` carries `{code: "QUOTA_EXCEEDED", status, resource, limit, used}`. |
 | `list_collection_configs` | List all collections that have custom configuration set. |
 
 ## Access Modes
@@ -1169,7 +1169,7 @@ docker run -d \
   tradik/mddb:latest
 ```
 
-## Confirming Destructive Tools (v2.18.9+)
+## Confirming Destructive Tools
 
 `destructiveHint` is advice to the client, and a client may ignore it. With
 `MDDB_MCP_CONFIRM_DESTRUCTIVE` set, MDDB asks for itself: before a destructive
@@ -1232,7 +1232,7 @@ no change; `elicit` is the intended future default.
 | Feature | Description |
 |---------|-------------|
 | **Tool Annotations** | `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` on all tools |
-| **Elicitation** (v2.18.9+) | Destructive tools ask the user to confirm when `MDDB_MCP_CONFIRM_DESTRUCTIVE` is set — `InputRequiredResult` for 2026-07-28, `elicitation/create` for 2025-11-25. See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
+| **Elicitation** | Destructive tools ask the user to confirm when `MDDB_MCP_CONFIRM_DESTRUCTIVE` is set — `InputRequiredResult` for 2026-07-28, `elicitation/create` for 2025-11-25. See [Confirming Destructive Tools](#confirming-destructive-tools) |
 | **Structured Output** | `outputSchema` on 9 key tools, and `structuredContent` conforming to it on every successful call of those tools (v2.19.12+). See [Structured Output](#structured-output-v21912) |
 | **5 Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |
@@ -1244,11 +1244,11 @@ no change; `elicit` is the intended future default.
 | **Caching Hints** (2026-07-28) | `ttlMs` + `cacheScope` on every list and read |
 | **Notifications** | `notifications/initialized`, `notifications/cancelled` |
 | **Memory RAG Tools** | 6 tools for conversational memory: start session, add message, recall, summarize, list sessions, history |
-| **Async Bulk Ingest Tools** (v2.9.12+) | 4 tools for long-running ingest jobs: submit, status, list, cancel |
-| **Autocomplete Tool** (v2.9.12+) | Prefix autocomplete over the FTS index — top-N suggestions ranked by document frequency |
-| **Per-Query Boost** (v2.9.12+) | `full_text_search` and `hybrid_search` tools accept a `boost` map keyed by `"metaKey:metaValue"` to boost/demote matching documents at query time |
+| **Async Bulk Ingest Tools** | 4 tools for long-running ingest jobs: submit, status, list, cancel |
+| **Autocomplete Tool** | Prefix autocomplete over the FTS index — top-N suggestions ranked by document frequency |
+| **Per-Query Boost** | `full_text_search` and `hybrid_search` tools accept a `boost` map keyed by `"metaKey:metaValue"` to boost/demote matching documents at query time |
 
-## Async Bulk Ingest Tools (v2.9.12+)
+## Async Bulk Ingest Tools
 
 Queue long-running bulk ingest jobs from LLMs without blocking on the tool call. The worker drains jobs FIFO in 500-document chunks; status records persist across restarts.
 
@@ -1259,13 +1259,13 @@ Queue long-running bulk ingest jobs from LLMs without blocking on the tool call.
 | `bulk_ingest_list` | List all jobs newest-first, optionally filtered by collection | No |
 | `bulk_ingest_cancel` | Cancel a pending job (in-flight jobs run to completion) | Yes |
 
-## Autocomplete Tool (v2.9.12+)
+## Autocomplete Tool
 
 | Tool | Description | Write? |
 |------|-------------|--------|
 | `autocomplete` | Top-N prefix suggestions over the FTS inverted index, ranked by doc frequency; supports field scoping | No |
 
-## WordPress Publishing Tools (v2.11.0+)
+## WordPress Publishing Tools
 
 Publish straight from MCP into WordPress sites running the [mddb-sync plugin](https://github.com/tradik/mddb/blob/main/integrations/wordpress-plugin/README.md) with **Remote publishing** enabled. Posts and pages, tags/categories/custom taxonomies, post meta ("metafields") and Polylang/WPML language assignment + translation linking are all supported.
 
@@ -1302,7 +1302,7 @@ The target site comes from the collection's config — one collection per WordPr
 
 The site URL must be `https://` (plain `http://` only for localhost). Both tools also accept explicit `site_url` + `api_key` arguments to skip the collection config. Translations: pass `lang` plus `translation_of: <post id>` to link a new post as a translation via Polylang or WPML.
 
-> **Projection note (v2.11.0, GO-019):** for `search_documents` / `full_text_search` / `semantic_search` / `hybrid_search`, passing `fields` now also drops the document body by default — pass `include_content: true` explicitly to keep it.
+> **Projection note:** for `search_documents` / `full_text_search` / `semantic_search` / `hybrid_search`, passing `fields` now also drops the document body by default — pass `include_content: true` explicitly to keep it.
 
 ## Memory RAG Tools
 
@@ -1344,7 +1344,7 @@ Built-in MCP tools for conversational memory and RAG:
 | `import-guide` | `source` (required) | Step-by-step import from wordpress/url/file/api/scraping |
 | `rag-pipeline` | `collection` (required), `model` | RAG pipeline design with embedding and search strategy |
 
-### Custom prompts (v2.18.1)
+### Custom prompts
 
 Prompts of your own go in the `MDDB_MCP_CONFIG` file, next to
 `custom_tools`. They are listed by `prompts/list` after the built-in ones,

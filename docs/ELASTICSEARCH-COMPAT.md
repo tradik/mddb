@@ -7,7 +7,7 @@ status: publish
 
 # Elasticsearch-Compatible Subset
 
-> v2.18.10+ (INT-019). Off by default. From v2.19.10 it is the `esCompat`
+> Off by default. From v2.19.10 it is the `esCompat`
 > module: switch it on under *System → Features* in the panel or with
 > `PUT /v1/features/esCompat`, no restart. `MDDB_ES_COMPAT=true` still turns it
 > on by default, so a server that used it keeps `/es` after the upgrade; a
@@ -223,7 +223,7 @@ header — through the full middleware chain, in both storage layouts.
 
 ### opensearch-py
 
-`opensearch-py` is not in CI. It was run by hand (3.2.0, against a v2.18.10
+`opensearch-py` is not in CI. It was run by hand (3.2.0, against a
 build with `MDDB_ES_COMPAT=true` and the lexical provider), with
 `OpenSearch(hosts=[{"host": "localhost", "port": 11023, "url_prefix": "es"}])`.
 `info`, `ping`, `index`, `helpers.bulk`, `indices.refresh`, `indices.exists`,

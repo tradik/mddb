@@ -1,11 +1,11 @@
 ---
-title: "MDDB Automations (v2.7.1)"
+title: "MDDB Automations"
 slug: "docs/automations"
 description: "Reactive and scheduled workflows in MDDB: webhook targets, triggers that fire when documents match a search, and cron jobs, all stored in the database."
 status: publish
 ---
 
-# MDDB Automations (v2.7.1)
+# MDDB Automations
 
 MDDB supports an **automation system** for reactive and scheduled workflows. Define webhook targets, create triggers that fire when documents match search criteria, and schedule periodic trigger execution with cron jobs. All three types are stored in a single `automation` BoltDB bucket and managed through a unified REST API.
 
@@ -624,9 +624,7 @@ MDDB uses the standard cron expression format with optional seconds support:
 0 0 */2 * * *      # Every 2 hours
 ```
 
-Before 2.18.9 the scheduler accepted only the six-field form: a five-field
-schedule was stored, then silently never ran. Both forms run now, and a
-schedule that does not parse is refused when the rule is created or updated.
+Both forms run, and a schedule that does not parse is refused when the rule is created or updated.
 
 ### Common Schedules
 
@@ -690,7 +688,7 @@ curl -X POST http://localhost:11023/v1/automation \
 
 ### Scheduled Backups
 
-Since 2.18.9 a cron rule can take a backup instead of firing a webhook: give
+A cron rule can take a backup instead of firing a webhook: give
 it a `backup` object and no `webhookId` (a rule with both is refused). The
 same scheduler runs it, the same automation log records it, and each run is
 a job on the SSE stream. `mddb-cli backup schedule add|list|remove` manages
@@ -735,7 +733,7 @@ Over gRPC the same block is `AutomationRuleProto.backup` (25,
 `BackupActionProto`), whose `storage_config` is the `StorageConfigProto` of
 S3-backed collections: `secret_key` is write-only, reads set
 `secret_key_set`. Validation and masking are the REST ones; see
-[GRPC.md](GRPC.md#new-in-v2189).
+[GRPC.md](GRPC.md#query-planner-relevance-feedback-summaries-images-and-backups).
 
 A backup run's log entry has `action: "backup"`, `target` (where the backup
 is) and `removed` (what retention deleted). A failed run fires the
@@ -746,7 +744,7 @@ verification, checksums, restoring from S3 — is in
 
 ### Synced Sources
 
-Since 2.18.10 a cron rule can keep a collection in step with a source: give
+A cron rule can keep a collection in step with a source: give
 it a `sync` object and neither `webhookId` nor `backup` (a cron rule takes
 exactly one action). The same scheduler runs it and the same automation log
 records it; each run is a job on the SSE stream and fires the
@@ -1204,7 +1202,7 @@ The MDDB Panel (React web UI) includes an **Automations** section under the Admi
 - **Test** triggers with a single click, viewing matched documents and scores in a results table.
 - **Toggle** enabled/disabled state per rule.
 - **View** cron metadata including `lastRun`, `nextRun`, and the human-readable schedule description.
-- **Choose a cron rule's action** (2.18.10): call a webhook, take a [scheduled backup](BACKUP.md) (local directory or S3, retention `keep`, collections) or [sync a source](#synced-sources) (sitemap, URL list or S3 prefix, `prune`, `maxDocuments`, max MiB per document). A stored S3 secret is never shown: leave the field blank to keep it.
+- **Choose a cron rule's action**: call a webhook, take a [scheduled backup](BACKUP.md) (local directory or S3, retention `keep`, collections) or [sync a source](#synced-sources) (sitemap, URL list or S3 prefix, `prune`, `maxDocuments`, max MiB per document). A stored S3 secret is never shown: leave the field blank to keep it.
 - **Run a sync or backup now** (2.19.0): the Run now button of a sync or backup rule starts it and shows the job id; the rule's row shows its last result (status, the sync's counts, the error).
 - **Sync a git repository** (2.19.5): *Git repository* as the source shows the repository URL, the ref (a branch, a tag or `latest-release`, explained under the field), include and exclude globs (one per line), the forge (only for a host other than github.com, gitlab.com and codeberg.org), the token and webhook secrets — picked by name from the stored secrets, each marked *set* or not; their values are written in Chat → MCP secrets and never shown — and *Adopt*. A git rule's last result names the ref and the short commit, linked to the commit's page on the forge, and says plainly when the commit was the last run's: *up to date … nothing downloaded or written*.
 

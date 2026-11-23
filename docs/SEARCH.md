@@ -23,7 +23,7 @@ MDDB provides four search methods: **Metadata Search**, **Full-Text Search**, **
 
 Full-text search uses an inverted index built from document content. Queries are tokenized, stop words are removed, and documents are scored by relevance.
 
-### Multi-Language Support (v2.8.0+)
+### Multi-Language Support
 
 FTS supports language-aware stemming and stop word filtering for 17 languages. Each document's `lang` field determines which stemmer and stop word list is used during indexing and querying.
 
@@ -45,7 +45,7 @@ Configure default language: `MDDB_FTS_DEFAULT_LANG=en` (default). Query supporte
 
 **Protocol parity:** The `lang` parameter, FTS reindex, and FTS languages endpoints are available across all protocols: REST API, gRPC (`FTS`, `FTSReindex`, `FTSLanguages` RPCs), and MCP tools (`full_text_search` with `lang`, `fts_reindex`, `fts_languages`).
 
-### Incremental indexing (v2.18.10+)
+### Incremental indexing
 
 A write re-indexes only what it changed (#367). The index keeps a signature
 of each document: a hash of its content, language and kind, and one of each
@@ -57,7 +57,7 @@ scheduled sync, gRPC and MCP — compares the document with it:
 | nothing indexed (a resent document, a TTL-only update) | nothing |
 | meta values only | the postings of the changed `meta.<key>` fields; the fields that are gone lose theirs |
 | content, `lang` or the document's kind | the whole document, as before |
-| content emptied (v2.18.10, GO-048) | the content postings, positions and BM25 length are removed; the `meta.<key>` fields stay searchable unless excluded |
+| content emptied | the content postings, positions and BM25 length are removed; the `meta.<key>` fields stay searchable unless excluded |
 
 The result is the index a full rebuild would produce, byte for byte,
 statistics included, so ranking does not change. On a database larger than
@@ -80,8 +80,8 @@ work on them. See [API.md](API.md#put-v1collection-config).
 1. **Lowercasing** - All text converted to lowercase
 2. **Tokenization** - Split on non-alphanumeric characters, minimum 2 characters
 3. **Stop Word Removal** - Language-specific stop words filtered (e.g., ~79 English, ~297 Polish, ~232 German). Configurable via per-collection custom stop words.
-4. **Stemming** (v2.6.4+) - Language-specific stemmer reduces words to their root form (e.g., English "running" → "run", Polish "domów" → "dom", German "Häuser" → "haus"). Enabled by default, configurable via `MDDB_FTS_STEMMING`.
-5. **Synonym Expansion** (v2.6.4+, query-time only) - Query terms are expanded with configured synonyms. Bidirectional: if "big" has synonym "large", searching "large" also finds "big". Configurable via `MDDB_FTS_SYNONYMS`.
+4. **Stemming** - Language-specific stemmer reduces words to their root form (e.g., English "running" → "run", Polish "domów" → "dom", German "Häuser" → "haus"). Enabled by default, configurable via `MDDB_FTS_STEMMING`.
+5. **Synonym Expansion** (query-time only) - Query terms are expanded with configured synonyms. Bidirectional: if "big" has synonym "large", searching "large" also finds "big". Configurable via `MDDB_FTS_SYNONYMS`.
 
 #### Per-Query Control
 
@@ -139,7 +139,7 @@ FTS supports 8 search modes. The mode can be set via the `mode` parameter, or le
 | `phrase` | `"markdown database"` | Exact phrase matching (consecutive terms) |
 | `proximity` | `"markdown database"~5` | Terms within N words of each other |
 | `wildcard` | `mark* dat?base` | Pattern matching with `*` and `?` |
-| `expression` | `(rust OR golang) AND "async runtime"~3 NOT legacy` | Full query DSL with parentheses, precedence, and mixed atoms (v2.9.13+) |
+| `expression` | `(rust OR golang) AND "async runtime"~3 NOT legacy` | Full query DSL with parentheses, precedence, and mixed atoms |
 | `range` | via `rangeMeta` parameter | Numeric/date range filtering |
 | `fuzzy` | `fuzzy: 1` or `fuzzy: 2` | Typo-tolerant matching (any mode) |
 | `auto` | _(default)_ | Auto-detects the appropriate mode |
@@ -154,7 +154,7 @@ When `mode` is omitted or set to `"auto"`, the query parser inspects the query s
 4. Contains `AND`, `OR`, `NOT`, `+`, `-` → **boolean** mode
 5. Otherwise → **simple** mode
 
-#### Expression Search (v2.9.13+)
+#### Expression Search
 
 `mode: "expression"` runs the query through a proper recursive-descent parser that understands parenthesized grouping, operator precedence (NOT > AND > OR), and mixed atom types in a single query.
 
@@ -179,7 +179,7 @@ Precedence from tightest to loosest: `NOT` > `AND` > `OR`. So `a AND b OR c` par
 | `"a \\ b"` | `a \ b` |
 | `"unterminated` | error: *unterminated phrase: expected a closing quote* |
 
-Before v2.12.0 an embedded quote ended the phrase early and the rest of the query was reinterpreted as operators, so `"the "json" field"` silently searched for something else. A phrase with no closing quote is now an error rather than a phrase running to the end of the query.
+A phrase with no closing quote is an error rather than a phrase running to the end of the query.
 
 The parser normalises what it reads, so `expr.String()` returns a query that parses back to the same expression — worth knowing when a query is logged and pasted back. Double negation collapses (`NOT NOT rust` and `NOT(NOT rust)` are both `rust`), implicit AND is printed explicitly, and grouping is printed where precedence needs it.
 
@@ -313,7 +313,7 @@ where:
 
 **When to use:** When documents vary significantly in length (e.g., mix of short FAQs and long guides). BM25 prevents long documents from dominating results.
 
-#### Tuning k1 and b (v2.18.8+)
+#### Tuning k1 and b
 
 `k1` and `b` are parameters of the scoring, not of the index, so changing them
 needs no reindex.
@@ -331,7 +331,7 @@ needs no reindex.
 
 Don't change them by feel. On the MDDB docs, lowering either one made
 ranking worse and raising `k1` to 2 helped slightly. The numbers are in
-[BENCHMARK.md](BENCHMARK.md#bm25-parameters-on-the-mddb-docs-v2188). Try
+[BENCHMARK.md](BENCHMARK.md#bm25-parameters-on-the-mddb-docs). Try
 values on your own questions with `mddb-cli eval --config fts/bm25:k1=2:b=0.75`.
 With an evaluation set stored, the search advisor tries three variants and
 recommends one only when it scores better.
@@ -362,7 +362,7 @@ where:
 | `meta.category` | 2.0 |
 | `meta.description` | 1.5 |
 
-Custom weights can be passed per-query via `fieldWeights`. Fields not in the weights map are ignored. While the collection's `retrieval.summaryMode` is not `off`, `meta.summary` is added with `retrieval.summaryWeight` (default 2.0); see [Summaries](#summaries--a-second-representation-v2189).
+Custom weights can be passed per-query via `fieldWeights`. Fields not in the weights map are ignored. While the collection's `retrieval.summaryMode` is not `off`, `meta.summary` is added with `retrieval.summaryWeight` (default 2.0); see [Summaries](#summaries--a-second-representation).
 
 **When to use:** When documents have structured metadata (title, tags, etc.) and you want title matches to rank higher than body-only matches. Best for content management, documentation, and knowledge bases.
 
@@ -418,7 +418,7 @@ All algorithms (TF-IDF, BM25, BM25F) support typo tolerance via the `fuzzy` para
 
 **Matched terms format:** Fuzzy matches appear as `queryTerm~indexedTerm` (e.g., `javascrip~javascript`) in the `matchedTerms` array, making it easy to distinguish exact vs fuzzy matches.
 
-### In-Graph Metadata Filtering (v2.6.5+)
+### In-Graph Metadata Filtering
 
 FTS supports `filterMeta` to narrow results by metadata before scoring, just like vector search. This is useful for scoped keyword searches (e.g., search only within a specific category).
 
@@ -436,7 +436,7 @@ curl -X POST http://localhost:11023/v1/fts \
 
 **Filter logic:** AND between different metadata keys, OR between values of the same key (same as metadata search).
 
-### Filter Operators (v2.18.8+)
+### Filter Operators
 
 `filterMeta` asks one question: is the value one of these? `filter` asks the
 rest — "path starts with `internal/`", "modified after September", "smaller
@@ -478,12 +478,12 @@ curl -X POST http://localhost:11023/v1/fts \
   read to evaluate a filter.
 - An unknown operator is rejected with `400` and its name, so a typo does not
   turn into a filter that matches everything.
-- `rangeMeta` on `/v1/fts` (v2.7) still works. Since v2.18.8 a range on a
+- `rangeMeta` on `/v1/fts` still works. A range on a
   metadata key is folded into `filter` and answered from the index; ranges on
   `addedAt` / `updatedAt` are still checked on the document. A multi-valued
   key now matches when any value is in range, not only the first.
 
-### Per-Query Boost/Demote (v2.9.12+)
+### Per-Query Boost/Demote
 
 Reshape ranking without reindexing by attaching a `boost` map to the request. Keys are in `"metaKey:metaValue"` form; values multiply the score of matching documents.
 
@@ -506,7 +506,7 @@ curl -X POST http://localhost:11023/v1/fts \
   }'
 ```
 
-### Highlighting with Fragments (v2.9.13+)
+### Highlighting with Fragments
 
 Set `highlight: true` on `/v1/fts` and each result carries a `highlights` array with text snippets taken from the document around matched terms. Works uniformly across every FTS mode — `simple`, `boolean`, `phrase`, `wildcard`, `proximity`, and `expression` — because the highlighter reuses `matchedTerms` from the existing FTS pipeline rather than adding its own index.
 
@@ -540,7 +540,7 @@ curl -X POST http://localhost:11023/v1/fts \
   }'
 ```
 
-### Prefix Autocomplete (v2.9.12+)
+### Prefix Autocomplete
 
 Return up to `topN` terms starting with the given prefix, ranked by document frequency. Scans the existing FTS inverted index — no additional storage or indexing step is required.
 
@@ -622,7 +622,7 @@ curl -X POST http://localhost:11023/v1/fts \
 }
 ```
 
-## Result Limits (v2.18.10+)
+## Result Limits
 
 Every search returns at most `MDDB_SEARCH_MAX_LIMIT` results (default
 **1000**), whatever the request asks for. One public `POST /v1/fts` with
@@ -680,7 +680,7 @@ A request under the cap gets exactly the answer it always got: neither field
 appears. A default above the cap (for example the FTS default of 50 with
 `MDDB_SEARCH_MAX_LIMIT=20`) is capped and reported the same way.
 
-Response size has two other levers, bounded the same way in v2.18.10:
+Response size has two other levers, bounded the same way:
 
 - `facetMaxValues` (full-text search) never exceeds the cap; `0`, which used
   to mean "every value", now means the cap.
@@ -735,7 +735,7 @@ built structures are also kept on disk and read back at start — see
 enabled but none stored cost nothing. A disk-only collection loads its
 quantized vectors only.
 
-Since v2.18.4 collections load smallest first, and each one is searchable as
+Collections load smallest first, and each one is searchable as
 soon as its own vectors are in: a small collection answers while a large one
 is still loading, and a collection without vectors answers at once. Until a
 collection is loaded, a vector search on it answers `503` with `Retry-After`;
@@ -743,11 +743,7 @@ hybrid search answers from full text alone. The progress is on
 `/v1/vector-stats` (`indexProgress`) and `/health` (`vectorIndex`), and in the
 log every minute.
 
-Since v2.18.10 the training does not hold a collection back (GO-047). Before,
-a collection became searchable only after IVF, PQ and OPQ had trained on it,
-so flat and HNSW, which never use that training, waited too: 937 vectors of
-768 dimensions answered "loading 0%" for over a minute, and every later
-collection waited for the training of the ones before it. Now a collection
+The training does not hold a collection back (GO-047). A collection
 answers on `flat`, `hnsw` and `bq` as soon as its vectors are in. One
 background goroutine then trains the collections in load order. Until it has
 trained a collection, `ivf`, `pq`, `opq`, `sq` and `sq4` refuse it: a search
@@ -883,22 +879,14 @@ Approximate nearest neighbor search using a multi-layer graph structure. Each la
 
 **When to use:** Best general-purpose algorithm for medium to large collections (10K-1M documents). Excellent speed/accuracy trade-off.
 
-> **The graph was replaced in v2.18.9 (SRCH-013).** Before, HNSW ran on
-> `github.com/coder/hnsw`, and its recall@10 on the planner benchmark was 0.86
-> at 2k vectors, 0.83 at 200k and 0.66 at 2M, varying by up to 0.13 between
-> two loads of the same data. The library kept each node's M *closest*
-> candidates as neighbours. Documents that arrive topic by topic then link only
-> within their own topic, and a search that enters the wrong topic cannot get
-> out. It also kept M links on layer 0 rather than 2M, ignored
-> `efConstruction`, and drew levels from the clock. The graph is now part of
-> MDDB (`internal/vector/vector_hnsw_graph.go`). It uses the paper's
+> **The graph (SRCH-013)** is part of MDDB
+> (`internal/vector/vector_hnsw_graph.go`). It uses the paper's
 > neighbour-selection heuristic, 2M links on layer 0 and a real
 > `efConstruction`, and draws levels from a fixed seed. It measures recall@10
-> of 1.000 at 20k and 200k and is faster per query; see
-> [Vector query planner](BENCHMARK.md#vector-query-planner-v2189). The graph
-> orders by cosine distance whatever `metric` the search scores with, as
-> before. For normalised embeddings, cosine, dot product and euclidean rank
-> alike.
+> of 1.000 at 20k and 200k; see
+> [Vector query planner](BENCHMARK.md#vector-query-planner). The graph
+> orders by cosine distance whatever `metric` the search scores with. For
+> normalised embeddings, cosine, dot product and euclidean rank alike.
 
 ### IVF (Inverted File Index)
 
@@ -906,14 +894,12 @@ Clusters vectors using k-means, then searches only the nearest clusters.
 
 > **Training (IVF, PQ, OPQ, SQ, SQ4).** These five search a structure trained
 > from the collection's vectors. It is trained at startup, after a
-> `vector-reindex`, and — since 2.15.3 — by the index itself: the first search
+> `vector-reindex`, and by the index itself: the first search
 > on a collection that was never trained trains it and waits for it, and a
 > collection that has doubled since its last training is retrained in the
-> background while searches carry on against the current structure. Before
-> 2.15.3 a collection created while the server was running returned no results
-> from these five until a restart or reindex.
+> background while searches carry on against the current structure.
 
-> **Two embedding models in one collection (v2.15.4).** After a model change a
+> **Two embedding models in one collection.** After a model change a
 > collection holds both models' vectors until a reindex replaces the old ones.
 > Every algorithm now compares a query only with vectors of its own dimension;
 > before, the others came back with a score of 0, and a threshold of 0 let
@@ -1032,7 +1018,7 @@ Extreme compression by converting each float32 dimension to a single bit (1 if p
 | Algorithm | Accuracy | Speed | Memory | Best For |
 |-----------|----------|-------|--------|----------|
 | Flat | Exact | Slow | 1x | < 10K docs |
-| HNSW | ~98–100% (measured, v2.18.9) | Fast | ~2x | 10K-1M docs |
+| HNSW | ~98–100% (measured) | Fast | ~2x | 10K-1M docs |
 | IVF | ~94% | Medium | ~1.1x | 100K+ docs |
 | PQ | ~90% | Fast | ~0.03x | 500K+ docs, low memory |
 | OPQ | ~93% | Fast | ~0.03x | 500K+ docs, higher recall than PQ |
@@ -1058,7 +1044,7 @@ Need guaranteed exact results?
   → Always use Flat regardless of size
 ```
 
-### `auto`: the server chooses (v2.18.9+)
+### `auto`: the server chooses
 
 You don't have to pick an index. Send `"algorithm": "auto"` (hybrid search:
 `"vectorAlgorithm": "auto"`) and the query planner decides for each query.
@@ -1080,11 +1066,9 @@ collection the filter admits, and the request:
   trained first. If the index the table names is not trained yet, the planner
   takes the best index that is: `hnsw`, then a trained `ivf`, and finally
   `flat`. The reason says so. An index still training after a restart is not
-  a candidate either, and the plan says `ivf: training` (v2.18.10).
-- **The prefilter costs what the filter admits (v2.18.9).** It looks up the
-  admitted documents' vectors and scores those alone. Until v2.18.9 it walked
-  the whole collection and dropped what the filter refused, so a 2% filter on
-  2M vectors took 79 ms. Where the prefilter stops paying is measured, not a
+  a candidate either, and the plan says `ivf: training`.
+- **The prefilter costs what the filter admits.** It looks up the
+  admitted documents' vectors and scores those alone. Where the prefilter stops paying is measured, not a
   fixed 5% (v2.19.8): see [Filtered search](#filtered-search-v2198).
 - **Large collections with real embeddings get a quantized index, for
   memory.** At 64 dimensions or more, a few million vectors pass 256 MB of
@@ -1147,7 +1131,7 @@ target under `plan.collections`. Without `explain` the response has no
 Measured at 2k, 200k and 2M vectors, then at 20k and 200k after the HNSW,
 prefilter and threshold fixes (recall@10, p50/p99, what `auto` picked, and
 filters admitting 2%, 10% and 25%): see
-[Vector query planner](BENCHMARK.md#vector-query-planner-v2189) in
+[Vector query planner](BENCHMARK.md#vector-query-planner) in
 docs/BENCHMARK.md. The bench is `tools/bench/planner`.
 
 ### Filtered search (v2.19.8)
@@ -1289,7 +1273,7 @@ curl -X POST http://localhost:11023/v1/vector-search \
 
 If the selected algorithm's index is not yet ready (e.g., HNSW graph still building, IVF/PQ still training), the server automatically falls back to the **flat** algorithm and includes the actual algorithm used in the response.
 
-### Retrieval Modes — Parent, Chunk, Window (v2.11.4+)
+### Retrieval Modes — Parent, Chunk, Window
 
 Documents are embedded per chunk, and `retrievalMode` controls the granularity
 of what a search returns:
@@ -1330,7 +1314,7 @@ are derived from the parent's current content, so they never go stale. The
 same options are available on the `semantic_search` MCP tool
 (`retrieval_mode`, `window_size`).
 
-### MMR Result Diversification (v2.11.4+)
+### MMR Result Diversification
 
 When a collection contains many similar documents (or chunks), plain top-K
 often fills up with near-duplicates. Maximal Marginal Relevance (MMR)
@@ -1361,7 +1345,7 @@ curl -X POST http://localhost:11023/v1/vector-search \
   applies across chunks, in `parent` mode across documents.
 - Also available on the `semantic_search` MCP tool (`mmr`, `mmr_lambda`).
 
-### Relevance Feedback — Positive and Negative Examples (v2.18.9+)
+### Relevance Feedback — Positive and Negative Examples
 
 After a first search you know which results were right and which were not.
 Send that back instead of rewriting the query. `positive` and `negative` list
@@ -1402,11 +1386,11 @@ curl -X POST http://localhost:11023/v1/vector-search \
   ([GRAPHQL.md](GRAPHQL.md#vector-search-semantic-search)). All of them go
   through one implementation and refuse the same inputs with the same message.
 
-Measured in [BENCHMARK.md](BENCHMARK.md#relevance-feedback-v2189): one round
+Measured in [BENCHMARK.md](BENCHMARK.md#relevance-feedback): one round
 of feedback raises recall@10 from 0.31 to 0.49–0.50 on a corpus built so
 that the query is ambiguous.
 
-### Query Decomposition — Questions with Several Needs (v2.18.10+)
+### Query Decomposition — Questions with Several Needs
 
 "How do I set up a read replica and how does backup work" asks for two
 pages. One query vector for the whole question lands between the two topics,
@@ -1449,7 +1433,7 @@ curl -X POST http://localhost:11023/v1/vector-search \
   refused with 422 (gRPC `InvalidArgument`).
 
 **Why max, why no similarity gate.** Measured in
-[BENCHMARK.md](BENCHMARK.md#query-decomposition-v21810) on 20 questions and
+[BENCHMARK.md](BENCHMARK.md#query-decomposition) on 20 questions and
 190 two-topic questions, nomic-embed-text:
 - On the two-topic questions vector search gains +0.065 nDCG@10
   (CI [+0.046, +0.085]) and hybrid +0.047 (CI [+0.030, +0.066]). On ordinary
@@ -1461,7 +1445,7 @@ curl -X POST http://localhost:11023/v1/vector-search \
   nothing on ordinary questions. Keeping the whole query as one of the
   searches is what protects them.
 
-### Summaries — a Second Representation (v2.18.9+)
+### Summaries — a Second Representation
 
 A question like "what are the main risks here" matches the language of a
 summary, not of any single chunk. A document can carry a summary in its
@@ -1488,7 +1472,7 @@ curl -X PUT http://localhost:11023/v1/collection-config \
 
 | `retrieval.summaryMode` | What a search does |
 |---|---|
-| `off` (default) | Ignores summaries. Results are byte-for-byte what they were before v2.18.9. |
+| `off` (default) | Ignores summaries: results are byte-for-byte what a search returns when no document has a summary. |
 | `blend` | A document scores the better of its best chunk and its summary. A document that only its summary matched comes back with its best chunk for the query. |
 | `expand` | Like `blend`, and a summary hit also brings the document's best *n* chunks, ranked against the query, at the summary's score. With `format: "passages"` each chunk is a passage, and in `chunk` mode each chunk is a result. *n* is 3, or fewer when `contextTokenBudget` cannot hold *n* chunks for each of `topK` results (never fewer than 1). |
 
@@ -1500,8 +1484,8 @@ curl -X PUT http://localhost:11023/v1/collection-config \
   their summaries matched.
 - **Cross-collection search, per target.** Each target collection applies its
   own `summaryMode` and `summaryWeight` to its own hits. A target with
-  summaries `off` contributes exactly what it did before, so a search over
-  targets that are all `off` returns the same bytes as before v2.18.9. Under
+  summaries `off` ignores them, so a search over targets that are all `off`
+  returns the same bytes as one without summaries. Under
   `blend`, a document only its summary matched joins the merged results.
   Under `expand`, with `format: "passages"`, its summary hit brings that
   document's best chunks, one passage each. With `explain: true` and a named
@@ -1544,7 +1528,7 @@ curl -X POST http://localhost:11023/v1/eval -d '{"collection": "kb", "configs": 
   {"searchType": "vector", "summaryMode": "expand"}]}'
 ```
 
-### Images — Alt Text, Captions and Pictures (v2.18.9+)
+### Images — Alt Text, Captions and Pictures
 
 Diagrams, screenshots and tables saved as pictures carry content a text
 index never sees. MDDB keeps a document's images as **image documents** of
@@ -1622,12 +1606,12 @@ passages alike) attaches each hit's images:
 
 It is one metadata-index lookup for all the hits of a collection. Without
 `includeImages` nothing is looked up and nothing is added: the response is
-byte-for-byte what it was before v2.18.9 (a golden test holds every surface
+byte-for-byte what a search without images returns (a golden test holds every surface
 to that).
 
 **Searching by picture.** With a provider that embeds images (Voyage's
 multimodal models, Cohere Embed v3 and newer — see
-[EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#images-v2189)), the embedding
+[EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#images)), the embedding
 worker embeds each image document's picture into the image space, after its
 text. Then:
 
@@ -1661,7 +1645,7 @@ so:
 
 `POST /v1/vector-reindex` with `force` re-embeds images too.
 
-## Passages — What an Agent Gets (v2.18.8+)
+## Passages — What an Agent Gets
 
 A document answers "which file"; an agent editing code needs "which lines,
 inside which definition, and what they say". `format: "passages"` returns that
@@ -1693,7 +1677,7 @@ against 4 KB for the stylesheet it came from.
 | everything else | around the first line the query's terms match, `passageLines` (default 10) on each side; a hit inside a definition no longer than that window returns the definition. (v2.19.13) A hit on a Markdown heading starts at the heading and runs down, so the passage holds the text under it, not the end of the section before |
 
 - `symbol` is the innermost definition holding the hit (code documents; see
-  [Code Documents](API.md#one-symbol-everywhere-it-matters-v2188) for the
+  [Code Documents](API.md#one-symbol-everywhere-it-matters) for the
   languages).
 - `tokens` uses the same estimate as the context budget, and the budget counts
   passages in this format, not the documents they came from.
@@ -1714,7 +1698,7 @@ against 4 KB for the stylesheet it came from.
   returns the passages without their text, unless `include_content: true` is
   passed. Before, `fields` was ignored in this format.
 
-## Searching What You Just Wrote (v2.18.8+)
+## Searching What You Just Wrote
 
 A write returns once the document, its full text and its metadata are
 committed, so a full-text search finds it at once. Its embedding is computed
@@ -1736,12 +1720,12 @@ slow provider.
   queued and whose text matches the query, after the ranked results, marked
   `pendingEmbedding: true`. They have no vector score.
 - Hybrid search has always found queued documents through its full-text half;
-  since v2.18.8 such results are marked `pendingEmbedding: true` too.
+  such results are marked `pendingEmbedding: true` too.
 - `failedEmbeddings` counts documents left without vectors by a provider
   failure or a full queue. They stay unsearchable by meaning until
   `/v1/vector-reindex`.
 
-## Grouping Results (v2.18.8+)
+## Grouping Results
 
 Parent mode already keeps one hit per document. `groupBy` is the general
 form: keep the `perGroup` best results for each value of a key, then cut to
@@ -1780,7 +1764,7 @@ curl -X POST http://localhost:11023/v1/vector-search \
   uses only the request.
 - Without `groupBy` responses are exactly as before.
 
-## Oversampling (v2.12.0+)
+## Oversampling
 
 Every search that post-processes its results — deduplicating chunks of one
 document, merging two rankings, rescoring quantized candidates — asks the index
@@ -1852,7 +1836,7 @@ request silently change another's beam width — a data race producing wrong
 results rather than a crash. Raising `oversample` moves HNSW recall through the
 requested neighbour count instead, which is per-call and safe.
 
-## Hybrid Search (v2.6.5+)
+## Hybrid Search
 
 Hybrid search combines FTS (keyword) and vector (semantic) search into a single query, producing results ranked by a fused score. This gives you the best of both worlds: exact keyword matching plus semantic understanding.
 
@@ -1912,7 +1896,7 @@ score = 1/(k + rank_fts) + 1/(k + rank_vector)
 | `geo` | — | Spatial pre-filter: `{lat, lng, radiusMeters}` |
 | `sort` | `"combined"` | Result ordering: `combined` (default, by fused score) or `distance` (by `distanceMeters` ascending — requires `geo`) |
 
-### Sort by Distance (v2.9.13+)
+### Sort by Distance
 
 When the request carries a `geo` filter, `sort: "distance"` re-orders the merged result set by ascending distance from the reference point instead of by fused score. Useful for "nearest matching venue" queries where proximity matters more than keyword relevance.
 
@@ -2135,7 +2119,7 @@ One transport, as a fact about the code: `POST {apiUrl}/rerank` with
 running on the same machine, work without code changes; choosing one is the
 operator's decision.
 
-## Measuring Instead of Guessing (v2.18.8+)
+## Measuring Instead of Guessing
 
 Every recommendation in this guide is a starting point. Which configuration
 is best for a collection depends on its documents and on the questions people
@@ -2160,7 +2144,7 @@ hybrid                    0.875    0.783    0.765      10.7      17.3  1790501
 ```
 
 That is the MDDB documentation measured with its own 20-question set (see
-[BENCHMARK.md](BENCHMARK.md#retrieval-quality-on-the-mddb-docs-v2188)).
+[BENCHMARK.md](BENCHMARK.md#retrieval-quality-on-the-mddb-docs)).
 
 - **Store a set** on the collection with `POST /v1/eval-queries` or the MCP
   tool `add_eval_query`. Each query is
@@ -2177,7 +2161,7 @@ Twenty to fifty real questions are enough to tell configurations apart.
 Collect them from what people actually asked, not from document titles.
 Queries written from a title favour keyword search.
 
-## Which algorithm should I use? (v2.12.0+)
+## Which algorithm should I use?
 
 MDDB offers eight vector algorithms, four ranking algorithms, three fusion
 strategies and four retrieval modes. That is a lot of menu and no basis for
@@ -2260,7 +2244,7 @@ The same thing is the `search_advisor` MCP tool, annotated read-only. An agent
 should call it once per collection before its first search, rather than
 guessing from algorithm names or defaulting forever.
 
-## Graph retrieval (v2.12.0+)
+## Graph retrieval
 
 `parent`, `chunk` and `window` change the *shape* of a result. `graph` changes
 which documents are *reached*.
@@ -2298,7 +2282,7 @@ and cannot tell whether the search is working.
 | `graphDecay` | 0.5 | Fraction of the source's score a neighbour inherits per hop |
 | `graphMaxNeighbours` | 10 | Stops a hub document flooding the answer |
 | `graphDirection` | `both` | `in` = what depends on this, `out` = what it depends on |
-| `graphKinds` | — | (v2.18.8) Expand by symbol relation instead: `callers`, `callees`, `tests`, `siblings` (code in the same directory), and (v2.19.3) `implementations` (documents implementing an interface a result defines; needs semantic facts). Each expansion reports its `kind`. Unknown values are a 422 |
+| `graphKinds` | — | Expand by symbol relation instead: `callers`, `callees`, `tests`, `siblings` (code in the same directory), and (v2.19.3) `implementations` (documents implementing an interface a result defines; needs semantic facts). Each expansion reports its `kind`. Unknown values are a 422 |
 
 (v2.19.3) A result carrying semantic facts (`mddb-cli autoindex --semantic`)
 expands `callers`, `callees`, `tests` and `implementations` from its facts —
@@ -2322,7 +2306,7 @@ answer, and sorting them together hides which is which.
 A collection with no edges — most prose — expands to nothing, which is the
 right answer rather than an error.
 
-### Weighted (multi-signal fusion, v2.12.0+)
+### Weighted (multi-signal fusion)
 
 `alpha` and `rrf` both answer one question: how well does this document match
 the query. There are cheap signals they cannot see, and the one that matters
@@ -2441,13 +2425,13 @@ curl -X POST http://localhost:11023/v1/search \
 
 For best results, combine search methods:
 
-1. **Hybrid Search** (v2.6.5+): Use `/v1/hybrid-search` for a single query that combines FTS + vector search with automatic score fusion. Best for general-purpose search where you want both keyword precision and semantic recall.
+1. **Hybrid Search**: Use `/v1/hybrid-search` for a single query that combines FTS + vector search with automatic score fusion. Best for general-purpose search where you want both keyword precision and semantic recall.
 2. **Vector + Metadata**: Use `filterMeta` in vector search to narrow semantic results by category
-3. **FTS + Metadata** (v2.6.5+): Use `filterMeta` in FTS to scope keyword search to specific metadata values
+3. **FTS + Metadata**: Use `filterMeta` in FTS to scope keyword search to specific metadata values
 4. **FTS for keywords, Vector for meaning**: Use FTS when users search for specific terms, vector when queries are natural language questions
 5. **BM25F for structured docs**: Use BM25F when documents have meaningful titles and tags — matches in titles will rank higher than body-only matches
 
-## Search Stats (v2.7.0+)
+## Search Stats
 
 All search endpoints (`/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search`) return an optional `searchStats` object with performance metrics:
 
@@ -2479,7 +2463,7 @@ MDDB_SEARCH_STATS=false ./mddbd
 
 The config endpoint (`GET /v1/config`) includes `searchStatsEnabled` field.
 
-## Distance Metrics (v2.7.0+)
+## Distance Metrics
 
 MDDB supports three distance metrics for vector and hybrid search. The metric controls how similarity between embedding vectors is computed.
 
@@ -2508,7 +2492,7 @@ curl -X POST http://localhost:11023/v1/vector-search \
 - **Normalized embeddings:** For normalized embeddings (OpenAI, most providers), all three metrics produce equivalent ranking order. The default `cosine` is recommended unless you have a specific reason to change it.
 - **Per-request configuration:** The distance metric is specified per-request via the `distanceMetric` parameter. No server-side configuration is needed.
 
-## Automation Triggers (v2.6.9+)
+## Automation Triggers
 
 MDDB supports **automation triggers** that fire webhooks when documents matching search criteria are added to a collection.
 
@@ -2613,7 +2597,7 @@ When a trigger fires, it sends a POST to the webhook URL:
 }
 ```
 
-## Cross-Collection Search (v2.7.0+)
+## Cross-Collection Search
 
 Search across multiple collections using a document's embedding or a text query.
 
@@ -2668,7 +2652,7 @@ Each result includes the collection it came from:
 }
 ```
 
-## Collection Attributes (v2.7.0+)
+## Collection Attributes
 
 Configure collection metadata: type, description, icon, color, and custom key-value pairs.
 
@@ -2699,7 +2683,7 @@ curl http://localhost:8080/v1/collection-config?collection=blog
 
 Collection attributes are returned in stats responses and visible in the panel sidebar.
 
-## Duplicate Detection (v2.7.0+)
+## Duplicate Detection
 
 MDDB can detect exact and semantically similar documents within a collection. Useful for deduplication, quality control, and understanding content overlap.
 
@@ -2916,7 +2900,7 @@ curl -X POST http://localhost:11023/v1/classify \
 }
 ```
 
-## Inline Facets on Search (v2.9.14+)
+## Inline Facets on Search
 
 Facets can now be computed inline with `/v1/fts` and `/v1/hybrid-search` so UIs don't need a separate `/v1/aggregate` round-trip. Pass `facetBy` with the metadata keys to aggregate; the response grows a `facets` map keyed by the same names, with per-value counts ordered by count desc, value asc.
 
@@ -2955,7 +2939,7 @@ curl -X POST http://localhost:11023/v1/fts \
 - Missing keys still appear in the map with an empty bucket list, so UIs can render a stable facet group layout across queries.
 - Works with HybridSearch in the same way (parameter is also `facetBy` / `facetMaxValues`).
 
-### Counting over every match: `facetScope` (v2.17.0+, `/v1/fts`)
+### Counting over every match: `facetScope` (`/v1/fts`)
 
 A filter sidebar wants the number of matches per category, not the number on
 the current page. With `"facetScope": "all"` the counts cover every document
@@ -2988,7 +2972,7 @@ document, so "every match" would be the whole collection.
 For multi-select facets, ask each group's counts with that group's own filter
 left out, as usual.
 
-## Curation Rules — Pinned & Hidden Results (v2.9.14+)
+## Curation Rules — Pinned & Hidden Results
 
 Curation rules override organic ranking for specific queries. For each rule, editors can pin documents to fixed 1-based positions and hide other documents entirely; applied inside the FTS + Hybrid pipelines after scoring but before pagination.
 

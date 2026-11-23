@@ -81,7 +81,7 @@ Welcome to the MDDB documentation! This guide will help you understand, deploy, 
 ### For AI Agents
 1. Connect and pick toolsets: [Using MDDB from AI Agents](AGENTS.md)
 2. Configure your client: [LLM Connections](LLM_CONNECTIONS.md)
-3. Index a repository: [`mddb-cli autoindex`](BULK-IMPORT.md#autoindex-one-command-v2188)
+3. Index a repository: [`mddb-cli autoindex`](BULK-IMPORT.md#autoindex-one-command)
 
 ### For DevOps
 1. Follow [Deployment Guide](DEPLOYMENT.md)

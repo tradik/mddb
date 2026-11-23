@@ -14,13 +14,13 @@ Complete reference for all MDDB configuration parameters.
 ## Table of Contents
 
 - [General / Core](#general--core)
-- [OpenTelemetry Tracing](#opentelemetry-tracing-v2189)
+- [OpenTelemetry Tracing](#opentelemetry-tracing)
 - [HTTP Server](#http-server)
 - [gRPC Server](#grpc-server)
 - [MCP (Model Context Protocol)](#mcp-model-context-protocol)
 - [HTTP/3 (QUIC)](#http3-quic)
 - [Authentication](#authentication)
-- [Quotas and Reserves](#quotas-and-reserves-v2189)
+- [Quotas and Reserves](#quotas-and-reserves)
 - [Embedding / Vector Search](#embedding--vector-search)
 - [Vector Index](#vector-index)
 - [Full-Text Search (FTS)](#full-text-search-fts)
@@ -51,11 +51,11 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_OUTBOUND_ALLOW_PRIVATE` | `"false"` | bool | Allow outbound HTTP requests to private/loopback IP ranges (disabled by default to block SSRF pivoting) |
 | `MDDB_WIKI_MAX_PAGES` | `500000` | int | Maximum pages processed by a single `/v1/import-wiki` run (DoS guard) |
 | `MDDB_WIKI_MAX_DECOMPRESSED_BYTES` | `4294967296` (4 GiB) | int | Maximum decompressed XML volume for a wiki import (zip-bomb guard) |
-| `MDDB_SHUTDOWN_TIMEOUT_SEC` | `15` | int | Deadline for the ordered shutdown, closing the database files included; a subsystem that does not finish is named in the log and the process exits anyway (v2.18.5+). A second SIGTERM or Ctrl-C exits at once |
-| `MDDB_HEALTH_STALL_LIMIT` | `300` | int | Seconds a read transaction may wait to begin before `/health` answers `503` `stalled`; shorter waits answer `200` `busy` (v2.18.5+) |
+| `MDDB_SHUTDOWN_TIMEOUT_SEC` | `15` | int | Deadline for the ordered shutdown, closing the database files included; a subsystem that does not finish is named in the log and the process exits anyway. A second SIGTERM or Ctrl-C exits at once |
+| `MDDB_HEALTH_STALL_LIMIT` | `300` | int | Seconds a read transaction may wait to begin before `/health` answers `503` `stalled`; shorter waits answer `200` `busy` |
 | `MDDB_SEARCH_MAX_CONCURRENT` | CPU count | int | Maximum heavy queries running at once, counted together on every surface: REST (`/v1/search`, `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search`, `/v1/cross-search`, `/v1/aggregate`, `/v1/code-graph`, `/v1/symbol`, `/v1/eval`, `/v1/find-duplicates`, `/v1/memory/recall`, and `_search` / `_count` of the Elasticsearch-compatible API), and the same queries over gRPC, GraphQL and MCP (v2.19.8; before, only some REST routes were counted). One request holds one slot however many searches it runs inside (a hybrid search, a cross-collection fan-out, an evaluation run). Further queries queue, then are refused: REST `503` with `Retry-After: 1` and `{"code":"SEARCH_BUSY","status":503,"retryAfterSeconds":1,"error":…}`, gRPC `RESOURCE_EXHAUSTED`, MCP a tool error with that object as `structuredContent`, GraphQL an error with it in `extensions`. Not counted on any surface: geo search and autocomplete, which read a bounded index. `0` disables the limit |
 | `MDDB_SEARCH_QUEUE_TIMEOUT_MS` | `2000` | int | How long a query waits for a slot before it is refused |
-| `MDDB_SEARCH_MAX_LIMIT` | `1000` | int | Most results one search returns, on every surface (REST, MCP, gRPC, GraphQL) and every endpoint that takes `limit`, `topK` or `topN`: FTS, document search, autocomplete, vector, hybrid, cross-collection, code symbol, geo radius, memory recall, eval. A larger request is lowered to the cap and the response says `"limitCapped": true` with the `limit` used. A collection's `retrieval.maxTopK` can lower it further, never raise it. Also bounds FTS `facetMaxValues` (`0` = the cap). `1`–`1000000`; any other value stops startup with the value named (v2.18.10+). See [SEARCH.md](SEARCH.md#result-limits-v21810) |
+| `MDDB_SEARCH_MAX_LIMIT` | `1000` | int | Most results one search returns, on every surface (REST, MCP, gRPC, GraphQL) and every endpoint that takes `limit`, `topK` or `topN`: FTS, document search, autocomplete, vector, hybrid, cross-collection, code symbol, geo radius, memory recall, eval. A larger request is lowered to the cap and the response says `"limitCapped": true` with the `limit` used. A collection's `retrieval.maxTopK` can lower it further, never raise it. Also bounds FTS `facetMaxValues` (`0` = the cap). `1`–`1000000`; any other value stops startup with the value named. See [SEARCH.md](SEARCH.md#result-limits) |
 | `MDDB_SEARCH_CACHE_SIZE` | `500` | int | Maximum cached search responses; `0` disables the cache regardless of what a request asks for. Caching is opt-in per request via `cacheTtl` — see [SEARCH.md](SEARCH.md#result-caching) |
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
 | `MDDB_METRICS_PUBLIC` | `"false"` | bool | With `MDDB_AUTH_ENABLED=true`, serve `/metrics` without credentials (SEC-009). No effect when auth is off ([TELEMETRY.md](TELEMETRY.md)) |
@@ -64,9 +64,9 @@ Complete reference for all MDDB configuration parameters.
 
 ---
 
-## OpenTelemetry Tracing (v2.18.9+)
+## OpenTelemetry Tracing
 
-Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is set, and free when off. Spans, attributes and an example collector: [TELEMETRY.md](TELEMETRY.md#opentelemetry-tracing-v2189). `GET /v1/config` reports `telemetry.enabled` and the collector's scheme and host only (v2.18.10+): a path or query can carry a tenant token, and `MDDB_OTEL_HEADERS` is a secret that is never shown.
+Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is set, and free when off. Spans, attributes and an example collector: [TELEMETRY.md](TELEMETRY.md#opentelemetry-tracing). `GET /v1/config` reports `telemetry.enabled` and the collector's scheme and host only: a path or query can carry a tenant token, and `MDDB_OTEL_HEADERS` is a secret that is never shown.
 
 | Variable | Default | Type | Description |
 |---|---|---|---|
@@ -88,7 +88,7 @@ Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is s
 | `MDDB_HTTP_PORT` | — | string | — | Plain port number (converted to `":PORT"`) |
 | `MDDB_ADDR` | `":11023"` | string | — | Legacy alias for `MDDB_HTTP_ADDR` |
 | `MDDB_HTTP_READ_TIMEOUT` | `30s` | duration | — | Time allowed to read a whole request, body included. `0` = no limit. Applies to the HTTP API and the MCP HTTP listener |
-| `MDDB_HTTP_WRITE_TIMEOUT` | `30s` | duration | — | Time allowed from reading the request to writing the response. `0` = no limit. A response that misses it is dropped by the connection, so it is logged as `response not delivered`. `add-batch`, `delete-batch`, `backup`, `restore`, `vector-reindex` and, since v2.18.6, `fts-reindex`, `import-url` and `import-wiki` lift it for their own response |
+| `MDDB_HTTP_WRITE_TIMEOUT` | `30s` | duration | — | Time allowed from reading the request to writing the response. `0` = no limit. A response that misses it is dropped by the connection, so it is logged as `response not delivered`. `add-batch`, `delete-batch`, `backup`, `restore`, `vector-reindex`, `fts-reindex`, `import-url` and `import-wiki` lift it for their own response |
 
 ---
 
@@ -117,9 +117,9 @@ Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is s
 | `MDDB_TRAINERS_CONFIG` | `""` | string | — | Path to the trainer profile file (YAML or JSON) of the `modelTraining` module (v2.19.11): the commands a run may start, their fixed arguments, declared parameters, timeouts and environment allowlist. Read at startup; unset, datasets can still be built and a run answers `409`. See [MODEL-TRAINING.md](MODEL-TRAINING.md) |
 | `MDDB_TRAINING_DIR` | `training` beside the database | string | — | Where training jobs keep their directories: datasets, trial cuts, results, evaluation reports and logs (v2.19.11) |
 | `MDDB_MCP_BUILTIN_TOOLS` | `true` | bool | — | Set to `false` to expose only custom YAML tools |
-| `MDDB_MCP_TOOLSETS` | `all` | list | `search`, `code`, `documents`, `ingest`, `memory`, `schema`, `admin`, `geo`, `automation`, `webhooks`, `wordpress`, `all` | Built-in tool groups to expose (v2.18.8, MCP-003); tools outside them are neither listed nor callable |
+| `MDDB_MCP_TOOLSETS` | `all` | list | `search`, `code`, `documents`, `ingest`, `memory`, `schema`, `admin`, `geo`, `automation`, `webhooks`, `wordpress`, `all` | Built-in tool groups to expose; tools outside them are neither listed nor callable |
 | `MDDB_MCP_MODE` | `"wr"` | string | — | MCP access mode: `"read"`, `"write"`, or `"wr"` |
-| `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `"off"` | string | — | Ask the user through MCP elicitation before a destructive tool (`delete_collection`, `delete_documents_batch`, `delete_where`, `truncate_revisions`, `restore_backup`) runs (v2.18.9). `"off"`: never ask. `"elicit"`: ask clients that declared elicitation, serve others as before. `"require"`: also refuse clients that cannot be asked (`-32021`). An unknown value is logged and treated as `"off"`. See [MCP.md](MCP.md#confirming-destructive-tools-v2189) |
+| `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `"off"` | string | — | Ask the user through MCP elicitation before a destructive tool (`delete_collection`, `delete_documents_batch`, `delete_where`, `truncate_revisions`, `restore_backup`) runs. `"off"`: never ask. `"elicit"`: ask clients that declared elicitation, serve others as before. `"require"`: also refuse clients that cannot be asked (`-32021`). An unknown value is logged and treated as `"off"`. See [MCP.md](MCP.md#confirming-destructive-tools) |
 | `MDDB_MCP_PROTOCOL_VERSION` | `""` | string | — | Pin the MCP spec revision, disabling negotiation. Empty means negotiate and default to the newest revision this build implements. An unknown value stops the server at startup. |
 
 ### MCP API Key Authentication
@@ -130,11 +130,11 @@ Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is s
 | `MDDB_MCP_API_KEYS` | `""` | string | Static API keys: `key1:name1,key2:name2`; each entry is `key[:name[:toolsets[:collections[:ro]]]]` (toolsets and collections `|`-separated; see [MCP.md](MCP.md#scoped-keys-collections-read-only-a-chat-scenario-v2199)) |
 | `MDDB_MCP_API_KEY_CACHE_TTL` | `"5m"` | duration | Cache TTL for dynamic API key lookups |
 
-### MCP OAuth 2.1 (v2.18.1+)
+### MCP OAuth 2.1
 
 OAuth for clients that cannot send an API key, such as claude.ai custom
 connectors. Every token stands for an MCP API key; see
-[MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181).
+[MCP.md](MCP.md#oauth-21-for-claudeai-connectors).
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
@@ -203,9 +203,9 @@ Security and operational incidents are delivered through the existing `/v1/webho
 | `ops.replication_lag_high` | Follower lag exceeds threshold on poll | `{lagMs, thresholdMs}` |
 | `ops.panic_recovered` | An HTTP handler panicked and was recovered by the middleware | `{method, path, panic, ip}` |
 | `ops.disk_usage_high` | DB filesystem used-% ≥ threshold | `{path, usedBytes, totalBytes, usedPct, thresholdPct}` |
-| `backup.failed` | A scheduled backup failed (2.18.9, [BACKUP.md](BACKUP.md#scheduled-backups)) | `{ruleId, ruleName, target, backup, error}` |
-| `source.synced` | (v2.18.10+) A run of a synced source finished ([AUTOMATIONS.md](AUTOMATIONS.md#synced-sources)) | `{ruleId, ruleName, collection, source, added, updated, unchanged, deleted, failed, error?, errors?}` |
-| `quota.exceeded` | (v2.18.9+) A write or embedding refused by a collection quota, the disk reserve or the vector RAM limit; at most once a minute per collection and resource. Collection-scoped webhooks receive their collection's events | `{error, code, collection, resource, limit, used, retryAfterSeconds?}` |
+| `backup.failed` | A scheduled backup failed ([BACKUP.md](BACKUP.md#scheduled-backups)) | `{ruleId, ruleName, target, backup, error}` |
+| `source.synced` | A run of a synced source finished ([AUTOMATIONS.md](AUTOMATIONS.md#synced-sources)) | `{ruleId, ruleName, collection, source, added, updated, unchanged, deleted, failed, error?, errors?}` |
+| `quota.exceeded` | A write or embedding refused by a collection quota, the disk reserve or the vector RAM limit; at most once a minute per collection and resource. Collection-scoped webhooks receive their collection's events | `{error, code, collection, resource, limit, used, retryAfterSeconds?}` |
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
@@ -268,9 +268,9 @@ Generate a fresh key:
 export MDDB_ENCRYPTION_KEY="$(openssl rand -base64 32)"
 ```
 
-### Key Rotation (2.9.16+)
+### Key Rotation
 
-The 2.9.16 wire format **V2** prefixes every ciphertext with a 1-byte `keyID` so the encryptor can hold a primary plus any number of read-only previous keys. V1 (2.9.15) ciphertexts continue to decrypt — non-breaking upgrade.
+Wire format **V2** prefixes every ciphertext with a 1-byte `keyID` so the encryptor can hold a primary plus any number of read-only previous keys. V1 ciphertexts continue to decrypt — non-breaking upgrade.
 
 Rotation procedure:
 
@@ -334,13 +334,13 @@ export MDDB_AUDIT_EXPORT_SYSLOG_ADDR="tcp://logs.papertrailapp.com:12345"
 
 ---
 
-## Backup Path Jail (2.9.16+)
+## Backup Path Jail
 
-`/v1/backup` and `/v1/restore` accept a user-supplied path. Without bounds an admin (or an attacker who steals admin creds) could read or overwrite arbitrary files. The 2.9.16 jail confines every backup to a single directory.
+`/v1/backup` and `/v1/restore` accept a user-supplied path. Without bounds an admin (or an attacker who steals admin creds) could read or overwrite arbitrary files. The jail confines every backup to a single directory.
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
-| `MDDB_BACKUP_DIR` | `./backups` | path | Directory backups are written to and restored from. Symlinks that escape the jail are rejected; absolute paths and `../` traversal are rejected; empty / NUL bytes are rejected; a target that exists and is not a regular file (the directory itself, a subdirectory) is rejected (v2.18.7+). Paths are checked and backups written through `os.Root`, so a symlink created after the check cannot lead out of the directory |
+| `MDDB_BACKUP_DIR` | `./backups` | path | Directory backups are written to and restored from. Symlinks that escape the jail are rejected; absolute paths and `../` traversal are rejected; empty / NUL bytes are rejected; a target that exists and is not a regular file (the directory itself, a subdirectory) is rejected. Paths are checked and backups written through `os.Root`, so a symlink created after the check cannot lead out of the directory |
 | `MDDB_GEO_DATA_DIR` | `"geodata"` | path | Directory postcode CSVs must live in. `/v1/geo-reindex` and its gRPC twin accept a name relative to it and refuse anything that resolves outside, symlinks included — the path used to be taken from the request and opened as given |
 
 No further configuration required — the jail is always on.
@@ -383,10 +383,10 @@ Shared sliding-window limiter covering both HTTP and gRPC. Separate from the pre
 | `MDDB_RATE_LIMIT_BURST` | `50` | int | Additional allowance before a client is blocked. Effective ceiling = `REQUESTS + BURST`. |
 | `MDDB_RATE_LIMIT_BY` | `"ip"` | string | `"ip"` (default) or `"user"`. `user` keys on the authenticated username and falls back to IP for anonymous traffic. |
 | `MDDB_TRUSTED_PROXIES` | `""` | list | Comma-separated IPs or CIDR prefixes of the reverse proxies and load balancers whose client IP header and PROXY header are believed, e.g. `127.0.0.1,10.0.0.0/8,fd00::/8`. Empty (the default) trusts nobody. An entry that is not an IP or prefix stops startup with that entry named. `0.0.0.0/0` or `::/0` trusts every client again: mddbd warns at startup and `MDDB_PRODUCTION=true` refuses it. See [Client IP and trusted proxies](#client-ip-and-trusted-proxies). |
-| `MDDB_CLIENT_IP_HEADER` | `X-Forwarded-For` | string | v2.18.10+. The header a trusted proxy puts the client address in. `X-Forwarded-For` (with the `X-Real-IP` fallback) and `Forwarded` (RFC 7239) are chains; any other name (`X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP`, `X-Cluster-Client-Ip`, `Client-IP`, ...) is one address. gRPC reads the same name in lower case from the metadata. A name that is not a valid HTTP header name stops startup. See [Proxies and load balancers](#proxies-and-load-balancers). |
-| `MDDB_PROXY_PROTOCOL` | `off` | `off`/`on` | v2.18.10+. PROXY protocol v1 and v2 on the HTTP, gRPC and MCP listeners. When `on`, a peer in `MDDB_TRUSTED_PROXIES` **must** send a PROXY header and any other peer **must not**. Any other value stops startup. See [PROXY protocol](#proxy-protocol). |
+| `MDDB_CLIENT_IP_HEADER` | `X-Forwarded-For` | string | The header a trusted proxy puts the client address in. `X-Forwarded-For` (with the `X-Real-IP` fallback) and `Forwarded` (RFC 7239) are chains; any other name (`X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP`, `X-Cluster-Client-Ip`, `Client-IP`, ...) is one address. gRPC reads the same name in lower case from the metadata. A name that is not a valid HTTP header name stops startup. See [Proxies and load balancers](#proxies-and-load-balancers). |
+| `MDDB_PROXY_PROTOCOL` | `off` | `off`/`on` | PROXY protocol v1 and v2 on the HTTP, gRPC and MCP listeners. When `on`, a peer in `MDDB_TRUSTED_PROXIES` **must** send a PROXY header and any other peer **must not**. Any other value stops startup. See [PROXY protocol](#proxy-protocol). |
 
-`GET /v1/config` reports these settings under `clientAddressing` (v2.18.10+): how many trusted proxy entries there are (never their addresses), the client IP header and whether PROXY protocol is on. The admin panel shows them on the Config and System pages.
+`GET /v1/config` reports these settings under `clientAddressing`: how many trusted proxy entries there are (never their addresses), the client IP header and whether PROXY protocol is on. The admin panel shows them on the Config and System pages.
 
 HTTP responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`; rejected requests get `429 Too Many Requests` with `Retry-After`. gRPC rejects with `codes.ResourceExhausted`. The paths `/health`, `/v1/health`, and `/metrics` are always exempt so monitoring and load-balancer probes never trip the limiter.
 
@@ -488,7 +488,7 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
-| `MDDB_EMBEDDING_PROVIDER` | `""` (disabled) | string | Provider: `"openai"`, `"ollama"`, `"voyage"`, `"cohere"`, `"lexical"` (v2.18.9+: hashed words and n-grams, no model, no network, does not match by meaning — see [EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#5-lexical-no-model-no-network--v2189); never autodetected), or `""`. When empty and nothing is stored, MDDB probes a local Ollama once at startup — see `MDDB_EMBEDDING_AUTODETECT` |
+| `MDDB_EMBEDDING_PROVIDER` | `""` (disabled) | string | Provider: `"openai"`, `"ollama"`, `"voyage"`, `"cohere"`, `"lexical"` (hashed words and n-grams, no model, no network, does not match by meaning — see [EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#5-lexical-no-model-no-network); never autodetected), or `""`. When empty and nothing is stored, MDDB probes a local Ollama once at startup — see `MDDB_EMBEDDING_AUTODETECT` |
 | `MDDB_UPDATE_CHECK` | `"1"` | bool | Set to `0` to skip the startup release check. One GET to a pinned GitHub URL, carrying nothing about this installation; the answer is cached in `/health` |
 | `MDDB_EMBEDDING_AUTODETECT` | `"1"` | bool | Set to `0` (or `false`, `no`, `off`) to skip the startup probe for a local Ollama. The probe is one `GET localhost:11434/api/tags` with a two-second budget, and only runs when no provider is configured |
 | `OLLAMA_HOST` | `http://localhost:11434` | string | Where the autodetection probe looks. Accepted with or without a scheme |
@@ -496,15 +496,15 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 | `MDDB_EMBEDDING_API_URL` | *(see below)* | string | API base URL |
 | `MDDB_EMBEDDING_MODEL` | *(see below)* | string | Embedding model name |
 | `MDDB_EMBEDDING_DIMENSIONS` | *(see below)* | int | Vector dimensionality |
-| `MDDB_EMBEDDING_IMAGE_MODEL` | `""` | string | (v2.18.9+, RAG-010) Voyage: the multimodal model pictures are embedded with (default `voyage-multimodal-3.5`, or the text model itself when it is multimodal). `none` embeds no pictures, with Voyage or Cohere. Other providers embed no images. See [EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#images-v2189) |
+| `MDDB_EMBEDDING_IMAGE_MODEL` | `""` | string | Voyage: the multimodal model pictures are embedded with (default `voyage-multimodal-3.5`, or the text model itself when it is multimodal). `none` embeds no pictures, with Voyage or Cohere. Other providers embed no images. See [EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#images) |
 | `MDDB_EMBEDDING_CHUNK_ENABLED` | `true` | bool | Enable text chunking before embedding |
-| `MDDB_EMBEDDING_CHUNK_MODE` | `""` | string | `code` or `prose` for every document; empty decides per document. A collection's `embedding.chunkMode` takes precedence (v2.18.1+) |
-| `MDDB_EMBEDDING_CHUNK_SIZE` | `1500` | int | Maximum chunk size in characters. A collection can set its own with `embedding.chunkSize` in its collection config (v2.18.1+) |
-| `MDDB_EMBEDDING_QUEUE_SIZE` | `1000` | int | (v2.15.0+) Pending embedding jobs the worker will hold — per tenant since v2.19.8 (collections outside any namespace share one queue), and the workers take one tenant's job after another's. Raise it for large imports; it was hardcoded before |
-| `MDDB_EMBEDDING_QUEUE_WAIT` | `5s` | duration | (v2.15.0+) How long a write waits for room in its tenant's full queue. Since v2.19.8 a job that found no room is **parked** — it stays `pending` in `/v1/indexing-status` and goes back on the queue as soon as there is room — instead of being dropped. `0` parks at once |
+| `MDDB_EMBEDDING_CHUNK_MODE` | `""` | string | `code` or `prose` for every document; empty decides per document. A collection's `embedding.chunkMode` takes precedence |
+| `MDDB_EMBEDDING_CHUNK_SIZE` | `1500` | int | Maximum chunk size in characters. A collection can set its own with `embedding.chunkSize` in its collection config |
+| `MDDB_EMBEDDING_QUEUE_SIZE` | `1000` | int | Pending embedding jobs the worker will hold — per tenant since v2.19.8 (collections outside any namespace share one queue), and the workers take one tenant's job after another's. Raise it for large imports; it was hardcoded before |
+| `MDDB_EMBEDDING_QUEUE_WAIT` | `5s` | duration | How long a write waits for room in its tenant's full queue. Since v2.19.8 a job that found no room is **parked** — it stays `pending` in `/v1/indexing-status` and goes back on the queue as soon as there is room — instead of being dropped. `0` parks at once |
 | `MDDB_EMBEDDING_PARK_MAX` | `100000` | int | (v2.19.8+) Jobs the worker keeps parked — waiting for room in the queue or for an embedding budget — over all tenants. Past it a job is dropped as before: stored without its vector, counted in `/v1/vector-stats` `queue.dropped` and `mddb_operations_total{operation="embedding",label="dropped"}`. `0` restores the drop-when-full behaviour of 2.15–2.19.7 |
-| `MDDB_EMBEDDING_CACHE_SIZE` | `1024` | int | (v2.12.0+) Embeddings held in the query cache; `0` disables caching and restores the pre-2.12.0 path exactly |
-| `MDDB_EMBEDDING_CACHE_TTL` | `3600` | int | (v2.12.0+) Cache entry lifetime in seconds |
+| `MDDB_EMBEDDING_CACHE_SIZE` | `1024` | int | Embeddings held in the query cache; `0` disables caching |
+| `MDDB_EMBEDDING_CACHE_TTL` | `3600` | int | Cache entry lifetime in seconds |
 
 ### Model reranking (v2.19.8+, RAG-011)
 
@@ -577,7 +577,7 @@ Customize the MCP server profile returned in the `initialize` response. Useful f
 | `MDDB_MCP_SERVER_VENDOR` | `""` | string | Organization / vendor name |
 | `MDDB_MCP_SERVER_HOMEPAGE` | `""` | string | URL to server documentation or homepage |
 | `MDDB_MCP_INSTRUCTIONS` | `""` | string | System prompt for LLM — tells the AI how to use this server. Unset, a server that holds code sends a short default naming the code tools (`code_symbol` with `format: "lines"`, `code_search`) to a key bound to no chat scenario that may use the `code` toolset; `none` turns the default off (v2.19.13) |
-| `MDDB_MCP_INSTRUCTIONS_FILE` | `""` | string | Path to a file with the instructions, read at startup; `MDDB_MCP_INSTRUCTIONS` wins when both are set (v2.18.1) |
+| `MDDB_MCP_INSTRUCTIONS_FILE` | `""` | string | Path to a file with the instructions, read at startup; `MDDB_MCP_INSTRUCTIONS` wins when both are set |
 
 Or via YAML config:
 
@@ -770,13 +770,13 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 | `MDDB_PLACEMENT_REFRESH` | `1s` | duration | How often a node fetches the placement map and runs its group's duties (pinning, copying global settings every 5 rounds, dropping moved collections) (v2.19.8+) |
 | `MDDB_PLACEMENT_DROP_GRACE` | `30s` | duration | How long the old group keeps a moved collection before it drops its copy (v2.19.8+) |
 | `MDDB_PLACEMENT_FENCE_TIMEOUT` | `10s` | duration | During a move's switch-over: how long routed writes to the collection are held, and how long the fence waits for running writes (v2.19.8+) |
-| `MDDB_FREELIST_SYNC` | auto | bool | Write bbolt's freelist on every commit so opening the database reads one page instead of the whole file. On a 908 MB database: 7 ms and 37 MB RSS instead of ~400 ms and 938 MB; minutes from a cold disk on large files ([DEPLOYMENT.md](DEPLOYMENT.md#large-databases-startup-time-and-memory)). Since v2.18.2 a clean shutdown stores the freelist anyway; this setting is what protects a start after a crash. Unset (or `auto`, v2.18.2+): on for a file of `MDDB_FREELIST_SYNC_THRESHOLD` or more, decided at start; `true`/`false` force it |
-| `MDDB_FREELIST_SYNC_THRESHOLD` | `4294967296` | int | File size in bytes from which `MDDB_FREELIST_SYNC` defaults to on (v2.18.2+) |
-| `MDDB_STATS_TTL` | `300` | int | Seconds between background recounts for `/v1/stats` on a database whose count is slow (v2.18.5+) |
-| `MDDB_STATS_WAIT` | `2` | int | Seconds the first `/v1/stats` after a start waits for the count before answering `statsPending` (v2.18.5+) |
-| `MDDB_STORAGE_LAYOUT` | `single` | string | `per-collection` keeps each collection in its own file under `<database>.d/`; switch with `mddbd -split-collections` / `-merge-collections` ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md), v2.18.2+) |
-| `MDDB_FREELIST_BACKGROUND` | `true` | bool | When the freelist is not stored (after a crash), open at once, serve reads, and rebuild it in the background; writes get 503 until it is done. `false` walks before the server starts (v2.18.2+) |
-| `MDDB_PREWARM` | `auto` | string | When the open has to walk the file: `auto` reads the file sequentially into the page cache first if it fits in half the available memory (cgroup limit included), `on` always, `off` never (v2.18.2+) |
+| `MDDB_FREELIST_SYNC` | auto | bool | Write bbolt's freelist on every commit so opening the database reads one page instead of the whole file. On a 908 MB database: 7 ms and 37 MB RSS instead of ~400 ms and 938 MB; minutes from a cold disk on large files ([DEPLOYMENT.md](DEPLOYMENT.md#large-databases-startup-time-and-memory)). A clean shutdown stores the freelist anyway; this setting is what protects a start after a crash. Unset (or `auto`): on for a file of `MDDB_FREELIST_SYNC_THRESHOLD` or more, decided at start; `true`/`false` force it |
+| `MDDB_FREELIST_SYNC_THRESHOLD` | `4294967296` | int | File size in bytes from which `MDDB_FREELIST_SYNC` defaults to on |
+| `MDDB_STATS_TTL` | `300` | int | Seconds between background recounts for `/v1/stats` on a database whose count is slow |
+| `MDDB_STATS_WAIT` | `2` | int | Seconds the first `/v1/stats` after a start waits for the count before answering `statsPending` |
+| `MDDB_STORAGE_LAYOUT` | `single` | string | `per-collection` keeps each collection in its own file under `<database>.d/`; switch with `mddbd -split-collections` / `-merge-collections` ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md)) |
+| `MDDB_FREELIST_BACKGROUND` | `true` | bool | When the freelist is not stored (after a crash), open at once, serve reads, and rebuild it in the background; writes get 503 until it is done. `false` walks before the server starts |
+| `MDDB_PREWARM` | `auto` | string | When the open has to walk the file: `auto` reads the file sequentially into the page cache first if it fits in half the available memory (cgroup limit included), `on` always, `off` never |
 | `MDDB_BACKUP_VERIFY` | `true` | bool | Check every backup with bbolt's full integrity check before keeping it |
 | `MDDB_VERIFY_TIMEOUT` | `1h` | duration | Longest an integrity check (backup, restore, follower snapshot) may run |
 
@@ -803,7 +803,7 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 ---
 
-## Elasticsearch-Compatible Subset (v2.18.10+)
+## Elasticsearch-Compatible Subset
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
@@ -841,7 +841,7 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 ---
 
-## Corpus Packs (v2.18.10+)
+## Corpus Packs
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
@@ -849,10 +849,10 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 ---
 
-## Quotas and Reserves (v2.18.9+)
+## Quotas and Reserves
 
 Server-wide limits that protect the node, next to the per-collection `quota`
-([MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189)). Both are off by default.
+([MULTI_TENANCY.md](MULTI_TENANCY.md#quotas)). Both are off by default.
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
@@ -886,20 +886,20 @@ that sets none behaves as before, and so does a user without a tenant.
 
 ---
 
-## Per-Collection Configuration (v2.9.14+ additions)
+## Per-Collection Configuration
 
-Per-collection attributes are persisted via `PUT /v1/collection-config` (REST), `SetCollectionConfig` (gRPC), the `set_collection_config` MCP tool, or the Admin Panel — **not** via env vars. The settings below extend what has been configurable since earlier versions.
+Per-collection attributes are persisted via `PUT /v1/collection-config` (REST), `SetCollectionConfig` (gRPC), the `set_collection_config` MCP tool, or the Admin Panel — **not** via env vars.
 
 | Field | Default | Type | Description |
 |-------|---------|------|-------------|
-| `maxRevisions` | `0` | integer | (v2.9.14+) Revision retention cap per document. `0` = unlimited. When `> 0`, each `add`/`update` trims older revisions in the same BoltDB transaction so history stays capped even under high write-churn. |
+| `maxRevisions` | `0` | integer | Revision retention cap per document. `0` = unlimited. When `> 0`, each `add`/`update` trims older revisions in the same BoltDB transaction so history stays capped even under high write-churn. |
 | `trackAccess` | `false` | bool | Record per-read access events (needs `MDDB_TEMPORAL=true`) |
 | `trackHot` | `false` | bool | Maintain a hot-docs leaderboard |
 | `spellCorrect` | `false` | bool | Auto-correct FTS queries (needs `MDDB_SPELL=true`) |
 | `spellLang` | `""` | string | Override spell-correction language for this collection |
 | `quantization` | `"float32"` | string | Vector quantization level: `float32`, `int8`, or `int4` |
 | `storageBackend` | `"boltdb"` | string | `boltdb`, `memory`, or `s3` |
-| `quota` | none | object | (v2.18.9+) `{maxDocuments, maxBytes, maxVectors, embeddingCallsPerDay, embeddingTokensPerDay}`, `0` = no limit. Omitted keeps the stored quota, `{}` removes it; changing it needs a global admin when auth is on. See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189) |
+| `quota` | none | object | `{maxDocuments, maxBytes, maxVectors, embeddingCallsPerDay, embeddingTokensPerDay}`, `0` = no limit. Omitted keeps the stored quota, `{}` removes it; changing it needs a global admin when auth is on. See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas) |
 
 **Example — set a 20-revision cap:**
 ```bash
@@ -910,7 +910,7 @@ curl -X PUT http://localhost:11023/v1/collection-config \
 
 ---
 
-## Curation Rules (v2.9.14+)
+## Curation Rules
 
 Curation is data, not configuration — rules live in a dedicated bolt bucket and are managed at runtime via `/v1/curation` (see [API.md](API.md) and [SEARCH.md](SEARCH.md)). No server-level flag controls the subsystem; it's always on and has zero overhead when no rules match an incoming query.
 
@@ -930,7 +930,7 @@ Curation is data, not configuration — rules live in a dedicated bolt bucket an
 | `--mcp-stdio` | | string | MCP stdio mode (true/false) |
 | `--http3-enabled` | | string | Enable HTTP/3 server (true/false) |
 | `--http3-addr` | | string | HTTP/3 listen address |
-| `--version` | | bool | Print `mddbd version X.Y.Z` and exit (v2.18.8) |
+| `--version` | | bool | Print `mddbd version X.Y.Z` and exit |
 | `--check-update` | | bool | Report whether a newer release exists, then exit |
 
 The version is the constant `VERSION` in `services/mddbd/main.go`. It is not

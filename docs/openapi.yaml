@@ -13987,7 +13987,7 @@ components:
             result before deduplication, merging or rescoring trims them.
             Omitted, uses the collection's retrieval profile then MDDB's default
             of 3.0. Out of range returns 422 rather than clamping. See
-            SEARCH.md#oversampling-v2120 for measured effect.
+            SEARCH.md#oversampling for measured effect.
         collection:
           type: string
           description: Collection name to search
@@ -14042,7 +14042,7 @@ components:
             - **auto** (v2.18.9+): the query planner chooses per query from the
               collection size, the indexes already built and the filter's
               selectivity; it never builds an index on the query path. See
-              SEARCH.md#auto-the-server-chooses-v2189.
+              SEARCH.md#auto-the-server-chooses.
             - **flat**: Exact brute-force cosine similarity (most accurate, slower for large datasets)
             - **hnsw**: Hierarchical Navigable Small World graph (fast approximate, best general-purpose)
             - **ivf**: Inverted File Index with k-means clustering (good for large datasets)
@@ -15729,7 +15729,7 @@ components:
             result before deduplication, merging or rescoring trims them.
             Omitted, uses the collection's retrieval profile then MDDB's default
             of 3.0. Out of range returns 422 rather than clamping. See
-            SEARCH.md#oversampling-v2120 for measured effect.
+            SEARCH.md#oversampling for measured effect.
         collection:
           type: string
           description: Collection name to search
@@ -19243,7 +19243,7 @@ components:
             result before deduplication, merging or rescoring trims them.
             Omitted, uses the collection's retrieval profile then MDDB's default
             of 3.0. Out of range returns 422 rather than clamping. See
-            SEARCH.md#oversampling-v2120 for measured effect.
+            SEARCH.md#oversampling for measured effect.
         sourceCollection:
           type: string
           description: Collection containing the source document (for document-as-query)

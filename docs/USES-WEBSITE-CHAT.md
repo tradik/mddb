@@ -174,9 +174,6 @@ read. `GET /config` returns both — `scenarios` lists the identifiers,
 `scenario_labels` maps each to its label — so a picker can show
 "Documentation Assistant" and send `assistant`.
 
-Before v2.12.0 nothing read `name`, so an operator who set it saw no effect
-anywhere.
-
 ### Rate limiting behind a proxy
 
 The rate limit is charged per client address, and that address is the TCP peer

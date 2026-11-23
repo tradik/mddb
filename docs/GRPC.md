@@ -104,9 +104,9 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `UpdateBatch` | `UpdateBatchRequest` → `UpdateBatchResponse` |
 | | `DeleteDocument` | `DeleteDocumentRequest` → `DeleteDocumentResponse` |
 | | `DeleteBatch` | `DeleteBatchRequest` → `DeleteBatchResponse` |
-| | `DeleteWhere` | `WhereRequest` → `WhereResponse` (v2.18.8: by metadata filter, with `dry_run`) |
-| | `UpdateWhere` | `WhereRequest` → `WhereResponse` (v2.18.8) |
-| | `SetTTLWhere` | `WhereRequest` → `WhereResponse` (v2.18.8) |
+| | `DeleteWhere` | `WhereRequest` → `WhereResponse` (by metadata filter, with `dry_run`) |
+| | `UpdateWhere` | `WhereRequest` → `WhereResponse` |
+| | `SetTTLWhere` | `WhereRequest` → `WhereResponse` |
 | | `DeleteCollection` | `DeleteCollectionRequest` → `DeleteCollectionResponse` |
 | | `Get` | `GetRequest` → `Document` |
 | | `GetDocumentMeta` | `GetDocumentMetaRequest` → `GetDocumentMetaResponse` |
@@ -121,13 +121,13 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `VectorReindex` | `VectorReindexRequest` → `VectorReindexResponse` |
 | | `VectorStats` | `VectorStatsRequest` → `VectorStatsResponse` |
 | | `SearchAdvisor` | `SearchAdvisorRequest` → `SearchAdvisorResponse` |
-| | `GetIndexingStatus` | `IndexingStatusRequest` → `IndexingStatusResponse` (v2.18.8: queued embeddings and metadata updates — is what was just written searchable yet?) |
-| | `RunEval` | `RunEvalRequest` → `RunEvalResponse` (v2.18.8: recall@k, nDCG@k, MRR, latency and tokens per search configuration) |
-| | `AddEvalQuery` | `AddEvalQueryRequest` → `EvalQueryProto` (v2.18.8) |
-| | `ListEvalQueries` | `ListEvalQueriesRequest` → `ListEvalQueriesResponse` (v2.18.8) |
-| | `DeleteEvalQuery` | `DeleteEvalQueryRequest` → `DeleteEvalQueryResponse` (v2.18.8) |
-| | `GetGain` | `GetGainRequest` → `GetGainResponse` (v2.18.8: tokens returned and avoided over a window of days) |
-| **Code** | `CodeSymbol` | `CodeSymbolRequest` → `CodeSymbolResponse` (v2.18.8: definitions, references, callers, callees, tests and siblings of a symbol) |
+| | `GetIndexingStatus` | `IndexingStatusRequest` → `IndexingStatusResponse` (queued embeddings and metadata updates — is what was just written searchable yet?) |
+| | `RunEval` | `RunEvalRequest` → `RunEvalResponse` (recall@k, nDCG@k, MRR, latency and tokens per search configuration) |
+| | `AddEvalQuery` | `AddEvalQueryRequest` → `EvalQueryProto` |
+| | `ListEvalQueries` | `ListEvalQueriesRequest` → `ListEvalQueriesResponse` |
+| | `DeleteEvalQuery` | `DeleteEvalQueryRequest` → `DeleteEvalQueryResponse` |
+| | `GetGain` | `GetGainRequest` → `GetGainResponse` (tokens returned and avoided over a window of days) |
+| **Code** | `CodeSymbol` | `CodeSymbolRequest` → `CodeSymbolResponse` (definitions, references, callers, callees, tests and siblings of a symbol) |
 | **Geo** | `GeoSearch` | `GeoSearchRequest` → `GeoSearchResponse` |
 | | `GeoWithin` | `GeoWithinRequest` → `GeoWithinResponse` |
 | | `GeoReindex` | `GeoReindexRequest` → `GeoReindexResponse` |
@@ -451,14 +451,14 @@ grpcurl -plaintext -d '{"url":"https://example.org/k8s-docs-1.31.mddbpack","sha2
 
 See [CORPUS-PACKS.md](CORPUS-PACKS.md).
 
-### New in v2.18.10
+### Quota usage, sync rules, corpus collections and result limits
 
 `GetCollectionConfigResponse.usage` (4, `CollectionQuotaUsageProto`) is what
 a collection with a quota uses of it (GO-043): `documents`, `bytes`,
 `vectors`, and today's (UTC) `embedding_calls` and `embedding_tokens` —
 compare each with the `CollectionQuotaProto` limit. Unset for a collection
 without a quota. The same numbers as REST `GET /v1/collection-config`
-(`usage`); see [API.md](API.md#quota-usage-v21810).
+(`usage`); see [API.md](API.md#quota-usage).
 
 `CollectionFTSProto.exclude_meta_keys` (2) lists meta keys kept out of
 full-text search (#367): no `meta.<key>` postings, so changing them costs no
@@ -522,9 +522,9 @@ only lower the server value (#368). When the cap lowered a request's
 
 `limit` is the count used and is set only with `limit_capped`; a request under
 the cap leaves both at their zero values, so its response is unchanged. See
-[SEARCH.md](SEARCH.md#result-limits-v21810).
+[SEARCH.md](SEARCH.md#result-limits).
 
-### New in v2.18.9
+### Query planner, relevance feedback, summaries, images and backups
 
 The query planner (SRCH-013) is available over gRPC. `VectorSearch` and
 `CrossSearch` take `algorithm: "auto"`; `HybridSearch` takes
@@ -541,7 +541,7 @@ on the other two. A plan has `algorithm`, `prefilter`, `candidates`,
 `iterative_scan`, `reasons`, `strategy` (9, v2.19.8: how a filtered search ran — `prefilter`, `graph+filter`, `ivf` or `scan+filter`) and, for cross search, one `SearchPlan` per
 target in `collections`. `RetrievalProfileProto.vector_algorithm` (14) stores
 a collection's default, for example `"auto"`. The table the planner decides by
-is in [SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189).
+is in [SEARCH.md](SEARCH.md#auto-the-server-chooses).
 
 Relevance feedback (SRCH-015) is available on the same three requests:
 
@@ -556,12 +556,12 @@ With `explain`, `SearchPlan.feedback` (7, `FeedbackApplied`) reports the
 correction. An example that names nothing usable is `INVALID_ARGUMENT`. All
 of this is additive.
 
-Query decomposition (SRCH-020, v2.18.10) is `string query_decomposition` on
+Query decomposition (SRCH-020) is `string query_decomposition` on
 `VectorSearchRequest` (28) and `HybridSearchRequest` (36): `off` (default)
 or `auto`. With `explain`, `SearchPlan.decomposition` (8,
 `QueryDecomposition`) holds `int32 parts` (1 = not split) and `repeated
 string texts`. Another mode is `INVALID_ARGUMENT`. See
-[SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810).
+[SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs).
 
 Summaries (RAG-009) need no new request field. A document carries its
 client-written summary in the metadata key `summary`. The collection profile
@@ -570,7 +570,7 @@ follow it:
 
 | Field | Message | Meaning |
 |---|---|---|
-| `summary_mode` (15) | `RetrievalProfileProto` | `off` (default), `blend` or `expand`; see [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189) |
+| `summary_mode` (15) | `RetrievalProfileProto` | `off` (default), `blend` or `expand`; see [SEARCH.md](SEARCH.md#summaries--a-second-representation) |
 | `summary_weight` (16, `optional double`) | `RetrievalProfileProto` | BM25F weight of `meta.summary` while summaries are on, 0–10; unset = 2.0 |
 | `summary_mode` (10) | `EvalConfigProto` | Measure a mode with `RunEval`; empty = the profile's |
 | `summary_documents` (13), `summary_ratio` (14) | `CollectionProfile` | Sampled documents with a summary, and their share |
@@ -580,7 +580,7 @@ With `expand` and `format: "passages"`, a summary hit returns one passage per
 chunk it brought in. All of this is additive.
 
 Images (RAG-010) are additive fields; see
-[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189):
+[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures):
 
 | Field | Message | Meaning |
 |---|---|---|
@@ -608,7 +608,7 @@ too:
 Validation and masking are the REST code, so a rule is the same whichever
 surface wrote it. All of this is additive.
 
-### New in v2.18.8
+### Shared search options, indexing status and filter-based writes
 
 `GetIndexingStatus` reports queued work for a collection, or for the server
 when `collection` is empty (GO-042), as `GET /v1/indexing-status` does.
@@ -616,13 +616,10 @@ when `collection` is empty (GO-042), as `GET /v1/indexing-status` does.
 (10), the collection's default result grouping (SRCH-016), and `format` (11,
 AGT-002). `Document.revision` (9) and `UpdateDocumentRequest.expected_revision`
 (10) make updates conditional (INT-021): a stale revision is `ABORTED`.
-`CodeConfigProto.role` (2) marks reference collections (AGT-003). `Search` also
-finds documents again — its index walk cut document IDs wrongly.
+`CodeConfigProto.role` (2) marks reference collections (AGT-003).
 
 **The search RPCs run the shared search code.** `FTS`, `VectorSearch`,
-`HybridSearch` and `CrossSearch` used to be separate copies of the search,
-and every feature had to be added to them a third time. In 2.18.8 they call
-the code that REST and MCP use. They take the same options:
+`HybridSearch` and `CrossSearch` call the code that REST and MCP use. They take the same options:
 
 | Field | On | Meaning |
 |---|---|---|
@@ -653,9 +650,9 @@ The new RPCs `CodeSymbol`, `RunEval`, `AddEvalQuery`, `ListEvalQueries`,
 
 All of this is additive. Clients built against an older proto keep working.
 
-### New in v2.9.12
+### Per-query boost
 
-`FTSRequest` and `HybridSearchRequest` each gained a `map<string, double> boost` field (field number `8` on `FTSRequest`, `15` on `HybridSearchRequest`) for per-query metadata-based score boosting/demotion. Keys are in `"metaKey:metaValue"` form; positive values multiply matching documents' scores, negative values demote. Adding fields is backwards compatible — existing clients compiled against the pre-2.9.12 proto continue to work and simply omit the new field. See [SEARCH.md — Per-Query Boost/Demote](SEARCH.md) for semantics.
+`FTSRequest` and `HybridSearchRequest` each have a `map<string, double> boost` field (field number `8` on `FTSRequest`, `15` on `HybridSearchRequest`) for per-query metadata-based score boosting/demotion. Keys are in `"metaKey:metaValue"` form; positive values multiply matching documents' scores, negative values demote. Adding fields is backwards compatible — clients compiled against an older proto continue to work and simply omit the new field. See [SEARCH.md — Per-Query Boost/Demote](SEARCH.md) for semantics.
 
 ### Message Types
 
@@ -1155,7 +1152,7 @@ grpcurl -plaintext -d '{
 
 ## Curation RPCs
 
-Curation rules (v2.9.14+) let editors pin specific documents to fixed positions and hide others for a given query, overriding organic ranking. Rules are persisted in the `curation` bucket and applied in the FTS and HybridSearch post-processing stages. Implemented in `services/mddbd/grpc_curation.go`.
+Curation rules let editors pin specific documents to fixed positions and hide others for a given query, overriding organic ranking. Rules are persisted in the `curation` bucket and applied in the FTS and HybridSearch post-processing stages. Implemented in `services/mddbd/grpc_curation.go`.
 
 ### Message Types
 

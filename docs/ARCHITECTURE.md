@@ -66,7 +66,7 @@ mddb.db
 1. **`docs`** — latest document version. Key: `doc|{collection}|{docID}`. Value: protobuf-encoded `Doc` (compressed via the configured codec).
 2. **`idxmeta`** — metadata index for fast filter pre-pruning. Key: `meta|{collection}|{metaKey}|{metaValue}|{docID}`. Value: existence marker. Enables prefix scans.
 3. **`rev`** — revision history. Key: `rev|{collection}|{docID}|{timestamp}`. Value: encoded document snapshot, sorted by timestamp.
-4. **`bykey`** — key/lang → docID lookup. Key: `bykey|{collection}|{key}|{lang}`, with the key and language normalised as the docID is (ASCII letters in lower case; the collection as written), so any spelling of a key finds its document (v2.18.9, DOC-017).
+4. **`bykey`** — key/lang → docID lookup. Key: `bykey|{collection}|{key}|{lang}`, with the key and language normalised as the docID is (ASCII letters in lower case; the collection as written), so any spelling of a key finds its document.
 
 Every file also records its on-disk format in `schema_version`; the server migrates an older file before it reads or writes it — see [STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version).
 

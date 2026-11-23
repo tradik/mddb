@@ -72,10 +72,10 @@ curl -H "X-API-Key: mddb_live_..." \
 
 ## Create User with Limited Access
 
-Since v2.18.10 one gate checks every request before its handler runs
+One gate checks every request before its handler runs
 (SEC-019): a request needs the permission on **every collection it names**,
 and a request that names **no** collection needs it on `"*"`. The rules are in
-[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced-21810-sec-019).
+[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced).
 
 ```bash
 # Create user

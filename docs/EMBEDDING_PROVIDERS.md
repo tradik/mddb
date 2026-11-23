@@ -9,7 +9,7 @@ status: publish
 
 MDDB supports multiple embedding providers for vector search functionality. You can configure embeddings either through environment variables or via the Admin Panel UI.
 
-## Zero configuration: a local model is found automatically (v2.12.0+)
+## Zero configuration: a local model is found automatically
 
 If no embedding provider is configured, MDDB asks `localhost:11434` once at
 startup whether Ollama is running with an embedding model pulled. If one is,
@@ -176,7 +176,7 @@ export MDDB_EMBEDDING_MODEL=nomic-embed-text
 export MDDB_EMBEDDING_DIMENSIONS=768
 ```
 
-### 5. Lexical (no model, no network) — v2.18.9+
+### 5. Lexical (no model, no network)
 
 > **This provider does not understand meaning.** Its vectors are hashed
 > words and word fragments. Two texts are close when they share spelling:
@@ -222,7 +222,7 @@ The 20 questions of
 [`tools/bench/evalsets/docs.json`](https://github.com/tradik/mddb/blob/main/tools/bench/evalsets/docs.json)
 against the 60 pages of `docs/`, keyed by file name, measured 2026-10-29 on
 a server built from this release. The method is the one in
-[BENCHMARK.md](BENCHMARK.md#retrieval-quality-on-the-mddb-docs-v2188); hybrid
+[BENCHMARK.md](BENCHMARK.md#retrieval-quality-on-the-mddb-docs); hybrid
 is the default fusion (alpha 0.5).
 
 ```bash
@@ -272,9 +272,9 @@ change: the vectors are not comparable, so re-embed every collection with
 
 ---
 
-## Images (v2.18.9+)
+## Images
 
-Image documents (see [SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189))
+Image documents (see [SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures))
 are always found by their alt text and captions. Their pictures are embedded
 only by a provider whose API takes images, into the same space as text
 embedded by the same model, so a text query can find a picture with no
@@ -351,7 +351,7 @@ If you're using environment variables and want to migrate to database config:
 
 ## Comparison Matrix
 
-| Provider | Cost | Quality | Speed | Multilingual | Local | API Key Required | Images (v2.18.9+) |
+| Provider | Cost | Quality | Speed | Multilingual | Local | API Key Required | Images |
 |----------|------|---------|-------|--------------|-------|------------------|-------------------|
 | **OpenAI** | $$ | Excellent | Fast | Good | No | Yes | No |
 | **Cohere** | $$ | Excellent | Fast | **Best** | No | Yes | Yes (v3+) |
@@ -522,7 +522,7 @@ If you're using environment variables and want to migrate to database config:
 }
 ```
 
-### Where `apiUrl` may point (v2.12.0+)
+### Where `apiUrl` may point
 
 `apiUrl` is the one field that reaches the network without going through the
 server's SSRF guard — because `localhost` is precisely what that guard refuses,

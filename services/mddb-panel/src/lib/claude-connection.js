@@ -23,7 +23,7 @@ export const KEY_PLACEHOLDER = 'mcp_…';
 export const KEY_HEADER = 'X-API-Key';
 
 /** MCP_DOCS is the server-side setup of custom connectors (OAuth). */
-export const MCP_DOCS = 'https://github.com/tradik/mddb/blob/main/docs/MCP.md#oauth-21-for-claudeai-connectors-v2181';
+export const MCP_DOCS = 'https://github.com/tradik/mddb/blob/main/docs/MCP.md#oauth-21-for-claudeai-connectors';
 
 // Characters a shell treats specially: inside double quotes (", $, `, \, !)
 // or anywhere in a bare word (also whitespace, quotes, globs, ;, |, &, …).
