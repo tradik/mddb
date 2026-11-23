@@ -164,7 +164,7 @@ stdio with `MDDB_MCP_STDIO=true`, run with `--network host` and a volume on
 [Connect to Claude / Cursor / Windsurf (MCP)](https://github.com/tradik/mddb#connect-to-claude--cursor--windsurf-mcp)
 snippet, so a host that reads the registry and a user who pastes the snippet
 start the same server. The description is the one-liner from
-[LISTING.md](LISTING.md), which every catalogue uses.
+[LISTING.md](https://github.com/tradik/mddb/blob/main/docs/LISTING.md), which every catalogue uses.
 
 **Installing from the registry.** A host or a client that browses the registry
 (and the aggregators that copy it hourly: Glama, PulseMCP, mcp.so, the

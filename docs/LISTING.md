@@ -2,7 +2,7 @@
 title: "Catalogue Listing Text"
 slug: "docs/listing"
 description: "The one description of MDDB for the MCP Registry, Docker Hub, GitHub and the MCP directories: one-liner, long text, categories, proof and the submissions log."
-status: publish
+status: draft
 ---
 
 # Catalogue Listing Text
